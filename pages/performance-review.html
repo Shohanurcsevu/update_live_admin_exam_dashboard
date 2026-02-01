@@ -1,0 +1,61 @@
+<!-- <div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+<div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b pb-4">
+        <div>
+            <h2 id="review-exam-title" class="text-2xl font-bold text-gray-800">Exam Review</h2>
+            <p id="review-breadcrumb" class="text-sm text-gray-500"></p>
+        </div>
+        <button id="back-to-performance-btn" class="mt-4 sm:mt-0 w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow">
+            <span class="material-symbols-outlined mr-2">arrow_back</span>
+            Back to List
+        </button>
+    </div>
+    <!-- Summary Cards -->
+    <!-- <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <div class="bg-blue-100 text-blue-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Final Score</h4><p id="review-final-score" class="text-2xl font-bold"></p></div>
+        <div class="bg-green-100 text-green-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Correct</h4><p id="review-correct" class="text-2xl font-bold"></p></div>
+        <div class="bg-red-100 text-red-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Wrong</h4><p id="review-wrong" class="text-2xl font-bold"></p></div>
+        <div class="bg-gray-100 text-gray-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Unanswered</h4><p id="review-unanswered" class="text-2xl font-bold"></p></div>
+        <div class="bg-purple-100 text-purple-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Time Used</h4><p id="review-time-used" class="text-2xl font-bold"></p></div>
+    </div> -->
+    <!-- Questions Breakdown -->
+    <!-- <div id="review-questions-container" class="space-y-4"> -->
+        <!-- Question cards will be dynamically inserted here -->
+    <!-- </div>
+</div> -->
+
+<div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+<div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b pb-4">
+        <div>
+            <h2 id="review-exam-title" class="text-2xl font-bold text-gray-800">Exam Review</h2>
+            <p id="review-breadcrumb" class="text-sm text-gray-500"></p>
+        </div>
+        <button id="back-to-performance-btn" class="mt-4 sm:mt-0 w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow">
+            <span class="material-symbols-outlined mr-2">arrow_back</span>
+            Back to List
+        </button>
+    </div>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <div class="bg-blue-100 text-blue-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Final Score</h4><p id="review-final-score" class="text-2xl font-bold"></p></div>
+        <div class="bg-green-100 text-green-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Correct</h4><p id="review-correct" class="text-2xl font-bold"></p></div>
+        <div class="bg-red-100 text-red-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Wrong</h4><p id="review-wrong" class="text-2xl font-bold"></p></div>
+        <div class="bg-gray-100 text-gray-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Unanswered</h4><p id="review-unanswered" class="text-2xl font-bold"></p></div>
+        <div class="bg-purple-100 text-purple-800 p-4 rounded-lg text-center"><h4 class="font-semibold text-sm">Time Used</h4><p id="review-time-used" class="text-2xl font-bold"></p></div>
+    </div>
+
+    <!-- NEW: Filter Buttons -->
+    <div class="my-6 flex flex-wrap gap-2" id="review-filter-buttons">
+        <button class="filter-btn bg-blue-600 text-white px-4 py-2 text-sm font-semibold rounded-md shadow" data-filter="all">All</button>
+        <button class="filter-btn bg-white text-gray-700 px-4 py-2 text-sm font-semibold rounded-md border hover:bg-gray-100" data-filter="correct">Correct</button>
+        <button class="filter-btn bg-white text-gray-700 px-4 py-2 text-sm font-semibold rounded-md border hover:bg-gray-100" data-filter="wrong">Wrong</button>
+        <button class="filter-btn bg-white text-gray-700 px-4 py-2 text-sm font-semibold rounded-md border hover:bg-gray-100" data-filter="unanswered">Unanswered</button>
+        <button class="filter-btn bg-white text-gray-700 px-4 py-2 text-sm font-semibold rounded-md border hover:bg-gray-100" data-filter="attempted">Attempted</button>
+    </div>
+
+    <!-- Questions Breakdown -->
+    <div id="review-questions-container" class="space-y-4">
+        <!-- Question cards will be dynamically inserted here -->
+    </div>
+</div>

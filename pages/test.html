@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test Subjects</title>
+</head>
+<body>
+  <select id="subject-filter"></select>
+
+  <script>
+    const SUBJECT_API_URL = '/admin-dashboard/api/exam/subjects.php';
+
+    const subjectFilter = document.getElementById('subject-filter');
+
+    async function populateSubjects() {
+      try {
+        const response = await fetch(SUBJECT_API_URL);
+        const result = await response.json();
+        console.log(result);
+        if (result.success && result.data.length) {
+          subjectFilter.innerHTML = '<option value="0">Select Subject</option>';
+          result.data.forEach(subject => {
+            subjectFilter.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load subjects:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      populateSubjects();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<div class="p-4 sm:p-6 space-y-6">
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+
+    <!-- Header -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Exams Across Subjects</h2>
+        <p class="text-gray-600">Create a custom exam by selecting questions from multiple exams across different
+            subjects, lessons, and topics.</p>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md overflow-x-auto">
+        <!-- Desktop: Horizontal Layout -->
+        <div class="hidden sm:flex items-center justify-between">
+            <div class="flex items-center space-x-2 md:space-x-4">
+                <div id="step-1-indicator" class="flex items-center">
+                    <div
+                        class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm md:text-base">
+                        1</div>
+                    <span class="ml-2 font-semibold text-gray-800 text-sm md:text-base">Select Questions</span>
+                </div>
+                <div class="w-8 md:w-16 h-1 bg-gray-300"></div>
+                <div id="step-2-indicator" class="flex items-center opacity-50">
+                    <div
+                        class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold text-sm md:text-base">
+                        2</div>
+                    <span class="ml-2 font-semibold text-gray-500 text-sm md:text-base">Configure Exam</span>
+                </div>
+                <div class="w-8 md:w-16 h-1 bg-gray-300"></div>
+                <div id="step-3-indicator" class="flex items-center opacity-50">
+                    <div
+                        class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold text-sm md:text-base">
+                        3</div>
+                    <span class="ml-2 font-semibold text-gray-500 text-sm md:text-base">Generate</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile: Compact Horizontal Layout -->
+        <div class="flex sm:hidden items-center justify-center space-x-2">
+            <div id="step-1-indicator-mobile" class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">1
+                </div>
+                <span class="mt-1 text-xs font-semibold text-gray-800">Select</span>
+            </div>
+            <div class="w-8 h-1 bg-gray-300"></div>
+            <div id="step-2-indicator-mobile" class="flex flex-col items-center opacity-50">
+                <div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold">2
+                </div>
+                <span class="mt-1 text-xs font-semibold text-gray-500">Configure</span>
+            </div>
+            <div class="w-8 h-1 bg-gray-300"></div>
+            <div id="step-3-indicator-mobile" class="flex flex-col items-center opacity-50">
+                <div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold">3
+                </div>
+                <span class="mt-1 text-xs font-semibold text-gray-500">Generate</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 1: Select Questions -->
+    <div id="step-1-content" class="bg-white p-6 rounded-lg shadow-md">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Step 1: Select Questions from Exams</h3>
+        <p class="text-gray-600 mb-4">Expand subjects, lessons, and topics to view exams. Select exams (checkbox) and
+            specify how many questions to randomly select from each.</p>
+
+        <!-- Loading State -->
+        <div id="hierarchy-loading" class="text-center py-8">
+            <span class="material-symbols-outlined animate-spin text-4xl text-blue-600">sync</span>
+            <p class="text-gray-500 mt-2">Loading exams...</p>
+        </div>
+
+        <!-- Hierarchical Tree -->
+        <div id="hierarchy-tree" class="hidden space-y-2"></div>
+
+        <!-- Selected Summary -->
+        <div id="selection-summary" class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-600 hidden">
+            <h4 class="font-bold text-gray-800 mb-2">Selection Summary</h4>
+            <p class="text-gray-700">Total Questions Selected: <span id="total-selected"
+                    class="font-bold text-blue-600">0</span></p>
+            <div id="selected-exams-list" class="mt-2 text-sm text-gray-600"></div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-6 flex justify-end">
+            <button id="next-to-step-2"
+                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 sm:py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                disabled>
+                <span class="hidden sm:inline">Next: Configure Exam</span>
+                <span class="sm:hidden">Next Step</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 2: Configure Exam -->
+    <div id="step-2-content" class="bg-white p-6 rounded-lg shadow-md hidden">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Step 2: Configure Exam Details</h3>
+
+        <form id="exam-config-form" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Exam Name *</label>
+                    <input type="text" id="exam-name" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="e.g., Combined Model Test">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Duration (minutes) -
+                        Auto-calculated</label>
+                    <input type="number" id="exam-duration" readonly
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Total Marks - Auto-calculated</label>
+                    <input type="number" id="exam-marks" readonly
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Negative Marking</label>
+                    <input type="number" id="exam-negative" step="0.01" value="0.5"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Total Questions (Read-only)</label>
+                <input type="number" id="exam-total-questions" readonly
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed">
+            </div>
+        </form>
+
+        <!-- Navigation -->
+        <div class="mt-6 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between">
+            <button id="back-to-step-1"
+                class="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 sm:py-2 px-6 rounded-lg text-sm sm:text-base">
+                Back
+            </button>
+            <button id="next-to-step-3"
+                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 sm:py-2 px-6 rounded-lg text-sm sm:text-base">
+                <span class="hidden sm:inline">Next: Review & Generate</span>
+                <span class="sm:hidden">Next Step</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 3: Generate Exam -->
+    <div id="step-3-content" class="bg-white p-6 rounded-lg shadow-md hidden">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Step 3: Review & Generate Exam</h3>
+
+        <div class="space-y-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h4 class="font-bold text-gray-800 mb-2">Exam Details</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                    <div class="break-words"><span class="font-semibold">Name:</span> <span id="review-name"></span>
+                    </div>
+                    <div><span class="font-semibold">Duration:</span> <span id="review-duration"></span> minutes</div>
+                    <div><span class="font-semibold">Total Marks:</span> <span id="review-marks"></span></div>
+                    <div><span class="font-semibold">Total Questions:</span> <span id="review-questions"></span></div>
+                    <div class="sm:col-span-2"><span class="font-semibold">Negative Marking:</span> <span
+                            id="review-negative"></span></div>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h4 class="font-bold text-gray-800 mb-2">Selected Exams</h4>
+                <div id="review-exams-list" class="text-sm space-y-1"></div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-6 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between">
+            <button id="back-to-step-2"
+                class="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 sm:py-2 px-6 rounded-lg text-sm sm:text-base">
+                Back
+            </button>
+            <button id="generate-exam-btn"
+                class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 sm:py-2 px-6 rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base">
+                <span class="material-symbols-outlined text-lg sm:text-xl">check_circle</span>
+                Generate Exam
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hierarchy-item {
+        border-left: 2px solid #e5e7eb;
+        padding-left: 1rem;
+        margin-left: 0.5rem;
+    }
+
+    .hierarchy-header {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem;
+        cursor: pointer;
+        border-radius: 0.375rem;
+        transition: background-color 0.2s;
+    }
+
+    .hierarchy-header:hover {
+        background-color: #f3f4f6;
+    }
+
+    .expand-icon {
+        transition: transform 0.2s;
+    }
+
+    .expand-icon.expanded {
+        transform: rotate(90deg);
+    }
+
+    .exam-input {
+        width: 80px;
+    }
+</style>

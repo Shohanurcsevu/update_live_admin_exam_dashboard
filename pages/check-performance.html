@@ -1,0 +1,26 @@
+<div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+<div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+    <div class="mb-4">
+        <h2 class="text-2xl font-bold text-gray-800">Check Performance</h2>
+        <p class="text-gray-500">Filter and review past exam attempts.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 border rounded-lg bg-gray-50">
+        <div><label for="subject-filter" class="block text-sm font-medium text-gray-700">Subject</label><select id="subject-filter" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"></select></div>
+        <div><label for="lesson-filter" class="block text-sm font-medium text-gray-700">Lesson</label><select id="lesson-filter" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm" disabled></select></div>
+        <div><label for="topic-filter" class="block text-sm font-medium text-gray-700">Topic</label><select id="topic-filter" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm" disabled></select></div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white">
+            <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                <tr>
+                    <th class="py-3 px-6 text-left">Exam Title</th>
+                    <th class="py-3 px-6 text-left">Attempt Date</th>
+                    <th class="py-3 px-6 text-center">Score</th>
+                    <th class="py-3 px-6 text-center">Total Marks</th>
+                    <th class="py-3 px-6 text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody id="attempts-table-body" class="text-gray-600 text-sm font-light"></tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,32 @@
+/* Use the Inter font loaded from Google Fonts */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* MODIFIED: Updated scrollbar to match dashboard dark theme */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent; /* Make track invisible */
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4b5563; /* Tailwind gray-600 */
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #374151; /* Tailwind gray-700 */
+}
+
+/* Style for the Google Icons */
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 24
+}

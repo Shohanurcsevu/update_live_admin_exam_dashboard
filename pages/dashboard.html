@@ -1,0 +1,555 @@
+<div class="p-4 sm:p-6 space-y-8">
+    <div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+    <!-- Section 1: Dashboard Overview -->
+    <div>
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Dashboard Overview</h2>
+            <p class="text-gray-500">A quick summary of your application's data.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                        <span class="material-symbols-outlined text-white">subject</span>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <p class="text-sm font-medium text-gray-500 truncate">Total Subjects</p>
+                        <p id="total-subjects" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+                        <span class="material-symbols-outlined text-white">library_books</span>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <p class="text-sm font-medium text-gray-500 truncate">Total Lessons</p>
+                        <p id="total-lessons" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-yellow-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+                        <span class="material-symbols-outlined text-white">topic</span>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <p class="text-sm font-medium text-gray-500 truncate">Total Topics</p>
+                        <p id="total-topics" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-purple-500 rounded-md p-3">
+                        <span class="material-symbols-outlined text-white">quiz</span>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <p class="text-sm font-medium text-gray-500 truncate">Total Exams</p>
+                        <p id="total-exams" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-red-500 rounded-md p-3">
+                        <span class="material-symbols-outlined text-white">help_center</span>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <p class="text-sm font-medium text-gray-500 truncate">Total Questions</p>
+                        <p id="total-questions" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr />
+
+    <!-- Section 2: Select Exam -->
+    <div>
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Select an Exam</h2>
+            <p class="text-gray-500">Filter and choose an exam to start.</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 border rounded-lg bg-gray-50">
+            <div>
+                <label for="exam-subject-filter" class="block text-sm font-medium text-gray-700">Subject</label>
+                <select id="exam-subject-filter"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"></select>
+            </div>
+            <div>
+                <label for="exam-lesson-filter" class="block text-sm font-medium text-gray-700">Lesson</label>
+                <select id="exam-lesson-filter"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"
+                    disabled></select>
+            </div>
+            <div>
+                <label for="exam-topic-filter" class="block text-sm font-medium text-gray-700">Topic</label>
+                <select id="exam-topic-filter"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"
+                    disabled></select>
+            </div>
+        </div>
+
+        <!-- Exam Cards Grid (Responsive Fix Applied Here) -->
+        <!-- Scrollable container -->
+        <div class="max-h-[600px] overflow-y-auto border rounded-md p-4 bg-gray-50">
+            <div id="exam-cards-container">
+                <!-- Cards injected here -->
+            </div>
+        </div>
+
+        <style>
+            #exam-cards-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1.5rem;
+            }
+
+            @media (max-width: 639px) {
+                #exam-cards-container {
+                    gap: 0.35rem;
+                    /* Smaller gap on mobile */
+                }
+            }
+
+            #exam-cards-container>div {
+                flex: 1 1 100%;
+                max-width: 100%;
+                box-sizing: border-box;
+
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                min-height: 10px;
+                background: white;
+                padding: 1.25rem;
+                border-radius: 0.5rem;
+                box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+                transition: box-shadow 0.3s ease;
+            }
+
+            #exam-cards-container>div:hover {
+                box-shadow: 0 4px 10px rgb(0 0 0 / 0.15);
+            }
+
+            @media (min-width: 640px) {
+                #exam-cards-container>div {
+                    flex: 1 1 calc(50% - 1.5rem);
+                    max-width: calc(50% - 1.5rem);
+                }
+            }
+
+            @media (min-width: 1024px) {
+                #exam-cards-container>div {
+                    flex: 1 1 calc(33.333% - 1.5rem);
+                    max-width: calc(33.333% - 1.5rem);
+                }
+            }
+        </style>
+
+    </div>
+
+    <!-- PRINT OPTIONS MODAL -->
+    <div id="print-options-modal"
+        class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-blue-600 p-4 flex justify-between items-center text-white">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined">print_connect</span>
+                    Print Configuration
+                </h3>
+                <button type="button" id="close-print-modal"
+                    class="hover:bg-blue-700 rounded-full p-1 transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="p-6 max-h-[85vh] overflow-y-auto">
+                <!-- Exam ID Info -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-6 flex items-center justify-between">
+                    <span class="text-blue-700 font-medium">Selected Exam ID: <span id="modal-exam-id"
+                            class="font-bold"></span></span>
+                </div>
+
+                <!-- Presets Section -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Quick Presets</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="applyExamPreset('BCS')"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">BCS
+                            Model Test</button>
+                        <button type="button" onclick="applyExamPreset('Primary')"
+                            class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Primary
+                            Teacher</button>
+                        <button type="button" onclick="applyExamPreset('Bank')"
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Bank
+                            Preliminary</button>
+                        <button type="button" onclick="applyExamPreset('Clear')"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Clear
+                            All</button>
+                    </div>
+                </div>
+
+                <!-- Fields Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Exam Title</label>
+                        <input type="text" id="print-custom-title"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Default: প্রিলিমিনারি টেস্ট">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Year</label>
+                        <input type="text" id="print-custom-year"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Default: 2026">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Time</label>
+                        <input type="text" id="print-custom-time"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Default from JSON">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Full Marks</label>
+                        <input type="text" id="print-custom-marks"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Default from JSON">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Start Question Number</label>
+                        <input type="number" id="print-start-num"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Default: 1" min="1">
+                    </div>
+                    <div class="flex items-center pt-6">
+                        <label class="flex items-center gap-2 cursor-pointer font-semibold text-gray-700">
+                            <input type="checkbox" id="print-shuffle-options" checked
+                                class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            Shuffle Options (ক, খ, গ, ঘ)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Custom Instructions (One per
+                        line)</label>
+                    <textarea id="print-custom-instructions" rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="Default instructions will be used if left blank"></textarea>
+                </div>
+
+                <!-- Progress / Actions -->
+                <div class="flex flex-col gap-4">
+                    <button type="button" id="generate-pdf-btn"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95">
+                        <span class="material-symbols-outlined">picture_as_pdf</span>
+                        Generate PDF Questions
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRINT ENGINE STYLES (Screen Hidden) -->
+    <style>
+        #print-container {
+            display: none;
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            body * {
+                visibility: hidden;
+            }
+
+            #print-container,
+            #print-container * {
+                visibility: visible;
+            }
+
+            #print-container {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background-color: white;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            .page-content-wrapper {
+                padding: 25mm 20mm;
+                box-sizing: border-box;
+                width: 210mm;
+                min-height: 297mm;
+                overflow: visible;
+            }
+
+            .exam-text {
+                font-family: 'Kalpurush', 'Nirmala UI', sans-serif;
+                color: #000;
+            }
+
+            .cover-page {
+                position: relative;
+                height: 297mm;
+                width: 210mm;
+                box-sizing: border-box;
+            }
+
+            .cover-page+.page-content-wrapper {
+                break-before: page;
+                page-break-before: always;
+            }
+
+            .set-info-top {
+                position: absolute;
+                top: 30mm;
+                left: 0;
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+                padding: 0 25mm;
+                font-weight: bold;
+                font-size: 12pt;
+            }
+
+            .set-info-top .set-number {
+                text-align: left;
+            }
+
+            .set-info-top .code-name {
+                text-align: right;
+            }
+
+            .exam-title-block {
+                position: absolute;
+                top: 80mm;
+                left: 0;
+                width: 100%;
+                text-align: center;
+            }
+
+            .exam-title-block h1 {
+                font-size: 24pt;
+                color: #000;
+                margin: 0 0 5mm 0;
+            }
+
+            .exam-year {
+                font-size: 18pt;
+                font-weight: bold;
+                margin: 0;
+            }
+
+            .exam-meta {
+                position: absolute;
+                top: 140mm;
+                left: 0;
+                width: 100%;
+                text-align: center;
+                font-size: 14pt;
+                font-weight: bold;
+                margin: 0;
+            }
+
+            .instructions {
+                position: absolute;
+                top: 175mm;
+                left: 25mm;
+                right: 25mm;
+                text-align: center;
+                font-size: 10pt;
+            }
+
+            .instructions-divider {
+                position: absolute;
+                top: 230mm;
+                left: 25mm;
+                right: 25mm;
+                height: 1pt;
+                background-color: #000;
+            }
+
+            .instruction-note {
+                position: absolute;
+                top: 245mm;
+                left: 25mm;
+                right: 25mm;
+                text-align: center;
+                font-size: 11pt;
+                margin: 0;
+            }
+
+            .questions-header {
+                display: flex;
+                justify-content: space-between;
+                font-weight: bold;
+                margin-bottom: 1rem;
+                border-bottom: 1px solid #000;
+                padding-bottom: 0.5rem;
+            }
+
+            .question-columns {
+                column-count: 2;
+                column-gap: 10mm;
+                widows: 2;
+                orphans: 2;
+            }
+
+            .question-item {
+                break-inside: avoid;
+                -webkit-column-break-inside: avoid;
+                page-break-inside: avoid;
+                display: inline-block;
+                width: 100%;
+                margin-bottom: 1rem;
+                text-align: justify;
+                font-size: 0.95rem;
+            }
+
+            .q-text {
+                font-weight: bold;
+                display: block;
+                margin-bottom: 0.3rem;
+            }
+
+            .q-options {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .q-options.horizontal {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: center;
+            }
+
+            .q-options.vertical {
+                flex-direction: column;
+            }
+
+            .q-opt {
+                display: flex;
+                gap: 0.4rem;
+                align-items: baseline;
+            }
+
+            .answer-key-section {
+                break-before: page;
+                margin-top: 2rem;
+            }
+
+            .answer-header {
+                text-align: center;
+                font-size: 1.5rem;
+                font-weight: bold;
+                margin-bottom: 1.5rem;
+            }
+
+            .answer-grid {
+                column-count: 5;
+                column-gap: 1rem;
+                font-size: 0.9rem;
+            }
+
+            .answer-item {
+                break-inside: avoid;
+                margin-bottom: 0.2rem;
+            }
+
+            .omr-section {
+                break-before: page;
+                margin-top: 0;
+            }
+
+            .omr-header {
+                text-align: center;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+                margin-bottom: 20px;
+            }
+
+            .omr-grid-container {
+                column-count: 4;
+                column-gap: 15px;
+                width: 100%;
+            }
+
+            .omr-row {
+                break-inside: avoid;
+                display: flex;
+                align-items: center;
+                margin-bottom: 8px;
+                gap: 8px;
+                font-family: sans-serif;
+            }
+
+            .omr-q-num {
+                width: 30px;
+                text-align: right;
+                font-weight: bold;
+                font-family: 'Kalpurush', sans-serif;
+            }
+
+            .omr-bubbles {
+                display: flex;
+                gap: 8px;
+            }
+
+            .omr-bubble {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                border: 1px solid #000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                color: #444;
+            }
+        }
+    </style>
+
+    <!-- PRINT CONTAINER -->
+    <div id="print-container"></div>
+</div>
+<div id="delete-exam-confirm-modal"
+    class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto p-6">
+        <div class="flex flex-col items-center text-center">
+            <div class="bg-red-100 p-3 rounded-full">
+                <span class="material-symbols-outlined text-4xl text-red-600">warning</span>
+            </div>
+            <h3 class="text-xl font-semibold mt-4 text-gray-800">Delete Exam</h3>
+            <p class="text-gray-600 mt-2">Are you sure you want to delete this exam and all of its questions? This
+                action cannot be undone.</p>
+        </div>
+        <div class="flex justify-center mt-6 space-x-4">
+            <button type="button" id="cancel-delete-btn"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg">Cancel</button>
+            <button type="button" id="confirm-delete-btn"
+                class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Delete</button>
+        </div>
+    </div>
+</div>

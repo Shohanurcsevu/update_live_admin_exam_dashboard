@@ -1,0 +1,35 @@
+<!-- Header -->
+<header class="bg-white shadow-md p-4 flex justify-between items-center">
+    <!-- Sidebar Toggle Button for Mobile -->
+    <button id="sidebar-toggle" class="text-gray-600 hover:text-gray-800 md:hidden">
+        <span class="material-symbols-outlined">menu</span>
+    </button>
+    
+    <h1 class="text-xl font-semibold text-gray-800">Dashboard</h1>
+    
+    <!-- User Profile Section -->
+    <div class="flex items-center space-x-4">
+        <!-- MODIFIED: Notification Bell with Dropdown -->
+        <div class="relative">
+            <button id="notification-btn" class="relative text-gray-600 hover:text-gray-800">
+                <span class="material-symbols-outlined">notifications</span>
+                <!-- Optional: Add a dot for new notifications -->
+                <span id="notification-dot" class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-600 hidden"></span>
+            </button>
+            <!-- Dropdown Panel -->
+            <div id="notification-panel" class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl overflow-hidden z-20 hidden">
+                <div class="py-2 px-4 text-sm font-semibold text-gray-700 border-b">
+                    Recent Activity
+                </div>
+                <div id="notification-list" class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                    <!-- Notifications will be injected here by JavaScript -->
+                    <p class="p-4 text-sm text-gray-500">No recent activity.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="relative">
+            <img class="w-10 h-10 rounded-full cursor-pointer" src="https://placehold.co/40x40/E2E8F0/4A5568?text=A" alt="Admin Profile">
+        </div>
+    </div>
+</header>

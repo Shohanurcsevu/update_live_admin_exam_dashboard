@@ -1,0 +1,72 @@
+<div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+<!-- MODIFIED: Removed the mobile-specific bottom padding (pb-24) as we are using a spacer div instead -->
+<div id="exam-container" class="bg-white p-2 sm:p-6 rounded-lg shadow-md sm:pb-6">
+    <!-- Header -->
+    <div class="border-b pb-4 mb-4">
+        <h2 id="exam-title" class="text-2xl font-bold text-gray-800">Loading Exam...</h2>
+        <p id="exam-breadcrumb" class="text-sm text-gray-500 break-words"></p>
+        <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-700">
+            <span class="flex items-center"><span class="material-symbols-outlined text-base mr-1">timer</span>Duration: <strong id="exam-duration" class="ml-1">0 mins</strong></span>
+            <span class="flex items-center"><span class="material-symbols-outlined text-base mr-1">help</span>Questions: <strong id="exam-total-questions" class="ml-1">0</strong></span>
+            <span class="flex items-center"><span class="material-symbols-outlined text-base mr-1">military_tech</span>Total Marks: <strong id="exam-total-marks" class="ml-1">0</strong></span>
+            <span class="flex items-center"><span class="material-symbols-outlined text-base mr-1">verified</span>Pass Marks: <strong id="exam-pass-mark" class="ml-1">0</strong></span>
+        </div>
+    </div>
+
+    <!-- Timer and Instructions -->
+    <div class="flex flex-col sm:flex-row justify-between items-center p-4 rounded-lg bg-blue-50 border border-blue-200 mb-6 gap-4">
+        <div class="prose prose-sm max-w-none text-gray-600 w-full min-w-0">
+            <h4 class="font-semibold">Instructions:</h4>
+            <p id="exam-instructions" class="break-words"></p>
+        </div>
+        <div id="timer-box" class="sm:ml-6 text-center flex-shrink-0">
+            <div class="text-lg font-bold text-red-600">Time Left</div>
+            <div id="timer" class="text-3xl font-mono tracking-widest bg-red-600 text-white rounded-lg px-4 py-2">00:00</div>
+        </div>
+    </div>
+
+    <!-- Questions Area -->
+    <div id="questions-area" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Questions will be rendered here -->
+    </div>
+    
+    <!-- NEW: Spacer DIV for mobile view. This pushes content up so it's not hidden by the sticky footer. -->
+    <div class="h-24 sm:hidden"></div>
+
+    <!-- Submission Footer -->
+    <div class="fixed bottom-0 left-0 right-0 w-full bg-white p-4 border-t border-gray-200 shadow-[0_-2px_5px_rgba(0,0,0,0.05)] sm:relative sm:bg-transparent sm:p-0 sm:mt-8 sm:border-0 sm:shadow-none flex justify-center sm:justify-end">
+        <button id="submit-exam-btn" class="w-full max-w-xs sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg flex items-center justify-center shadow-lg">
+            <span class="material-symbols-outlined mr-2">check_circle</span>
+            Submit Exam
+        </button>
+    </div>
+</div>
+
+<!-- Exam Result Modal -->
+<div id="result-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto">
+        <div class="p-6 text-center">
+            <span class="material-symbols-outlined text-6xl text-green-500">task_alt</span>
+            <h3 class="text-2xl font-bold mt-4 text-gray-800">Exam Submitted!</h3>
+            <p class="text-gray-500 text-sm">Here is your performance summary.</p>
+        </div>
+        <div class="p-6 border-t border-b bg-gray-50 space-y-3">
+            <div class="flex justify-between text-sm"><span class="text-gray-600">Exam Title:</span><strong id="result-exam-title" class="text-gray-800"></strong></div>
+            <div class="flex justify-between text-sm"><span class="text-gray-600">Attempt Time:</span><strong id="result-attempt-time" class="text-gray-800"></strong></div>
+            <hr>
+            <div class="flex justify-between text-sm"><span class="text-gray-600">Total Questions:</span><strong id="result-total-questions" class="text-gray-800"></strong></div>
+            <div class="flex justify-between text-sm"><span class="text-gray-600 text-green-600">Correct Answers:</span><strong id="result-correct" class="text-green-600"></strong></div>
+            <div class="flex justify-between text-sm"><span class="text-gray-600 text-red-600">Wrong Answers:</span><strong id="result-wrong" class="text-red-600"></strong></div>
+            <div class="flex justify-between text-sm"><span class="text-gray-600">Unanswered:</span><strong id="result-unanswered" class="text-gray-800"></strong></div>
+            <hr>
+            <div class="flex justify-between text-sm"><span class="text-gray-600">Score (without negative):</span><strong id="result-score" class="text-gray-800"></strong></div>
+            <div class="flex justify-between font-bold"><span class="text-gray-600">Final Score:</span><strong id="result-final-score" class="text-blue-600"></strong></div>
+             <hr>
+            <div class="flex justify-between text-xs"><span class="text-gray-500">Time Used:</span><strong id="result-time-used" class="text-gray-700"></strong></div>
+            <div class="flex justify-between text-xs"><span class="text-gray-500">Time Left:</span><strong id="result-time-left" class="text-gray-700"></strong></div>
+        </div>
+        <div class="p-4 flex justify-end">
+             <button id="close-result-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Text Extractor & MCQ Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles for Inter font */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Basic styling for the loading spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6; /* Blue-500 */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: hidden; /* Important for cropper */
+            display: flex;
+            flex-direction: column;
+        }
+        .img-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-height: calc(100vh - 150px); /* Adjusted height as controls are removed */
+            overflow: hidden; /* Crucial for Cropper.js */
+            margin-bottom: 20px;
+        }
+        .img-container img {
+            max-width: 100%;
+            max-height: 100%;
+            display: block; /* Important for Cropper.js */
+        }
+
+        /* Styling for the output div to mimic textarea and render markdown/preserve whitespace */
+        .output-display {
+            min-height: 10rem; /* Same as rows="10" for textarea */
+            padding: 1rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.375rem; /* rounded-md */
+            background-color: #f9fafb; /* gray-50 */
+            color: #1f2937; /* gray-800 */
+            overflow-y: auto; /* Scroll for long content */
+            white-space: pre-wrap; /* Preserve whitespace and wrap lines */
+            word-break: break-word; /* Break long words */
+            /* Add some transition for smoother rendering if content changes */
+            transition: all 0.3s ease-in-out;
+            /* Add styling to indicate editability */
+            cursor: text;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+        }
+        .output-display:focus {
+            outline: none;
+            border-color: #3b82f6; /* blue-500 */
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); /* blue-500 with opacity */
+        }
+
+        /* Enhanced table styling for Markdown rendered tables */
+        .output-display table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1em;
+            border-radius: 0.5rem; /* Rounded corners for the table */
+            overflow: hidden; /* Ensures rounded corners are applied to content */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        }
+        .output-display th, .output-display td {
+            border: 1px solid #e2e8f0; /* Softer border color (gray-200) */
+            padding: 0.75em 1em; /* Increased padding */
+            text-align: left;
+        }
+        .output-display th {
+            background-color: #4f46e5; /* Deeper indigo for header (indigo-600) */
+            color: #ffffff; /* White text for header */
+            font-weight: 600; /* Semi-bold font */
+            text-transform: uppercase; /* Uppercase header text */
+            letter-spacing: 0.05em; /* Slight letter spacing */
+        }
+        /* Alternating row colors */
+        .output-display tbody tr:nth-child(even) {
+            background-color: #f0f4f8; /* Light gray for even rows */
+        }
+        /* Hover effect for rows */
+        .output-display tbody tr:hover {
+            background-color: #e2e8f0; /* Lighter gray on hover */
+            transition: background-color 0.2s ease-in-out;
+        }
+        /* Responsive table behavior */
+        .output-display .table-wrapper {
+            overflow-x: auto; /* Allows horizontal scrolling for large tables */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            border-radius: 0.5rem; /* Match table border-radius */
+        }
+        /* Style for the H3 headers in the output */
+        .output-display h3 {
+            font-size: 1.5rem; /* Tailwind text-2xl */
+            font-weight: 700; /* Tailwind font-bold */
+            color: #374151; /* Tailwind gray-700 */
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e5e7eb; /* Subtle separator */
+            padding-bottom: 0.5rem;
+        }
+
+        /* Styling for the JSON output area */
+        .json-output-display {
+            min-height: 10rem;
+            padding: 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            background-color: #f9fafb;
+            color: #1f2937;
+            overflow-y: auto;
+            white-space: pre-wrap; /* Preserve whitespace for prettified JSON */
+            word-break: break-all; /* Break long JSON lines */
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Monospace font for code */
+            font-size: 0.875rem; /* text-sm */
+        }
+
+        /* Styles for individual MCQ cards */
+        .mcq-card {
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            cursor: grab; /* Indicate draggable */
+        }
+        .mcq-card.dragging {
+            opacity: 0.5;
+            border: 2px dashed #3b82f6;
+        }
+        .mcq-card .question-text,
+        .mcq-card .option-text,
+        .mcq-card .explanation-text { /* Added explanation-text */
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.5rem;
+            background-color: #f9fafb;
+            cursor: text;
+            min-height: 2.5rem; /* Ensure consistent height */
+            display: block; /* Make div behave like a block input */
+        }
+        .mcq-card .question-text:focus,
+        .mcq-card .option-text:focus,
+        .mcq-card .explanation-text:focus { /* Added explanation-text */
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+        .mcq-card .option-label {
+            font-weight: 600;
+            margin-right: 0.5rem;
+            color: #4b5563;
+        }
+        .mcq-card .correct-answer-select {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            background-color: #f9fafb;
+        }
+
+        /* Progress bar styling */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e7ff; /* Light blue background */
+            border-radius: 0.25rem;
+            height: 0.75rem; /* Height of the bar */
+            overflow: hidden;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #4f46e5; /* Indigo fill */
+            border-radius: 0.25rem;
+            transition: width 0.3s ease-in-out; /* Smooth transition for width changes */
+        }
+        .progress-text {
+            text-align: center;
+            font-size: 0.875rem; /* text-sm */
+            color: #4b5563; /* gray-600 */
+        }
+
+        /* Drag and Drop Zone Styling */
+        .drop-zone {
+            border: 2px dashed #9ca3af; /* gray-400 */
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            color: #6b7280; /* gray-500 */
+            transition: border-color 0.3s ease-in-out, background-color 0.3s ease-in-out;
+            cursor: pointer;
+        }
+        .drop-zone.highlight {
+            border-color: #3b82f6; /* blue-500 */
+            background-color: #eff6ff; /* blue-50 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl flex flex-col items-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Image Text Extractor & MCQ Generator</h1>
+
+        <div class="mb-6 w-full">
+            <label for="imageUploadInput" class="block text-gray-700 text-sm font-semibold mb-2">Upload Images (select multiple):</label>
+            <div id="dropZone" class="drop-zone mb-4">
+                <p class="text-lg">Drag & drop images here</p>
+                <p class="text-sm">or</p>
+                <input type="file" id="imageUploadInput" accept="image/*" multiple class="hidden">
+                <label for="imageUploadInput" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md cursor-pointer transition duration-200 ease-in-out">
+                    Browse Files
+                </label>
+            </div>
+            <p class="text-gray-500 text-sm text-center">Accepted formats: JPG, PNG, GIF, BMP, WebP</p>
+        </div>
+
+        <div id="imagePreviewsContainer" class="mb-6 w-full min-h-32 flex flex-wrap justify-center items-center gap-4 bg-gray-50 border border-gray-300 rounded-md p-4 overflow-auto hidden">
+            <p id="noImageText" class="text-gray-500 text-center w-full">No images selected</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-6 w-full justify-center">
+            <button id="scanButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 flex items-center justify-center flex-grow sm:flex-grow-0" disabled>
+                <span id="buttonText">Scan Images Text</span>
+                <div id="loadingSpinner" class="spinner ml-3 hidden"></div>
+            </button>
+
+            <button id="clearImageButton" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 flex-grow sm:flex-grow-0" disabled>
+                Clear Images
+            </button>
+        </div>
+
+        <div id="scanProgressBarContainer" class="w-full hidden">
+            <div class="progress-text" id="scanProgressText"></div>
+            <div class="progress-container">
+                <div class="progress-bar" id="scanProgressBar"></div>
+            </div>
+        </div>
+
+        <div class="w-full mb-8">
+            <label for="outputText" class="block text-gray-700 text-sm font-semibold mb-2">Extracted & Organized Text (Editable):</label>
+            <div id="outputText" class="output-display" contenteditable="true" placeholder="Extracted text will appear here..."></div>
+            <button id="copyTextButton" class="mt-4 bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-opacity-75 w-full" disabled>
+                Copy Text
+            </button>
+        </div>
+
+        <div class="w-full mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Generate MCQs</h2>
+            <div class="mb-4 w-full">
+                <label for="questionSampleInput" class="block text-gray-700 text-sm font-semibold mb-2">Question Sample (optional):</label>
+                <input type="text" id="questionSampleInput" placeholder="e.g., Who is the first president of Bangladesh?" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200 ease-in-out">
+            </div>
+            <div class="mb-4 w-full">
+                <label for="numQuestionsInput" class="block text-gray-700 text-sm font-semibold mb-2">Number of Questions to Generate (optional):</label>
+                <input type="number" id="numQuestionsInput" min="1" placeholder="e.g., 10" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200 ease-in-out">
+            </div>
+            <div class="mb-4 w-full">
+                <label for="questionLanguageSelect" class="block text-gray-700 text-sm font-semibold mb-2">Question Language:</label>
+                <select id="questionLanguageSelect" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200 ease-in-out">
+                    <option value="auto">Auto-Detect (Recommended)</option>
+                    <option value="english">English</option>
+                    <option value="bangla">Bangla</option>
+                </select>
+            </div>
+            <div class="mb-4 w-full">
+                <label for="keywordsInput" class="block text-gray-700 text-sm font-semibold mb-2">Focus on Topics/Keywords (optional):</label>
+                <input type="text" id="keywordsInput" placeholder="e.g., history, science, dates" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200 ease-in-out">
+            </div>
+            <div class="mb-4 w-full">
+                <label for="difficultySelect" class="block text-gray-700 text-sm font-semibold mb-2">Difficulty Level:</label>
+                <select id="difficultySelect" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200 ease-in-out">
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+            <button id="generateQuestionsButton" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75 flex items-center justify-center w-full mb-6" disabled>
+                <span id="generateButtonText">Generate Questions</span>
+                <div id="questionSpinner" class="spinner ml-3 hidden"></div>
+            </button>
+
+            <div id="genProgressBarContainer" class="w-full hidden">
+                <div class="progress-text" id="genProgressText"></div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="genProgressBar"></div>
+                </div>
+            </div>
+
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Generated Questions (Review & Edit):</label>
+            <div id="mcqCountDisplay" class="text-sm text-gray-600 mb-2"></div>
+            <div id="mcqReviewContainer" class="w-full">
+                <p id="noQuestionsText" class="text-gray-500 text-center">No questions generated yet. Click "Generate Questions" above.</p>
+            </div>
+        </div>
+
+        <div class="w-full">
+            <label for="questionsOutput" class="block text-gray-700 text-sm font-semibold mb-2">Raw JSON Output:</label>
+            <div id="questionsOutput" class="json-output-display" placeholder="Generated MCQs will appear here in JSON format..."></div>
+            <div class="flex flex-col sm:flex-row gap-4 mt-4 w-full">
+                <button id="copyQuestionsButton" class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-opacity-75 flex-grow" disabled>
+                    Copy Questions
+                </button>
+                <button id="exportCsvButton" class="bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-opacity-75 flex-grow" disabled>
+                    Export as CSV
+                </button>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="mt-4 text-red-600 text-sm hidden"></div>
+    </div>
+
+    <div id="croppingModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Crop Image</h2>
+            <div class="img-container">
+                <img id="imageToCrop" src="#" alt="Image to Crop">
+            </div>
+            <div class="flex justify-center gap-4 mt-auto">
+                <button id="applyCropButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75">
+                    Apply Crop
+                </button>
+                <button id="cancelCropButton" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <script>
+        // Get references to DOM elements
+        const imageUploadInput = document.getElementById('imageUploadInput');
+        const imagePreviewsContainer = document.getElementById('imagePreviewsContainer');
+        const noImageText = document.getElementById('noImageText');
+        const scanButton = document.getElementById('scanButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const outputText = document.getElementById('outputText');
+        const copyTextButton = document.getElementById('copyTextButton');
+        const clearImageButton = document.getElementById('clearImageButton');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // MCQ Generation Elements
+        const generateQuestionsButton = document.getElementById('generateQuestionsButton');
+        const generateButtonText = document.getElementById('generateButtonText');
+        const questionSpinner = document.getElementById('questionSpinner');
+        const questionsOutput = document.getElementById('questionsOutput');
+        const copyQuestionsButton = document.getElementById('copyQuestionsButton');
+        const mcqCountDisplay = document.getElementById('mcqCountDisplay');
+        const mcqReviewContainer = document.getElementById('mcqReviewContainer');
+        const noQuestionsText = document.getElementById('noQuestionsText');
+        const difficultySelect = document.getElementById('difficultySelect');
+        const keywordsInput = document.getElementById('keywordsInput');
+        const questionLanguageSelect = document.getElementById('questionLanguageSelect');
+        const questionSampleInput = document.getElementById('questionSampleInput');
+        const numQuestionsInput = document.getElementById('numQuestionsInput');
+
+        // Progress Bar Elements
+        const scanProgressBarContainer = document.getElementById('scanProgressBarContainer');
+        const scanProgressText = document.getElementById('scanProgressText');
+        const scanProgressBar = document.getElementById('scanProgressBar');
+        const genProgressBarContainer = document.getElementById('genProgressBarContainer');
+        const genProgressText = document.getElementById('genProgressText');
+        const genProgressBar = document.getElementById('genProgressBar');
+
+        // Drag and Drop Elements
+        const dropZone = document.getElementById('dropZone');
+
+        // CSV Export Element
+        const exportCsvButton = document.getElementById('exportCsvButton');
+
+        // Cropping Modal Elements
+        const croppingModal = document.getElementById('croppingModal');
+        const imageToCrop = document.getElementById('imageToCrop');
+        const applyCropButton = document.getElementById('applyCropButton');
+        const cancelCropButton = document.getElementById('cancelCropButton');
+
+        // Removed image processing controls (brightness, contrast, grayscale, binarize, and their reset)
+        // const brightnessSlider = document.getElementById('brightness'); // Removed
+        // const contrastSlider = document.getElementById('contrast');   // Removed
+        // const grayscaleButton = document.getElementById('grayscaleButton'); // Removed
+        // const binarizeButton = document.getElementById('binarizeButton'); // Removed
+        // const resetImageProcessingButton = document.getElementById('resetImageProcessing'); // Removed
+
+        let uploadedImages = [];
+        let cropperInstance = null;
+        let currentCroppingImageIndex = -1;
+        let lastScannedText = '';
+        let currentMCQs = [];
+
+        // Variables for image processing state (now only relevant for original bitmap)
+        let originalImageBitmap = null;
+        // imageProcessingCanvas and imageProcessingCtx are no longer needed as no filters are applied
+        // let imageProcessingCanvas = document.createElement('canvas'); // Removed
+        // let imageProcessingCtx = imageProcessingCanvas.getContext('2d'); // Removed
+        // currentFilterState is no longer needed as filters are removed
+
+
+        /**
+         * Checks if a given text contains Bengali characters.
+         * @param {string} text - The text to check.
+         * @returns {boolean} - True if Bengali characters are found, false otherwise.
+         */
+        function containsBengali(text) {
+            const bengaliRegex = /[\u0980-\u09FF]/;
+            return bengaliRegex.test(text);
+        }
+
+        /**
+         * Resets a progress bar to its initial hidden state.
+         * @param {HTMLElement} container - The container div of the progress bar.
+         * @param {HTMLElement} bar - The progress bar element.
+         * @param {HTMLElement} text - The text element for the progress.
+         */
+        function resetProgressBar(container, bar, text) {
+            if (container) container.classList.add('hidden');
+            if (bar) bar.style.width = '0%';
+            if (text) text.textContent = '';
+        }
+
+        /**
+         * Updates a progress bar.
+         * @param {HTMLElement} container - The container div of the progress bar.
+         * @param {HTMLElement} bar - The progress bar element.
+         * @param {HTMLElement} text - The text element for the progress.
+         * @param {number} percentage - The percentage to set the bar width (0-100).
+         * @param {string} message - The message to display.
+         */
+        function updateProgressBar(container, bar, text, percentage, message) {
+            if (container) container.classList.remove('hidden');
+            if (bar) bar.style.width = `${percentage}%`;
+            if (text) text.textContent = message;
+        }
+
+        /**
+         * Processes selected files (from input or drag-and-drop).
+         * @param {FileList} files - The FileList object from input or drag-and-drop.
+         */
+        function processFiles(files) {
+            if (files.length > 0) {
+                uploadedImages = [];
+                imagePreviewsContainer.innerHTML = '';
+                noImageText.classList.add('hidden');
+                imagePreviewsContainer.classList.remove('hidden');
+
+                resetProgressBar(scanProgressBarContainer, scanProgressBar, scanProgressText);
+                resetProgressBar(genProgressBarContainer, genProgressBar, genProgressText);
+
+
+                Array.from(files).forEach((file, index) => {
+                    if (!file.type.startsWith('image/')) {
+                        displayError(`Skipping non-image file: ${file.name}. Please upload only image files.`);
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const base64Data = e.target.result;
+                        const mimeType = base64Data.split(',')[0].split(':')[1].split(';')[0];
+
+                        const imgWrapper = document.createElement('div');
+                        imgWrapper.className = 'relative w-28 h-28 rounded-md overflow-hidden shadow-md group';
+                        const img = document.createElement('img');
+                        img.src = base64Data;
+                        img.alt = `Image preview of ${file.name}`;
+                        img.className = 'w-full h-full object-cover';
+                        imgWrapper.appendChild(img);
+
+                        const cropButton = document.createElement('button');
+                        cropButton.className = 'absolute bottom-1 right-1 bg-gray-800 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300';
+                        cropButton.textContent = 'Crop';
+                        cropButton.title = `Crop ${file.name}`;
+                        cropButton.addEventListener('click', () => handleCropButtonClick(index));
+                        imgWrapper.appendChild(cropButton);
+
+                        imagePreviewsContainer.appendChild(imgWrapper);
+
+                        uploadedImages.push({
+                            base64: base64Data,
+                            mimeType: mimeType,
+                            name: file.name,
+                            previewElement: img
+                        });
+
+                        if (uploadedImages.length === files.length) {
+                            scanButton.disabled = false;
+                            clearImageButton.disabled = false;
+                            clearError();
+                            outputText.innerHTML = '';
+                            copyTextButton.disabled = true;
+                            generateQuestionsButton.disabled = true;
+                            questionsOutput.innerHTML = '';
+                            copyQuestionsButton.disabled = true;
+                            exportCsvButton.disabled = true; // Disable CSV export
+                            mcqCountDisplay.textContent = '';
+                            mcqReviewContainer.innerHTML = '<p id="noQuestionsText" class="text-gray-500 text-center">No questions generated yet. Click "Generate Questions" above.</p>';
+                            noQuestionsText.classList.remove('hidden');
+                        }
+                    };
+                    reader.onerror = function() {
+                        displayError(`Failed to read file: ${file.name}.`);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                resetUI();
+            }
+        }
+
+        /**
+         * Handles the image file selection from the input.
+         */
+        imageUploadInput.addEventListener('change', function(event) {
+            processFiles(event.target.files);
+        });
+
+        /**
+         * Resets the UI to its initial state.
+         */
+        function resetUI() {
+            uploadedImages = [];
+            imageUploadInput.value = '';
+            imagePreviewsContainer.innerHTML = '';
+            noImageText.classList.remove('hidden');
+            imagePreviewsContainer.classList.add('hidden');
+            scanButton.disabled = true;
+            clearImageButton.disabled = true;
+            outputText.innerHTML = '';
+            copyTextButton.disabled = true;
+            generateQuestionsButton.disabled = true;
+            questionsOutput.innerHTML = '';
+            copyQuestionsButton.disabled = true;
+            exportCsvButton.disabled = true; // Disable CSV export on reset
+            mcqCountDisplay.textContent = '';
+            mcqReviewContainer.innerHTML = '<p id="noQuestionsText" class="text-gray-500 text-center">No questions generated yet. Click "Generate Questions" above.</p>';
+            noQuestionsText.classList.remove('hidden');
+            clearError();
+            buttonText.textContent = 'Scan Images Text';
+            loadingSpinner.classList.add('hidden');
+            generateButtonText.textContent = 'Generate Questions';
+            questionSpinner.classList.add('hidden');
+            hideCroppingModal();
+            lastScannedText = '';
+            currentMCQs = [];
+            keywordsInput.value = '';
+            questionLanguageSelect.value = 'auto'; // Reset language select to auto
+            questionSampleInput.value = ''; // Reset question sample input
+            numQuestionsInput.value = ''; // Reset number of questions input
+
+            resetProgressBar(scanProgressBarContainer, scanProgressBar, scanProgressText);
+            resetProgressBar(genProgressBarContainer, genProgressBar, genProgressText);
+        }
+
+        /**
+         * Displays an error message to the user.
+         * @param {string} message - The error message to display.
+         * @param {string} color - The color of the error message (e.g., 'red', 'green').
+         */
+        function displayError(message, color = 'red') {
+            errorMessage.textContent = message;
+            errorMessage.className = `mt-4 text-${color}-600 text-sm`;
+            errorMessage.classList.remove('hidden');
+        }
+
+        /**
+         * Clears any displayed error messages.
+         */
+        function clearError() {
+            errorMessage.textContent = '';
+            errorMessage.classList.add('hidden');
+        }
+
+        /**
+         * Handles the click event for the scan button.
+         * Calls the Gemini API to extract text from each uploaded image.
+         */
+        scanButton.addEventListener('click', async function() {
+            if (uploadedImages.length === 0) {
+                displayError('Please upload images first.');
+                return;
+            }
+
+            scanButton.disabled = true;
+            clearImageButton.disabled = true;
+            copyTextButton.disabled = true;
+            generateQuestionsButton.disabled = true; // Disable during scanning
+            questionsOutput.innerHTML = ''; // Clear previous questions
+            copyQuestionsButton.disabled = true; // Disable copy questions button
+            exportCsvButton.disabled = true; // Disable CSV export during scan
+            mcqCountDisplay.textContent = ''; // Clear MCQ count
+            outputText.innerHTML = '';
+            mcqReviewContainer.innerHTML = '<p id="noQuestionsText" class="text-gray-500 text-center">No questions generated yet. Click "Generate Questions" above.</p>'; // Clear review container
+            noQuestionsText.classList.remove('hidden');
+            clearError();
+            buttonText.textContent = 'Scanning...';
+            loadingSpinner.classList.add('hidden'); // Hide spinner for detailed progress
+
+            // Reset and show scan progress bar
+            resetProgressBar(genProgressBarContainer, genProgressBar, genProgressText); // Reset gen progress
+            updateProgressBar(scanProgressBarContainer, scanProgressBar, scanProgressText, 0, 'Starting scan...');
+
+
+            let allExtractedRawText = ''; // To store raw text for language detection and question generation
+
+            try {
+                for (let i = 0; i < uploadedImages.length; i++) {
+                    const image = uploadedImages[i];
+                    const progress = Math.round(((i + 1) / uploadedImages.length) * 100);
+                    updateProgressBar(scanProgressBarContainer, scanProgressBar, scanProgressText, progress, `Scanning image ${i + 1} of ${uploadedImages.length}... (${progress}%)`);
+
+
+                    const prompt = `Extract all text from this image. If tables are present, format them as Markdown tables. For all other text, preserve its original line breaks, paragraph structure and general visual alignment as accurately as possible. Output both tabular and non-tabular text, maintaining their distinct formatting and relative positions. Do not include any conversational text or explanations in your response, only the extracted and formatted text.
+
+                    Based on the text you have extracted above, organize and present the relevant information clearly and neatly. If presenting numbered or listed items, use the format "০১ -ক ০২-ঘ" (Bengali numerals followed by a hyphen, space, and Bengali character for options) or similar Bengali numbering/listing conventions if more appropriate for the content. Do not add any other or new information — stay strictly within the provided text. Remember that the current location is Rajshahi, Rajshahi Division, Bangladesh (this context may help in understanding relevance if location-specific information is present).`;
+
+                    const base64ImageData = image.base64.split(',')[1];
+
+                    const chatHistory = [];
+                    chatHistory.push({
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: image.mimeType,
+                                    data: base64ImageData
+                                }
+                            }
+                        ]
+                    });
+
+                    const payload = { contents: chatHistory };
+                    const apiKey = "AIzaSyCTYNcUgP7OE26bn2eefiLVO3u7M6gBFNs"; // Replace with your actual API key
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorDetail = await response.json();
+                        throw new Error(`API error for ${image.name}: ${response.status} - ${errorDetail.error.message || 'Unknown error'}`);
+                    }
+
+                    const result = await response.json();
+
+                    let extractedText = '';
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        extractedText = result.candidates[0].content.parts[0].text;
+                    } else {
+                        extractedText = `No text could be extracted from ${image.name} or the response was empty.`;
+                    }
+
+                    allExtractedRawText += extractedText + '\n\n'; // Store raw text for later use
+                    outputText.innerHTML += `<h3>--- Information from Image ${i + 1} (${image.name}) ---</h3>\n\n`;
+                    outputText.innerHTML += extractedText + '\n\n';
+                }
+
+                // Final update for scan progress
+                updateProgressBar(scanProgressBarContainer, scanProgressBar, scanProgressText, 100, 'Scan Complete!');
+                setTimeout(() => resetProgressBar(scanProgressBarContainer, scanProgressBar, scanProgressText), 2000);
+
+                // Update lastScannedText with the content that's currently visible in the outputText div,
+                // allowing for immediate editing after scan.
+                lastScannedText = outputText.innerHTML; // Use innerHTML to preserve formatting
+
+                copyTextButton.disabled = false;
+                generateQuestionsButton.disabled = false; // Enable question generation after text is scanned
+                buttonText.textContent = 'Scan Complete & Organized!';
+
+            } catch (error) {
+                console.error("Error scanning images:", error);
+                displayError(`Error scanning images: ${error.message}. Please try again.`);
+                outputText.innerHTML += "<p>An error occurred during scanning. Please check the console for details.</p>";
+                updateProgressBar(scanProgressBarContainer, scanProgressBar, scanProgressText, 0, 'Scan Failed!');
+            } finally {
+                scanButton.disabled = false;
+                clearImageButton.disabled = false;
+                loadingSpinner.classList.add('hidden');
+                setTimeout(() => {
+                    if (buttonText.textContent === 'Scan Complete & Organized!') {
+                         buttonText.textContent = 'Scan Images Text';
+                    }
+                }, 2000);
+            }
+        });
+
+        // Event listener for changes in the editable outputText div
+        outputText.addEventListener('input', function() {
+            // Update lastScannedText whenever the user types in the div
+            lastScannedText = outputText.innerHTML; // Use innerHTML to capture all formatting
+        });
+
+
+        /**
+         * Handles the click event for the copy text button.
+         * Copies the text from the outputText div to the clipboard.
+         */
+        copyTextButton.addEventListener('click', function() {
+            if (outputText.textContent) {
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = outputText.textContent;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                tempTextArea.setSelectionRange(0, 99999);
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+
+                const originalCopyButtonText = copyTextButton.textContent;
+                copyTextButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyTextButton.textContent = originalCopyButtonText;
+                }, 1500);
+            }
+        });
+
+        /**
+         * Handles the click event for the clear image button.
+         * Resets the UI to its initial state.
+         */
+        clearImageButton.addEventListener('click', resetUI);
+
+        /**
+         * Opens the cropping modal with the selected image.
+         * @param {number} index - The index of the image in the uploadedImages array to crop.
+         */
+        function handleCropButtonClick(index) {
+            currentCroppingImageIndex = index;
+            const imageDataURL = uploadedImages[index].base64;
+            imageToCrop.src = imageDataURL;
+
+            // No image processing controls to reset here anymore.
+
+            if (cropperInstance) {
+                cropperInstance.destroy();
+            }
+
+            // Create a new Image object from dataURL to ensure it's fully loaded before processing
+            const img = new Image();
+            img.src = imageDataURL;
+            img.onload = () => {
+                // Initialize Cropper after the Image is loaded
+                cropperInstance = new Cropper(imageToCrop, {
+                    aspectRatio: NaN,
+                    viewMode: 1, // Keep viewMode 1 to fit the image within the canvas
+                    autoCropArea: 0.8, // Keep autoCropArea for initial selection
+                    responsive: true,
+                    background: false,
+                    ready() {
+                        // Cropper is ready, no filters to apply directly
+                        // The image is already set via imageToCrop.src = imageDataURL;
+                    }
+                });
+            };
+            img.onerror = () => {
+                displayError("Failed to load image for cropping. Ensure it's a valid image file.");
+                hideCroppingModal();
+            };
+
+
+            croppingModal.classList.remove('hidden');
+        }
+
+        // Removed image processing functions (updateCropperImage, applyGrayscale, applyBinarization)
+        // Removed event listeners for brightnessSlider, contrastSlider, grayscaleButton, binarizeButton, resetImageProcessingButton
+        // The image processing controls are now removed from the HTML and JS
+
+        applyCropButton.addEventListener('click', function() {
+            if (cropperInstance && currentCroppingImageIndex !== -1) {
+                const croppedCanvas = cropperInstance.getCroppedCanvas();
+                const croppedBase64 = croppedCanvas.toDataURL(uploadedImages[currentCroppingImageIndex].mimeType);
+
+                uploadedImages[currentCroppingImageIndex].base64 = croppedBase64;
+                uploadedImages[currentCroppingImageIndex].previewElement.src = croppedBase64;
+
+                hideCroppingModal();
+            }
+        });
+
+        cancelCropButton.addEventListener('click', function() {
+            hideCroppingModal();
+        });
+
+        function hideCroppingModal() {
+            croppingModal.classList.add('hidden');
+            if (cropperInstance) {
+                cropperInstance.destroy();
+                cropperInstance = null;
+            }
+            currentCroppingImageIndex = -1;
+            // No longer need to clear originalImageBitmap or imageProcessingCtx as they are not used for filters
+        }
+
+        function renderMCQsForEditing(mcqs) {
+            mcqReviewContainer.innerHTML = '';
+            noQuestionsText.classList.add('hidden');
+
+            if (mcqs.length === 0) {
+                mcqReviewContainer.innerHTML = '<p class="text-gray-500 text-center">No questions generated.</p>';
+                return;
+            }
+
+            mcqs.forEach((mcq, index) => {
+                const card = document.createElement('div');
+                card.className = 'mcq-card';
+                card.dataset.index = index;
+                card.setAttribute('draggable', true);
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-lg font-semibold text-gray-800">Question ${index + 1}</h4>
+                        <button class="delete-mcq-button bg-red-500 hover:bg-red-600 text-white text-sm py-1 px-3 rounded-md transition duration-200">Delete</button>
+                    </div>
+                    <div class="mb-3">
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Question:</label>
+                        <div contenteditable="true" class="question-text" data-field="question">${mcq.question}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Options:</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="flex items-center">
+                                <span class="option-label">A:</span>
+                                <div contenteditable="true" class="option-text flex-grow" data-option="A">${mcq.options.A}</div>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="option-label">B:</span>
+                                <div contenteditable="true" class="option-text flex-grow" data-option="B">${mcq.options.B}</div>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="option-label">C:</span>
+                                <div contenteditable="true" class="option-text flex-grow" data-option="C">${mcq.options.C}</div>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="option-label">D:</span>
+                                <div contenteditable="true" class="option-text flex-grow" data-option="D">${mcq.options.D}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Correct Answer:</label>
+                        <select class="correct-answer-select w-full" data-field="answer">
+                            <option value="A" ${mcq.answer === 'A' ? 'selected' : ''}>A</option>
+                            <option value="B" ${mcq.answer === 'B' ? 'selected' : ''}>B</option>
+                            <option value="C" ${mcq.answer === 'C' ? 'selected' : ''}>C</option>
+                            <option value="D" ${mcq.answer === 'D' ? 'selected' : ''}>D</option>
+                        </select>
+                    </div>
+                    <div class="mt-3">
+                        <label class="block text-gray-700 text-sm font-medium mb-1">Explanation:</label>
+                        <div contenteditable="true" class="explanation-text" data-field="explanation">${mcq.explanation || ''}</div>
+                    </div>
+                `;
+                mcqReviewContainer.appendChild(card);
+            });
+
+            mcqReviewContainer.querySelectorAll('.question-text, .option-text, .explanation-text').forEach(element => {
+                element.addEventListener('input', handleMCQEdit);
+            });
+            mcqReviewContainer.querySelectorAll('.correct-answer-select').forEach(element => {
+                element.addEventListener('change', handleMCQEdit);
+            });
+            mcqReviewContainer.querySelectorAll('.delete-mcq-button').forEach(button => {
+                button.addEventListener('click', handleDeleteMCQ);
+            });
+
+            // Add drag and drop event listeners
+            mcqReviewContainer.querySelectorAll('.mcq-card').forEach(card => {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragover', handleDragOver);
+                card.addEventListener('dragleave', handleDragLeave);
+                card.addEventListener('drop', handleDrop);
+                card.addEventListener('dragend', handleDragEnd);
+            });
+
+            updateQuestionsOutputJson();
+        }
+
+        // Drag and Drop Logic
+        let draggedItem = null;
+
+        function handleDragStart(e) {
+            draggedItem = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+            this.classList.add('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (this !== draggedItem && this.classList.contains('mcq-card')) {
+                const rect = this.getBoundingClientRect();
+                const offsetY = e.clientY - rect.top;
+                const middle = rect.height / 2;
+
+                if (offsetY < middle) {
+                    this.parentNode.insertBefore(draggedItem, this);
+                } else {
+                    this.parentNode.insertBefore(draggedItem, this.nextSibling);
+                }
+            }
+        }
+
+        function handleDragLeave(e) {
+            // No specific visual feedback needed on leave, handled by dragover inserting
+        }
+
+        function handleDrop(e) {
+            e.stopPropagation();
+            return false;
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedItem = null;
+            const newOrderMCQs = [];
+            mcqReviewContainer.querySelectorAll('.mcq-card').forEach(cardElement => {
+                newOrderMCQs.push(currentMCQs[parseInt(cardElement.dataset.index)]);
+            });
+            currentMCQs = newOrderMCQs;
+            renderMCQsForEditing(currentMCQs);
+            mcqCountDisplay.textContent = `Total MCQs: ${currentMCQs.length}`;
+        }
+
+
+        function handleMCQEdit(event) {
+            const card = event.target.closest('.mcq-card');
+            const index = parseInt(card.dataset.index);
+            const mcq = currentMCQs[index];
+
+            if (event.target.dataset.field === 'question') {
+                mcq.question = event.target.textContent;
+            } else if (event.target.dataset.option) {
+                mcq.options[event.target.dataset.option] = event.target.textContent;
+            } else if (event.target.dataset.field === 'answer') {
+                mcq.answer = event.target.value;
+            } else if (event.target.dataset.field === 'explanation') {
+                mcq.explanation = event.target.textContent;
+            }
+            updateQuestionsOutputJson();
+        }
+
+        function handleDeleteMCQ(event) {
+            const card = event.target.closest('.mcq-card');
+            const indexToDelete = parseInt(card.dataset.index);
+
+            currentMCQs.splice(indexToDelete, 1);
+
+            renderMCQsForEditing(currentMCQs);
+            mcqCountDisplay.textContent = `Total MCQs: ${currentMCQs.length}`;
+        }
+
+        function updateQuestionsOutputJson() {
+            questionsOutput.innerHTML = `<pre>${JSON.stringify(currentMCQs, null, 2)}</pre>`;
+            copyQuestionsButton.disabled = currentMCQs.length === 0;
+            exportCsvButton.disabled = currentMCQs.length === 0;
+        }
+
+        generateQuestionsButton.addEventListener('click', async function() {
+            if (!lastScannedText || lastScannedText.trim() === '') {
+                displayError('Please scan text from images first or ensure the text box is not empty before generating questions.');
+                return;
+            }
+
+            generateQuestionsButton.disabled = true;
+            copyQuestionsButton.disabled = true;
+            exportCsvButton.disabled = true;
+            questionsOutput.innerHTML = '';
+            mcqCountDisplay.textContent = '';
+            mcqReviewContainer.innerHTML = '<p id="noQuestionsText" class="text-gray-500 text-center">No questions generated yet. Click "Generate Questions" above.</p>';
+            noQuestionsText.classList.remove('hidden');
+            clearError();
+            generateButtonText.textContent = 'Generating Questions...';
+            questionSpinner.classList.remove('hidden');
+
+            updateProgressBar(genProgressBarContainer, genProgressBar, genProgressText, 0, 'Starting generation...');
+
+            try {
+                const selectedLanguage = questionLanguageSelect.value;
+                let languageInstruction;
+
+                if (selectedLanguage === 'english') {
+                    languageInstruction = " in English only.";
+                } else if (selectedLanguage === 'bangla') {
+                    languageInstruction = " in Bengali only.";
+                } else { // 'auto'
+                    const isBengaliText = containsBengali(lastScannedText);
+                    languageInstruction = isBengaliText ? " in Bengali only." : " in English.";
+                }
+
+                const difficulty = difficultySelect.value;
+                const keywords = keywordsInput.value.trim();
+                const questionSample = questionSampleInput.value.trim();
+                const numQuestions = parseInt(numQuestionsInput.value.trim());
+
+                let prompt = `Analyze the provided text.
+                1. Identify any existing Multiple Choice Questions (MCQs) complete with question, options (A, B, C, D), and a clear answer within the text. Extract these and format them precisely into the specified JSON schema.
+                2. For any remaining lines or segments of text that do NOT already contain an MCQ, generate one new MCQ question per line/segment. Each new question must be strictly based on the context of its corresponding line/segment only. Do not add or assume any new information beyond what is explicitly stated.
+                3. Ensure comprehensive coverage of all key ideas and important topics present in each line. For every line that can reasonably form an MCQ, generate one.
+                4. Combine all identified existing MCQs and all newly generated MCQs into a single JSON array.
+                5. The difficulty level of the generated questions should be: ${difficulty}.`;
+
+                if (keywords) {
+                    prompt += `\n6. Focus the generation of new questions on the following topics or keywords: "${keywords}". Ensure questions are still strictly derived from the provided text.`;
+                }
+                if (questionSample) {
+                    prompt += `\n7. Adopt the style and structure of the following question sample when generating new questions: "${questionSample}".`;
+                }
+                if (!isNaN(numQuestions) && numQuestions > 0) {
+                    prompt += `\n8. Generate a total of approximately ${numQuestions} questions, including any pre-existing ones. Prioritize covering key ideas from the text.`;
+                } else {
+                    prompt += `\n8. For each question, provide a brief explanation for why the chosen answer is correct.`; // Original explanation instruction
+                }
+
+                prompt += `\n\nLanguage handling: Generate questions and options ${languageInstruction}
+
+                Text to generate questions from:
+                \`\`\`
+                ${lastScannedText}
+                \`\`\`
+                `;
+
+                const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+
+                const payload = {
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    question: { type: "STRING" },
+                                    options: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            A: { type: "STRING" },
+                                            B: { type: "STRING" },
+                                            C: { type: "STRING" },
+                                            D: { type: "STRING" }
+                                        },
+                                        required: ["A", "B", "C", "D"],
+                                        propertyOrdering: ["A", "B", "C", "D"]
+                                    },
+                                    answer: { type: "STRING" },
+                                    explanation: { type: "STRING" }
+                                },
+                                required: ["question", "options", "answer", "explanation"],
+                                propertyOrdering: ["question", "options", "answer", "explanation"]
+                            }
+                        }
+                    }
+                };
+
+                const apiKey = "AIzaSyCTYNcUgP7OE26bn2eefiLVO3u7M6gBFNs";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorDetail = await response.json();
+                    throw new Error(`API error: ${response.status} - ${errorDetail.error.message || 'Unknown error'}`);
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    const parsedJson = JSON.parse(jsonString);
+                    currentMCQs = parsedJson;
+                    renderMCQsForEditing(currentMCQs);
+                    mcqCountDisplay.textContent = `Total MCQs: ${currentMCQs.length}`;
+                    updateProgressBar(genProgressBarContainer, genProgressBar, genProgressText, 100, 'Generation Complete!');
+                    setTimeout(() => resetProgressBar(genProgressBarContainer, genProgressBar, genProgressText), 2000);
+                } else {
+                    questionsOutput.innerHTML = "No questions could be generated from the text or the response was empty.";
+                    mcqCountDisplay.textContent = 'Total MCQs: 0';
+                    mcqReviewContainer.innerHTML = '<p class="text-gray-500 text-center">No questions generated.</p>';
+                    updateProgressBar(genProgressBarContainer, genProgressBar, genProgressText, 0, 'Generation Failed: No output.');
+                }
+
+            } catch (error) {
+                console.error("Error generating questions:", error);
+                displayError(`Error generating questions: ${error.message}. Please try again.`);
+                questionsOutput.innerHTML = "<p>An error occurred while generating questions.</p>";
+                mcqCountDisplay.textContent = 'Total MCQs: 0';
+                mcqReviewContainer.innerHTML = '<p class="text-gray-500 text-center">An error occurred while generating questions.</p>';
+                updateProgressBar(genProgressBarContainer, genProgressBar, genProgressText, 0, 'Generation Failed!');
+            } finally {
+                generateQuestionsButton.disabled = false;
+                generateButtonText.textContent = 'Generate Questions';
+                questionSpinner.classList.add('hidden');
+            }
+        });
+
+        copyQuestionsButton.addEventListener('click', function() {
+            if (questionsOutput.textContent) {
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = questionsOutput.textContent;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                tempTextArea.setSelectionRange(0, 99999);
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+
+                const originalCopyButtonText = copyQuestionsButton.textContent;
+                copyQuestionsButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyQuestionsButton.textContent = originalCopyButtonText;
+                }, 1500);
+            }
+        });
+
+        exportCsvButton.addEventListener('click', function() {
+            if (currentMCQs.length === 0) {
+                displayError('No questions to export. Generate questions first.', 'red');
+                return;
+            }
+
+            let csvContent = "Question,Option A,Option B,Option C,Option D,Answer,Explanation\n";
+
+            currentMCQs.forEach(mcq => {
+                const question = `"${mcq.question.replace(/"/g, '""')}"`;
+                const optionA = `"${mcq.options.A.replace(/"/g, '""')}"`;
+                const optionB = `"${mcq.options.B.replace(/"/g, '""')}"`;
+                const optionC = `"${mcq.options.C.replace(/"/g, '""')}"`;
+                const optionD = `"${mcq.options.D.replace(/"/g, '""')}"`;
+                const answer = `"${mcq.answer.replace(/"/g, '""')}"`;
+                const explanation = `"${(mcq.explanation || '').replace(/"/g, '""')}"`;
+
+                csvContent += `${question},${optionA},${optionB},${optionC},${optionD},${answer},${explanation}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'MCQ_Questions.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                displayError('MCQs exported as CSV successfully!', 'green');
+            } else {
+                displayError('Your browser does not support downloading files directly. Please copy the JSON and convert it manually.', 'red');
+            }
+        });
+
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('highlight');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            dropZone.classList.remove('highlight');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('highlight');
+            const files = e.dataTransfer.files;
+            processFiles(files);
+        });
+
+        window.onload = resetUI;
+    </script>
+</body>
+</html>
