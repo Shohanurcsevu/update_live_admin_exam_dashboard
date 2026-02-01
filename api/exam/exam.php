@@ -60,7 +60,7 @@ function list_exams($conn) {
         $sql .= " WHERE " . implode(' AND ', $where_clauses);
     }
     
-    $sql .= " ORDER BY e.id ASC";
+    $sql .= " ORDER BY e.id DESC";
     
     $stmt = $conn->prepare($sql);
     if (!empty($params)) {
