@@ -140,7 +140,7 @@ function initializeExamPage() {
         const formData = new FormData(examForm);
         const data = Object.fromEntries(formData.entries());
         const url = data.id ? `${EXAM_API_URL}?action=update` : `${EXAM_API_URL}?action=create`;
-        
+
         try {
             const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             const result = await response.json();
@@ -165,7 +165,7 @@ function initializeExamPage() {
     async function handleTableClick(e) {
         const editBtn = e.target.closest('.edit-btn');
         const deleteBtn = e.target.closest('.delete-btn');
-        
+
         if (editBtn) {
             const id = editBtn.dataset.id;
             try {
@@ -187,7 +187,7 @@ function initializeExamPage() {
                 }
             } catch (error) { showToast('Failed to fetch exam details.', 'error'); }
         }
-        
+
         if (deleteBtn) {
             examIdToDelete = deleteBtn.dataset.id;
             openModal(deleteModal);
@@ -200,6 +200,9 @@ function initializeExamPage() {
         examForm.reset();
         document.getElementById('exam-id').value = '';
         document.getElementById('instructions').value = defaultInstructions;
+        document.getElementById('duration').value = 10;
+        document.getElementById('total-marks').value = 10;
+        document.getElementById('pass-mark').value = 10;
         modalLessonSelector.innerHTML = '<option value="">Select Subject First</option>';
         modalLessonSelector.disabled = true;
         modalTopicSelector.innerHTML = '<option value="">Select Lesson First</option>';
