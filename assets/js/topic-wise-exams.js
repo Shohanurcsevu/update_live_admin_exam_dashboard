@@ -222,7 +222,7 @@
         checkbox.addEventListener('change', (e) => {
             input.disabled = !e.target.checked;
             if (e.target.checked) {
-                input.value = Math.min(5, topic.total_questions); // Default to 5 or max available
+                input.value = Math.min(1, topic.total_questions); // Default to 5 or max available
                 updateSelectedTopics();
             } else {
                 input.value = '';
