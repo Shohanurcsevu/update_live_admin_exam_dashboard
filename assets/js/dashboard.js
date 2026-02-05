@@ -102,7 +102,7 @@ function initializeDashboardPage() {
     }
 
     let currentOffset = 0;
-    const PAGE_SIZE = 10;
+    const PAGE_SIZE = 6;
 
     async function fetchAndDisplayExams(isLoadMore = false) {
         // Ensure isLoadMore is strictly boolean
@@ -306,19 +306,18 @@ function initializeDashboardPage() {
                 });
         }
 
-        // Load More Button Handler (via localized listener to prevent stacking in SPA)
-        if (window._dashboardLoadMoreHandler) {
-            document.removeEventListener('click', window._dashboardLoadMoreHandler);
-        }
-        window._dashboardLoadMoreHandler = (e) => {
+    });
+
+    const dashContainer = document.getElementById('dashboard-container');
+    if (dashContainer) {
+        dashContainer.addEventListener('click', (e) => {
             const loadMoreEl = e.target.closest("#load-more-btn");
             if (loadMoreEl && !loadMoreEl.disabled) {
-                console.log("Dashboard Load More clicked");
+                console.log("Dashboard Load More clicked, current offset:", currentOffset);
                 fetchAndDisplayExams(true);
             }
-        };
-        document.addEventListener('click', window._dashboardLoadMoreHandler);
-    });
+        });
+    }
 
     const openDeleteModal = (id) => {
         examIdToDelete = id;
