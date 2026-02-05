@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'custom-exam-topics': 'assets/js/custom-exam-topics.js', 'custom-exams': 'assets/js/custom-exams.js',
             'custom-exam-from-lessons': 'assets/js/custom-exam-from-lessons.js', 'model-test-builder': 'assets/js/model-test-builder.js',
             'exams-across-subjects': 'assets/js/exams-across-subjects.js', 'topic-wise-exams': 'assets/js/topic-wise-exams.js',
-            'lesson-wise-exams': 'assets/js/lesson-wise-exams.js'
+            'lesson-wise-exams': 'assets/js/lesson-wise-exams.js', 'offline-exams': 'assets/js/offline-exams.js'
         };
 
         if (pageScripts[page]) {
@@ -180,6 +180,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.loadPage = loadPage;
 
+    // --- Service Worker Registration ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker registered', reg))
+                .catch(err => console.error('Service Worker registration failed', err));
+        });
+    }
+
     const initDashboard = async () => {
         await Promise.all([
             loadComponent('components/header.html', headerContainer),
@@ -189,6 +198,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- FIX: The function to start the notification system is now being called. ---
         initializeNotifications();
+
+        // Initialize Auto-Sync
+        if (typeof syncManager !== 'undefined') {
+            syncManager.initAutoSync();
+        }
 
         const initialParams = new URLSearchParams(window.location.search);
         const initialPage = initialParams.get('page') || 'dashboard';
