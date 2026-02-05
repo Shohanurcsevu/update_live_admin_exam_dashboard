@@ -24,21 +24,13 @@ function log_activity($conn, $type, $message) {
 }
 
 function list_exams($conn) {
-    // MODIFIED: Changed to LEFT JOINs to include exams with NULL IDs (custom exams)
-    $sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name,
-                   (SELECT COUNT(*) FROM questions WHERE exam_id = e.id) as total_questions
-            FROM exams e
-            LEFT JOIN subjects s ON e.subject_id = s.id
-            LEFT JOIN lessons l ON e.lesson_id = l.id
-            LEFT JOIN topics t ON e.topic_id = t.id";
+    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+    $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
 
+    $where_clauses = [];
     $params = [];
     $types = '';
     
-    // MODIFIED: Removed the strict base condition to allow all exams to be shown by default.
-    $where_clauses = [];
-
-    // Add filtering logic from the UI. This will still work as expected.
     if (!empty($_GET['subject_id'])) {
         $where_clauses[] = "e.subject_id = ?";
         $params[] = intval($_GET['subject_id']);
@@ -55,13 +47,27 @@ function list_exams($conn) {
         $types .= 'i';
     }
 
-    // Combine all conditions if any exist
-    if (!empty($where_clauses)) {
-        $sql .= " WHERE " . implode(' AND ', $where_clauses);
-    }
+    $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
+
+    $sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name,
+                   q_count.total_questions
+            FROM exams e
+            LEFT JOIN subjects s ON e.subject_id = s.id
+            LEFT JOIN lessons l ON e.lesson_id = l.id
+            LEFT JOIN topics t ON e.topic_id = t.id
+            LEFT JOIN (
+                SELECT exam_id, COUNT(*) as total_questions 
+                FROM questions 
+                GROUP BY exam_id
+            ) q_count ON e.id = q_count.exam_id
+            $where_sql
+            ORDER BY e.id DESC
+            LIMIT ? OFFSET ?";
     
-    $sql .= " ORDER BY e.id DESC";
-    
+    $params[] = $limit;
+    $params[] = $offset;
+    $types .= 'ii';
+
     $stmt = $conn->prepare($sql);
     if (!empty($params)) {
         $stmt->bind_param($types, ...$params);
@@ -73,9 +79,30 @@ function list_exams($conn) {
     while ($row = $result->fetch_assoc()) {
         $exams[] = $row;
     }
+
+    // Get total count for pagination info
+    $count_sql = "SELECT COUNT(*) as total FROM exams e $where_sql";
+    $count_stmt = $conn->prepare($count_sql);
+    if (!empty($where_clauses)) {
+        $count_types = substr($types, 0, -2); // Remove 'ii'
+        $count_params = array_slice($params, 0, -2);
+        $count_stmt->bind_param($count_types, ...$count_params);
+    }
+    $count_stmt->execute();
+    $total_count = $count_stmt->get_result()->fetch_assoc()['total'];
     
-    echo json_encode(['success' => true, 'data' => $exams]);
+    echo json_encode([
+        'success' => true, 
+        'data' => $exams,
+        'pagination' => [
+            'total' => (int)$total_count,
+            'limit' => $limit,
+            'offset' => $offset,
+            'hasMore' => ($offset + $limit) < $total_count
+        ]
+    ]);
     $stmt->close();
+    $count_stmt->close();
 }
 
 function get_exam($conn) {

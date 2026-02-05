@@ -306,12 +306,18 @@ function initializeDashboardPage() {
                 });
         }
 
-        // Load More Button Handler (via delegation for robustness)
-        const loadMoreEl = e.target.closest("#load-more-btn");
-        if (loadMoreEl && !loadMoreEl.disabled) {
-            console.log("Load More clicked");
-            fetchAndDisplayExams(true);
+        // Load More Button Handler (via localized listener to prevent stacking in SPA)
+        if (window._dashboardLoadMoreHandler) {
+            document.removeEventListener('click', window._dashboardLoadMoreHandler);
         }
+        window._dashboardLoadMoreHandler = (e) => {
+            const loadMoreEl = e.target.closest("#load-more-btn");
+            if (loadMoreEl && !loadMoreEl.disabled) {
+                console.log("Dashboard Load More clicked");
+                fetchAndDisplayExams(true);
+            }
+        };
+        document.addEventListener('click', window._dashboardLoadMoreHandler);
     });
 
     const openDeleteModal = (id) => {
