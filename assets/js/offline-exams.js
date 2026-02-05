@@ -24,29 +24,101 @@
     }
 
     /**
-     * Render Exams from IndexedDB
+     * Render Exams and Attempts from IndexedDB
+     */
+    /**
+     * Render Exams and Attempts from IndexedDB
      */
     async function renderExams() {
-        cardsContainer.innerHTML = '<div class="col-span-full py-12 text-center text-gray-500">Loading local data...</div>';
+        const attemptsSection = document.getElementById('attempts-section');
+        const attemptsContainer = document.getElementById('attempts-container');
+
+        if (cardsContainer) {
+            cardsContainer.innerHTML = '<div class="col-span-full py-12 text-center text-gray-500">Loading local data...</div>';
+        }
 
         try {
-            const subjectId = subjectFilter.value;
-            const lessonId = lessonFilter.value;
-            const topicId = topicFilter.value;
+            await idbManager.init();
 
-            let exams = await idbManager.getAll('exams');
+            // 1. Fetch and Render Attempts
+            const allAttempts = await idbManager.getAll('offline_attempts');
+            const exams = await idbManager.getAll('exams');
+
+            if (allAttempts.length > 0 && attemptsSection && attemptsContainer) {
+                attemptsSection.classList.remove('hidden');
+                // Sort by last_saved or end_time descending
+                allAttempts.sort((a, b) => {
+                    const timeA = new Date(a.last_saved || a.end_time || 0);
+                    const timeB = new Date(b.last_saved || b.end_time || 0);
+                    return timeB - timeA;
+                });
+
+                attemptsContainer.innerHTML = allAttempts.map(attempt => {
+                    const exam = exams.find(e => e.id == attempt.exam_id) || { exam_title: 'Unknown Exam' };
+                    let statusColor, statusLabel, actionBtn;
+
+                    switch (attempt.status) {
+                        case 'IN_PROGRESS':
+                            statusColor = 'bg-orange-100 text-orange-700';
+                            statusLabel = 'In Progress';
+                            actionBtn = `<button onclick="window.resumeOfflineAttempt('${attempt.id}', ${attempt.exam_id})" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition-colors">Resume</button>`;
+                            break;
+                        case 'COMPLETED':
+                            statusColor = 'bg-blue-100 text-blue-700';
+                            statusLabel = 'Completed (Pending Sync)';
+                            actionBtn = `<button onclick="window.reviewOfflineAttempt('${attempt.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors">Review</button>`;
+                            break;
+                        case 'SYNCED':
+                            statusColor = 'bg-green-100 text-green-700';
+                            statusLabel = 'Synced';
+                            actionBtn = `<button onclick="window.reviewOfflineAttempt('${attempt.id}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition-colors">Review</button>`;
+                            break;
+                        default:
+                            statusColor = 'bg-gray-100 text-gray-700';
+                            statusLabel = attempt.status;
+                            actionBtn = '';
+                    }
+
+                    return `
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="px-2 py-1 ${statusColor} text-[10px] font-bold rounded uppercase">${statusLabel}</span>
+                                <span class="text-xs text-gray-400">${new Date(attempt.last_saved || attempt.end_time).toLocaleDateString()}</span>
+                            </div>
+                            <h3 class="font-bold text-gray-800 text-lg mb-2 line-clamp-2">${exam.exam_title}</h3>
+                            <div class="flex gap-2 mt-4">
+                                ${actionBtn}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else if (attemptsSection) {
+                attemptsSection.classList.add('hidden');
+            }
+
+            // 2. Fetch and Render Available Exams (Existing Logic with local filters)
+            const subjectId = (subjectFilter) ? subjectFilter.value : "";
+            const lessonId = (lessonFilter) ? lessonFilter.value : "";
+            const topicId = (topicFilter) ? topicFilter.value : "";
+
+            let filteredExams = [...exams];
+
+            // Sort by ID descending
+            filteredExams.sort((a, b) => b.id - a.id);
 
             // Apply filters locally
-            if (subjectId) exams = exams.filter(e => e.subject_id == subjectId);
-            if (lessonId) exams = exams.filter(e => e.lesson_id == lessonId);
-            if (topicId) exams = exams.filter(e => e.topic_id == topicId);
+            if (subjectId) filteredExams = filteredExams.filter(e => e.subject_id == subjectId);
+            if (lessonId) filteredExams = filteredExams.filter(e => e.lesson_id == lessonId);
+            if (topicId) filteredExams = filteredExams.filter(e => e.topic_id == topicId);
 
-            if (exams.length === 0) {
+            if (!cardsContainer) return;
+
+            if (filteredExams.length === 0) {
                 cardsContainer.innerHTML = '<div class="col-span-full py-12 text-center text-gray-500 italic">No exams found offline matching these filters.</div>';
                 return;
             }
 
-            cardsContainer.innerHTML = exams.map(exam => `
+            cardsContainer.innerHTML = filteredExams.map(exam => `
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-4">
                         <span class="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded">ID: ${exam.id}</span>
@@ -56,24 +128,90 @@
                     <div class="space-y-2 text-sm text-gray-600 mb-6">
                         <div class="flex items-center gap-2">
                             <span class="material-symbols-outlined text-base">timer</span>
-                            ${exam.duration_minutes} Minutes
+                            ${exam.duration || 0} Minutes
                         </div>
                         <div class="flex items-center gap-2">
                             <span class="material-symbols-outlined text-base">summarize</span>
-                            ${exam.total_marks} Marks (${exam.pass_mark} to pass)
+                            ${exam.total_marks || 0} Marks (${exam.pass_mark || 0} to pass)
                         </div>
                     </div>
-                    <button onclick="alert('Offline exam taking capability coming soon!')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold py-2 rounded-lg transition-colors">
-                        View Details
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="window.takeOfflineExam(${exam.id})" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors">
+                            Take Exam
+                        </button>
+                        <button onclick="window.openPrintModalOffline(${exam.id})" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" title="Print Options">
+                            <span class="material-symbols-outlined">print</span>
+                        </button>
+                    </div>
                 </div>
             `).join('');
 
         } catch (error) {
             console.error('Error rendering exams:', error);
-            cardsContainer.innerHTML = '<div class="col-span-full py-12 text-center text-red-500">Error loading local data.</div>';
+            if (cardsContainer) {
+                cardsContainer.innerHTML = '<div class="col-span-full py-12 text-center text-red-500">Error loading local data.</div>';
+            }
         }
     }
+
+    /**
+     * Offline PDF Generation Logic
+     */
+    async function processAndPrintOffline() {
+        const examId = PrintEngine.selectedExamId;
+        if (!examId) return;
+
+        const generateBtn = document.getElementById('generate-pdf-btn');
+        if (generateBtn) {
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Preparing PDF...';
+        }
+
+        try {
+            await idbManager.init();
+            const exam = await idbManager.getById('exams', examId);
+            if (!exam) throw new Error('Exam not found in local storage');
+
+            const questions = await idbManager.getByIndex('questions', 'exam_id', parseInt(examId));
+            if (!questions || questions.length === 0) throw new Error('Questions not found locally');
+
+            // Map IDB question structure to what PrintEngine expects
+            const formattedQuestions = questions.map(q => ({
+                id: q.id,
+                question: q.question,
+                options: (typeof q.options === 'string') ? JSON.parse(q.options) : q.options,
+                answer: q.answer
+            }));
+
+            const data = {
+                details: {
+                    exam_title: exam.exam_title,
+                    full_marks: exam.total_marks,
+                    time: (exam.duration || 0) + " মিনিট"
+                },
+                questions: formattedQuestions
+            };
+
+            PrintEngine.generatePDF(data);
+            if (window.showToast) showToast('Offline PDF generated successfully!');
+            PrintEngine.closeModal();
+
+        } catch (error) {
+            console.error('Offline PDF Error:', error);
+            if (window.showToast) showToast('Failed to generate PDF: ' + error.message, 'error');
+        } finally {
+            if (generateBtn) {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<span class="material-symbols-outlined">picture_as_pdf</span> Generate PDF Questions';
+            }
+        }
+    }
+
+    // Expose print modal opener
+    window.openPrintModalOffline = (examId) => {
+        PrintEngine.onGenerate = processAndPrintOffline;
+        PrintEngine.openModal(examId);
+    };
 
     /**
      * Populate Filter Options
@@ -158,6 +296,25 @@
             if (window.showToast) showToast('Sync failed: ' + err.message, 'error');
         };
     }
+
+    // Expose takeOfflineExam to window
+    window.takeOfflineExam = (examId) => {
+        if (window.loadPage) {
+            window.loadPage('take-offline-exam', `?exam_id=${examId}`);
+        }
+    };
+
+    window.resumeOfflineAttempt = (attemptUuid, examId) => {
+        if (window.loadPage) {
+            window.loadPage('take-offline-exam', `?exam_id=${examId}&attempt_uuid=${attemptUuid}`);
+        }
+    };
+
+    window.reviewOfflineAttempt = (attemptUuid) => {
+        if (window.loadPage) {
+            window.loadPage('performance-review', `?attempt_id=${attemptUuid}`);
+        }
+    };
 
     initPage();
 })();

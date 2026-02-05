@@ -9,11 +9,11 @@
 
 //     function renderReview(data) {
 //         const { performance, exam, questions } = data;
-        
+
 //         // Populate Header
 //         document.getElementById('review-exam-title').textContent = exam.exam_title;
 //         document.getElementById('review-breadcrumb').textContent = `${exam.subject_name || 'N/A'} > ${exam.lesson_name || 'N/A'} > ${exam.topic_name || 'N/A'}`.replace(/ > N\/A/g, '');
-        
+
 //         // Populate Summary Cards
 //         document.getElementById('review-final-score').textContent = parseFloat(performance.score_with_negative).toFixed(2);
 //         document.getElementById('review-correct').textContent = performance.right_answers;
@@ -64,7 +64,7 @@
 //             `;
 
 //             const sortedOptions = Object.entries(JSON.parse(q.options)).sort((a, b) => a[0].localeCompare(b[0]));
-            
+
 //             sortedOptions.forEach(([key, value]) => {
 //                 let classes = 'flex items-center p-3 rounded-lg border';
 //                 let icon = '';
@@ -173,18 +173,20 @@ function initializePerformanceReviewPage() {
 
     function renderReview(data) {
         const { performance, exam, questions } = data;
-        
+
         document.getElementById('review-exam-title').textContent = exam.exam_title;
         document.getElementById('review-breadcrumb').textContent = `${exam.subject_name || 'N/A'} > ${exam.lesson_name || 'N/A'} > ${exam.topic_name || 'N/A'}`.replace(/ > N\/A/g, '');
         document.getElementById('review-final-score').textContent = parseFloat(performance.score_with_negative).toFixed(2);
         document.getElementById('review-correct').textContent = performance.right_answers;
         document.getElementById('review-wrong').textContent = performance.wrong_answers;
         document.getElementById('review-unanswered').textContent = performance.unanswered;
-        document.getElementById('review-time-used').textContent = new Date(performance.time_used_seconds * 1000).toISOString().substr(14, 5);
+
+        const timeUsed = performance.time_used_seconds || performance.duration_used || 0;
+        document.getElementById('review-time-used').textContent = new Date(timeUsed * 1000).toISOString().substr(14, 5);
 
         const container = document.getElementById('review-questions-container');
         container.innerHTML = '';
-        const userAnswers = JSON.parse(performance.selected_answers);
+        const userAnswers = (typeof performance.selected_answers === 'string') ? JSON.parse(performance.selected_answers) : (performance.selected_answers || {});
 
         questions.forEach((q, index) => {
             const userAnswer = userAnswers[q.id] || null;
@@ -216,17 +218,17 @@ function initializePerformanceReviewPage() {
                     </div>
                     <div class="space-y-2 text-sm">
             `;
+            const optionsObj = (typeof q.options === 'string') ? JSON.parse(q.options) : (q.options || {});
+            const sortedOptions = Object.entries(optionsObj).sort((a, b) => a[0].localeCompare(b[0]));
 
-            const sortedOptions = Object.entries(JSON.parse(q.options)).sort((a, b) => a[0].localeCompare(b[0]));
-            
             sortedOptions.forEach(([key, value]) => {
                 let classes = 'flex items-center p-3 rounded-lg border';
                 let icon = '';
                 if (key === userAnswer) {
-                    if(isCorrect) { classes += ' bg-green-100 border-green-400 font-bold'; icon = '<span class="material-symbols-outlined text-green-600 mr-2">check_circle</span>'; } 
+                    if (isCorrect) { classes += ' bg-green-100 border-green-400 font-bold'; icon = '<span class="material-symbols-outlined text-green-600 mr-2">check_circle</span>'; }
                     else { classes += ' bg-red-100 border-red-400 font-bold'; icon = '<span class="material-symbols-outlined text-red-600 mr-2">cancel</span>'; }
-                } 
-                else if (key === correctOptionKey) { classes += ' bg-green-50 border-green-300'; icon = '<span class="material-symbols-outlined text-green-600 mr-2">check_circle</span>'; } 
+                }
+                else if (key === correctOptionKey) { classes += ' bg-green-50 border-green-300'; icon = '<span class="material-symbols-outlined text-green-600 mr-2">check_circle</span>'; }
                 else { classes += ' bg-white'; }
                 questionCardHTML += `<div class="${classes}">${icon}<strong>${optionLabels[key]}.</strong><span class="ml-2">${value}</span></div>`;
             });
@@ -238,6 +240,51 @@ function initializePerformanceReviewPage() {
 
     async function loadAttemptDetails() {
         if (!attemptId) return;
+
+        // Check if it's a local attempt (UUID v4 format usually has hyphens)
+        const isLocalAttempt = attemptId.includes('-');
+
+        if (isLocalAttempt) {
+            try {
+                await idbManager.init();
+                const attempt = await idbManager.getAttempt(attemptId);
+                const exams = await idbManager.getAll('exams');
+                const exam = exams.find(e => e.id == attempt.exam_id);
+                const questions = await idbManager.getQuestionsByExam(attempt.exam_id);
+
+                if (attempt && exam && questions) {
+                    // Fetch nested names for breadcrumb
+                    const subject = await idbManager.getById('subjects', exam.subject_id);
+                    const lesson = await idbManager.getById('lessons', exam.lesson_id);
+                    const topic = await idbManager.getById('topics', exam.topic_id);
+
+                    renderReview({
+                        performance: {
+                            ...attempt,
+                            time_used_seconds: attempt.duration_used || 0,
+                            right_answers: attempt.right_answers || 0,
+                            wrong_answers: attempt.wrong_answers || 0,
+                            unanswered: attempt.unanswered || 0,
+                            selected_answers: JSON.stringify(attempt.answers)
+                        },
+                        exam: {
+                            ...exam,
+                            subject_name: subject?.subject_name,
+                            lesson_name: lesson?.lesson_name,
+                            topic_name: topic?.topic_name
+                        },
+                        questions: questions
+                    });
+                } else {
+                    throw new Error('Local attempt data incomplete');
+                }
+            } catch (error) {
+                console.error('Offline Fetch Error:', error);
+                document.getElementById('review-questions-container').innerHTML = `<p class="text-red-500 text-center">Failed to load local attempt data.</p>`;
+            }
+            return;
+        }
+
         try {
             const response = await fetch(`${API_URL}?attempt_id=${attemptId}`);
             const result = await response.json();
@@ -246,11 +293,27 @@ function initializePerformanceReviewPage() {
             } else {
                 document.getElementById('review-questions-container').innerHTML = `<p class="text-red-500 text-center">${result.message}</p>`;
             }
-        } catch (error) { console.error('Fetch Details Error:', error); }
+        } catch (error) {
+            console.error('Fetch Details Error:', error);
+            // Fallback to local if fetch fails (maybe it was synced but we're offline now)
+            try {
+                await idbManager.init();
+                const attempt = await idbManager.getAttempt(attemptId);
+                if (attempt) {
+                    const exams = await idbManager.getAll('exams');
+                    const exam = exams.find(e => e.id == attempt.exam_id);
+                    const questions = await idbManager.getQuestionsByExam(attempt.exam_id);
+                    renderReview({
+                        performance: { ...attempt, selected_answers: JSON.stringify(attempt.answers) },
+                        exam, questions
+                    });
+                }
+            } catch (e) { }
+        }
     }
 
     document.getElementById('back-to-performance-btn').addEventListener('click', () => {
-        if(window.loadPage) window.loadPage('check-performance');
+        if (window.loadPage) window.loadPage('check-performance');
     });
 
     // --- NEW: Event listener for the filter buttons ---

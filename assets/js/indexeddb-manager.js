@@ -5,7 +5,7 @@
  */
 
 const DB_NAME = 'ExamOfflineDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class IndexedDBManager {
     constructor() {
@@ -22,7 +22,7 @@ class IndexedDBManager {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
 
-                // Create Object Stores
+                // Create Object Stores (Initial V1)
                 if (!db.objectStoreNames.contains('subjects')) {
                     db.createObjectStore('subjects', { keyPath: 'id' });
                 }
@@ -41,7 +41,20 @@ class IndexedDBManager {
                     examStore.createIndex('topic_id', 'topic_id', { unique: false });
                     examStore.createIndex('updated_at', 'updated_at', { unique: false });
                 }
-                
+
+                // New Stores for V2 (Phase 2)
+                if (!db.objectStoreNames.contains('questions')) {
+                    const questionStore = db.createObjectStore('questions', { keyPath: 'id' });
+                    questionStore.createIndex('exam_id', 'exam_id', { unique: false });
+                    questionStore.createIndex('updated_at', 'updated_at', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('offline_attempts')) {
+                    const attemptStore = db.createObjectStore('offline_attempts', { keyPath: 'id' });
+                    attemptStore.createIndex('exam_id', 'exam_id', { unique: false });
+                    attemptStore.createIndex('status', 'status', { unique: false });
+                }
+
                 // Store for sync metadata
                 if (!db.objectStoreNames.contains('metadata')) {
                     db.createObjectStore('metadata', { keyPath: 'key' });
@@ -67,9 +80,12 @@ class IndexedDBManager {
         if (!this.db) await this.init();
 
         return new Promise((resolve, reject) => {
-            const tx = this.db.transaction(['subjects', 'lessons', 'topics', 'exams'], 'readwrite');
-            
+            const storeNames = ['subjects', 'lessons', 'topics', 'exams', 'questions', 'offline_attempts'];
+            const tx = this.db.transaction(storeNames, 'readwrite');
+
             for (const [table, records] of Object.entries(changes)) {
+                if (!storeNames.includes(table)) continue;
+
                 const store = tx.objectStore(table);
                 records.forEach(record => {
                     if (record.is_deleted == 1) {
@@ -80,7 +96,8 @@ class IndexedDBManager {
                         if (record.subject_id) record.subject_id = parseInt(record.subject_id);
                         if (record.lesson_id) record.lesson_id = parseInt(record.lesson_id);
                         if (record.topic_id) record.topic_id = parseInt(record.topic_id);
-                        
+                        if (record.exam_id) record.exam_id = parseInt(record.exam_id);
+
                         store.put(record);
                     }
                 });
@@ -109,12 +126,31 @@ class IndexedDBManager {
      * Query by index
      */
     async getByIndex(storeName, indexName, value) {
+        if (value === null || value === undefined) return [];
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readonly');
             const store = tx.objectStore(storeName);
             const index = store.index(indexName);
             const request = index.getAll(value);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * Get a single record by ID
+     */
+    async getById(storeName, id) {
+        if (id === null || id === undefined) return null;
+        const numericId = parseInt(id);
+        if (isNaN(numericId)) return null;
+
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const request = store.get(numericId);
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
@@ -137,6 +173,9 @@ class IndexedDBManager {
     /**
      * Set Sync Metadata
      */
+    /**
+     * Set Sync Metadata
+     */
     async setMetadata(key, value) {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -145,6 +184,65 @@ class IndexedDBManager {
             store.put({ key, value });
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    /**
+     * Get Questions by Exam ID
+     */
+    async getQuestionsByExam(examId) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('questions', 'readonly');
+            const store = tx.objectStore('questions');
+            const index = store.index('exam_id');
+            const request = index.getAll(parseInt(examId));
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * Create or Update an Offline Attempt
+     */
+    async saveAttempt(attempt) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('offline_attempts', 'readwrite');
+            const store = tx.objectStore('offline_attempts');
+            store.put(attempt);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    /**
+     * Get Attempt by ID
+     */
+    async getAttempt(attemptId) {
+        if (!attemptId) return null;
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('offline_attempts', 'readonly');
+            const store = tx.objectStore('offline_attempts');
+            const request = store.get(attemptId);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * Get Pending Sync Attempts
+     */
+    async getPendingAttempts() {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('offline_attempts', 'readonly');
+            const store = tx.objectStore('offline_attempts');
+            const index = store.index('status');
+            const request = index.getAll('COMPLETED');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
         });
     }
 }

@@ -44,6 +44,9 @@ function get_table_changes($conn, $table, $last_sync) {
     $changes = [];
     
     while ($row = $result->fetch_assoc()) {
+        if ($table === 'questions' && isset($row['options'])) {
+            $row['options'] = json_decode($row['options'], true);
+        }
         $changes[] = $row;
     }
     
@@ -62,7 +65,7 @@ $server_time_row = $server_time_query->fetch_assoc();
 $server_time = $server_time_row['current_time'];
 
 // Tables to sync
-$tables = ['subjects', 'lessons', 'topics', 'exams'];
+$tables = ['subjects', 'lessons', 'topics', 'exams', 'questions'];
 $response_changes = [];
 
 try {

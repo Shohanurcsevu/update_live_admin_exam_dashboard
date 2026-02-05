@@ -22,7 +22,10 @@ class SyncManager {
         console.log('Sync started...');
 
         try {
-            // Get last sync time from IndexedDB
+            // 1. Sync completed attempts first
+            await this.syncAttempts();
+
+            // 2. Get last sync time from IndexedDB for metadata sync
             const lastSync = await idbManager.getMetadata('last_server_sync');
 
             // Fetch deltas from server
@@ -48,6 +51,65 @@ class SyncManager {
             if (this.onSyncError) this.onSyncError(error);
         } finally {
             this.isSyncing = false;
+        }
+    }
+
+    /**
+     * Sync completed offline attempts to server
+     */
+    async syncAttempts() {
+        if (!navigator.onLine) return;
+
+        const pending = await idbManager.getPendingAttempts();
+        if (pending.length === 0) return;
+
+        console.log(`Syncing ${pending.length} pending attempts...`);
+
+        for (const attempt of pending) {
+            await this.syncSingleAttempt(attempt);
+        }
+    }
+
+    /**
+     * Sync a single attempt and return the result
+     */
+    async syncSingleAttempt(attempt) {
+        if (!navigator.onLine) return { success: false, message: 'Offline' };
+
+        try {
+            const response = await fetch('api/offline/submit-attempt.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    attempt_uuid: attempt.id,
+                    exam_id: attempt.exam_id,
+                    answers: attempt.answers,
+                    start_time: attempt.start_time,
+                    end_time: attempt.end_time,
+                    duration_used: attempt.duration_used,
+                    checksum: attempt.checksum
+                })
+            });
+
+            const result = await response.json();
+            if (result.success || result.already_synced) {
+                // Update local status to SYNCED
+                attempt.status = 'SYNCED';
+                if (result.data) {
+                    attempt.score = result.data.score;
+                    attempt.score_with_negative = result.data.score_with_negative;
+                    attempt.server_attempt_id = result.data.attempt_id;
+                }
+                await idbManager.saveAttempt(attempt);
+                console.log(`Attempt ${attempt.id} synced successfully.`);
+                return result;
+            } else {
+                console.error(`Failed to sync attempt ${attempt.id}:`, result.message);
+                return result;
+            }
+        } catch (e) {
+            console.error(`Sync error for attempt ${attempt.id}:`, e);
+            return { success: false, message: e.message };
         }
     }
 

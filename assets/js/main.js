@@ -120,7 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'custom-exam-topics': 'assets/js/custom-exam-topics.js', 'custom-exams': 'assets/js/custom-exams.js',
             'custom-exam-from-lessons': 'assets/js/custom-exam-from-lessons.js', 'model-test-builder': 'assets/js/model-test-builder.js',
             'exams-across-subjects': 'assets/js/exams-across-subjects.js', 'topic-wise-exams': 'assets/js/topic-wise-exams.js',
-            'lesson-wise-exams': 'assets/js/lesson-wise-exams.js', 'offline-exams': 'assets/js/offline-exams.js'
+            'lesson-wise-exams': 'assets/js/lesson-wise-exams.js', 'offline-exams': 'assets/js/offline-exams.js',
+            'take-offline-exam': 'assets/js/offline-exam-engine.js'
         };
 
         if (pageScripts[page]) {

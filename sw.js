@@ -1,4 +1,4 @@
-const CACHE_NAME = 'exam-app-shell-v1';
+const CACHE_NAME = 'exam-app-shell-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -7,11 +7,13 @@ const ASSETS_TO_CACHE = [
     './assets/js/sidebar.js',
     './assets/js/indexeddb-manager.js',
     './assets/js/sync-manager.js',
+    './assets/js/offline-exams.js',
+    './assets/js/offline-exam-engine.js',
     './components/sidebar.html',
     './components/header.html',
     './pages/dashboard.html',
     './pages/offline-exams.html',
-    './assets/js/offline-exams.js',
+    './pages/take-offline-exam.html',
     'https://cdn.tailwindcss.com',
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
     'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200'
