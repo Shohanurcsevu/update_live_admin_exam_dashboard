@@ -15,7 +15,7 @@ $sql = "SELECT
         FROM exams e
         LEFT JOIN subjects s ON e.subject_id = s.id
         LEFT JOIN lessons l ON e.lesson_id = l.id
-        WHERE e.topic_id IS NULL
+        WHERE e.topic_id IS NULL AND e.is_deleted = 0
         ORDER BY e.id DESC";
 
 $sqle = "SELECT 
@@ -35,9 +35,10 @@ LEFT JOIN subjects s ON e.subject_id = s.id
 LEFT JOIN lessons l ON e.lesson_id = l.id
 LEFT JOIN topics t ON e.topic_id = t.id
 WHERE 
+    e.is_deleted = 0 AND (
     e.subject_id IS NULL 
     OR e.lesson_id IS NULL 
-    OR e.topic_id IS NULL;
+    OR e.topic_id IS NULL)
 ";
 
 $result = $conn->query($sqle);
