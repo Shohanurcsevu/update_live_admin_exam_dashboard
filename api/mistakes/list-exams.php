@@ -18,7 +18,9 @@ $query = "
     FROM mistake_bank m
     LEFT JOIN exams e ON m.exam_id = e.id
     LEFT JOIN subjects s ON m.subject_id = s.id
-    WHERE m.resolved = 0
+    WHERE m.resolved = 0 
+      AND (e.is_deleted IS NULL OR e.is_deleted = 0)
+      AND (s.is_deleted IS NULL OR s.is_deleted = 0)
     GROUP BY m.exam_id
     ORDER BY last_activity DESC
 ";

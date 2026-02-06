@@ -15,12 +15,14 @@ $exam_id = isset($_GET['exam_id']) ? intval($_GET['exam_id']) : null;
 $sql = "SELECT mb.question_id, mb.subject_id, mb.lesson_id, mb.topic_id, mb.is_custom, q.* 
         FROM mistake_bank mb 
         JOIN questions q ON mb.question_id = q.id 
-        WHERE mb.resolved = 0 ";
+        LEFT JOIN exams e ON mb.exam_id = e.id
+        WHERE mb.resolved = 0 
+          AND (e.is_deleted IS NULL OR e.is_deleted = 0) ";
 
 if ($exam_id !== null) {
     $sql .= " AND mb.exam_id = ? ";
 } else {
-    $sql .= " AND mb.exam_id IS NULL "; // Or remove this if you want global mastery fallback
+    // For global/null mastery, we still respect the e.is_deleted check above via LEFT JOIN
 }
 
 $sql .= " ORDER BY mb.mistake_count DESC, RAND() LIMIT ?";
