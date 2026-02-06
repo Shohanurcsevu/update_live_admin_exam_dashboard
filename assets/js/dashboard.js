@@ -74,7 +74,62 @@ function initializeDashboardPage() {
 
             // Mistake Bank Stats
             fetchMistakeStats();
+            fetchAndRenderHeatmap();
         } catch (error) { console.error("Error fetching metrics:", error); }
+    }
+
+    async function fetchAndRenderHeatmap() {
+        const heatmapGrid = document.getElementById('subject-heatmap-grid');
+        if (!heatmapGrid) return;
+
+        try {
+            const response = await fetch('api/mistakes/subject-stats.php');
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                heatmapGrid.innerHTML = result.data.map(subject => {
+                    let bgColor = 'bg-white';
+                    let borderColor = 'border-gray-100';
+                    let textColor = 'text-gray-900';
+                    let labelColor = 'text-gray-500';
+                    let glowClass = '';
+
+                    if (subject.mistake_count === 0) {
+                        bgColor = 'bg-emerald-50';
+                        borderColor = 'border-emerald-200';
+                        textColor = 'text-emerald-900';
+                        labelColor = 'text-emerald-600';
+                    } else if (subject.mistake_count <= 5) {
+                        bgColor = 'bg-amber-50';
+                        borderColor = 'border-amber-200';
+                        textColor = 'text-amber-900';
+                        labelColor = 'text-amber-600';
+                    } else {
+                        bgColor = 'bg-rose-50';
+                        borderColor = 'border-rose-200';
+                        textColor = 'text-rose-900';
+                        labelColor = 'text-rose-600';
+                        glowClass = 'shadow-[0_0_15px_rgba(244,63,94,0.1)]';
+                    }
+
+                    return `
+                        <div class="${bgColor} ${borderColor} ${glowClass} border p-4 rounded-xl transition-all hover:scale-[1.02] hover:shadow-md group cursor-default">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="material-symbols-outlined text-xl ${labelColor}">
+                                    ${subject.mistake_count === 0 ? 'verified' : (subject.mistake_count <= 5 ? 'warning' : 'dangerous')}
+                                </span>
+                                <span class="text-2xl font-black ${textColor}">${subject.mistake_count}</span>
+                            </div>
+                            <h3 class="font-bold text-sm ${textColor} truncate">${subject.subject_name}</h3>
+                            <p class="${labelColor} text-[10px] font-bold uppercase tracking-widest mt-0.5">Mistakes</p>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } catch (error) {
+            console.error("Error fetching heatmap stats:", error);
+            heatmapGrid.innerHTML = '<p class="col-span-full text-center text-gray-400 py-10">Failed to load heatmap.</p>';
+        }
     }
 
     async function fetchMistakeStats() {
