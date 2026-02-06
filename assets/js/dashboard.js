@@ -508,24 +508,6 @@ function initializeDashboardPage() {
             });
         }
 
-        const masteryBtn = document.getElementById('mastery-quiz-btn');
-        if (masteryBtn) {
-            masteryBtn.addEventListener('click', () => {
-                console.log("Dashboard: Starting Mastery Quiz...");
-
-                const originalContent = masteryBtn.innerHTML;
-                masteryBtn.disabled = true;
-                masteryBtn.innerHTML = `<span class="material-symbols-outlined animate-spin text-lg">sync</span> Preparing...`;
-
-                if (window.loadPage) {
-                    window.loadPage('take-offline-exam', `?mode=mastery_quiz`);
-                } else {
-                    console.error("loadPage not found");
-                    masteryBtn.disabled = false;
-                    masteryBtn.innerHTML = originalContent;
-                }
-            });
-        }
         checkRecentAttempt();
     }
 

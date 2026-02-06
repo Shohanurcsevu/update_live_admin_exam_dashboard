@@ -333,7 +333,12 @@ function initializeOfflineExamEngine() {
                         if (window.loadPage) window.loadPage('dashboard');
                         return;
                     }
-                    const response = await fetch(`api/mistakes/get-mastery.php?limit=${count}`);
+
+                    const fExamId = params.get('exam_id');
+                    let apiPath = `api/mistakes/get-mastery.php?limit=${count}`;
+                    if (fExamId) apiPath += `&exam_id=${fExamId}`;
+
+                    const response = await fetch(apiPath);
                     const result = await response.json();
                     if (result.success && result.data.length > 0) {
                         questions = result.data;

@@ -30,17 +30,27 @@ foreach ($data['questions'] as $q) {
     $top_id = isset($q['topic_id']) ? intval($q['topic_id']) : null;
 
     // Insert or Increment mistake count
-    // Using simple approach for compatibility
-    $check = $conn->prepare("SELECT id, mistake_count FROM mistake_bank WHERE question_id = ?");
-    $check->bind_param("i", $q_id);
+    // Now tracking per question PER EXAM
+    $check = $conn->prepare("SELECT id, mistake_count FROM mistake_bank WHERE question_id = ? AND exam_id " . ($exam_id === null ? "IS NULL" : "= ?"));
+    
+    if ($exam_id === null) {
+        $check->bind_param("i", $q_id);
+    } else {
+        $check->bind_param("ii", $q_id, $exam_id);
+    }
+    
     $check->execute();
     $result = $check->get_result();
 
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         $new_count = $row['mistake_count'] + 1;
-        $stmt = $conn->prepare("UPDATE mistake_bank SET mistake_count = ?, resolved = 0, last_missed_at = NOW() WHERE question_id = ?");
-        $stmt->bind_param("ii", $new_count, $q_id);
+        $stmt = $conn->prepare("UPDATE mistake_bank SET mistake_count = ?, resolved = 0, last_missed_at = NOW() WHERE question_id = ? AND exam_id " . ($exam_id === null ? "IS NULL" : "= ?"));
+        if ($exam_id === null) {
+            $stmt->bind_param("ii", $new_count, $q_id);
+        } else {
+            $stmt->bind_param("iii", $new_count, $q_id, $exam_id);
+        }
     } else {
         $stmt = $conn->prepare("INSERT INTO mistake_bank (question_id, exam_id, subject_id, lesson_id, topic_id, is_custom, mistake_count) VALUES (?, ?, ?, ?, ?, ?, 1)");
         $stmt->bind_param("iiiiii", $q_id, $exam_id, $sub_id, $les_id, $top_id, $is_custom);
