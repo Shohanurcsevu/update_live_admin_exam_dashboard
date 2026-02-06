@@ -1,82 +1,106 @@
-const CACHE_NAME = 'exam-app-shell-v2';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'rethink-exam-v4';
+const PRE_CACHE_ASSETS = [
     './',
     './index.html',
+    './manifest.json',
     './assets/css/style.css',
     './assets/js/main.js',
     './assets/js/sidebar.js',
     './assets/js/indexeddb-manager.js',
     './assets/js/sync-manager.js',
+    './assets/js/print-engine.js',
     './assets/js/offline-exams.js',
     './assets/js/offline-exam-engine.js',
-    './components/sidebar.html',
+    './assets/js/performance-review.js',
     './components/header.html',
+    './components/sidebar.html',
     './pages/dashboard.html',
     './pages/offline-exams.html',
     './pages/take-offline-exam.html',
+    './pages/performance-review.html'
+];
+
+const EXTERNAL_ASSETS = [
     'https://cdn.tailwindcss.com',
+    'https://cdn.jsdelivr.net/npm/chart.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css',
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
     'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200'
 ];
 
-// Install Event - Cache assets
+// Install Event
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            console.log('Opened cache and adding assets');
-            return cache.addAll(ASSETS_TO_CACHE);
+        caches.open(CACHE_NAME).then(async (cache) => {
+            console.log('SW v4: Starting resilient installation...');
+
+            // 1. Cache internal assets (must succeed)
+            try {
+                await cache.addAll(PRE_CACHE_ASSETS);
+                console.log('SW v4: Internal assets cached.');
+            } catch (e) {
+                console.error('SW v4: Critical internal cache failed!', e);
+            }
+
+            // 2. Cache external assets individually with no-cors
+            for (const url of EXTERNAL_ASSETS) {
+                try {
+                    // Using no-cors ensures we get an opaque response that can be cached
+                    // even if the server doesn't provide CORS headers.
+                    const response = await fetch(url, { mode: 'no-cors' });
+                    await cache.put(url, response);
+                    console.log(`SW v4: Cached external asset: ${url}`);
+                } catch (e) {
+                    console.warn(`SW v4: Failed to cache external asset: ${url}`, e);
+                }
+            }
         })
     );
+    self.skipWaiting();
 });
 
-// Activate Event - Clean up old caches
+// Activate Event
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
                     if (cacheName !== CACHE_NAME) {
+                        console.log('SW v4: Clearing old cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
             );
         })
     );
+    self.clients.claim();
 });
 
-// Fetch Event - Serve from cache or network
+// Fetch Event
 self.addEventListener('fetch', (event) => {
-    // Skip API calls - we don't want to cache sync.php or other data APIs
-    if (event.request.url.includes('/api/')) {
+    if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
         return;
     }
 
     event.respondWith(
-        caches.match(event.request).then((response) => {
-            // Cache hit - return response
-            if (response) {
-                return response;
-            }
-
-            // Not in cache - fetch from network
-            return fetch(event.request).then((networkResponse) => {
-                // Check if we received a valid response
-                if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-                    return networkResponse;
+        caches.match(event.request).then((cachedResponse) => {
+            // Cache-First with Network Fallback & Update
+            const networkFetch = fetch(event.request).then((networkResponse) => {
+                if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 0)) {
+                    const responseToCache = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseToCache);
+                    });
                 }
-
-                // Clone the response to store in cache
-                const responseToCache = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseToCache);
-                });
-
                 return networkResponse;
+            }).catch((error) => {
+                // Return cached response if network fails, OR throw if nothing
+                if (cachedResponse) return cachedResponse;
+                throw error;
             });
-        }).catch(() => {
-            // If both fail, let it fail naturally 
-            // Do not leave empty as it causes "canceled" status
-            return fetch(event.request);
+
+            return cachedResponse || networkFetch;
         })
     );
 });
