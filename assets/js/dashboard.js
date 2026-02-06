@@ -71,7 +71,33 @@ function initializeDashboardPage() {
                 animateCount(document.getElementById('total-exams'), metrics.exams);
                 animateCount(document.getElementById('total-questions'), metrics.questions);
             }
+
+            // Mistake Bank Stats
+            fetchMistakeStats();
         } catch (error) { console.error("Error fetching metrics:", error); }
+    }
+
+    async function fetchMistakeStats() {
+        try {
+            const response = await fetch('api/mistakes/stats.php');
+            const result = await response.json();
+            if (result.success) {
+                const countEl = document.getElementById('mistake-count');
+                if (countEl) animateCount(countEl, result.count);
+
+                const masteryBtn = document.getElementById('mastery-quiz-btn');
+                if (masteryBtn) {
+                    masteryBtn.disabled = (result.count === 0);
+                    if (result.count === 0) {
+                        masteryBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                        masteryBtn.title = "No mistakes found yet! Complete some exams first.";
+                    } else {
+                        masteryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        masteryBtn.title = "";
+                    }
+                }
+            }
+        } catch (error) { console.error("Error fetching mistake stats:", error); }
     }
 
     // --- Section 2: Exam Selection Logic ---
@@ -478,6 +504,25 @@ function initializeDashboardPage() {
                     console.error("loadPage not found");
                     daily10Btn.disabled = false;
                     daily10Btn.innerHTML = originalContent;
+                }
+            });
+        }
+
+        const masteryBtn = document.getElementById('mastery-quiz-btn');
+        if (masteryBtn) {
+            masteryBtn.addEventListener('click', () => {
+                console.log("Dashboard: Starting Mastery Quiz...");
+
+                const originalContent = masteryBtn.innerHTML;
+                masteryBtn.disabled = true;
+                masteryBtn.innerHTML = `<span class="material-symbols-outlined animate-spin text-lg">sync</span> Preparing...`;
+
+                if (window.loadPage) {
+                    window.loadPage('take-offline-exam', `?mode=mastery_quiz`);
+                } else {
+                    console.error("loadPage not found");
+                    masteryBtn.disabled = false;
+                    masteryBtn.innerHTML = originalContent;
                 }
             });
         }

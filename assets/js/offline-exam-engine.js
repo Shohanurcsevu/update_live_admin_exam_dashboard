@@ -80,7 +80,7 @@ function initializeOfflineExamEngine() {
 
         // Calculate remaining time if resuming
         const now = new Date();
-        const elapsedSeconds = Math.floor((now - new Date(startTime)) / 1000);
+        const elapsedSeconds = startTime ? Math.floor((now - new Date(startTime)) / 1000) : 0;
         const remainingSeconds = (duration * 60) - elapsedSeconds;
 
         startTimer(remainingSeconds > 0 ? remainingSeconds : 0);
@@ -135,10 +135,8 @@ function initializeOfflineExamEngine() {
             last_saved: new Date().toISOString()
         };
 
-        // NEW: Persist metadata for virtual exams (like Daily 10)
         if (attempt.exam_id === 0 && examData.details) {
             attempt.exam_title = examData.details.exam_title;
-            // Store a snapshot of questions for review mapping
             attempt.questions_snapshot = examData.questions;
         }
 
@@ -193,24 +191,40 @@ function initializeOfflineExamEngine() {
 
     async function submitExam() {
         clearInterval(timerInterval);
-        submitExamBtn.disabled = true;
-        submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">autorenew</span>Submitting...`;
+        if (submitExamBtn) {
+            submitExamBtn.disabled = true;
+            submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">autorenew</span>Submitting...`;
+        }
 
         let right = 0, wrong = 0, unanswered = 0;
+        const mistakes = [];
+        const correctIds = [];
+
         examData.questions.forEach(q => {
-            if (!userAnswers[q.id]) { unanswered++; }
-            else if (userAnswers[q.id] === q.answer) { right++; }
-            else { wrong++; }
+            if (!userAnswers[q.id]) {
+                unanswered++;
+            } else if (userAnswers[q.id] === q.answer) {
+                right++;
+                correctIds.push(q.id);
+            } else {
+                wrong++;
+                mistakes.push({
+                    question_id: q.id,
+                    subject_id: q.subject_id,
+                    lesson_id: q.lesson_id,
+                    topic_id: q.topic_id
+                });
+            }
         });
 
         const score = right * 1;
         const scoreWithNegative = score - (wrong * 0.5);
 
         const timerEl = document.getElementById('timer');
-        const timeLeft = timerEl ? timerEl.textContent.split(':') : ['0', '0'];
+        const timeLeft = (timerEl && timerEl.textContent.includes(':')) ? timerEl.textContent.split(':') : ['0', '0'];
         const timeLeftSeconds = parseInt(timeLeft[0]) * 60 + parseInt(timeLeft[1]);
         const durationSeconds = (examData.details.duration || examData.details.duration_minutes || 0) * 60;
-        const durationUsed = durationSeconds - timeLeftSeconds;
+        const durationUsed = Math.max(0, durationSeconds - timeLeftSeconds);
 
         const attempt = {
             id: attemptUuid,
@@ -225,10 +239,9 @@ function initializeOfflineExamEngine() {
             score: score,
             score_with_negative: scoreWithNegative,
             status: 'COMPLETED',
-            checksum: btoa(attemptUuid + examId + JSON.stringify(userAnswers))
+            checksum: btoa(attemptUuid + (examId || 0) + JSON.stringify(userAnswers))
         };
 
-        // NEW: Persist metadata for virtual exams
         if (attempt.exam_id === 0 && examData.details) {
             attempt.exam_title = examData.details.exam_title;
             attempt.questions_snapshot = examData.questions;
@@ -247,10 +260,43 @@ function initializeOfflineExamEngine() {
         try {
             await idbManager.saveAttempt(attempt);
 
-            // Immediate Sync Attempt
-            if (navigator.onLine && typeof syncManager !== 'undefined') {
-                submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">sync</span>Syncing with Server...`;
-                const syncResult = await syncManager.syncSingleAttempt(attempt);
+            if (navigator.onLine) {
+                if (submitExamBtn) submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">sync</span>Syncing...`;
+
+                // 1. Sync Performance
+                let syncResult = null;
+                if (typeof syncManager !== 'undefined') {
+                    syncResult = await syncManager.syncSingleAttempt(attempt);
+                }
+
+                // 2. Sync Mistakes
+                if (mistakes.length > 0) {
+                    try {
+                        await fetch('api/mistakes/add.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                exam_id: examId,
+                                is_custom: (examId == 0 ? 1 : 0),
+                                questions: mistakes
+                            })
+                        });
+                    } catch (err) { console.error("Mistake sync failed", err); }
+                }
+
+                // 3. Sync Resolutions (NEW)
+                if (correctIds.length > 0) {
+                    try {
+                        await fetch('api/mistakes/resolve.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                questions: correctIds
+                            })
+                        });
+                        console.log("Resolutions synced to Mistake Bank.");
+                    } catch (err) { console.error("Resolution sync failed", err); }
+                }
 
                 if (syncResult && syncResult.success) {
                     displayExamResult(performanceData, true, syncResult.data?.attempt_id);
@@ -260,14 +306,14 @@ function initializeOfflineExamEngine() {
             } else {
                 displayExamResult(performanceData, false);
             }
-
         } catch (e) {
-            console.error("Error during offline submission:", e);
-            if (window.showToast) showToast('Failed to save attempt.', 'error');
+            console.error("Error during submission:", e);
             displayExamResult(performanceData, false);
         } finally {
-            submitExamBtn.disabled = false;
-            submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2">check_circle</span>Submit Exam`;
+            if (submitExamBtn) {
+                submitExamBtn.disabled = false;
+                submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2">check_circle</span>Submit Exam`;
+            }
         }
     }
 
@@ -275,35 +321,52 @@ function initializeOfflineExamEngine() {
         const mode = params.get('mode');
         console.log("Offline Engine: Starting load...", { mode, examId, attemptUuid });
 
-        if (mode === 'daily_15' || mode === 'daily_10') {
-            console.log(`Daily ${mode === 'daily_15' ? '15' : '10'} mode active`);
+        if (mode === 'daily_15' || mode === 'daily_10' || mode === 'mastery_quiz') {
             try {
-                const count = mode === 'daily_15' ? 15 : 10;
-                const questions = await idbManager.getBalancedRandomQuestions(count);
-                console.log(`Daily ${count}: Questions found:`, questions.length);
+                let questions = [];
+                const count = (mode === 'daily_15' || mode === 'mastery_quiz') ? 15 : 10;
+                const title = mode === 'mastery_quiz' ? 'Mastery Quiz' : `Daily ${count} Challenge`;
+
+                if (mode === 'mastery_quiz') {
+                    if (!navigator.onLine) {
+                        alert('You must be online to fetch questions from your Mistake Bank.');
+                        if (window.loadPage) window.loadPage('dashboard');
+                        return;
+                    }
+                    const response = await fetch(`api/mistakes/get-mastery.php?limit=${count}`);
+                    const result = await response.json();
+                    if (result.success && result.data.length > 0) {
+                        questions = result.data;
+                    } else {
+                        alert('Your Mistake Bank is empty or could not be reached.');
+                        if (window.loadPage) window.loadPage('dashboard');
+                        return;
+                    }
+                } else {
+                    questions = await idbManager.getBalancedRandomQuestions(count);
+                }
 
                 if (questions.length === 0) {
-                    const msg = 'Your offline question bank is empty. Please download at least one subject from the "Offline Exams" page first.';
-                    if (window.showToast) showToast(msg, 'error');
-                    else alert(msg);
+                    const msg = 'No questions found for this mode.';
+                    if (window.showToast) showToast ? showToast(msg, 'error') : alert(msg);
                     if (window.loadPage) window.loadPage('dashboard');
                     return;
                 }
 
                 const details = {
                     id: 0,
-                    exam_title: `Daily ${count} Challenge`,
+                    exam_title: title,
                     duration: count,
                     total_marks: count,
                     pass_mark: Math.ceil(count * 0.4),
-                    instructions: `${count} random questions from all your downloaded subjects. You have ${count} minutes!`
+                    instructions: mode === 'mastery_quiz' ? "Focus and get them right this time!" : "Practice across all subjects."
                 };
 
                 startTime = new Date().toISOString();
                 renderExam(details, questions);
                 return;
             } catch (e) {
-                console.error("Critical error in Daily quiz load:", e);
+                console.error("Critical error in load:", e);
                 return;
             }
         }
@@ -311,21 +374,18 @@ function initializeOfflineExamEngine() {
         if (!examId) return;
 
         try {
-            // 1. Check for existing attempt (resume support)
             const existingAttempt = await idbManager.getAttempt(attemptUuid);
-
-            // 2. Load exam details and questions
             const exams = await idbManager.getAll('exams');
             const details = exams.find(e => e.id == examId);
 
             if (!details) {
-                if (window.showToast) showToast('Exam data not found offline. Please sync while online.', 'error');
+                if (window.showToast) showToast('Exam data not found offline.', 'error');
                 return;
             }
 
             const questions = await idbManager.getQuestionsByExam(examId);
             if (!questions || questions.length === 0) {
-                if (window.showToast) showToast('Exam questions not found offline. Please sync while online.', 'error');
+                if (window.showToast) showToast('Exam questions not found offline.', 'error');
                 return;
             }
 
@@ -333,13 +393,11 @@ function initializeOfflineExamEngine() {
                 userAnswers = existingAttempt.answers || {};
                 startTime = existingAttempt.start_time;
                 if (existingAttempt.status === 'COMPLETED' || existingAttempt.status === 'SYNCED') {
-                    if (window.showToast) showToast('This exam has already been completed.', 'warning');
                     window.loadPage('offline-exams');
                     return;
                 }
             } else {
                 startTime = new Date().toISOString();
-                // Create initial record
                 await autoSaveProgress();
             }
 
@@ -347,14 +405,13 @@ function initializeOfflineExamEngine() {
 
         } catch (e) {
             console.error("Failed to load offline exam:", e);
-            if (window.showToast) showToast('Error loading offline exam.', 'error');
         }
     }
 
     const exitExamBtn = document.getElementById('exit-exam-btn');
     if (exitExamBtn) {
         exitExamBtn.addEventListener('click', async () => {
-            if (confirm("Are you sure you want to exit? Your progress will be saved, and you can resume this exam later from the 'My Attempts' section.")) {
+            if (confirm("Are you sure you want to exit? Your progress will be saved.")) {
                 await autoSaveProgress();
                 if (window.loadPage) window.loadPage('offline-exams');
             }
@@ -374,7 +431,7 @@ function initializeOfflineExamEngine() {
 
     if (questionsArea) questionsArea.addEventListener('click', handleOptionClick);
     if (submitExamBtn) submitExamBtn.addEventListener('click', async () => {
-        if (confirm("Are you sure you want to submit? You cannot change your answers after submission.")) {
+        if (confirm("Are you sure you want to submit?")) {
             await submitExam();
         }
     });

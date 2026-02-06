@@ -2,7 +2,7 @@
     <div id="toast-container" class="fixed top-5 right-5 z-50"></div>
 
     <!-- Action Hub: Resume & Rapid Fire -->
-    <div id="action-hub" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div id="action-hub" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Resume Card -->
         <div id="resume-card"
             class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-6 text-white shadow-lg hidden">
@@ -48,6 +48,30 @@
                     class="bg-white text-emerald-600 px-6 py-2 rounded-lg font-bold hover:bg-emerald-50 transition-colors shadow-sm flex items-center gap-2">
                     <span class="material-symbols-outlined text-lg">rocket_launch</span>
                     Start Quiz
+                </button>
+            </div>
+        </div>
+
+        <!-- Mistake Bank Card -->
+        <div class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <span class="bg-white/20 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">Adaptive
+                        Learning</span>
+                    <h3 class="text-xl font-bold mt-2">Mistake Bank</h3>
+                    <p class="text-rose-50 text-sm opacity-90"><span id="mistake-count">0</span> persistent errors
+                        tracked</p>
+                </div>
+                <div class="bg-white/20 p-2 rounded-lg">
+                    <span class="material-symbols-outlined text-3xl">psychology</span>
+                </div>
+            </div>
+            <div class="mt-6">
+                <button id="mastery-quiz-btn"
+                    onclick="if(window.loadPage) window.loadPage('take-offline-exam', '?mode=mastery_quiz')"
+                    class="bg-white text-rose-600 px-6 py-2 rounded-lg font-bold hover:bg-rose-50 transition-colors shadow-sm flex items-center gap-2">
+                    <span class="material-symbols-outlined text-lg">school</span>
+                    Mastery Quiz
                 </button>
             </div>
         </div>

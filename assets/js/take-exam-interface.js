@@ -267,10 +267,24 @@ function initializeTakeExamInterface() {
 
     function calculatePerformance() {
         let right = 0, wrong = 0, unanswered = 0;
+        let mistakes = [];
+        let correct_ids = [];
+
         examData.questions.forEach(q => {
-            if (!userAnswers[q.id]) unanswered++;
-            else if (userAnswers[q.id] === q.answer) right++;
-            else wrong++;
+            if (!userAnswers[q.id]) {
+                unanswered++;
+            } else if (userAnswers[q.id] === q.answer) {
+                right++;
+                correct_ids.push(q.id);
+            } else {
+                wrong++;
+                mistakes.push({
+                    question_id: q.id,
+                    subject_id: q.subject_id,
+                    lesson_id: q.lesson_id,
+                    topic_id: q.topic_id
+                });
+            }
         });
         const score = right * 1;
         const timerEl = document.getElementById('timer');
@@ -278,8 +292,14 @@ function initializeTakeExamInterface() {
         const timeLeftSeconds = (parseInt(timeLeft[0]) || 0) * 60 + (parseInt(timeLeft[1]) || 0);
 
         return {
-            selected_answers: userAnswers, score, score_with_negative: score - (wrong * 0.5),
-            right_answers: right, wrong_answers: wrong, unanswered,
+            selected_answers: userAnswers,
+            score,
+            score_with_negative: score - (wrong * 0.5),
+            right_answers: right,
+            wrong_answers: wrong,
+            unanswered,
+            mistakes,
+            correct_ids,
             time_used_seconds: (examData.details.duration * 60) - timeLeftSeconds,
             time_left_seconds: timeLeftSeconds
         };
@@ -308,6 +328,40 @@ function initializeTakeExamInterface() {
             if (result.success && result.data && result.data.attempt_id) {
                 closeResultModalBtn.dataset.attemptId = result.data.attempt_id;
                 displayExamResult(result.data);
+
+                // --- NEW: Sync mistakes to Mistake Bank ---
+                if (performance.mistakes && performance.mistakes.length > 0) {
+                    try {
+                        await fetch('api/mistakes/add.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                exam_id: examId,
+                                is_custom: 0,
+                                questions: performance.mistakes
+                            })
+                        });
+                        console.log("Mistakes recorded in bank.");
+                    } catch (mistakeErr) {
+                        console.error("Failed to sync mistakes:", mistakeErr);
+                    }
+                }
+
+                // --- NEW: Resolve mistakes from Bank ---
+                if (performance.correct_ids && performance.correct_ids.length > 0) {
+                    try {
+                        await fetch('api/mistakes/resolve.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                questions: performance.correct_ids
+                            })
+                        });
+                        console.log("Correct answers resolved in bank.");
+                    } catch (resolveErr) {
+                        console.error("Failed to resolve mistakes:", resolveErr);
+                    }
+                }
             } else showToast(result.message || 'Submission failed.', 'error');
         } catch (e) { showToast('A network error occurred.', 'error'); }
         finally {
