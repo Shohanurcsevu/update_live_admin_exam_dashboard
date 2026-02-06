@@ -41,7 +41,7 @@ function list_topics($conn) {
             FROM topics t 
             JOIN subjects s ON t.subject_id = s.id 
             JOIN lessons l ON t.lesson_id = l.id
-            LEFT JOIN exams e ON t.id = e.topic_id";
+            LEFT JOIN exams e ON t.id = e.topic_id AND e.is_deleted = 0";
     
     $params = [];
     $types = '';
@@ -58,6 +58,7 @@ function list_topics($conn) {
         $types .= 'i';
     }
 
+    $where_clauses[] = "t.is_deleted = 0";
     if (!empty($where_clauses)) {
         $sql .= " WHERE " . implode(' AND ', $where_clauses);
     }
@@ -83,7 +84,7 @@ function list_topics($conn) {
 
 function get_topic($conn) {
     $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-    $stmt = $conn->prepare("SELECT * FROM topics WHERE id = ?");
+    $stmt = $conn->prepare("SELECT * FROM topics WHERE id = ? AND is_deleted = 0");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -227,14 +228,14 @@ function delete_topic($conn) {
     $topic_name = $row['topic_name'];
     $stmt_select->close();
 
-    // ✅ Step 2: Proceed to delete
-    $stmt = $conn->prepare("DELETE FROM topics WHERE id = ?");
+    // ✅ Step 2: Proceed to soft delete
+    $stmt = $conn->prepare("UPDATE topics SET is_deleted = 1 WHERE id = ?");
     $stmt->bind_param("i", $id);
 
     if ($stmt->execute()) {
         if ($stmt->affected_rows > 0) {
             // ✅ Log activity with accurate topic name
-            $message = "Topic '" . $topic_name . "' (ID: " . $id . ") has been deleted.";
+            $message = "Topic '" . $topic_name . "' (ID: " . $id . ") has been soft-deleted.";
             log_activity($conn, 'Topic Deleted', $message);
             echo json_encode(['success' => true, 'message' => 'Topic deleted successfully.']);
         } else {

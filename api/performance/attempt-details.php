@@ -25,7 +25,7 @@ $exam_sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name
              LEFT JOIN subjects s ON e.subject_id = s.id 
              LEFT JOIN lessons l ON e.lesson_id = l.id 
              LEFT JOIN topics t ON e.topic_id = t.id 
-             WHERE e.id = ?";
+             WHERE e.id = ? AND e.is_deleted = 0";
 
 $exam_stmt = $conn->prepare($exam_sql);
 $exam_stmt->bind_param("i", $performance['exam_id']);
@@ -40,7 +40,7 @@ if (!$exam) {
 
 // 3. Get all questions for that exam
 // --- MODIFIED: Added `explanation` to the SELECT statement ---
-$q_stmt = $conn->prepare("SELECT id, question, options, answer, explanation FROM questions WHERE exam_id = ?");
+$q_stmt = $conn->prepare("SELECT id, question, options, answer, explanation FROM questions WHERE exam_id = ? AND is_deleted = 0");
 $q_stmt->bind_param("i", $performance['exam_id']);
 $q_stmt->execute();
 $result = $q_stmt->get_result();

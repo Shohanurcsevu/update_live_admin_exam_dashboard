@@ -7,7 +7,7 @@ require_once 'subject/db_connect.php'; // Reuse the existing connection file
 
 // Function to get count from a table
 function get_count($conn, $table_name) {
-    $result = $conn->query("SELECT COUNT(*) as count FROM {$table_name}");
+    $result = $conn->query("SELECT COUNT(*) as count FROM {$table_name} WHERE is_deleted = 0");
     if ($result) {
         return $result->fetch_assoc()['count'];
     }

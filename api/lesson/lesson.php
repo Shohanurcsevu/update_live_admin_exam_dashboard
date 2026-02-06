@@ -39,15 +39,17 @@ function list_lessons($conn) {
     $sql = "SELECT l.*, s.subject_name, COUNT(t.id) as created_topics 
             FROM lessons l 
             JOIN subjects s ON l.subject_id = s.id
-            LEFT JOIN topics t ON l.id = t.lesson_id";
+            LEFT JOIN topics t ON l.id = t.lesson_id AND t.is_deleted = 0";
     
-    $params = [];
-    $types = '';
-
+    $where_clauses = ["l.is_deleted = 0"];
     if ($subject_id > 0) {
-        $sql .= " WHERE l.subject_id = ?";
+        $where_clauses[] = "l.subject_id = ?";
         $params[] = $subject_id;
         $types .= 'i';
+    }
+
+    if (!empty($where_clauses)) {
+        $sql .= " WHERE " . implode(' AND ', $where_clauses);
     }
 
     $sql .= " GROUP BY l.id ORDER BY l.id ASC";
@@ -70,7 +72,7 @@ function list_lessons($conn) {
 
 function get_lesson($conn) {
     $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-    $stmt = $conn->prepare("SELECT * FROM lessons WHERE id = ?");
+    $stmt = $conn->prepare("SELECT * FROM lessons WHERE id = ? AND is_deleted = 0");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -191,15 +193,15 @@ function delete_lesson($conn) {
     $row = $result->fetch_assoc();
     $lesson_name = $row['lesson_name'];
     $stmt_select->close();
-      // ✅ Step 2: Proceed to delete
-    $stmt = $conn->prepare("DELETE FROM lessons WHERE id = ?");
+      // ✅ Step 2: Proceed to soft delete
+    $stmt = $conn->prepare("UPDATE lessons SET is_deleted = 1 WHERE id = ?");
     $stmt->bind_param("i", $id);
 
 
     if ($stmt->execute()) {
     if ($stmt->affected_rows > 0) {
         // ✅ Log activity with accurate lesson name
-        $message = "Lesson '" . $lesson_name . "' (ID: " . $id . ") has been deleted successfully.";
+        $message = "Lesson '" . $lesson_name . "' (ID: " . $id . ") has been soft-deleted successfully.";
         log_activity($conn, 'Lesson Deleted', $message);
         echo json_encode(['success' => true, 'message' => 'Lesson deleted successfully.']);
     } else {

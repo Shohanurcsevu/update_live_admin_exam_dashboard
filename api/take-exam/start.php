@@ -15,7 +15,7 @@ $exam_sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name
              LEFT JOIN subjects s ON e.subject_id = s.id 
              LEFT JOIN lessons l ON e.lesson_id = l.id 
              LEFT JOIN topics t ON e.topic_id = t.id 
-             WHERE e.id = ?";
+             WHERE e.id = ? AND e.is_deleted = 0";
 
 $stmt = $conn->prepare($exam_sql);
 $stmt->bind_param("i", $exam_id);
@@ -27,7 +27,7 @@ if (!$exam_details) {
     exit; 
 }
 
-$question_sql = "SELECT id, question, options, answer FROM questions WHERE exam_id = ?";
+$question_sql = "SELECT id, question, options, answer FROM questions WHERE exam_id = ? AND is_deleted = 0";
 $stmt = $conn->prepare($question_sql);
 $stmt->bind_param("i", $exam_id);
 $stmt->execute();

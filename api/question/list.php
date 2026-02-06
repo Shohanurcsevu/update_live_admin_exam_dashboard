@@ -8,7 +8,7 @@ if (empty($_GET['exam_id'])) {
 
 $exam_id = intval($_GET['exam_id']);
 
-$stmt = $conn->prepare("SELECT * FROM questions WHERE exam_id = ? ORDER BY id ASC");
+$stmt = $conn->prepare("SELECT * FROM questions WHERE exam_id = ? AND is_deleted = 0 ORDER BY id ASC");
 $stmt->bind_param("i", $exam_id);
 $stmt->execute();
 $result = $stmt->get_result();

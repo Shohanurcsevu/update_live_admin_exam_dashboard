@@ -12,7 +12,7 @@ if ($subject_id === 0) {
     exit;
 }
 
-$stmt = $conn->prepare("SELECT id, lesson_name FROM lessons WHERE subject_id = ? ORDER BY id ASC");
+$stmt = $conn->prepare("SELECT id, lesson_name FROM lessons WHERE subject_id = ? AND is_deleted = 0 ORDER BY id ASC");
 $stmt->bind_param("i", $subject_id);
 $stmt->execute();
 $result = $stmt->get_result();

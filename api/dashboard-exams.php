@@ -29,6 +29,7 @@ if (!empty($_GET['topic_id'])) {
     $types .= 'i';
 }
 
+$where_clauses[] = "e.is_deleted = 0";
 $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
 
 $sql = "
@@ -52,6 +53,7 @@ $sql = "
     LEFT JOIN (
         SELECT exam_id, COUNT(*) as total_questions 
         FROM questions 
+        WHERE is_deleted = 0
         GROUP BY exam_id
     ) q_count ON e.id = q_count.exam_id
     LEFT JOIN (
@@ -95,9 +97,9 @@ while ($row = $result->fetch_assoc()) {
 // Get total count for pagination info
 $count_sql = "SELECT COUNT(*) as total FROM exams e $where_sql";
 $count_stmt = $conn->prepare($count_sql);
-if (!empty($where_clauses)) {
-    $count_types = substr($types, 0, -2); // Remove 'ii' from types
-    $count_params = array_slice($params, 0, -2);
+$count_types = substr($types, 0, -2); // Remove 'ii' from types
+$count_params = array_slice($params, 0, -2);
+if ($count_types !== "") {
     $count_stmt->bind_param($count_types, ...$count_params);
 }
 $count_stmt->execute();

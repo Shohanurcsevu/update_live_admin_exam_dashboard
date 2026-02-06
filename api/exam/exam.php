@@ -47,6 +47,7 @@ function list_exams($conn) {
         $types .= 'i';
     }
 
+    $where_clauses[] = "e.is_deleted = 0";
     $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
 
     $sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name,
@@ -58,6 +59,7 @@ function list_exams($conn) {
             LEFT JOIN (
                 SELECT exam_id, COUNT(*) as total_questions 
                 FROM questions 
+                WHERE is_deleted = 0
                 GROUP BY exam_id
             ) q_count ON e.id = q_count.exam_id
             $where_sql
@@ -83,9 +85,9 @@ function list_exams($conn) {
     // Get total count for pagination info
     $count_sql = "SELECT COUNT(*) as total FROM exams e $where_sql";
     $count_stmt = $conn->prepare($count_sql);
-    if (!empty($where_clauses)) {
-        $count_types = substr($types, 0, -2); // Remove 'ii'
-        $count_params = array_slice($params, 0, -2);
+    $count_types = substr($types, 0, -2); // Remove 'ii' from limit/offset
+    $count_params = array_slice($params, 0, -2);
+    if ($count_types !== "") {
         $count_stmt->bind_param($count_types, ...$count_params);
     }
     $count_stmt->execute();
@@ -113,7 +115,7 @@ function get_exam($conn) {
                             LEFT JOIN subjects s ON e.subject_id = s.id
                             LEFT JOIN lessons l ON e.lesson_id = l.id
                             LEFT JOIN topics t ON e.topic_id = t.id
-                            WHERE e.id = ?");
+                            WHERE e.id = ? AND e.is_deleted = 0");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -264,13 +266,19 @@ function delete_exam($conn) {
     $exam_title = $row['exam_title'];
     $stmt_select->close();
 
-    // ✅ Step 2: Proceed to delete
-    $stmt = $conn->prepare("DELETE FROM exams WHERE id = ?");
+    // ✅ Step 2: Proceed to soft delete
+    $stmt = $conn->prepare("UPDATE exams SET is_deleted = 1 WHERE id = ?");
     $stmt->bind_param("i", $id);
 
     if ($stmt->execute()) {
         if ($stmt->affected_rows > 0) {
-            $message = "Exam '" . $exam_title . "' (ID: " . $id . ") has been deleted successfully.";
+            // ✅ Step 3: Cascade soft delete to questions
+            $stmt_questions = $conn->prepare("UPDATE questions SET is_deleted = 1 WHERE exam_id = ?");
+            $stmt_questions->bind_param("i", $id);
+            $stmt_questions->execute();
+            $stmt_questions->close();
+
+            $message = "Exam '" . $exam_title . "' (ID: " . $id . ") and its questions have been soft-deleted successfully.";
             log_activity($conn, 'Exam Deleted', $message);
             echo json_encode(['success' => true, 'message' => 'Exam deleted successfully.']);
         } else {

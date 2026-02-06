@@ -8,7 +8,7 @@ $sql = "SELECT p.id, p.attempt_time, p.score_with_negative, e.exam_title, e.tota
 
 $params = [];
 $types = '';
-$where_clauses = [];
+$where_clauses = ["e.is_deleted = 0"];
 
 if (!empty($_GET['subject_id'])) {
     $where_clauses[] = "p.subject_id = ?";

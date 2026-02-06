@@ -10,7 +10,7 @@ $sql = "SELECT
             s.subject_name, 
             l.lesson_name, 
             t.topic_name,
-            (SELECT COUNT(*) FROM questions WHERE exam_id = e.id) as total_questions
+            (SELECT COUNT(*) FROM questions WHERE exam_id = e.id AND is_deleted = 0) as total_questions
         FROM exams e
         LEFT JOIN subjects s ON e.subject_id = s.id
         LEFT JOIN lessons l ON e.lesson_id = l.id
@@ -18,7 +18,7 @@ $sql = "SELECT
 
 $params = [];
 $types = '';
-$where_clauses = [];
+$where_clauses = ["e.is_deleted = 0"];
 
 // The UI filter logic remains the same and will work as expected.
 // If a filter is applied, it will correctly narrow down the results.

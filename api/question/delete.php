@@ -23,7 +23,7 @@ $row = $result->fetch_assoc();
 $question_text = $row['question'];
 $stmt_fetch->close();
 
-$stmt = $conn->prepare("DELETE FROM questions WHERE id = ?");
+$stmt = $conn->prepare("UPDATE questions SET is_deleted = 1 WHERE id = ?");
 $stmt->bind_param("i", $id);
 
 function log_activity($conn, $type, $message) {

@@ -56,7 +56,8 @@ function list_subjects($conn) {
     // --- MODIFIED: Added LEFT JOIN and COUNT to get created_lessons ---
     $sql = "SELECT s.*, COUNT(l.id) AS created_lessons
             FROM subjects s
-            LEFT JOIN lessons l ON s.id = l.subject_id
+            LEFT JOIN lessons l ON s.id = l.subject_id AND l.is_deleted = 0
+            WHERE s.is_deleted = 0
             GROUP BY s.id
             ORDER BY s.id ASC";
     
@@ -77,7 +78,7 @@ function get_subject($conn) {
         return;
     }
     $id = intval($_GET['id']);
-    $stmt = $conn->prepare("SELECT * FROM subjects WHERE id = ?");
+    $stmt = $conn->prepare("SELECT * FROM subjects WHERE id = ? AND is_deleted = 0");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -251,14 +252,14 @@ function delete_subject($conn) {
     $subject_name = $row['subject_name'];
     $stmt_select->close();
 
-    // ✅ Step 2: Proceed to delete
-    $stmt = $conn->prepare("DELETE FROM subjects WHERE id = ?");
+    // ✅ Step 2: Proceed to soft delete
+    $stmt = $conn->prepare("UPDATE subjects SET is_deleted = 1 WHERE id = ?");
     $stmt->bind_param("i", $id);
 
     if ($stmt->execute()) {
         if ($stmt->affected_rows > 0) {
             // ✅ Log activity with accurate subject name
-            $message = "Subject '" . $subject_name . "' (ID: " . $id . ") has been deleted successfully.";
+            $message = "Subject '" . $subject_name . "' (ID: " . $id . ") has been soft-deleted successfully.";
             log_activity($conn, 'Subject Deleted', $message);
             echo json_encode(['success' => true, 'message' => 'Subject deleted successfully.']);
         } else {
