@@ -210,7 +210,7 @@ function initializeTakeExamInterface() {
         const navSidebar = document.getElementById('navigator-sidebar');
         if (navSidebar && window.innerWidth < 1024) {
             navSidebar.classList.add('translate-x-full', 'pointer-events-none');
-            navSidebar.classList.remove('pointer-events-auto');
+            navSidebar.classList.remove('translate-x-0', 'pointer-events-auto');
         }
 
         const delay = window.innerWidth < 1024 ? 300 : 0;
@@ -360,19 +360,19 @@ function initializeTakeExamInterface() {
     if (openNavBtn && navSidebar) {
         openNavBtn.addEventListener('click', () => {
             navSidebar.classList.remove('translate-x-full', 'pointer-events-none');
-            navSidebar.classList.add('pointer-events-auto');
+            navSidebar.classList.add('translate-x-0', 'pointer-events-auto');
         });
     }
     if (closeNavBtn && navSidebar) {
         closeNavBtn.addEventListener('click', () => {
+            navSidebar.classList.remove('translate-x-0', 'pointer-events-auto');
             navSidebar.classList.add('translate-x-full', 'pointer-events-none');
-            navSidebar.classList.remove('pointer-events-auto');
         });
     }
     if (navOverlay && navSidebar) {
         navOverlay.addEventListener('click', () => {
+            navSidebar.classList.remove('translate-x-0', 'pointer-events-auto');
             navSidebar.classList.add('translate-x-full', 'pointer-events-none');
-            navSidebar.classList.remove('pointer-events-auto');
         });
     }
 

@@ -1,4 +1,4 @@
-<div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+<div id="toast-container" class="fixed top-5 right-5 z-[210]"></div>
 
 <div class="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
     <div class="flex flex-col lg:flex-row gap-6">
@@ -68,7 +68,7 @@
 
         <!-- Question Navigator Sidebar / Mobile Drawer -->
         <aside id="navigator-sidebar"
-            class="fixed inset-0 z-50 transform translate-x-full transition-transform duration-300 pointer-events-none lg:pointer-events-auto lg:relative lg:translate-x-0 lg:inset-auto lg:z-auto lg:w-72 flex-shrink-0">
+            class="fixed inset-0 z-[80] transform translate-x-full transition-transform duration-300 pointer-events-none lg:pointer-events-auto lg:relative lg:translate-x-0 lg:inset-auto lg:z-auto lg:w-72 flex-shrink-0">
             <!-- Mobile Overlay Background -->
             <div id="nav-overlay" class="absolute inset-0 bg-black/50 lg:hidden"></div>
 
@@ -105,14 +105,14 @@
                 </div>
             </div>
         </aside>
-
-        <!-- Floating Action Button for Navigator (Mobile Only) -->
-        <button id="open-nav-btn"
-            class="lg:hidden fixed bottom-24 right-6 z-[60] bg-blue-600 text-white p-4 rounded-full shadow-2xl active:scale-95 transition-transform flex items-center justify-center">
-            <span class="material-symbols-outlined">grid_view</span>
-        </button>
     </div>
 </div>
+
+<!-- Floating Action Button for Navigator (Mobile Only) -->
+<button id="open-nav-btn"
+    class="lg:hidden fixed bottom-24 right-6 z-[85] bg-blue-600 text-white p-4 rounded-full shadow-2xl active:scale-95 transition-transform flex items-center justify-center">
+    <span class="material-symbols-outlined">grid_view</span>
+</button>
 
 <!-- Exam Result Modal -->
 <div id="result-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-50 p-4">
