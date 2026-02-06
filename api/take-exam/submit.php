@@ -79,6 +79,21 @@ if ($stmt->execute()) {
     $exam_title = $exam_details['exam_title'] ?? 'Unknown Exam';
     log_activity($conn, 'Exam Attempted', "Exam '{$exam_title}' submitted with score {$score_with_negative}");
 
+    // --- NEW: Update Subject Discipline Tracking ---
+    $update_subject = $conn->prepare("
+        UPDATE subjects 
+        SET study_streak = CASE 
+            WHEN DATE(last_study_at) = CURRENT_DATE THEN study_streak
+            WHEN DATE(last_study_at) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY) THEN study_streak + 1
+            ELSE 1 
+        END,
+        last_study_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+    ");
+    $update_subject->bind_param("i", $subject_id);
+    $update_subject->execute();
+    $update_subject->close();
+
     echo json_encode([
         'success' => true, 
         'message' => 'Exam submitted successfully.',

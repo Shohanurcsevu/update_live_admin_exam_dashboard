@@ -85,9 +85,23 @@ function log_activity($conn, $type, $message) {
 }
 
 if ($success) {
-    // --- NEW: Log this activity with names and exam title ---
     $message = count($questions) . " questions were imported into Exam '" . $exam_title . "' (Subject: '" . $subject_name . "', Lesson: '" . $lesson_name . "', Topic: '" . $topic_name . "').";
     log_activity($conn, 'Questions Imported', $message);
+
+    // --- NEW: Update Subject Discipline Tracking ---
+    $update_subject = $conn->prepare("
+        UPDATE subjects 
+        SET study_streak = CASE 
+            WHEN DATE(last_study_at) = CURRENT_DATE THEN study_streak
+            WHEN DATE(last_study_at) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY) THEN study_streak + 1
+            ELSE 1 
+        END,
+        last_study_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+    ");
+    $update_subject->bind_param("i", $subject_id);
+    $update_subject->execute();
+    $update_subject->close();
 
     $conn->commit();
     echo json_encode(['success' => true, 'message' => 'Questions imported successfully.']);

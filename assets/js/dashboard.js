@@ -75,7 +75,54 @@ function initializeDashboardPage() {
             // Mistake Bank Stats
             fetchMistakeStats();
             fetchAndRenderHeatmap();
+            fetchAndRenderDisciplineTracker();
         } catch (error) { console.error("Error fetching metrics:", error); }
+    }
+
+    async function fetchAndRenderDisciplineTracker() {
+        const trackerList = document.getElementById('discipline-tracker-list');
+        if (!trackerList) return;
+
+        try {
+            const response = await fetch('api/mistakes/discipline-stats.php');
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                trackerList.innerHTML = result.data.map(subject => {
+                    const isNeglected = subject.status === 'Neglected';
+                    const isConsistent = subject.status === 'Consistent';
+                    const icon = isConsistent ? 'verified' : (isNeglected ? 'error' : 'schedule');
+                    const color = subject.status_color;
+
+                    return `
+                        <div class="bg-white border-2 border-gray-50 p-4 rounded-xl flex items-center justify-between hover:border-${color}-100 transition-all group">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-${color}-50 flex items-center justify-center text-${color}-600">
+                                    <span class="material-symbols-outlined">${icon}</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-gray-900">${subject.subject_name}</h3>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-${color}-100 text-${color}-700 uppercase">${subject.status}</span>
+                                        <span class="text-gray-400 text-xs">${subject.days_since_last_study === 999 ? 'Never studied' : (subject.days_since_last_study === 0 ? 'Studied today' : subject.days_since_last_study + ' days gap')}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="flex items-center gap-1 justify-end">
+                                    <span class="material-symbols-outlined text-sm text-orange-500 fill-current">local_fire_department</span>
+                                    <span class="font-black text-gray-900">${subject.study_streak}</span>
+                                </div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Day Streak</p>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } catch (error) {
+            console.error("Error fetching discipline stats:", error);
+            trackerList.innerHTML = '<p class="col-span-full text-center text-gray-400">Failed to load tracker.</p>';
+        }
     }
 
     async function fetchAndRenderHeatmap() {

@@ -131,6 +131,21 @@ if ($stmt->execute()) {
     $perf_id = $conn->insert_id;
     $perf_stmt->close();
 
+    // --- NEW: Update Subject Discipline Tracking ---
+    $update_subject = $conn->prepare("
+        UPDATE subjects 
+        SET study_streak = CASE 
+            WHEN DATE(last_study_at) = CURRENT_DATE THEN study_streak
+            WHEN DATE(last_study_at) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY) THEN study_streak + 1
+            ELSE 1 
+        END,
+        last_study_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+    ");
+    $update_subject->bind_param("i", $exam_info['subject_id']);
+    $update_subject->execute();
+    $update_subject->close();
+
     echo json_encode([
         'success' => true,
         'message' => 'Attempt synced successfully.',

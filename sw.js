@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rethink-exam-v13';
+const CACHE_NAME = 'rethink-exam-v14';
 const PRE_CACHE_ASSETS = [
     './',
     './index.html',
