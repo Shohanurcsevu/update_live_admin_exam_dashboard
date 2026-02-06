@@ -7,7 +7,8 @@
         currentStep: 1,
         subjects: [],
         selectedLessons: new Map(), // Map<lessonId, {subjectId, lessonName, questionCount, maxQuestions}>
-        examDetails: {}
+        examDetails: {},
+        cache: new Map()
     };
 
     // DOM Elements
@@ -70,17 +71,54 @@
         }, 3000);
     }
 
+    // Helper: Fetch data with caching
+    async function fetchData(url) {
+        if (state.cache.has(url)) return state.cache.get(url);
+
+        // Try localStorage persistence
+        const cacheKey = `rethink_cache_${url}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                const isExpired = Date.now() - timestamp > 3600000; // 1 hour
+                if (!isExpired) {
+                    state.cache.set(url, data);
+                    return data;
+                }
+            } catch (e) {
+                localStorage.removeItem(cacheKey);
+            }
+        }
+
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!result.success) throw new Error(result.message || 'Failed to fetch data');
+
+        state.cache.set(url, result.data);
+        // Persist to localStorage
+        localStorage.setItem(cacheKey, JSON.stringify({
+            data: result.data,
+            timestamp: Date.now()
+        }));
+
+        return result.data;
+    }
+
+    // Helper: Get icon for type
+    function getIcon(type) {
+        const icons = {
+            subject: 'subject',
+            lesson: 'library_books'
+        };
+        return icons[type] || 'folder';
+    }
+
     // Fetch hierarchical data (subjects -> lessons)
     async function fetchHierarchicalData() {
         try {
-            const response = await fetch('api/custom-exam/subjects-with-details.php');
-            const result = await response.json();
-
-            if (!result.success) {
-                throw new Error('Failed to fetch subjects');
-            }
-
-            state.subjects = result.data.sort((a, b) => a.subject_id - b.subject_id);
+            const data = await fetchData('api/custom-exam/subjects-with-details.php');
+            state.subjects = data.sort((a, b) => a.subject_id - b.subject_id);
             renderHierarchy();
         } catch (error) {
             console.error('Error fetching hierarchical data:', error);
@@ -110,6 +148,7 @@
         header.className = 'hierarchy-header';
         header.innerHTML = `
             <span class="material-symbols-outlined expand-icon text-gray-600 mr-2">chevron_right</span>
+            <span class="material-symbols-outlined mr-2 text-blue-600">${getIcon('subject')}</span>
             <span class="font-bold text-gray-800">${subject.subject_name}</span>
             <span class="ml-2 text-sm text-gray-500">(${subject.lessons.length} lessons)</span>
         `;
@@ -117,15 +156,21 @@
         const lessonsContainer = document.createElement('div');
         lessonsContainer.className = 'hierarchy-item hidden mt-2 space-y-2';
 
-        subject.lessons.forEach(lesson => {
-            const lessonDiv = createLessonElement(lesson, subject.subject_id, subject.subject_name);
-            lessonsContainer.appendChild(lessonDiv);
-        });
+        function expandSubject() {
+            if (lessonsContainer.children.length > 0) return;
+            subject.lessons.forEach(lesson => {
+                const lessonDiv = createLessonElement(lesson, subject.subject_id, subject.subject_name);
+                lessonsContainer.appendChild(lessonDiv);
+            });
+        }
 
         header.addEventListener('click', () => {
             const icon = header.querySelector('.expand-icon');
             icon.classList.toggle('expanded');
             lessonsContainer.classList.toggle('hidden');
+            if (!lessonsContainer.classList.contains('hidden')) {
+                expandSubject();
+            }
         });
 
         div.appendChild(header);
@@ -149,8 +194,12 @@
         checkbox.dataset.maxQuestions = lesson.total_questions;
 
         const label = document.createElement('label');
-        label.className = 'flex-1 text-sm text-gray-700 cursor-pointer';
-        label.innerHTML = `<span class="font-semibold">${lesson.lesson_name}</span> <span class="text-gray-500">(${lesson.total_questions} questions available)</span>`;
+        label.className = 'flex-1 text-sm text-gray-700 cursor-pointer flex items-center';
+        label.innerHTML = `
+            <span class="material-symbols-outlined mr-2 text-blue-500 text-sm">${getIcon('lesson')}</span>
+            <span class="font-semibold">${lesson.lesson_name}</span> 
+            <span class="ml-2 text-gray-500">(${lesson.total_questions} questions)</span>
+        `;
 
         const inputContainer = document.createElement('div');
         inputContainer.className = 'flex items-center gap-2';
