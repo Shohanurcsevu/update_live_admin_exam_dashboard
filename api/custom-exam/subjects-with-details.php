@@ -4,7 +4,7 @@ require_once '../subject/db_connect.php';
 // --- MODIFIED: Replaced the single complex query with a more robust, multi-step approach ---
 
 // 1. Get all subjects first
-$subjects_result = $conn->query("SELECT id as subject_id, subject_name FROM subjects ORDER BY subject_name ASC");
+$subjects_result = $conn->query("SELECT id as subject_id, subject_name FROM subjects WHERE is_deleted = 0 ORDER BY subject_name ASC");
 $response_data = [];
 
 if ($subjects_result) {
