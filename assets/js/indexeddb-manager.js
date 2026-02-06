@@ -109,6 +109,48 @@ class IndexedDBManager {
     }
 
     /**
+     * Efficiently store multiple records in a single transaction
+     */
+    async bulkPut(storeName, records) {
+        if (!this.db) await this.init();
+        if (!records || records.length === 0) return;
+
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+
+            records.forEach(record => {
+                // Ensure ID is number
+                if (record.id) record.id = parseInt(record.id);
+                if (record.subject_id) record.subject_id = parseInt(record.subject_id);
+                if (record.lesson_id) record.lesson_id = parseInt(record.lesson_id);
+                if (record.topic_id) record.topic_id = parseInt(record.topic_id);
+                if (record.exam_id) record.exam_id = parseInt(record.exam_id);
+
+                store.put(record);
+            });
+
+            tx.oncomplete = () => resolve();
+            tx.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    /**
+     * Check if an exam has questions downloaded
+     */
+    async isExamDownloaded(examId) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('questions', 'readonly');
+            const store = tx.objectStore('questions');
+            const index = store.index('exam_id');
+            const request = index.getKey(parseInt(examId));
+            request.onsuccess = () => resolve(!!request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
      * Get all records from a store
      */
     async getAll(storeName) {

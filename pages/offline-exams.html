@@ -15,39 +15,70 @@
                 <div class="text-sm text-gray-500">
                     Last synced: <span id="last-sync-time" class="font-semibold">Never</span>
                 </div>
-                <button id="manual-sync-btn"
-                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <span class="material-symbols-outlined text-lg">sync</span>
-                    Update Data
-                </button>
+                <div class="flex items-center gap-4">
+                    <button id="download-all-btn"
+                        class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm">
+                        <span class="material-symbols-outlined text-lg">download_for_offline</span>
+                        Download All Data
+                    </button>
+                    <button id="manual-sync-btn"
+                        class="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm">
+                        <span class="material-symbols-outlined text-lg">sync</span>
+                        Update Data
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Filters -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-xl bg-white shadow-sm">
-        <div>
-            <label for="offline-subject-filter" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-            <select id="offline-subject-filter"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
-                <option value="">All Subjects</option>
-            </select>
+    <!-- Filters & Download -->
+    <div class="space-y-4">
+        <div
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 border rounded-xl bg-white shadow-sm items-end">
+            <div>
+                <label for="offline-subject-filter" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <select id="offline-subject-filter"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                    <option value="">All Subjects</option>
+                </select>
+            </div>
+            <div>
+                <label for="offline-lesson-filter" class="block text-sm font-medium text-gray-700 mb-1">Lesson</label>
+                <select id="offline-lesson-filter"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    disabled>
+                    <option value="">All Lessons</option>
+                </select>
+            </div>
+            <div>
+                <label for="offline-topic-filter" class="block text-sm font-medium text-gray-700 mb-1">Topic</label>
+                <select id="offline-topic-filter"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    disabled>
+                    <option value="">All Topics</option>
+                </select>
+            </div>
+            <div class="flex flex-col gap-1">
+                <span class="text-[10px] text-gray-400 font-bold uppercase ml-1">Actions</span>
+                <button id="download-subject-btn" disabled
+                    class="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                    title="Download All Exams for Selected Subject">
+                    <span class="material-symbols-outlined text-lg">download_for_offline</span>
+                    <span class="font-bold text-sm">Download Subject</span>
+                </button>
+            </div>
         </div>
-        <div>
-            <label for="offline-lesson-filter" class="block text-sm font-medium text-gray-700 mb-1">Lesson</label>
-            <select id="offline-lesson-filter"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                disabled>
-                <option value="">All Lessons</option>
-            </select>
-        </div>
-        <div>
-            <label for="offline-topic-filter" class="block text-sm font-medium text-gray-700 mb-1">Topic</label>
-            <select id="offline-topic-filter"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                disabled>
-                <option value="">All Topics</option>
-            </select>
+
+        <!-- Download Progress Container -->
+        <div id="download-progress-container" class="hidden bg-white p-4 border rounded-xl shadow-sm space-y-2">
+            <div class="flex justify-between text-sm mb-1">
+                <span id="download-status-text" class="text-blue-600 font-medium">Downloading...</span>
+                <span id="download-percent" class="text-gray-500">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="download-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                    style="width: 0%"></div>
+            </div>
         </div>
     </div>
 

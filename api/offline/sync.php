@@ -65,7 +65,7 @@ $server_time_row = $server_time_query->fetch_assoc();
 $server_time = $server_time_row['current_time'];
 
 // Tables to sync
-$tables = ['subjects', 'lessons', 'topics', 'exams', 'questions'];
+$tables = ['subjects', 'lessons', 'topics', 'exams'];
 $response_changes = [];
 
 try {

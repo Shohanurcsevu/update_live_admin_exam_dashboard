@@ -114,6 +114,44 @@ class SyncManager {
     }
 
     /**
+     * Download all exams and questions for a specific subject
+     */
+    async downloadSubject(subjectId, onProgress = null) {
+        if (!navigator.onLine) {
+            throw new Error('You must be online to download exams.');
+        }
+
+        try {
+            if (onProgress) onProgress('Fetching question data...');
+
+            const response = await fetch(`api/offline/download-subject.php?subject_id=${subjectId}`);
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to download subject data.');
+            }
+
+            const { exams, questions } = result.changes;
+
+            if (onProgress) onProgress(`Storing ${exams.length} exams...`);
+            await idbManager.bulkPut('exams', exams);
+
+            if (onProgress) onProgress(`Storing ${questions.length} questions...`);
+            await idbManager.bulkPut('questions', questions);
+
+            return {
+                success: true,
+                examCount: exams.length,
+                questionCount: questions.length
+            };
+
+        } catch (error) {
+            console.error('Download error:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Initial sync check and auto-sync setup
      */
     initAutoSync() {

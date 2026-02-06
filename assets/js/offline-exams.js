@@ -107,8 +107,6 @@
             filteredExams.sort((a, b) => b.id - a.id);
 
             // Apply filters locally
-            if (subjectId) filteredExams = filteredExams.filter(e => e.subject_id == subjectId);
-            if (lessonId) filteredExams = filteredExams.filter(e => e.lesson_id == lessonId);
             if (topicId) filteredExams = filteredExams.filter(e => e.topic_id == topicId);
 
             if (!cardsContainer) return;
@@ -118,33 +116,49 @@
                 return;
             }
 
-            cardsContainer.innerHTML = filteredExams.map(exam => `
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start mb-4">
-                        <span class="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded">ID: ${exam.id}</span>
-                        <span class="material-symbols-outlined text-gray-400">offline_pin</span>
-                    </div>
-                    <h3 class="font-bold text-gray-800 text-lg mb-2 line-clamp-2">${exam.exam_title}</h3>
-                    <div class="space-y-2 text-sm text-gray-600 mb-6">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-base">timer</span>
-                            ${exam.duration || 0} Minutes
+            // check download status for each exam
+            const examCards = await Promise.all(filteredExams.map(async exam => {
+                const isDownloaded = await idbManager.isExamDownloaded(exam.id);
+                const statusBadge = isDownloaded
+                    ? '<span class="px-2 py-1 bg-green-50 text-green-700 text-[10px] font-bold rounded uppercase">Available Offline</span>'
+                    : '<span class="px-2 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold rounded uppercase">Online Only</span>';
+
+                const actionBtn = isDownloaded
+                    ? `<button onclick="window.takeOfflineExam(${exam.id})" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors">Take Exam</button>`
+                    : `<button disabled class="flex-1 bg-gray-200 text-gray-400 font-bold py-2 rounded-lg cursor-not-allowed">Download Required</button>`;
+
+                return `
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow ${!isDownloaded ? 'opacity-75' : ''}">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded">ID: ${exam.id}</span>
+                            <div class="flex flex-col items-end gap-1">
+                                ${statusBadge}
+                                ${isDownloaded ? '<span class="material-symbols-outlined text-green-500 text-sm">offline_pin</span>' : ''}
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-base">summarize</span>
-                            ${exam.total_marks || 0} Marks (${exam.pass_mark || 0} to pass)
+                        <h3 class="font-bold text-gray-800 text-lg mb-2 line-clamp-2">${exam.exam_title}</h3>
+                        <div class="space-y-2 text-sm text-gray-600 mb-6">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-base">timer</span>
+                                ${exam.duration || 0} Minutes
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-base">summarize</span>
+                                ${exam.total_marks || 0} Marks (${exam.pass_mark || 0} to pass)
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            ${actionBtn}
+                            ${isDownloaded ? `
+                            <button onclick="window.openPrintModalOffline(${exam.id})" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" title="Print Options">
+                                <span class="material-symbols-outlined">print</span>
+                            </button>` : ''}
                         </div>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="window.takeOfflineExam(${exam.id})" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors">
-                            Take Exam
-                        </button>
-                        <button onclick="window.openPrintModalOffline(${exam.id})" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" title="Print Options">
-                            <span class="material-symbols-outlined">print</span>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }));
+
+            cardsContainer.innerHTML = examCards.join('');
 
         } catch (error) {
             console.error('Error rendering exams:', error);
@@ -282,6 +296,113 @@
 
                 manualSyncBtn.disabled = false;
                 manualSyncBtn.innerHTML = '<span class="material-symbols-outlined text-lg">sync</span> Update Data';
+            };
+        }
+
+        /**
+         * Download Subject Handler
+         */
+        const downloadBtn = document.getElementById('download-subject-btn');
+        const progressContainer = document.getElementById('download-progress-container');
+        const statusText = document.getElementById('download-status-text');
+        const progressBar = document.getElementById('download-progress-bar');
+        const percentText = document.getElementById('download-percent');
+
+        if (downloadBtn) {
+            subjectFilter.addEventListener('change', () => {
+                downloadBtn.disabled = !subjectFilter.value || !navigator.onLine;
+            });
+
+            downloadBtn.onclick = async () => {
+                const subjectId = subjectFilter.value;
+                if (!subjectId) return;
+
+                downloadBtn.disabled = true;
+                progressContainer.classList.remove('hidden');
+
+                try {
+                    await syncManager.downloadSubject(subjectId, (status) => {
+                        statusText.textContent = status;
+                        // Simple progress simulation since bulk storage is fast but API might take time
+                        if (status.includes('Fetching')) {
+                            progressBar.style.width = '30%';
+                            percentText.textContent = '30%';
+                        } else if (status.includes('exams')) {
+                            progressBar.style.width = '60%';
+                            percentText.textContent = '60%';
+                        } else if (status.includes('questions')) {
+                            progressBar.style.width = '90%';
+                            percentText.textContent = '90%';
+                        }
+                    });
+
+                    progressBar.style.width = '100%';
+                    percentText.textContent = '100%';
+                    statusText.textContent = 'Download Complete!';
+                    statusText.className = 'text-green-600 font-medium';
+
+                    if (window.showToast) showToast('Subject downloaded for offline use!', 'success');
+
+                    setTimeout(() => {
+                        progressContainer.classList.add('hidden');
+                        renderExams();
+                    }, 2000);
+
+                } catch (error) {
+                    statusText.textContent = 'Download Failed: ' + error.message;
+                    statusText.className = 'text-red-600 font-medium';
+                    if (window.showToast) showToast('Download failed: ' + error.message, 'error');
+                } finally {
+                    downloadBtn.disabled = false;
+                }
+            };
+        }
+
+        /**
+         * Download All Data Handler
+         */
+        const downloadAllBtn = document.getElementById('download-all-btn');
+        if (downloadAllBtn) {
+            downloadAllBtn.onclick = async () => {
+                if (!confirm('This will download ALL available exams and questions for offline use. It may take some time. Proceed?')) return;
+
+                downloadAllBtn.disabled = true;
+                progressContainer.classList.remove('hidden');
+
+                try {
+                    await syncManager.downloadSubject('all', (status) => {
+                        statusText.textContent = status;
+                        if (status.includes('Fetching')) {
+                            progressBar.style.width = '30%';
+                            percentText.textContent = '30%';
+                        } else if (status.includes('exams')) {
+                            progressBar.style.width = '60%';
+                            percentText.textContent = '60%';
+                        } else if (status.includes('questions')) {
+                            progressBar.style.width = '90%';
+                            percentText.textContent = '90%';
+                        }
+                    });
+
+                    progressBar.style.width = '100%';
+                    percentText.textContent = '100%';
+                    statusText.textContent = 'Full Download Complete!';
+                    statusText.className = 'text-green-600 font-medium';
+
+                    if (window.showToast) showToast('All data downloaded successfully!', 'success');
+
+                    setTimeout(() => {
+                        progressContainer.classList.add('hidden');
+                        renderExams();
+                    }, 2000);
+
+                } catch (error) {
+                    statusText.textContent = 'Full Download Failed: ' + error.message;
+                    statusText.className = 'text-red-600 font-medium';
+                    if (window.showToast) showToast('Full download failed: ' + error.message, 'error');
+                } finally {
+                    downloadAllBtn.disabled = false;
+                }
             };
         }
 
