@@ -5,6 +5,7 @@ function initializeTakeExamInterface() {
 
     let examData = {};
     let userAnswers = {};
+    let flaggedQuestions = new Set();
     let timerInterval;
     let isExamInProgress = false;
     const originalLoadPage = window.loadPage;
@@ -40,58 +41,62 @@ function initializeTakeExamInterface() {
         document.getElementById('exam-pass-mark').textContent = details.pass_mark;
         document.getElementById('exam-instructions').textContent = details.instructions;
 
-        questionsArea.innerHTML = '';
-
+        let fullHTML = '';
         shuffle(data.questions).forEach((q, index) => {
             const optionsArray = Object.entries(q.options);
             const shuffledOptions = shuffle(optionsArray);
 
             const optionsHTML = displayOrder.map((displayKey, displayIndex) => {
                 const [originalKey, value] = shuffledOptions[displayIndex];
+                const isSelected = userAnswers[q.id] === originalKey;
                 return `
-                    <button class="option-btn p-3 text-left rounded-lg border bg-white hover:bg-blue-100 hover:border-blue-400" data-question-id="${q.id}" data-option-key="${originalKey}">
-                        <strong>${optionLabels[displayKey]}.</strong> ${value}
+                    <button class="option-btn p-4 text-left rounded-xl border-2 transition-all flex items-start gap-3 active:scale-[0.98] ${isSelected ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-100'}" 
+                        data-question-id="${q.id}" data-option-key="${originalKey}">
+                        <span class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-[10px] font-black ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-400'}">
+                            ${optionLabels[displayKey]}
+                        </span>
+                        <span class="text-sm font-medium leading-tight text-gray-700">${value}</span>
                     </button>
                 `;
             }).join('');
 
             const questionHTML = `
-                <div class="border rounded-lg p-4 bg-gray-50">
-                    <p class="text-gray-800 font-semibold">${toBengali(index + 1)}. ${q.question}</p>
+                <div class="border rounded-lg p-4 bg-gray-50 relative group scroll-mt-24 sm:scroll-mt-32" id="question-${q.id}">
+                    <button class="flag-btn absolute top-4 right-4 text-gray-400 hover:text-yellow-500 transition-colors" data-question-id="${q.id}" title="Flag for Review">
+                         <span class="material-symbols-outlined text-xl">flag</span>
+                    </button>
+                    <p class="text-gray-800 font-semibold pr-8">${toBengali(index + 1)}. ${q.question}</p>
                     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         ${optionsHTML}
                     </div>
                 </div>
             `;
-            questionsArea.innerHTML += questionHTML;
+            fullHTML += questionHTML;
         });
+        questionsArea.innerHTML = fullHTML;
 
         isExamInProgress = true;
         setupExitPrevention();
         startTimer(details.duration * 60);
+        updateNavigator();
     }
 
     function setupExitPrevention() {
-        // 1. Prevent accidental closing/refreshing
         window.onbeforeunload = function () {
             if (isExamInProgress) {
-                return "You have an exam in progress. Are you sure you want to leave? Your progress will be submitted.";
+                return "You have an exam in progress. Your progress will be submitted.";
             }
         };
 
-        // 2. Auto-submit on tab close or navigation away
         window.addEventListener('pagehide', () => {
-            if (isExamInProgress) {
-                emergencySubmit();
-            }
+            if (isExamInProgress) emergencySubmit();
         });
 
-        // 3. Intercept SPA navigation
         window.loadPage = async function (page, params = '') {
             if (isExamInProgress) {
-                const confirmed = confirm("An exam is in progress. If you leave, your exam will be submitted automatically. Continue?");
+                const confirmed = confirm("An exam is in progress. Exit and submit?");
                 if (confirmed) {
-                    await submitExam(true); // Fast submit
+                    await submitExam(true);
                     isExamInProgress = false;
                     window.loadPage = originalLoadPage;
                     return originalLoadPage(page, params);
@@ -101,23 +106,19 @@ function initializeTakeExamInterface() {
             return originalLoadPage(page, params);
         };
 
-        // 4. History Trap (Back Button Blocking)
         history.pushState(null, null, window.location.href);
-        const handlePopState = (e) => {
+        const handlePopState = () => {
             if (isExamInProgress) {
                 history.pushState(null, null, window.location.href);
-                showToast('Back navigation is disabled during exam. Please use the Submit button.', 'error');
+                showToast('Back navigation is disabled.', 'error');
             }
         };
         window.addEventListener('popstate', handlePopState);
         setupExitPrevention._popStateCleanup = () => window.removeEventListener('popstate', handlePopState);
 
-        // 5. Focus Loss Detection
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden' && isExamInProgress) {
-                console.warn("Exam Focus Lost: User switched tab or minimized window.");
-            } else if (document.visibilityState === 'visible' && isExamInProgress) {
-                showToast('Warning: Please stay on this tab until the exam is finished.', 'error');
+            if (document.visibilityState === 'visible' && isExamInProgress) {
+                showToast('Warning: Please stay on this tab.', 'error');
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -133,8 +134,6 @@ function initializeTakeExamInterface() {
             if (timerEl) timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             if (--timer < 0) {
                 clearInterval(timerInterval);
-                if (timerEl) timerEl.textContent = "00:00";
-                showToast('Time is up! Submitting exam automatically.', 'error');
                 submitExam();
             }
         }, 1000);
@@ -151,10 +150,75 @@ function initializeTakeExamInterface() {
         const parent = btn.parentElement;
         parent.querySelectorAll('.option-btn').forEach(b => {
             b.disabled = true;
-            b.classList.add('bg-gray-100', 'text-gray-500');
+            b.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-sm');
+            b.classList.add('bg-gray-50', 'text-gray-400', 'opacity-60', 'border-gray-100');
+            b.querySelector('span').classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+            b.querySelector('span').classList.add('bg-gray-100', 'text-gray-300', 'border-gray-200');
         });
-        btn.classList.add('bg-blue-200', 'border-blue-500');
+
+        btn.classList.remove('bg-gray-50', 'text-gray-400', 'opacity-60', 'border-gray-100');
+        btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-sm');
+        btn.querySelector('span').classList.remove('bg-gray-100', 'text-gray-300', 'border-gray-200');
+        btn.querySelector('span').classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+
+        updateNavigator();
     }
+
+    function toggleFlag(e) {
+        const btn = e.target.closest('.flag-btn');
+        if (!btn) return;
+        const qId = btn.dataset.questionId;
+        if (flaggedQuestions.has(qId)) {
+            flaggedQuestions.delete(qId);
+            btn.classList.remove('text-yellow-500');
+            btn.classList.add('text-gray-400');
+        } else {
+            flaggedQuestions.add(qId);
+            btn.classList.remove('text-gray-400');
+            btn.classList.add('text-yellow-500');
+        }
+        updateNavigator();
+    }
+
+    function updateNavigator() {
+        const navContainer = document.getElementById('question-navigator-grid');
+        if (!navContainer || !examData.questions) return;
+
+        navContainer.innerHTML = '';
+        examData.questions.forEach((q, idx) => {
+            let bgColor = 'bg-white border-gray-300 text-gray-600';
+            if (userAnswers[q.id]) bgColor = 'bg-green-500 border-green-600 text-white';
+            if (flaggedQuestions.has(q.id)) bgColor = 'bg-yellow-500 border-yellow-600 text-white';
+
+            const btn = document.createElement('button');
+            btn.className = `w-full aspect-square flex items-center justify-center rounded-xl border-2 text-sm font-bold transition-all hover:scale-105 active:scale-95 ${bgColor}`;
+            btn.title = `Question ${idx + 1}`;
+            btn.innerText = idx + 1;
+            btn.addEventListener('click', () => {
+                console.log('Navigator click for question ID:', q.id);
+                scrollToQuestion(q.id);
+            });
+            navContainer.appendChild(btn);
+        });
+    }
+
+    function scrollToQuestion(id) {
+        if (!id) return;
+        const el = document.getElementById(`question-${id}`);
+        if (!el) return;
+
+        const navSidebar = document.getElementById('navigator-sidebar');
+        if (navSidebar && window.innerWidth < 1024) {
+            navSidebar.classList.add('translate-x-full', 'pointer-events-none');
+            navSidebar.classList.remove('pointer-events-auto');
+        }
+
+        const delay = window.innerWidth < 1024 ? 300 : 0;
+        setTimeout(() => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, delay);
+    }
+    window.scrollToQuestion = scrollToQuestion;
 
     function displayExamResult(performanceData) {
         const elements = {
@@ -170,13 +234,7 @@ function initializeTakeExamInterface() {
             timeLeft: document.getElementById('result-time-left')
         };
 
-        const setText = (el, text) => {
-            if (el) {
-                el.textContent = text;
-            } else {
-                console.error(`Result modal element not found for text: ${text}`);
-            }
-        };
+        const setText = (el, text) => { if (el) el.textContent = text; };
 
         setText(elements.title, examData.details.exam_title);
         setText(elements.time, new Date(performanceData.attempt_time).toLocaleString());
@@ -195,46 +253,32 @@ function initializeTakeExamInterface() {
         if (resultModal) {
             resultModal.classList.remove('hidden');
             resultModal.classList.add('flex');
-        } else {
-            console.error("The #result-modal element itself was not found in the HTML.");
         }
     }
 
     async function emergencySubmit() {
         if (!isExamInProgress) return;
-
         const performance = calculatePerformance();
         const payload = JSON.stringify({ exam_id: examId, performance: performance });
-
-        if (navigator.sendBeacon) {
-            navigator.sendBeacon(`${API_URL}submit.php`, payload);
-        } else {
-            fetch(`${API_URL}submit.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: payload,
-                keepalive: true
-            });
-        }
+        if (navigator.sendBeacon) navigator.sendBeacon(`${API_URL}submit.php`, payload);
+        else fetch(`${API_URL}submit.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true });
         isExamInProgress = false;
     }
 
     function calculatePerformance() {
         let right = 0, wrong = 0, unanswered = 0;
         examData.questions.forEach(q => {
-            if (!userAnswers[q.id]) { unanswered++; }
-            else if (userAnswers[q.id] === q.answer) { right++; }
-            else { wrong++; }
+            if (!userAnswers[q.id]) unanswered++;
+            else if (userAnswers[q.id] === q.answer) right++;
+            else wrong++;
         });
-
         const score = right * 1;
-        const scoreWithNegative = score - (wrong * 0.5);
         const timerEl = document.getElementById('timer');
         const timeLeft = timerEl ? timerEl.textContent.split(':') : ['0', '0'];
         const timeLeftSeconds = (parseInt(timeLeft[0]) || 0) * 60 + (parseInt(timeLeft[1]) || 0);
 
         return {
-            selected_answers: userAnswers, score, score_with_negative: scoreWithNegative,
+            selected_answers: userAnswers, score, score_with_negative: score - (wrong * 0.5),
             right_answers: right, wrong_answers: wrong, unanswered,
             time_used_seconds: (examData.details.duration * 60) - timeLeftSeconds,
             time_left_seconds: timeLeftSeconds
@@ -243,7 +287,6 @@ function initializeTakeExamInterface() {
 
     async function submitExam(isAutoSubmit = false) {
         if (!isExamInProgress && !isAutoSubmit) return;
-
         clearInterval(timerInterval);
         isExamInProgress = false;
         window.onbeforeunload = null;
@@ -255,27 +298,19 @@ function initializeTakeExamInterface() {
         submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">autorenew</span>Submitting...`;
 
         const performance = calculatePerformance();
-
         try {
             const response = await fetch(`${API_URL}submit.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ exam_id: examId, performance: performance })
             });
-
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
             const result = await response.json();
             if (result.success && result.data && result.data.attempt_id) {
                 closeResultModalBtn.dataset.attemptId = result.data.attempt_id;
                 displayExamResult(result.data);
-            } else {
-                showToast(result.message || 'Submission failed. Please try again.', 'error');
-            }
-        } catch (e) {
-            console.error("Error during exam submission:", e);
-            showToast('A network or server error occurred. Please check the console.', 'error');
-        } finally {
+            } else showToast(result.message || 'Submission failed.', 'error');
+        } catch (e) { showToast('A network error occurred.', 'error'); }
+        finally {
             submitExamBtn.disabled = false;
             submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2">check_circle</span>Submit Exam`;
         }
@@ -285,15 +320,16 @@ function initializeTakeExamInterface() {
         const toastContainer = document.getElementById('toast-container');
         if (!toastContainer) return;
         const toast = document.createElement('div');
-        let bgColor, icon;
-        switch (type) {
-            case 'error': bgColor = 'bg-red-500'; icon = 'error'; break;
-            default: bgColor = 'bg-green-500'; icon = 'check_circle'; break;
-        }
+        const bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
+        const icon = type === 'error' ? 'error' : 'check_circle';
         toast.className = `flex items-center text-white p-4 rounded-lg shadow-lg mb-2 ${bgColor}`;
         toast.innerHTML = `<span class="material-symbols-outlined mr-3">${icon}</span> ${message}`;
         toastContainer.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s ease'; setTimeout(() => toast.remove(), 500); }, 3000);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s';
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
     }
 
     if (closeResultModalBtn) {
@@ -303,16 +339,42 @@ function initializeTakeExamInterface() {
                 resultModal.classList.remove('flex');
             }
             const attemptId = e.currentTarget.dataset.attemptId;
-            if (window.loadPage && attemptId) {
-                window.loadPage('performance-review', `?attempt_id=${attemptId}`);
-            } else {
-                window.loadPage('take-exam-list');
-            }
+            if (window.loadPage && attemptId) window.loadPage('performance-review', `?attempt_id=${attemptId}`);
+            else window.loadPage('take-exam-list');
         });
     }
 
-    if (questionsArea) questionsArea.addEventListener('click', handleOptionClick);
+    if (questionsArea) {
+        questionsArea.addEventListener('click', (e) => {
+            if (e.target.closest('.option-btn')) handleOptionClick(e);
+            if (e.target.closest('.flag-btn')) toggleFlag(e);
+        });
+    }
     if (submitExamBtn) submitExamBtn.addEventListener('click', submitExam);
+
+    const openNavBtn = document.getElementById('open-nav-btn');
+    const closeNavBtn = document.getElementById('close-nav-btn');
+    const navOverlay = document.getElementById('nav-overlay');
+    const navSidebar = document.getElementById('navigator-sidebar');
+
+    if (openNavBtn && navSidebar) {
+        openNavBtn.addEventListener('click', () => {
+            navSidebar.classList.remove('translate-x-full', 'pointer-events-none');
+            navSidebar.classList.add('pointer-events-auto');
+        });
+    }
+    if (closeNavBtn && navSidebar) {
+        closeNavBtn.addEventListener('click', () => {
+            navSidebar.classList.add('translate-x-full', 'pointer-events-none');
+            navSidebar.classList.remove('pointer-events-auto');
+        });
+    }
+    if (navOverlay && navSidebar) {
+        navOverlay.addEventListener('click', () => {
+            navSidebar.classList.add('translate-x-full', 'pointer-events-none');
+            navSidebar.classList.remove('pointer-events-auto');
+        });
+    }
 
     async function loadExam() {
         if (!examId) return;
