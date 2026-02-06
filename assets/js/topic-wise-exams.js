@@ -7,7 +7,8 @@
         currentStep: 1,
         subjects: [],
         selectedTopics: new Map(), // Map<topicId, {subjectId, lessonId, topicName, questionCount, maxQuestions}>
-        examDetails: {}
+        examDetails: {},
+        cache: new Map()
     };
 
     // DOM Elements
@@ -70,44 +71,28 @@
         }, 3000);
     }
 
-    // Fetch hierarchical data (subjects -> lessons -> topics)
+    // Fetch data with caching
+    async function fetchData(url) {
+        if (state.cache.has(url)) return state.cache.get(url);
+
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!result.success) throw new Error(result.message || 'Failed to fetch data');
+
+        state.cache.set(url, result.data);
+        return result.data;
+    }
+
+    // Fetch hierarchical data (subjects -> lessons initially)
     async function fetchHierarchicalData() {
         try {
-            const response = await fetch('api/custom-exam/subjects-with-details.php');
-            const result = await response.json();
-
-            if (!result.success) {
-                throw new Error('Failed to fetch subjects');
-            }
-
-            state.subjects = result.data.sort((a, b) => a.subject_id - b.subject_id);
-            await enrichWithTopics();
+            const subjectsData = await fetchData('api/custom-exam/subjects-with-details.php');
+            state.subjects = subjectsData.sort((a, b) => a.subject_id - b.subject_id);
             renderHierarchy();
         } catch (error) {
             console.error('Error fetching hierarchical data:', error);
-            showToast('Failed to load topics. Please refresh the page.', 'error');
+            showToast('Failed to load subjects. Please refresh the page.', 'error');
             elements.hierarchyLoading.innerHTML = '<p class="text-red-500 text-center">Failed to load data.</p>';
-        }
-    }
-
-    // Enrich lessons with topics
-    async function enrichWithTopics() {
-        for (const subject of state.subjects) {
-            for (const lesson of subject.lessons) {
-                try {
-                    const response = await fetch(`api/custom-exam/topics.php?lesson_id=${lesson.lesson_id}`);
-                    const result = await response.json();
-
-                    if (result.success) {
-                        lesson.topics = result.data || [];
-                    } else {
-                        lesson.topics = [];
-                    }
-                } catch (error) {
-                    console.error(`Error fetching topics for lesson ${lesson.lesson_id}:`, error);
-                    lesson.topics = [];
-                }
-            }
         }
     }
 
@@ -166,21 +151,45 @@
         header.innerHTML = `
             <span class="material-symbols-outlined expand-icon text-gray-600 mr-2">chevron_right</span>
             <span class="font-semibold text-gray-700">${lesson.lesson_name}</span>
-            <span class="ml-2 text-sm text-gray-500">(${lesson.topics.length} topics)</span>
+            <span class="ml-2 text-sm text-gray-500 lessons-count">... topics</span>
         `;
 
         const topicsContainer = document.createElement('div');
         topicsContainer.className = 'hierarchy-item hidden mt-2 space-y-1';
 
-        lesson.topics.forEach(topic => {
-            const topicDiv = createTopicElement(topic, subjectId, lesson.lesson_id);
-            topicsContainer.appendChild(topicDiv);
-        });
+        async function expandLesson() {
+            if (topicsContainer.children.length > 0) return;
+
+            topicsContainer.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading topics...</div>';
+
+            try {
+                const topics = await fetchData(`api/custom-exam/topics.php?lesson_id=${lesson.lesson_id}`);
+                lesson.topics = topics || [];
+
+                header.querySelector('.lessons-count').textContent = `(${lesson.topics.length} topics)`;
+                topicsContainer.innerHTML = '';
+
+                if (lesson.topics.length === 0) {
+                    topicsContainer.innerHTML = '<div class="py-2 text-sm text-gray-500">No topics available.</div>';
+                    return;
+                }
+
+                lesson.topics.forEach(topic => {
+                    const topicDiv = createTopicElement(topic, subjectId, lesson.lesson_id);
+                    topicsContainer.appendChild(topicDiv);
+                });
+            } catch (error) {
+                topicsContainer.innerHTML = '<div class="py-2 text-sm text-red-500">Failed to load topics.</div>';
+            }
+        }
 
         header.addEventListener('click', () => {
             const icon = header.querySelector('.expand-icon');
             icon.classList.toggle('expanded');
             topicsContainer.classList.toggle('hidden');
+            if (!topicsContainer.classList.contains('hidden')) {
+                expandLesson();
+            }
         });
 
         div.appendChild(header);
