@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rethink-exam-v4';
+const CACHE_NAME = 'rethink-exam-v6';
 const PRE_CACHE_ASSETS = [
     './',
     './index.html',
@@ -9,6 +9,7 @@ const PRE_CACHE_ASSETS = [
     './assets/js/indexeddb-manager.js',
     './assets/js/sync-manager.js',
     './assets/js/print-engine.js',
+    './assets/js/dashboard.js',
     './assets/js/offline-exams.js',
     './assets/js/offline-exam-engine.js',
     './assets/js/performance-review.js',
@@ -33,14 +34,14 @@ const EXTERNAL_ASSETS = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(async (cache) => {
-            console.log('SW v4: Starting resilient installation...');
+            console.log('SW v5: Starting resilient installation...');
 
             // 1. Cache internal assets (must succeed)
             try {
                 await cache.addAll(PRE_CACHE_ASSETS);
-                console.log('SW v4: Internal assets cached.');
+                console.log('SW v5: Internal assets cached.');
             } catch (e) {
-                console.error('SW v4: Critical internal cache failed!', e);
+                console.error('SW v5: Critical internal cache failed!', e);
             }
 
             // 2. Cache external assets individually with no-cors
@@ -50,9 +51,9 @@ self.addEventListener('install', (event) => {
                     // even if the server doesn't provide CORS headers.
                     const response = await fetch(url, { mode: 'no-cors' });
                     await cache.put(url, response);
-                    console.log(`SW v4: Cached external asset: ${url}`);
+                    console.log(`SW v5: Cached external asset: ${url}`);
                 } catch (e) {
-                    console.warn(`SW v4: Failed to cache external asset: ${url}`, e);
+                    console.warn(`SW v5: Failed to cache external asset: ${url}`, e);
                 }
             }
         })
@@ -67,7 +68,7 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('SW v4: Clearing old cache:', cacheName);
+                        console.log('SW v5: Clearing old cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })

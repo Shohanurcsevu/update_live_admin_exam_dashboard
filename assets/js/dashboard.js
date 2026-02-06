@@ -428,11 +428,68 @@ function initializeDashboardPage() {
         });
     }
 
+    // --- Action Hub Logic ---
+    async function checkRecentAttempt() {
+        if (typeof idbManager === 'undefined') return;
+
+        try {
+            const attempt = await idbManager.getLatestInProgressAttempt();
+            const resumeCard = document.getElementById('resume-card');
+            const resumeTitle = document.getElementById('resume-exam-title');
+            const resumeProgress = document.getElementById('resume-progress');
+            const resumeBtn = document.getElementById('resume-btn');
+
+            if (attempt) {
+                // Get exam title
+                const exam = await idbManager.getById('exams', attempt.exam_id);
+                resumeTitle.textContent = exam ? exam.exam_title : 'Unknown Exam';
+
+                const answeredCount = Object.keys(attempt.answers || {}).length;
+                resumeProgress.textContent = `${answeredCount} questions answered`;
+
+                resumeBtn.onclick = () => {
+                    console.log("Resuming exam:", attempt.exam_id);
+                    if (window.loadPage) window.loadPage('take-offline-exam', `?exam_id=${attempt.exam_id}&attempt_uuid=${attempt.id}`);
+                };
+
+                resumeCard.classList.remove('hidden');
+            } else {
+                resumeCard.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error("Error checking recent attempt:", error);
+        }
+    }
+
+    function setupActionHub() {
+        const daily10Btn = document.getElementById('daily-10-btn');
+        if (daily10Btn) {
+            daily10Btn.addEventListener('click', () => {
+                console.log("Dashboard: Starting Daily 10 Quiz...");
+
+                // Visual feedback
+                const originalContent = daily10Btn.innerHTML;
+                daily10Btn.disabled = true;
+                daily10Btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-lg">sync</span> Preparing...`;
+
+                if (window.loadPage) {
+                    window.loadPage('take-offline-exam', `?mode=daily_10`);
+                } else {
+                    console.error("loadPage not found");
+                    daily10Btn.disabled = false;
+                    daily10Btn.innerHTML = originalContent;
+                }
+            });
+        }
+        checkRecentAttempt();
+    }
+
     function initializePage() {
         fetchAndDisplayMetrics();
         populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
         fetchAndDisplayExams();
         setupEventListeners();
+        setupActionHub();
     }
     initializePage();
 }

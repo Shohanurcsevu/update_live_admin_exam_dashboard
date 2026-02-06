@@ -1,7 +1,17 @@
 function initializeOfflineExamEngine() {
     const params = new URLSearchParams(window.location.search);
     const examId = params.get('exam_id');
-    const attemptUuid = params.get('attempt_uuid') || crypto.randomUUID();
+
+    // Robust UUID Fallback
+    const generateUUID = () => {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    };
+
+    const attemptUuid = params.get('attempt_uuid') || generateUUID();
 
     let examData = {};
     let userAnswers = {};
@@ -118,12 +128,20 @@ function initializeOfflineExamEngine() {
     async function autoSaveProgress() {
         const attempt = {
             id: attemptUuid,
-            exam_id: parseInt(examId),
+            exam_id: parseInt(examId) || 0,
             answers: userAnswers,
             start_time: startTime,
             status: 'IN_PROGRESS',
             last_saved: new Date().toISOString()
         };
+
+        // NEW: Persist metadata for virtual exams (like Daily 10)
+        if (attempt.exam_id === 0 && examData.details) {
+            attempt.exam_title = examData.details.exam_title;
+            // Store a snapshot of questions for review mapping
+            attempt.questions_snapshot = examData.questions;
+        }
+
         await idbManager.saveAttempt(attempt);
     }
 
@@ -196,7 +214,7 @@ function initializeOfflineExamEngine() {
 
         const attempt = {
             id: attemptUuid,
-            exam_id: parseInt(examId),
+            exam_id: parseInt(examId) || 0,
             answers: userAnswers,
             start_time: startTime,
             end_time: new Date().toISOString(),
@@ -209,6 +227,12 @@ function initializeOfflineExamEngine() {
             status: 'COMPLETED',
             checksum: btoa(attemptUuid + examId + JSON.stringify(userAnswers))
         };
+
+        // NEW: Persist metadata for virtual exams
+        if (attempt.exam_id === 0 && examData.details) {
+            attempt.exam_title = examData.details.exam_title;
+            attempt.questions_snapshot = examData.questions;
+        }
 
         const performanceData = {
             right_answers: right,
@@ -248,6 +272,41 @@ function initializeOfflineExamEngine() {
     }
 
     async function loadOfflineExam() {
+        const mode = params.get('mode');
+        console.log("Offline Engine: Starting load...", { mode, examId, attemptUuid });
+
+        if (mode === 'daily_10') {
+            console.log("Daily 10 mode active");
+            try {
+                const questions = await idbManager.getRandomQuestions(10);
+                console.log("Daily 10: Questions found:", questions.length);
+
+                if (questions.length === 0) {
+                    const msg = 'Your offline question bank is empty. Please download at least one subject from the "Offline Exams" page first.';
+                    if (window.showToast) showToast(msg, 'error');
+                    else alert(msg);
+                    if (window.loadPage) window.loadPage('dashboard');
+                    return;
+                }
+
+                const details = {
+                    id: 0,
+                    exam_title: "Daily 10 Challenge",
+                    duration: 10,
+                    total_marks: 10,
+                    pass_mark: 4,
+                    instructions: "10 random questions from your downloaded subjects. You have 10 minutes!"
+                };
+
+                startTime = new Date().toISOString();
+                renderExam(details, questions);
+                return;
+            } catch (e) {
+                console.error("Critical error in Daily 10 load:", e);
+                return;
+            }
+        }
+
         if (!examId) return;
 
         try {

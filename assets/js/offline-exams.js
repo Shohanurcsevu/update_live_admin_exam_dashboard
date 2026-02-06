@@ -54,7 +54,7 @@
                 });
 
                 attemptsContainer.innerHTML = allAttempts.map(attempt => {
-                    const exam = exams.find(e => e.id == attempt.exam_id) || { exam_title: 'Unknown Exam' };
+                    const exam = exams.find(e => e.id == attempt.exam_id) || { exam_title: attempt.exam_title || 'Unknown Exam' };
                     let statusColor, statusLabel, actionBtn;
 
                     switch (attempt.status) {

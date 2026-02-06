@@ -287,6 +287,55 @@ class IndexedDBManager {
             request.onerror = () => reject(request.error);
         });
     }
+
+    /**
+     * Get the most recently saved IN_PROGRESS attempt
+     */
+    async getLatestInProgressAttempt() {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction('offline_attempts', 'readonly');
+            const store = tx.objectStore('offline_attempts');
+            const request = store.openCursor(null, 'prev'); // Most recent first
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    if (cursor.value.status === 'IN_PROGRESS') {
+                        resolve(cursor.value);
+                    } else {
+                        cursor.continue();
+                    }
+                } else {
+                    resolve(null);
+                }
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * Get random questions for Daily 10 quiz
+     */
+    async getRandomQuestions(limit = 10) {
+        console.log("IDBManager: getRandomQuestions requested", limit);
+        if (!this.db) await this.init();
+
+        try {
+            const allQuestions = await this.getAll('questions');
+            console.log("IDBManager: Total questions available:", allQuestions?.length || 0);
+
+            if (!allQuestions || allQuestions.length === 0) return [];
+
+            // Shuffle and pick
+            const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+            const result = shuffled.slice(0, limit);
+            console.log("IDBManager: Random selection complete", result.length);
+            return result;
+        } catch (error) {
+            console.error("IDBManager: Error getting random questions", error);
+            return [];
+        }
+    }
 }
 
 const idbManager = new IndexedDBManager();
