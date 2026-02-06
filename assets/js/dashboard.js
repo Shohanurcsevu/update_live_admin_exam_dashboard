@@ -465,7 +465,7 @@ function initializeDashboardPage() {
         const daily10Btn = document.getElementById('daily-10-btn');
         if (daily10Btn) {
             daily10Btn.addEventListener('click', () => {
-                console.log("Dashboard: Starting Daily 10 Quiz...");
+                console.log("Dashboard: Starting Daily 15 Quiz...");
 
                 // Visual feedback
                 const originalContent = daily10Btn.innerHTML;
@@ -473,7 +473,7 @@ function initializeDashboardPage() {
                 daily10Btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-lg">sync</span> Preparing...`;
 
                 if (window.loadPage) {
-                    window.loadPage('take-offline-exam', `?mode=daily_10`);
+                    window.loadPage('take-offline-exam', `?mode=daily_15`);
                 } else {
                     console.error("loadPage not found");
                     daily10Btn.disabled = false;

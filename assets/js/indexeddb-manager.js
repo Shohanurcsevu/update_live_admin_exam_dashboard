@@ -314,27 +314,58 @@ class IndexedDBManager {
     }
 
     /**
-     * Get random questions for Daily 10 quiz
+     * Get balanced random questions (at least one per subject)
      */
-    async getRandomQuestions(limit = 10) {
-        console.log("IDBManager: getRandomQuestions requested", limit);
+    async getBalancedRandomQuestions(limit = 15) {
+        console.log("IDBManager: getBalancedRandomQuestions requested", limit);
         if (!this.db) await this.init();
 
         try {
             const allQuestions = await this.getAll('questions');
-            console.log("IDBManager: Total questions available:", allQuestions?.length || 0);
-
             if (!allQuestions || allQuestions.length === 0) return [];
 
-            // Shuffle and pick
-            const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
-            const result = shuffled.slice(0, limit);
-            console.log("IDBManager: Random selection complete", result.length);
-            return result;
+            // 1. Group by subject
+            const subjectMap = new Map();
+            allQuestions.forEach(q => {
+                if (!subjectMap.has(q.subject_id)) subjectMap.set(q.subject_id, []);
+                subjectMap.get(q.subject_id).push(q);
+            });
+
+            const subjects = Array.from(subjectMap.keys());
+            const result = [];
+            const usedIds = new Set();
+
+            // 2. Pick at least one from each subject
+            subjects.forEach(subId => {
+                if (result.length < limit) {
+                    const subQuestions = subjectMap.get(subId);
+                    const randomPick = subQuestions[Math.floor(Math.random() * subQuestions.length)];
+                    result.push(randomPick);
+                    usedIds.add(randomPick.id);
+                }
+            });
+
+            // 3. Fill the rest randomly
+            const remainingPool = allQuestions.filter(q => !usedIds.has(q.id));
+            const shuffledRemaining = remainingPool.sort(() => 0.5 - Math.random());
+
+            while (result.length < limit && shuffledRemaining.length > 0) {
+                result.push(shuffledRemaining.pop());
+            }
+
+            console.log(`IDBManager: Balanced selection complete (${result.length} questions from ${subjects.length} subjects)`);
+            return result.sort(() => 0.5 - Math.random()); // Final shuffle
         } catch (error) {
-            console.error("IDBManager: Error getting random questions", error);
+            console.error("IDBManager: Error in balanced selection", error);
             return [];
         }
+    }
+
+    /**
+     * Get random questions (Legacy)
+     */
+    async getRandomQuestions(limit = 10) {
+        return this.getBalancedRandomQuestions(limit);
     }
 }
 

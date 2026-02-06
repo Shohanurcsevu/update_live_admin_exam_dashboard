@@ -275,11 +275,12 @@ function initializeOfflineExamEngine() {
         const mode = params.get('mode');
         console.log("Offline Engine: Starting load...", { mode, examId, attemptUuid });
 
-        if (mode === 'daily_10') {
-            console.log("Daily 10 mode active");
+        if (mode === 'daily_15' || mode === 'daily_10') {
+            console.log(`Daily ${mode === 'daily_15' ? '15' : '10'} mode active`);
             try {
-                const questions = await idbManager.getRandomQuestions(10);
-                console.log("Daily 10: Questions found:", questions.length);
+                const count = mode === 'daily_15' ? 15 : 10;
+                const questions = await idbManager.getBalancedRandomQuestions(count);
+                console.log(`Daily ${count}: Questions found:`, questions.length);
 
                 if (questions.length === 0) {
                     const msg = 'Your offline question bank is empty. Please download at least one subject from the "Offline Exams" page first.';
@@ -291,18 +292,18 @@ function initializeOfflineExamEngine() {
 
                 const details = {
                     id: 0,
-                    exam_title: "Daily 10 Challenge",
-                    duration: 10,
-                    total_marks: 10,
-                    pass_mark: 4,
-                    instructions: "10 random questions from your downloaded subjects. You have 10 minutes!"
+                    exam_title: `Daily ${count} Challenge`,
+                    duration: count,
+                    total_marks: count,
+                    pass_mark: Math.ceil(count * 0.4),
+                    instructions: `${count} random questions from all your downloaded subjects. You have ${count} minutes!`
                 };
 
                 startTime = new Date().toISOString();
                 renderExam(details, questions);
                 return;
             } catch (e) {
-                console.error("Critical error in Daily 10 load:", e);
+                console.error("Critical error in Daily quiz load:", e);
                 return;
             }
         }
