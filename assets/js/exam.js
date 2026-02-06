@@ -94,8 +94,16 @@ function initializeExamPage() {
         } catch (error) { showToast('Failed to load topics.', 'error'); }
     }
 
-    async function fetchAndDisplayExams() {
-        let url = `${EXAM_API_URL}?action=list`;
+    let currentOffset = 0;
+    const itemsPerPage = 10;
+
+    async function fetchAndDisplayExams(append = false) {
+        if (!append) {
+            currentOffset = 0;
+            tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading...</td></tr>';
+        }
+
+        let url = `${EXAM_API_URL}?action=list&limit=${itemsPerPage}&offset=${currentOffset}`;
         const params = new URLSearchParams();
         if (subjectFilter.value > 0) params.append('subject_id', subjectFilter.value);
         if (lessonFilter.value > 0) params.append('lesson_id', lessonFilter.value);
@@ -106,15 +114,17 @@ function initializeExamPage() {
         try {
             const response = await fetch(url);
             const result = await response.json();
-            tableBody.innerHTML = '';
+
+            if (!append) tableBody.innerHTML = '';
+
             if (result.success && result.data.length > 0) {
                 result.data.forEach(exam => {
                     const row = `
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
                             <td class="py-3 px-6 text-left font-medium">${exam.exam_title}</td>
-                            <td class="py-3 px-6 text-left">${exam.topic_name}</td>
-                            <td class="py-3 px-6 text-left">${exam.lesson_name}</td>
-                            <td class="py-3 px-6 text-left">${exam.subject_name}</td>
+                            <td class="py-3 px-6 text-left">${exam.topic_name || 'N/A'}</td>
+                            <td class="py-3 px-6 text-left">${exam.lesson_name || 'N/A'}</td>
+                            <td class="py-3 px-6 text-left">${exam.subject_name || 'N/A'}</td>
                             <td class="py-3 px-6 text-center">${exam.duration} min</td>
                             <td class="py-3 px-6 text-center">${exam.total_marks}</td>
                             <td class="py-3 px-6 text-center">
@@ -126,10 +136,37 @@ function initializeExamPage() {
                         </tr>`;
                     tableBody.innerHTML += row;
                 });
+
+                // Show/hide Load More button
+                const loadMoreContainer = document.getElementById('load-more-container');
+                if (result.pagination && result.pagination.hasMore) {
+                    loadMoreContainer.classList.remove('hidden');
+                } else {
+                    loadMoreContainer.classList.add('hidden');
+                }
             } else {
-                tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">No exams found.</td></tr>`;
+                if (!append) {
+                    tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">No exams found.</td></tr>`;
+                    document.getElementById('load-more-container').classList.add('hidden');
+                }
             }
-        } catch (error) { showToast('Failed to load exams.', 'error'); }
+        } catch (error) {
+            showToast('Failed to load exams.', 'error');
+            if (!append) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">Error loading exams.</td></tr>`;
+        }
+    }
+
+    async function loadMoreExams() {
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        const originalContent = loadMoreBtn.innerHTML;
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.innerHTML = '<span class="material-symbols-outlined animate-spin mr-2">sync</span> Loading...';
+
+        currentOffset += itemsPerPage;
+        await fetchAndDisplayExams(true);
+
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerHTML = originalContent;
     }
 
     function closeModal(modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
@@ -146,7 +183,7 @@ function initializeExamPage() {
             const result = await response.json();
             if (result.success) {
                 closeModal(examModal);
-                fetchAndDisplayExams();
+                fetchAndDisplayExams(false);
                 showToast(result.message, data.id ? 'update' : 'success');
             } else { showToast(result.message, 'error'); }
         } catch (error) { showToast('A network error occurred.', 'error'); }
@@ -159,7 +196,7 @@ function initializeExamPage() {
             const result = await response.json();
             showToast(result.message, result.success ? 'error' : 'error');
         } catch (error) { showToast('Network error.', 'error'); }
-        finally { closeModal(deleteModal); fetchAndDisplayExams(); }
+        finally { closeModal(deleteModal); fetchAndDisplayExams(false); }
     }
 
     async function handleTableClick(e) {
@@ -212,6 +249,7 @@ function initializeExamPage() {
 
     examForm.addEventListener('submit', handleFormSubmit);
     tableBody.addEventListener('click', handleTableClick);
+    document.getElementById('load-more-btn').addEventListener('click', loadMoreExams);
 
     // Filter listeners
     subjectFilter.addEventListener('change', () => {
@@ -222,7 +260,7 @@ function initializeExamPage() {
         populateTopics(lessonFilter.value, topicFilter);
         topicFilter.dispatchEvent(new Event('change')); // Trigger topic filter change
     });
-    topicFilter.addEventListener('change', fetchAndDisplayExams);
+    topicFilter.addEventListener('change', () => fetchAndDisplayExams(false));
 
     // Modal dependent dropdown listeners
     modalSubjectSelector.addEventListener('change', () => populateLessons(modalSubjectSelector.value, modalLessonSelector));
@@ -237,7 +275,7 @@ function initializeExamPage() {
     // --- Initial Load ---
     populateSubjects(subjectFilter);
     populateSubjects(modalSubjectSelector);
-    fetchAndDisplayExams();
+    fetchAndDisplayExams(false);
 }
 
 initializeExamPage();
