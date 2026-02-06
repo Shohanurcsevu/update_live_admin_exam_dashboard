@@ -44,6 +44,7 @@
     let hierarchyData = {};
     let selectedExams = {}; // { examId: { examTitle, maxQuestions, selectedCount } }
     let currentStep = 1;
+    const cache = new Map();
 
     // Helper: Show toast
     function showToast(message, type = 'success') {
@@ -60,11 +61,15 @@
         }, 3000);
     }
 
-    // Helper: Fetch data
+    // Helper: Fetch data with caching
     async function fetchData(url) {
+        if (cache.has(url)) return cache.get(url);
+
         const response = await fetch(url);
         const result = await response.json();
         if (!result.success) throw new Error(result.message || 'Failed to fetch data');
+
+        cache.set(url, result.data);
         return result.data;
     }
 
@@ -77,36 +82,19 @@
             const subjectsData = await fetchData(API_SUBJECTS);
             const subjects = subjectsData.sort((a, b) => a.id - b.id);
 
-            for (const subject of subjects) {
-                const lessons = await fetchData(`${API_LESSONS}?subject_id=${subject.id}`);
+            subjects.forEach(subject => {
                 hierarchyData[subject.id] = {
                     ...subject,
-                    lessons: {}
+                    lessons: null
                 };
-
-                for (const lesson of lessons) {
-                    const topics = await fetchData(`${API_TOPICS}?lesson_id=${lesson.id}`);
-                    hierarchyData[subject.id].lessons[lesson.id] = {
-                        ...lesson,
-                        topics: {}
-                    };
-
-                    for (const topic of topics) {
-                        const exams = await fetchData(`${API_EXAMS}&topic_id=${topic.id}`);
-                        hierarchyData[subject.id].lessons[lesson.id].topics[topic.id] = {
-                            ...topic,
-                            exams: exams
-                        };
-                    }
-                }
-            }
+            });
 
             renderHierarchy();
             hierarchyLoading.classList.add('hidden');
             hierarchyTree.classList.remove('hidden');
         } catch (error) {
             console.error('Error building hierarchy:', error);
-            showToast('Failed to load exam hierarchy', 'error');
+            showToast('Failed to load exam subjects', 'error');
             hierarchyLoading.innerHTML = '<p class="text-red-500 text-center">Failed to load data. Please refresh the page.</p>';
         }
     }
@@ -126,53 +114,85 @@
         });
     }
 
-    function renderLessons(subject, parentDiv) {
+    async function renderLessons(subject, parentDiv) {
         const container = parentDiv.querySelector('.children-container');
-        if (container.children.length > 0) {
-            container.innerHTML = '';
-            return;
-        }
+        if (container.children.length > 0) return;
 
-        Object.values(subject.lessons).forEach(lesson => {
-            const lessonDiv = createHierarchyItem(
-                lesson.lesson_name,
-                'lesson',
-                `lesson-${lesson.id}`,
-                () => renderTopics(lesson, lessonDiv)
-            );
-            container.appendChild(lessonDiv);
-        });
+        try {
+            container.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading lessons...</div>';
+
+            if (!subject.lessons) {
+                const lessons = await fetchData(`${API_LESSONS}?subject_id=${subject.id}`);
+                subject.lessons = {};
+                lessons.forEach(l => {
+                    subject.lessons[l.id] = { ...l, topics: null };
+                });
+            }
+
+            container.innerHTML = '';
+            Object.values(subject.lessons).forEach(lesson => {
+                const lessonDiv = createHierarchyItem(
+                    lesson.lesson_name,
+                    'lesson',
+                    `lesson-${lesson.id}`,
+                    () => renderTopics(lesson, lessonDiv)
+                );
+                container.appendChild(lessonDiv);
+            });
+        } catch (error) {
+            container.innerHTML = '<div class="py-2 text-sm text-red-500">Failed to load lessons.</div>';
+        }
     }
 
-    function renderTopics(lesson, parentDiv) {
+    async function renderTopics(lesson, parentDiv) {
         const container = parentDiv.querySelector('.children-container');
-        if (container.children.length > 0) {
-            container.innerHTML = '';
-            return;
-        }
+        if (container.children.length > 0) return;
 
-        Object.values(lesson.topics).forEach(topic => {
-            const topicDiv = createHierarchyItem(
-                topic.topic_name,
-                'topic',
-                `topic-${topic.id}`,
-                () => renderExams(topic, topicDiv)
-            );
-            container.appendChild(topicDiv);
-        });
+        try {
+            container.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading topics...</div>';
+
+            if (!lesson.topics) {
+                const topics = await fetchData(`${API_TOPICS}?lesson_id=${lesson.id}`);
+                lesson.topics = {};
+                topics.forEach(t => {
+                    lesson.topics[t.id] = { ...t, exams: null };
+                });
+            }
+
+            container.innerHTML = '';
+            Object.values(lesson.topics).forEach(topic => {
+                const topicDiv = createHierarchyItem(
+                    topic.topic_name,
+                    'topic',
+                    `topic-${topic.id}`,
+                    () => renderExams(topic, topicDiv)
+                );
+                container.appendChild(topicDiv);
+            });
+        } catch (error) {
+            container.innerHTML = '<div class="py-2 text-sm text-red-500">Failed to load topics.</div>';
+        }
     }
 
-    function renderExams(topic, parentDiv) {
+    async function renderExams(topic, parentDiv) {
         const container = parentDiv.querySelector('.children-container');
-        if (container.children.length > 0) {
-            container.innerHTML = '';
-            return;
-        }
+        if (container.children.length > 0) return;
 
-        topic.exams.forEach(exam => {
-            const examDiv = createExamItem(exam);
-            container.appendChild(examDiv);
-        });
+        try {
+            container.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading exams...</div>';
+
+            if (!topic.exams) {
+                topic.exams = await fetchData(`${API_EXAMS}&topic_id=${topic.id}`);
+            }
+
+            container.innerHTML = '';
+            topic.exams.forEach(exam => {
+                const examDiv = createExamItem(exam);
+                container.appendChild(examDiv);
+            });
+        } catch (error) {
+            container.innerHTML = '<div class="py-2 text-sm text-red-500">Failed to load exams.</div>';
+        }
     }
 
     function createHierarchyItem(name, type, id, onExpand) {
