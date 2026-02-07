@@ -94,6 +94,34 @@ function initializeDashboardPage() {
             const { subjects, insights } = result.data;
             const ctx = document.getElementById('mastery-radar-chart');
 
+            // Name mapping for chart labels
+            const shortSubjectMap = {
+                'বাংলা সাহিত্য': 'সাহিত্য',
+                'বাংলা ব্যাকরণ': 'ব্যাকরণ',
+                'English Literature': 'Literature',
+                'English Grammar': 'Grammar',
+                'বাংলাদেশ বিষয়াবলী': 'বাংলাদেশ',
+                'আন্তর্জাতিক বিষয়াবলী': 'আন্তর্জাতিক',
+                'ভূগোল ( বাংলাদেশ ও বিশ্ব ) , পরিবেশ ও দুর্যোগ ব্যাবস্থাপনা': 'ভূগোল',
+                'সাধারণ বিজ্ঞান': 'বিজ্ঞান',
+                'কম্পিউটার ও তথ্য প্রযুক্তি': 'কম্পিউটার',
+                'গাণিতিক যুক্তি': 'গণিত',
+                'মানসিক দক্ষতা': 'দক্ষতা',
+                'নৈতিকতা , মূল্যবোধ ও সুশাসন': 'নৈতিকতা'
+            };
+
+            const getShortName = (name) => {
+                // Try exact match or clean match (ignoring extra spaces)
+                const cleanName = name.trim();
+                if (shortSubjectMap[cleanName]) return shortSubjectMap[cleanName];
+
+                // Fallback for cases with slightly different formatting
+                for (let [long, short] of Object.entries(shortSubjectMap)) {
+                    if (cleanName.includes(long)) return short;
+                }
+                return cleanName;
+            };
+
             // 1. Radar Chart
             if (ctx && typeof Chart !== 'undefined') {
                 if (masteryChart) masteryChart.destroy();
@@ -103,7 +131,7 @@ function initializeDashboardPage() {
                     masteryChart = new Chart(ctx, {
                         type: 'radar',
                         data: {
-                            labels: subjects.map(s => s.name),
+                            labels: subjects.map(s => getShortName(s.name)),
                             datasets: [
                                 {
                                     label: 'This Week',
@@ -128,8 +156,27 @@ function initializeDashboardPage() {
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            scales: { r: { suggestedMin: 0, suggestedMax: 100 } },
-                            plugins: { legend: { display: false } }
+                            scales: {
+                                r: {
+                                    suggestedMin: 0,
+                                    suggestedMax: 100,
+                                    ticks: { display: false },
+                                    pointLabels: {
+                                        centerPointLabels: true, // Help keep labels centered
+                                        font: {
+                                            size: window.innerWidth < 640 ? 9 : 11,
+                                            weight: '600'
+                                        },
+                                        padding: 10
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            layout: {
+                                padding: 35 // Uniform symmetrical padding
+                            }
                         }
                     });
                 }
@@ -138,8 +185,8 @@ function initializeDashboardPage() {
             // 2. Insights
             if (insights.length > 0) {
                 insightsContainer.innerHTML = insights.map(i => `
-                    <div class="${i.type==='warning'?'bg-amber-50':'bg-emerald-50'} border p-4 rounded-xl flex items-start gap-3">
-                        <span class="material-symbols-outlined ${i.type==='warning'?'text-amber-500':'text-emerald-500'}">${i.type==='warning'?'trending_down':'trending_up'}</span>
+                    <div class="${i.type === 'warning' ? 'bg-amber-50' : 'bg-emerald-50'} border p-4 rounded-xl flex items-start gap-3">
+                        <span class="material-symbols-outlined ${i.type === 'warning' ? 'text-amber-500' : 'text-emerald-500'}">${i.type === 'warning' ? 'trending_down' : 'trending_up'}</span>
                         <p class="text-sm leading-relaxed">${i.message}</p>
                     </div>
                 `).join('');
