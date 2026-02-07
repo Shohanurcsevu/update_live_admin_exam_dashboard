@@ -90,8 +90,8 @@ try {
             while ($q_row = $questions_result->fetch_assoc()) {
                 $all_fetched_question_ids[] = $q_row['id'];
                 $insert_q_stmt->bind_param("iiiissss",
-                    $new_exam['subject_id'],
-                    $new_exam['lesson_id'],
+                    $q_row['subject_id'],
+                    $q_row['lesson_id'],
                     $source_topic_id,
                     $new_exam_id,
                     $q_row['question'],
