@@ -280,9 +280,9 @@ function initializeTakeExamInterface() {
                 wrong++;
                 mistakes.push({
                     question_id: q.id,
-                    subject_id: q.subject_id,
-                    lesson_id: q.lesson_id,
-                    topic_id: q.topic_id
+                    subject_id: q.subject_id || examData.details.subject_id,
+                    lesson_id: q.lesson_id || examData.details.lesson_id,
+                    topic_id: q.topic_id || examData.details.topic_id
                 });
             }
         });
@@ -338,6 +338,7 @@ function initializeTakeExamInterface() {
                             body: JSON.stringify({
                                 exam_id: examId,
                                 is_custom: 0,
+                                is_offline: 0,
                                 questions: performance.mistakes
                             })
                         });

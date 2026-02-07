@@ -17,6 +17,7 @@ if (empty($data['questions']) || !is_array($data['questions'])) {
 
 $exam_id = isset($data['exam_id']) ? intval($data['exam_id']) : null;
 $is_custom = isset($data['is_custom']) ? intval($data['is_custom']) : 0;
+$is_offline = isset($data['is_offline']) ? intval($data['is_offline']) : 0;
 
 $success_count = 0;
 $errors = [];
@@ -52,8 +53,8 @@ foreach ($data['questions'] as $q) {
             $stmt->bind_param("iii", $new_count, $q_id, $exam_id);
         }
     } else {
-        $stmt = $conn->prepare("INSERT INTO mistake_bank (question_id, exam_id, subject_id, lesson_id, topic_id, is_custom, mistake_count) VALUES (?, ?, ?, ?, ?, ?, 1)");
-        $stmt->bind_param("iiiiii", $q_id, $exam_id, $sub_id, $les_id, $top_id, $is_custom);
+        $stmt = $conn->prepare("INSERT INTO mistake_bank (question_id, exam_id, subject_id, lesson_id, topic_id, is_custom, is_offline, mistake_count) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+        $stmt->bind_param("iiiiiii", $q_id, $exam_id, $sub_id, $les_id, $top_id, $is_custom, $is_offline);
     }
 
     if ($stmt->execute()) {

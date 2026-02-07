@@ -14,7 +14,7 @@ $query = "
         s.subject_name,
         COUNT(DISTINCT mb.question_id) as mistake_count
     FROM subjects s
-    LEFT JOIN mistake_bank mb ON s.id = mb.subject_id AND mb.resolved = 0
+    LEFT JOIN mistake_bank mb ON s.id = mb.subject_id AND mb.resolved = 0 AND mb.is_offline = 0
     LEFT JOIN exams e ON mb.exam_id = e.id
     WHERE s.is_deleted = 0
       AND (e.id IS NULL OR e.is_deleted = 0)

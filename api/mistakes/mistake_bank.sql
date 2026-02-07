@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS mistake_bank (
     topic_id INT NULL,
     mistake_count INT DEFAULT 1,
     is_custom TINYINT(1) DEFAULT 0, -- 1 if from custom exam / Mystery Custom
+    is_offline TINYINT(1) DEFAULT 0, -- 1 if from offline exam engine
     last_missed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     resolved TINYINT(1) DEFAULT 0, -- 0 = active mistake, 1 = resolved correctly
     UNIQUE KEY (question_id, exam_id) -- Allows one record per question PER EXAM

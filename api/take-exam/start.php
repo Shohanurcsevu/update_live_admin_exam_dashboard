@@ -27,7 +27,7 @@ if (!$exam_details) {
     exit; 
 }
 
-$question_sql = "SELECT id, question, options, answer FROM questions WHERE exam_id = ? AND is_deleted = 0";
+$question_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer FROM questions WHERE exam_id = ? AND is_deleted = 0";
 $stmt = $conn->prepare($question_sql);
 $stmt->bind_param("i", $exam_id);
 $stmt->execute();
