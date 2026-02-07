@@ -8,10 +8,96 @@
 
     const init = async () => {
         await fetchData();
+        fetchAndDisplayGoalRoadmap(); // Correctly initialize the shifted roadmap
         renderHeatmap();
         renderCalendar();
         setupEventListeners();
     };
+
+    async function fetchAndDisplayGoalRoadmap() {
+        const foundationList = document.getElementById('foundation-goals-list');
+        const dailyList = document.getElementById('daily-routine-list');
+        const progressBar = document.getElementById('goal-progress-bar');
+        const percentageText = document.getElementById('goal-percentage');
+
+        if (!foundationList || !dailyList) return;
+
+        try {
+            const response = await fetch('api/performance/goal-status.php');
+            const result = await response.json();
+
+            if (result.success && result.goals) {
+                const goals = result.goals;
+
+                // 1. Render Foundation Goals
+                foundationList.innerHTML = Object.keys(goals.setup).map(key => {
+                    const goal = goals.setup[key];
+                    const icon = goal.completed ? 'check_circle' : 'pending';
+                    const iconColor = goal.completed ? 'text-emerald-500' : 'text-gray-300';
+                    return `
+                        <li class="flex items-center justify-between group">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined ${iconColor}">${icon}</span>
+                                <span class="text-sm font-semibold ${goal.completed ? 'text-gray-900' : 'text-gray-600'}">${goal.title}</span>
+                            </div>
+                            <span class="text-xs font-bold ${goal.completed ? 'text-emerald-600' : 'text-gray-400'}">${goal.current}/${goal.total}</span>
+                        </li>
+                    `;
+                }).join('');
+
+                // 2. Render Daily Routine
+                dailyList.innerHTML = Object.keys(goals.daily).map(key => {
+                    const goal = goals.daily[key];
+                    const icon = goal.completed ? 'verified' : 'circle';
+                    const iconColor = goal.completed ? 'text-emerald-500' : 'text-indigo-200';
+                    return `
+                        <li class="flex items-center justify-between group">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined ${iconColor}">${icon}</span>
+                                <span class="text-sm font-semibold ${goal.completed ? 'text-gray-900' : 'text-gray-600'}">${goal.title}</span>
+                            </div>
+                            ${goal.completed ? '<span class="text-[10px] font-black text-emerald-600 uppercase">Done</span>' : '<span class="text-[10px] font-bold text-indigo-400 uppercase">Pending</span>'}
+                        </li>
+                    `;
+                }).join('');
+
+                // 3. Update Overall Progress
+                const allGoals = [...Object.values(goals.setup), ...Object.values(goals.daily)];
+                const completedCount = allGoals.filter(g => g.completed).length;
+                const totalCount = allGoals.length;
+                const percentage = Math.round((completedCount / totalCount) * 100);
+
+                if (progressBar) {
+                    const circumference = 2 * Math.PI * 28;
+                    const offset = circumference - (percentage / 100) * circumference;
+                    progressBar.style.strokeDashoffset = offset;
+                }
+                if (percentageText) percentageText.textContent = `${percentage}%`;
+
+                // Fetch and render small badge summary
+                fetchAndRenderBadges();
+            }
+        } catch (error) {
+            console.error("Error fetching goal roadmap:", error);
+        }
+    }
+
+    async function fetchAndRenderBadges() {
+        const summaryBadgeText = document.getElementById('earned-badge-text');
+        const summaryBadgeEl = document.getElementById('dashboard-badge-summary');
+
+        try {
+            const response = await fetch('api/performance/badges.php');
+            const result = await response.json();
+
+            if (result.success && summaryBadgeText && summaryBadgeEl) {
+                summaryBadgeText.textContent = `${result.earned_count} Badges Earned`;
+                summaryBadgeEl.classList.remove('opacity-0');
+            }
+        } catch (error) {
+            console.error("Error fetching badges:", error);
+        }
+    }
 
     const fetchData = async () => {
         try {

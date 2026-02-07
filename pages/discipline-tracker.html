@@ -1,4 +1,54 @@
-<div class="space-y-6 animate-fade-in">
+<div id="dashboard-container" class="space-y-6 animate-fade-in">
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 pointer-events-none"></div>
+
+    <!-- Daily Objective Roadmap (Shifted from Dashboard) -->
+    <div id="goal-roadmap-section" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="bg-indigo-600 p-6 text-white flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined">map</span>
+                    Daily Objective Roadmap
+                </h2>
+                <div class="flex items-center gap-3 mt-1">
+                    <p class="text-indigo-100 text-sm opacity-90">Complete these goals to build your streak.</p>
+                    <span class="w-1 h-1 bg-white/30 rounded-full"></span>
+                    <span id="dashboard-badge-summary"
+                        class="text-indigo-100 text-sm font-bold opacity-0 transition-opacity flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm text-yellow-300">military_tech</span>
+                        <span id="earned-badge-text">0 Badges Earned</span>
+                    </span>
+                </div>
+            </div>
+            <div id="overall-progress-circle" class="relative w-16 h-16 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90">
+                    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="transparent"
+                        class="text-indigo-500/30" />
+                    <circle id="goal-progress-bar" cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4"
+                        fill="transparent" stroke-dasharray="175.9" stroke-dashoffset="175.9"
+                        class="text-white transition-all duration-1000" />
+                </svg>
+                <span id="goal-percentage" class="absolute text-xs font-black">0%</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+            <!-- Setup Goals (Checklist) -->
+            <div class="p-6">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Foundation Goals</h3>
+                <ul id="foundation-goals-list" class="space-y-4">
+                    <!-- Goals injected here -->
+                </ul>
+            </div>
+
+            <!-- Daily Routine (Checklist) -->
+            <div class="p-6">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Today's Routine</h3>
+                <ul id="daily-routine-list" class="space-y-4">
+                    <!-- Routine injected here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <!-- Header Section -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
