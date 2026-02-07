@@ -348,6 +348,20 @@ function initializeOfflineExamEngine() {
                         if (window.loadPage) window.loadPage('dashboard');
                         return;
                     }
+                } else if (mode === 'daily_15' && navigator.onLine) {
+                    try {
+                        const response = await fetch('api/take-exam/random-questions.php');
+                        const result = await response.json();
+                        if (result.success && result.data.length > 0) {
+                            questions = result.data;
+                            console.log("Offline Engine: Loaded live questions from Database");
+                        } else {
+                            throw new Error(result.message || "Failed to fetch from API");
+                        }
+                    } catch (apiError) {
+                        console.warn("API Fetch Failed, falling back to local IDB:", apiError);
+                        questions = await idbManager.getBalancedRandomQuestions(count);
+                    }
                 } else {
                     questions = await idbManager.getBalancedRandomQuestions(count);
                 }
