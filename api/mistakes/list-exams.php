@@ -13,7 +13,7 @@ $query = "
         m.exam_id, 
         COALESCE(e.exam_title, 'Mystery Custom Quiz') as exam_title,
         COALESCE(s.subject_name, 'General') as subject_name,
-        COUNT(*) as total_mistakes,
+        COUNT(DISTINCT m.question_id) as total_mistakes,
         MAX(m.last_missed_at) as last_activity
     FROM mistake_bank m
     LEFT JOIN exams e ON m.exam_id = e.id

@@ -7,7 +7,7 @@ require_once '../subject/db_connect.php';
 header('Content-Type: application/json');
 
 $sql = "
-    SELECT COUNT(*) as total_mistakes 
+    SELECT COUNT(DISTINCT mb.question_id) as total_mistakes 
     FROM mistake_bank mb
     LEFT JOIN exams e ON mb.exam_id = e.id
     LEFT JOIN subjects s ON mb.subject_id = s.id
