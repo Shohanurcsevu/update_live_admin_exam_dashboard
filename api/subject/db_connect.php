@@ -19,8 +19,7 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// --- FIX: Set the character set to utf8mb4 AFTER connecting ---
-// This is the crucial line that solves the '????' issue.
+// --- FIX: Set the character set and timezone AFTER connecting ---
 $conn->set_charset("utf8mb4");
-
+$conn->query("SET time_zone = '+06:00'");
 ?>

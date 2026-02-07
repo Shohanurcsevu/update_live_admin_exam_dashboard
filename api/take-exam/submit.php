@@ -1,5 +1,6 @@
 <?php
 require_once '../subject/db_connect.php';
+date_default_timezone_set('Asia/Dhaka');
 
 // Helper function to add to the activity log
 function log_activity($conn, $type, $message) {

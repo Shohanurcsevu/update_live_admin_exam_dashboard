@@ -1,7 +1,6 @@
 <div id="dashboard-container" class="p-4 sm:p-6 space-y-8">
-   <div id="toast-container"
-     class="fixed bottom-5 right-5 z-50 pointer-events-none">
-</div>
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 pointer-events-none">
+    </div>
 
 
     <!-- Daily Objective Roadmap (NEW) -->
@@ -12,7 +11,15 @@
                     <span class="material-symbols-outlined">map</span>
                     Daily Objective Roadmap
                 </h2>
-                <p class="text-indigo-100 text-sm opacity-90">Complete these goals to build your streak.</p>
+                <div class="flex items-center gap-3 mt-1">
+                    <p class="text-indigo-100 text-sm opacity-90">Complete these goals to build your streak.</p>
+                    <span class="w-1 h-1 bg-white/30 rounded-full"></span>
+                    <span id="dashboard-badge-summary"
+                        class="text-indigo-100 text-sm font-bold opacity-0 transition-opacity flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm text-yellow-300">military_tech</span>
+                        <span id="earned-badge-text">0 Badges Earned</span>
+                    </span>
+                </div>
             </div>
             <div id="overall-progress-circle" class="relative w-16 h-16 flex items-center justify-center">
                 <svg class="w-full h-full transform -rotate-90">
@@ -40,12 +47,38 @@
                     </li>
                 </ul>
             </div>
+
             <!-- Daily Routine (Checklist) -->
             <div class="p-6">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Today's Routine</h3>
                 <ul id="daily-routine-list" class="space-y-4">
                     <!-- Routine injected here -->
                 </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trophy Room (NEW: Gamification) -->
+    <div id="trophy-room-section" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-amber-500">military_tech</span>
+                    Trophy Room
+                </h3>
+                <p class="text-sm text-gray-500">Your unlocked milestone badges and achievements.</p>
+            </div>
+            <span id="badge-count-pill"
+                class="bg-amber-100 text-amber-700 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider">0
+                Badges</span>
+        </div>
+
+        <div id="badge-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+            <!-- Badges will be injected here -->
+            <div
+                class="flex flex-col items-center text-center p-4 rounded-xl border-2 border-dashed border-gray-100 opacity-40 animate-pulse">
+                <div class="w-12 h-12 bg-gray-100 rounded-full mb-2"></div>
+                <div class="h-3 w-16 bg-gray-100 rounded"></div>
             </div>
         </div>
     </div>

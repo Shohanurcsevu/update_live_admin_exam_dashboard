@@ -26,6 +26,7 @@
         }
     };
 
+
     const updateStats = () => {
         document.getElementById('current-streak').textContent = `${state.data.streak} Days`;
 

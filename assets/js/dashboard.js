@@ -244,9 +244,50 @@ function initializeDashboardPage() {
                     // Optional: Trigger a celebration effect if needed
                     console.log("All goals completed! Celebration!");
                 }
+
+                // NEW: Fetch and render full Trophy Room
+                fetchAndRenderBadges();
             }
         } catch (error) {
             console.error("Error fetching goal roadmap:", error);
+        }
+    }
+
+    async function fetchAndRenderBadges() {
+        const badgeGrid = document.getElementById('badge-grid');
+        const badgeCountPill = document.getElementById('badge-count-pill');
+        const summaryBadgeText = document.getElementById('earned-badge-text');
+        const summaryBadgeEl = document.getElementById('dashboard-badge-summary');
+
+        if (!badgeGrid) return;
+
+        try {
+            const response = await fetch('api/performance/badges.php');
+            const result = await response.json();
+
+            if (result.success && result.badges) {
+                badgeGrid.innerHTML = result.badges.map(badge => {
+                    const earnedClass = badge.earned ? `bg-${badge.color}-50 border-${badge.color}-200 text-${badge.color}-700` : 'bg-gray-50 border-gray-100 text-gray-400 grayscale opacity-60';
+                    const iconEarnedClass = badge.earned ? `text-${badge.color}-600` : 'text-gray-300';
+
+                    return `
+                        <div class="flex flex-col items-center text-center p-4 rounded-xl border-2 transition-all hover:scale-105 group ${earnedClass}" title="${badge.description}">
+                            <div class="w-12 h-12 flex items-center justify-center mb-2">
+                                <span class="material-symbols-outlined text-3xl ${iconEarnedClass}">${badge.icon}</span>
+                            </div>
+                            <h4 class="text-xs font-bold uppercase tracking-tighter">${badge.title}</h4>
+                            ${badge.earned ? '<span class="text-[10px] font-black opacity-60">UNLOCKED</span>' : '<span class="text-[10px] font-bold opacity-60">LOCKED</span>'}
+                        </div>
+                    `;
+                }).join('');
+
+                if (badgeCountPill) badgeCountPill.textContent = `${result.earned_count} Badges`;
+                if (summaryBadgeText) summaryBadgeText.textContent = `${result.earned_count} Badges Earned`;
+                if (summaryBadgeEl) summaryBadgeEl.classList.remove('opacity-0');
+            }
+        } catch (error) {
+            console.error("Error fetching badges:", error);
+            badgeGrid.innerHTML = '<p class="col-span-full text-center text-gray-400">Failed to load badges.</p>';
         }
     }
 
