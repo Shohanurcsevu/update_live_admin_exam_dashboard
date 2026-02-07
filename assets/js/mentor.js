@@ -117,11 +117,18 @@ class StudyMentor {
 
     async fetchMentorData() {
         try {
-            const response = await fetch('api/performance/mastery-trends.php');
-            const result = await response.json();
+            const [trendsResponse, decksResponse] = await Promise.all([
+                fetch('api/performance/mastery-trends.php'),
+                fetch('api/flashcards/decks.php')
+            ]);
 
-            if (result.success && result.data) {
-                this.mentorData = result.data;
+            const trendsResult = await trendsResponse.json();
+            const decksResult = await decksResponse.json();
+
+            if (trendsResult.success && trendsResult.data) {
+                this.mentorData = trendsResult.data;
+                this.mentorData.flashcard_decks = decksResult.success ? decksResult.decks : [];
+                this.mentorData.total_cards_due = decksResult.success ? decksResult.total_cards_due : 0;
                 this.renderRecommendations();
             }
         } catch (error) {
@@ -197,6 +204,36 @@ class StudyMentor {
                     <p class="text-sm">You're performing well across all subjects!</p>
                 </div>
             `;
+        }
+
+        // Add flashcard deck recommendations
+        const { flashcard_decks, total_cards_due } = this.mentorData;
+        if (flashcard_decks && flashcard_decks.length > 0 && total_cards_due > 0) {
+            const topDecks = flashcard_decks.filter(d => d.cards_due > 0).slice(0, 2);
+            if (topDecks.length > 0) {
+                container.innerHTML += `
+                    <div class="bg-purple-50 border border-purple-200 p-3 rounded-xl mt-3">
+                        <div class="flex items-start gap-2">
+                            <span class="material-symbols-outlined text-purple-600 text-lg">style</span>
+                            <div class="flex-1">
+                                <p class="text-xs font-bold text-purple-900 uppercase tracking-wider mb-2">Flashcards Ready</p>
+                                ${topDecks.map(deck => `
+                                    <div class="mb-2 last:mb-0">
+                                        <p class="text-sm text-gray-700">
+                                            <strong>${deck.topic}</strong> 
+                                            <span class="text-xs text-gray-500">(${deck.cards_due} cards due)</span>
+                                        </p>
+                                    </div>
+                                `).join('')}
+                                <button onclick="window.loadPage('flashcards')" 
+                                    class="mt-2 text-xs font-bold text-purple-600 hover:text-purple-700 hover:underline">
+                                    Review Now →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         }
     }
 }

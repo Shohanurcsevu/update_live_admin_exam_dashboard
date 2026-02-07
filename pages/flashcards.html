@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards - Spaced Repetition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <style>
+        .card-flip {
+            perspective: 1000px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .card-flip.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front,
+        .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 1rem;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .card-back {
+            transform: rotateY(180deg);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-6">
+        <!-- Header -->
+        <div class="mb-8">
+            <button onclick="window.history.back()"
+                class="text-gray-600 hover:text-gray-800 mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Back to Dashboard
+            </button>
+            <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                <span class="material-symbols-outlined text-4xl text-purple-600">psychology</span>
+                Spaced Repetition Flashcards
+            </h1>
+            <p class="text-gray-600 mt-2">Master your weak topics with intelligent review scheduling</p>
+        </div>
+
+        <!-- Deck Selection View -->
+        <div id="deck-selection-view">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Your Decks</h2>
+                    <button onclick="generateNewCards()"
+                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
+                        <span class="material-symbols-outlined">auto_awesome</span>
+                        Generate from Mistakes
+                    </button>
+                </div>
+                <div id="decks-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Decks will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Session View -->
+        <div id="review-session-view" class="hidden">
+            <!-- Progress Bar -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-semibold text-gray-600">Progress</span>
+                    <span id="progress-text" class="text-sm font-bold text-purple-600">0 / 0</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="progress-bar" class="bg-purple-600 h-2 rounded-full transition-all" style="width: 0%">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flashcard -->
+            <div id="flashcard-container" class="card-flip mb-6" onclick="flipCard()">
+                <div class="card-inner" style="height: 400px;">
+                    <div
+                        class="card-front bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-2xl cursor-pointer">
+                        <span class="material-symbols-outlined text-6xl mb-4 opacity-50">help</span>
+                        <p id="question-text" class="text-xl font-semibold mb-4"></p>
+                        <div id="options-container" class="w-full space-y-2"></div>
+                        <p class="text-sm opacity-75 mt-6">Click to reveal answer</p>
+                    </div>
+                    <div class="card-back bg-white shadow-2xl border-4 border-purple-500">
+                        <span class="material-symbols-outlined text-6xl mb-4 text-purple-600">lightbulb</span>
+                        <div class="text-left w-full">
+                            <p class="text-sm font-bold text-purple-600 mb-2">Correct Answer:</p>
+                            <p id="correct-answer" class="text-lg font-semibold text-gray-800 mb-4"></p>
+                            <p class="text-sm font-bold text-gray-600 mb-2">Explanation:</p>
+                            <p id="explanation-text" class="text-sm text-gray-700"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="action-buttons" class="hidden flex gap-4 justify-center">
+                <button onclick="reviewCard(false)"
+                    class="px-8 py-4 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
+                    <span class="material-symbols-outlined">close</span>
+                    Need Review
+                </button>
+                <button onclick="reviewCard(true)"
+                    class="px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
+                    <span class="material-symbols-outlined">check</span>
+                    Know It
+                </button>
+            </div>
+
+            <!-- Session Complete -->
+            <div id="session-complete"
+                class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+                <span class="material-symbols-outlined text-6xl text-green-500 mb-4">celebration</span>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Session Complete!</h2>
+                <p id="session-summary" class="text-gray-600 mb-6"></p>
+                <button onclick="location.reload()"
+                    class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                    Back to Decks
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/js/flashcards.js"></script>
+</body>
+
+</html>
