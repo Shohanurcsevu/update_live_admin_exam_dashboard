@@ -1,5 +1,54 @@
 <div id="dashboard-container" class="p-4 sm:p-6 space-y-8">
-    <div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+   <div id="toast-container"
+     class="fixed bottom-5 right-5 z-50 pointer-events-none">
+</div>
+
+
+    <!-- Daily Objective Roadmap (NEW) -->
+    <div id="goal-roadmap-section" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="bg-indigo-600 p-6 text-white flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined">map</span>
+                    Daily Objective Roadmap
+                </h2>
+                <p class="text-indigo-100 text-sm opacity-90">Complete these goals to build your streak.</p>
+            </div>
+            <div id="overall-progress-circle" class="relative w-16 h-16 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90">
+                    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="transparent"
+                        class="text-indigo-500/30" />
+                    <circle id="goal-progress-bar" cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4"
+                        fill="transparent" stroke-dasharray="175.9" stroke-dashoffset="175.9"
+                        class="text-white transition-all duration-1000" />
+                </svg>
+                <span id="goal-percentage" class="absolute text-xs font-black">0%</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+            <!-- Setup Goals (Checklist) -->
+            <div class="p-6">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Foundation Goals</h3>
+                <ul id="foundation-goals-list" class="space-y-4">
+                    <!-- Goals injected here -->
+                    <li class="flex items-center justify-between group">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-gray-300">pending</span>
+                            <span class="text-sm font-semibold text-gray-600">Subject Coverage</span>
+                        </div>
+                        <span class="text-xs font-bold text-gray-400">0/0</span>
+                    </li>
+                </ul>
+            </div>
+            <!-- Daily Routine (Checklist) -->
+            <div class="p-6">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Today's Routine</h3>
+                <ul id="daily-routine-list" class="space-y-4">
+                    <!-- Routine injected here -->
+                </ul>
+            </div>
+        </div>
+    </div>
 
     <!-- Action Hub: Resume & Rapid Fire -->
     <div id="action-hub" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -35,12 +35,14 @@
         const activeDays = new Set(monthlyRecords.map(r => r.attempt_time.split(' ')[0])).size;
         document.getElementById('active-days-month').textContent = activeDays;
 
-        if (monthlyRecords.length > 0) {
-            const avgScore = monthlyRecords.reduce((acc, curr) => acc + parseFloat(curr.score_with_negative), 0) / monthlyRecords.length;
-            document.getElementById('avg-score-month').textContent = `${Math.round(avgScore)}%`;
-        } else {
-            document.getElementById('avg-score-month').textContent = `0%`;
-        }
+        const today = new Date().toISOString().split('T')[0];
+        const todayExams = monthlyRecords.filter(r => r.attempt_time.startsWith(today)).length;
+        const goal = 3;
+        const goalEl = document.getElementById('today-goal-status');
+        const barEl = document.getElementById('goal-mini-bar');
+
+        if (goalEl) goalEl.textContent = `${todayExams} / ${goal}`;
+        if (barEl) barEl.style.width = `${Math.min((todayExams / goal) * 100, 100)}%`;
 
         renderActivityList(monthlyRecords);
     };
@@ -75,9 +77,9 @@
                 dayDiv.title = `${dateStr}: ${count} activities`;
 
                 if (count === 0) dayDiv.classList.add('bg-gray-100');
-                else if (count <= 2) dayDiv.classList.add('bg-emerald-200');
-                else if (count <= 5) dayDiv.classList.add('bg-emerald-400');
-                else dayDiv.classList.add('bg-emerald-600');
+                else if (count === 1) dayDiv.classList.add('bg-emerald-200'); // Lightest: 1 activity (Start)
+                else if (count === 2) dayDiv.classList.add('bg-emerald-400'); // Medium: 2 activities
+                else dayDiv.classList.add('bg-emerald-600'); // Deepest: 3+ activities (Goal Met)
 
                 colDiv.appendChild(dayDiv);
                 currentDate.setDate(currentDate.getDate() + 1);
