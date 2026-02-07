@@ -77,7 +77,78 @@ function initializeDashboardPage() {
             fetchAndRenderHeatmap();
             fetchAndRenderDisciplineTracker();
             fetchAndRenderBadges();
+            fetchAndRenderMasteryTrends(); // NEW: Mastery Trends
         } catch (error) { console.error("Error fetching metrics:", error); }
+    }
+
+    let masteryChart = null;
+    async function fetchAndRenderMasteryTrends() {
+        const insightsContainer = document.getElementById('mastery-insights-container');
+        if (!insightsContainer) return;
+
+        try {
+            const response = await fetch('api/performance/mastery-trends.php');
+            const result = await response.json();
+            if (!result.success || !result.data) return;
+
+            const { subjects, insights } = result.data;
+            const ctx = document.getElementById('mastery-radar-chart');
+
+            // 1. Radar Chart
+            if (ctx && typeof Chart !== 'undefined') {
+                if (masteryChart) masteryChart.destroy();
+                if (subjects.length === 0) {
+                    ctx.parentElement.innerHTML = '<div class="text-center text-gray-400 py-20">Not enough data to calculate trends yet.</div>';
+                } else {
+                    masteryChart = new Chart(ctx, {
+                        type: 'radar',
+                        data: {
+                            labels: subjects.map(s => s.name),
+                            datasets: [
+                                {
+                                    label: 'This Week',
+                                    data: subjects.map(s => s.this_week || 0),
+                                    fill: true,
+                                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    pointBackgroundColor: 'rgb(59, 130, 246)',
+                                    borderWidth: 2
+                                },
+                                {
+                                    label: 'Last Week',
+                                    data: subjects.map(s => s.last_week || 0),
+                                    fill: true,
+                                    backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                                    borderColor: 'rgb(156, 163, 175)',
+                                    borderWidth: 1,
+                                    borderDash: [5, 5]
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { r: { suggestedMin: 0, suggestedMax: 100 } },
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                }
+            }
+
+            // 2. Insights
+            if (insights.length > 0) {
+                insightsContainer.innerHTML = insights.map(i => `
+                    <div class="${i.type==='warning'?'bg-amber-50':'bg-emerald-50'} border p-4 rounded-xl flex items-start gap-3">
+                        <span class="material-symbols-outlined ${i.type==='warning'?'text-amber-500':'text-emerald-500'}">${i.type==='warning'?'trending_down':'trending_up'}</span>
+                        <p class="text-sm leading-relaxed">${i.message}</p>
+                    </div>
+                `).join('');
+            } else {
+                insightsContainer.innerHTML = '<div class="text-center py-10 text-gray-400">Performance is stable.</div>';
+            }
+        } catch (error) {
+            console.error("Mastery Trends Error:", error);
+        }
     }
 
     async function fetchAndRenderDisciplineTracker() {

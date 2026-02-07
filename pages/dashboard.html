@@ -28,6 +28,50 @@
 
     </div>
 
+    <!-- Performance Analytics (NEW: Subject Mastery Trends) -->
+    <div id="performance-analytics-section"
+        class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-600">analytics</span>
+                    Performance Analytics
+                </h3>
+                <p class="text-sm text-gray-500">Subject mastery trends and smart insights.</p>
+            </div>
+            <div class="flex gap-4 text-xs font-bold uppercase tracking-tighter">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500/20 border border-blue-500"></span>
+                    <span class="text-blue-600">This Week</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-200 border border-gray-400"></span>
+                    <span class="text-gray-500">Last Week</span>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+            <!-- Radar Chart -->
+            <div class="lg:col-span-7 p-6 flex flex-col items-center justify-center min-h-[400px]">
+                <div class="w-full max-w-[500px] aspect-square relative">
+                    <canvas id="mastery-radar-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Smart Insights -->
+            <div class="lg:col-span-5 p-6 bg-gray-50/30">
+                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Smart Insights</h4>
+                <div id="mastery-insights-container" class="space-y-4">
+                    <!-- Insights injected here -->
+                    <div class="text-center py-10 text-gray-400">
+                        <span class="material-symbols-outlined text-4xl mb-2 opacity-20">lightbulb</span>
+                        <p class="text-sm">Calculating performance trends...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Action Hub: Resume & Rapid Fire -->
     <div id="action-hub" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Resume Card -->
