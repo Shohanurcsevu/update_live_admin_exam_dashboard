@@ -68,6 +68,51 @@ if ($result) {
 $response['data']['subjects'] = $subjects;
 $response['data']['insights'] = $insights;
 
+// 3. AI Mentor: Identify weak topics for personalized recommendations
+$mentor_advice = [];
+foreach ($subjects as $subject) {
+    $this_week = $subject['this_week'];
+    $last_week = $subject['last_week'];
+    
+    // Only analyze subjects with recent activity and performance issues
+    if ($this_week !== null && ($this_week < 70 || ($last_week !== null && ($this_week - $last_week) <= -10))) {
+        // Find the weakest topic in this subject
+        $weak_topic_sql = "
+            SELECT 
+                t.topic_name,
+                AVG((p.score_with_negative / e.total_marks) * 100) as topic_accuracy,
+                COUNT(p.id) as attempt_count
+            FROM topics t
+            JOIN exams e ON t.id = e.topic_id
+            JOIN performance p ON e.id = p.exam_id
+            JOIN subjects s ON e.subject_id = s.id
+            WHERE s.subject_name = ?
+            AND p.attempt_time >= DATE_SUB(CURRENT_DATE, INTERVAL 14 DAY)
+            GROUP BY t.id, t.topic_name
+            HAVING attempt_count >= 1
+            ORDER BY topic_accuracy ASC
+            LIMIT 1
+        ";
+        
+        $stmt = $conn->prepare($weak_topic_sql);
+        $stmt->bind_param("s", $subject['name']);
+        $stmt->execute();
+        $topic_result = $stmt->get_result();
+        
+        if ($topic_row = $topic_result->fetch_assoc()) {
+            $mentor_advice[] = [
+                'subject' => $subject['name'],
+                'weak_topic' => $topic_row['topic_name'],
+                'topic_accuracy' => round(floatval($topic_row['topic_accuracy']), 1),
+                'current_accuracy' => $this_week,
+                'priority' => $this_week < 60 ? 'high' : 'medium'
+            ];
+        }
+    }
+}
+
+$response['data']['mentor_advice'] = $mentor_advice;
+
 echo json_encode($response);
 $conn->close();
 ?>
