@@ -13,7 +13,9 @@ $badges = [
         'description' => 'Daily: Completed an exam before 8:00 AM today',
         'icon' => 'wb_twilight',
         'color' => 'amber',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 1
     ],
     [
         'id' => 'night_owl',
@@ -21,7 +23,9 @@ $badges = [
         'description' => 'Daily: Studied late after 10:00 PM today',
         'icon' => 'dark_mode',
         'color' => 'purple',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 1
     ],
     [
         'id' => 'perfectionist',
@@ -29,7 +33,9 @@ $badges = [
         'description' => 'Daily: Achieved a 100% score today',
         'icon' => 'target',
         'color' => 'rose',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 1
     ],
     [
         'id' => 'marathoner',
@@ -37,7 +43,9 @@ $badges = [
         'description' => 'Daily: Completed 5+ exams today',
         'icon' => 'directions_run',
         'color' => 'orange',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 5
     ],
     [
         'id' => 'weekend_warrior',
@@ -45,7 +53,9 @@ $badges = [
         'description' => 'Weekly: Active on both Saturday and Sunday this week',
         'icon' => 'shield',
         'color' => 'indigo',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 2
     ],
     [
         'id' => 'consistency_7',
@@ -53,7 +63,9 @@ $badges = [
         'description' => 'Milestone: Maintained a 7-day study streak',
         'icon' => 'verified',
         'color' => 'blue',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 7
     ],
     [
         'id' => 'consistency_30',
@@ -61,7 +73,9 @@ $badges = [
         'description' => 'Milestone: Maintained a 30-day study streak',
         'icon' => 'workspace_premium',
         'color' => 'indigo',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 30
     ],
     [
         'id' => 'subject_explorer',
@@ -69,40 +83,48 @@ $badges = [
         'description' => 'Weekly: Studied 5 different subjects in one week',
         'icon' => 'explore',
         'color' => 'emerald',
-        'earned' => false
+        'earned' => false,
+        'current' => 0,
+        'target' => 5
     ]
 ];
 
 // 1. Check Early Bird (Today only)
-$badges[0]['earned'] = (bool)$conn->query("SELECT EXISTS(SELECT 1 FROM performance WHERE DATE(attempt_time) = CURRENT_DATE AND HOUR(attempt_time) < 8) as earned")->fetch_assoc()['earned'];
+$res0 = $conn->query("SELECT COUNT(*) as c FROM performance WHERE DATE(attempt_time) = CURRENT_DATE AND HOUR(attempt_time) < 8")->fetch_assoc();
+$badges[0]['current'] = min(1, intval($res0['c']));
+$badges[0]['earned'] = ($badges[0]['current'] >= $badges[0]['target']);
 
 // 2. Check Night Owl (Today: after 10 PM or before 4 AM)
-$badges[1]['earned'] = (bool)$conn->query("SELECT EXISTS(SELECT 1 FROM performance WHERE DATE(attempt_time) = CURRENT_DATE AND (HOUR(attempt_time) >= 22 OR HOUR(attempt_time) < 4)) as earned")->fetch_assoc()['earned'];
+$res1 = $conn->query("SELECT COUNT(*) as c FROM performance WHERE DATE(attempt_time) = CURRENT_DATE AND (HOUR(attempt_time) >= 22 OR HOUR(attempt_time) < 4)")->fetch_assoc();
+$badges[1]['current'] = min(1, intval($res1['c']));
+$badges[1]['earned'] = ($badges[1]['current'] >= $badges[1]['target']);
 
 // 3. Check Perfectionist (Today only)
-// Criteria: Score >= total marks OR (zero wrong AND zero unanswered)
-$badges[2]['earned'] = (bool)$conn->query("
-    SELECT EXISTS(
-        SELECT 1 FROM performance p 
-        JOIN exams e ON p.exam_id = e.id 
-        WHERE DATE(p.attempt_time) = CURRENT_DATE 
-        AND (
-            ROUND(p.score_with_negative, 2) >= ROUND(e.total_marks, 2) 
-            OR (p.wrong_answers = 0 AND p.unanswered = 0 AND p.right_answers > 0)
-        )
-    ) as earned")->fetch_assoc()['earned'];
+$res2 = $conn->query("
+    SELECT COUNT(*) as c FROM performance p 
+    JOIN exams e ON p.exam_id = e.id 
+    WHERE DATE(p.attempt_time) = CURRENT_DATE 
+    AND (
+        ROUND(p.score_with_negative, 2) >= ROUND(e.total_marks, 2) 
+        OR (p.wrong_answers = 0 AND p.unanswered = 0 AND p.right_answers > 0)
+    )")->fetch_assoc();
+$badges[2]['current'] = min(1, intval($res2['c']));
+$badges[2]['earned'] = ($badges[2]['current'] >= $badges[2]['target']);
 
 // 4. Check Marathoner (Today only)
-$badges[3]['earned'] = (bool)$conn->query("SELECT EXISTS(SELECT 1 FROM (SELECT DATE(attempt_time) as d, COUNT(*) as c FROM performance WHERE DATE(attempt_time) = CURRENT_DATE GROUP BY d) as dd WHERE c >= 5) as earned")->fetch_assoc()['earned'];
+$res3 = $conn->query("SELECT COUNT(*) as c FROM performance WHERE DATE(attempt_time) = CURRENT_DATE")->fetch_assoc();
+$badges[3]['current'] = intval($res3['c']);
+$badges[3]['earned'] = ($badges[3]['current'] >= $badges[3]['target']);
 
-// 5. Check Weekend Warrior (This week only)
-$badges[4]['earned'] = (bool)$conn->query("
-    SELECT EXISTS(
-        SELECT 1 FROM performance p1 
-        JOIN performance p2 ON YEARWEEK(p1.attempt_time, 1) = YEARWEEK(NOW(), 1)
-        WHERE YEARWEEK(p2.attempt_time, 1) = YEARWEEK(NOW(), 1)
-        AND DAYOFWEEK(p1.attempt_time) = 7 AND DAYOFWEEK(p2.attempt_time) = 1
-    ) as earned")->fetch_assoc()['earned'];
+// 5. Check Weekend Warrior (This week only) - Count distinct active days (Sat/Sun)
+$res4 = $conn->query("
+    SELECT COUNT(DISTINCT DAYOFWEEK(attempt_time)) as c 
+    FROM performance 
+    WHERE YEARWEEK(attempt_time, 1) = YEARWEEK(NOW(), 1)
+    AND DAYOFWEEK(attempt_time) IN (1, 7)
+")->fetch_assoc();
+$badges[4]['current'] = intval($res4['c']);
+$badges[4]['earned'] = ($badges[4]['current'] >= $badges[4]['target']);
 
 // 6. Check Consistency (Longest Streak)
 $streak_sql = "
@@ -124,8 +146,10 @@ $streak_sql = "
     SELECT MAX(streak_length) as max_streak FROM StreakCounts
 ";
 $max_streak = intval($conn->query($streak_sql)->fetch_assoc()['max_streak']);
-$badges[5]['earned'] = ($max_streak >= 7);
-$badges[6]['earned'] = ($max_streak >= 30);
+$badges[5]['current'] = $max_streak;
+$badges[5]['earned'] = ($max_streak >= $badges[5]['target']);
+$badges[6]['current'] = $max_streak;
+$badges[6]['earned'] = ($max_streak >= $badges[6]['target']);
 
 // 7. Check Subject Explorer (5 subjects in last 7 days)
 $explorer_sql = "
@@ -135,7 +159,8 @@ $explorer_sql = "
     WHERE p.attempt_time >= DATE_SUB(CURRENT_DATE, INTERVAL 7 DAY)
 ";
 $subject_count = intval($conn->query($explorer_sql)->fetch_assoc()['count']);
-$badges[7]['earned'] = ($subject_count >= 5);
+$badges[7]['current'] = $subject_count;
+$badges[7]['earned'] = ($subject_count >= $badges[7]['target']);
 
 echo json_encode([
     'success' => true,
