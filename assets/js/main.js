@@ -122,7 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'exams-across-subjects': 'assets/js/exams-across-subjects.js', 'topic-wise-exams': 'assets/js/topic-wise-exams.js',
             'lesson-wise-exams': 'assets/js/lesson-wise-exams.js', 'offline-exams': 'assets/js/offline-exams.js',
             'take-offline-exam': 'assets/js/offline-exam-engine.js', 'mistake-bank': 'assets/js/mistake-bank.js',
-            'discipline-tracker': 'assets/js/discipline-tracker.js', 'flashcards': 'assets/js/flashcards.js'
+            'discipline-tracker': 'assets/js/discipline-tracker.js', 'flashcards': 'assets/js/flashcards.js',
+            'analytics': 'assets/js/analytics.js'
         };
 
         if (pageScripts[page]) {

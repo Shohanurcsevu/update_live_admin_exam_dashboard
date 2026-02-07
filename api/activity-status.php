@@ -12,10 +12,10 @@ try {
     // Get the most recent exam attempt
     $sql = "
         SELECT 
-            MAX(taken_at) as last_exam_time,
+            MAX(attempt_time) as last_exam_time,
             COUNT(*) as total_exams_today
         FROM performance
-        WHERE DATE(taken_at) = CURRENT_DATE
+        WHERE DATE(attempt_time) = CURRENT_DATE
     ";
     
     $result = $conn->query($sql);
