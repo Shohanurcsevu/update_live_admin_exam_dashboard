@@ -129,10 +129,106 @@ class StudyMentor {
                 this.mentorData = trendsResult.data;
                 this.mentorData.flashcard_decks = decksResult.success ? decksResult.decks : [];
                 this.mentorData.total_cards_due = decksResult.success ? decksResult.total_cards_due : 0;
+                this.mentorData.activity_status = null; // Will be fetched separately
+
+                // Fetch activity status separately (optional - won't break if it fails)
+                this.fetchActivityStatus();
+
                 this.renderRecommendations();
             }
         } catch (error) {
             console.error('Mentor data fetch error:', error);
+        }
+    }
+
+    async fetchActivityStatus() {
+        try {
+            const response = await fetch('api/activity-status.php');
+            const result = await response.json();
+            if (result.success && this.mentorData) {
+                this.mentorData.activity_status = result;
+                // Re-render to show nudge if inactive
+                this.renderRecommendations();
+            }
+        } catch (error) {
+            console.log('Activity status not available (this is optional)');
+        }
+    }
+
+    generateNudgeMessage() {
+        const activity = this.mentorData.activity_status;
+        if (!activity || !activity.is_inactive) return null;
+
+        const { minutes_since_last_exam, inactivity_level, streak_at_risk, current_hour } = activity;
+        const { mentor_advice } = this.mentorData;
+
+        // Priority 1: Streak at risk
+        if (streak_at_risk) {
+            return {
+                icon: '🔥',
+                title: 'Streak Alert!',
+                message: 'Your streak is at risk! Just one quick exam keeps it alive.',
+                action: 'Save My Streak',
+                link: 'take-exam-list'
+            };
+        }
+
+        // Priority 2: Long inactivity + weak subject
+        if (inactivity_level === 'moderate' || inactivity_level === 'high') {
+            if (mentor_advice && mentor_advice.length > 0) {
+                const weakSubject = mentor_advice[0];
+                const hours = Math.floor(minutes_since_last_exam / 60);
+                return {
+                    icon: '💪',
+                    title: 'Let\'s Improve!',
+                    message: `It's been ${hours} hour${hours > 1 ? 's' : ''}! Your ${weakSubject.subject} needs work.`,
+                    action: `Practice ${weakSubject.subject}`,
+                    link: 'take-exam-list'
+                };
+            }
+        }
+
+        // Priority 3: Time-based messages
+        const timeMessages = {
+            morning: ['Good morning! Start your day with a win. 🌅', 'Early bird gets the knowledge!'],
+            afternoon: ['Afternoon slump? A quick quiz energizes the mind!', 'Perfect time for focused study!'],
+            evening: ['Evening study session? Let\'s make it count!', 'End your day strong!'],
+            night: ['Night owl mode! Quick quiz before bed?', 'Last chance to study today! 🌙']
+        };
+
+        let timeOfDay = 'afternoon';
+        if (current_hour >= 6 && current_hour < 12) timeOfDay = 'morning';
+        else if (current_hour >= 18 && current_hour < 22) timeOfDay = 'evening';
+        else if (current_hour >= 22 || current_hour < 6) timeOfDay = 'night';
+
+        const messages = timeMessages[timeOfDay];
+        const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+
+        // Different messages based on inactivity level
+        if (inactivity_level === 'critical') {
+            return {
+                icon: '🎯',
+                title: 'Welcome Back!',
+                message: 'Your comeback starts with one exam. Let\'s do this!',
+                action: 'Start Now',
+                link: 'take-exam-list'
+            };
+        } else if (inactivity_level === 'high') {
+            return {
+                icon: '⏰',
+                title: 'Study Nudge',
+                message: 'Long break! Let\'s ease back in with a quick quiz.',
+                action: 'Start Quiz',
+                link: 'take-exam-list'
+            };
+        } else {
+            return {
+                icon: '⏰',
+                title: 'Study Nudge',
+                message: randomMessage,
+                action: 'Start Quick Quiz',
+                link: 'take-exam-list'
+            };
         }
     }
 
@@ -234,6 +330,26 @@ class StudyMentor {
                     </div>
                 `;
             }
+        }
+
+        // Add study nudge if user is inactive
+        const nudge = this.generateNudgeMessage();
+        if (nudge) {
+            container.innerHTML += `
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 p-3 rounded-xl mt-3">
+                    <div class="flex items-start gap-2">
+                        <span class="text-2xl">${nudge.icon}</span>
+                        <div class="flex-1">
+                            <p class="text-xs font-bold text-orange-900 uppercase tracking-wider">${nudge.title}</p>
+                            <p class="text-sm text-gray-700 mt-1">${nudge.message}</p>
+                            <button onclick="window.loadPage('${nudge.link}')" 
+                                class="mt-2 px-3 py-1 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-colors">
+                                ${nudge.action} →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
     }
 }
