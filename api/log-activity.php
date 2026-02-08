@@ -1,5 +1,9 @@
 <?php
-require_once 'subject/db_connect.php';
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/subject/db_connect.php';
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -11,20 +15,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     
     if (isset($data['type']) && isset($data['message'])) {
-        $type = $conn->real_escape_string($data['type']);
-        $message = trim($conn->real_escape_string($data['message']));
-        $details = isset($data['details']) ? $conn->real_escape_string(json_encode($data['details'])) : null;
-        
-        $sql = "INSERT INTO activity_log (activity_type, activity_message, activity_details, timestamp) VALUES (?, ?, ?, NOW())";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sss", $type, $message, $details);
-        
-        if ($stmt->execute()) {
-            echo json_encode(['success' => true]);
-        } else {
-            echo json_encode(['success' => false, 'error' => $stmt->error]);
+        try {
+            $type = $data['type'];
+            $message = trim($data['message']);
+            
+            // Handle details: try to encode, fallback to NULL if failed or empty
+            $details = null;
+            if (isset($data['details']) && $data['details'] !== null) {
+                $encoded = json_encode($data['details'], JSON_UNESCAPED_UNICODE);
+                if ($encoded !== false) {
+                    $details = $encoded;
+                }
+            }
+
+            // Prepare statement
+            $sql = "INSERT INTO activity_log (activity_type, activity_message, activity_details, timestamp) VALUES (?, ?, ?, NOW())";
+            $stmt = $conn->prepare($sql);
+            
+            if (!$stmt) {
+                throw new Exception("Prepare failed: " . $conn->error);
+            }
+
+            // Bind parameters ("sss" works for string or null)
+            $stmt->bind_param("sss", $type, $message, $details);
+            
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true]);
+            } else {
+                // Check if it's the constraint violation specifically
+                if ($conn->errno == 3819) { // CHECK constraint violated
+                     throw new Exception("JSON constraint failed. Details: " . ($details ?? 'NULL'));
+                }
+                throw new Exception("Execute failed: " . $stmt->error);
+            }
+            $stmt->close();
+            
+        } catch (Exception $e) {
+            // Catch ANY exception (mysqli or logic)
+            http_response_code(500); // Optional, but good for client to know
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
-        $stmt->close();
     } else {
         echo json_encode(['success' => false, 'error' => 'Missing required fields']);
     }

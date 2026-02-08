@@ -104,10 +104,11 @@ class StudyMentor {
 
     completeFocusSession() {
         clearInterval(this.focusSession.intervalId);
-        const completedSubject = this.focusSession.subject;
+        const completedSubject = this.focusSession.subject || "General Focus";
         this.focusSession.isActive = false;
 
         // Log completion to backend
+        console.log('Logging session for:', completedSubject);
         fetch('api/log-activity.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -116,7 +117,17 @@ class StudyMentor {
                 message: completedSubject,
                 details: { duration: 25, timestamp: new Date().toISOString() }
             })
-        }).then(() => this.fetchMentorData()); // Refresh to update counts
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Session log response:', data);
+                if (data.success) {
+                    this.fetchMentorData(); // Refresh to update counts
+                } else {
+                    console.error('Session log failed:', data.error);
+                }
+            })
+            .catch(err => console.error('Session log network error:', err));
 
         // Celebrate!
         if (typeof confetti !== 'undefined') {

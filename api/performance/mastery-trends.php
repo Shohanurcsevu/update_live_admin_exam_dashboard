@@ -216,6 +216,11 @@ $response['debug']['today_end'] = $today_end;
 $response['debug']['activity_log_count'] = $total_taken_today;
 $response['debug']['performance_total'] = $response['data']['total_exams'];
 
+// Session Debug
+$session_debug_sql = "SELECT COUNT(*) as total FROM activity_log WHERE activity_type = 'pomodoro_session' AND timestamp BETWEEN '$today_start' AND '$today_end'";
+$sd_res = $conn->query($session_debug_sql);
+$response['debug']['session_count_today'] = ($sd_res) ? intval($sd_res->fetch_assoc()['total']) : 0;
+
 // --- GET SPECIFIC UNCOMPLETED EXAM TITLES ---
 $uncompleted_sql = "
     SELECT e.id, e.exam_title, s.subject_name
