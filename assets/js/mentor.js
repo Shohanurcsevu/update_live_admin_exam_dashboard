@@ -6,6 +6,8 @@ class StudyMentor {
         this.isOpen = false;
         this.mentorData = null;
         this.isInitialGreeting = false;
+        this.isMotivationalNudgeActive = false;
+        this.lastMessageIndex = -1;
         this.init();
     }
 
@@ -14,6 +16,7 @@ class StudyMentor {
         this.attachEventListeners();
         this.fetchMentorData();
         this.showWelcomeGreeting();
+        this.startTimeBasedNudges();
     }
 
     showWelcomeGreeting() {
@@ -67,10 +70,59 @@ class StudyMentor {
                 <div id="mentor-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 border-2 border-white rounded-full animate-bounce"></div>
             </button>
 
-            <!-- Teaser Message -->
-            <div id="mentor-teaser" class="hidden absolute bottom-16 right-0 bg-white px-4 py-2 rounded-xl shadow-lg border border-gray-100 text-xs font-medium text-gray-700 whitespace-nowrap mb-2 animate-fade-in-up">
-                <span id="teaser-text">Hey! I have a tip for you.</span>
+            <!-- Teaser Message (Enhanced with Realistic Flames) -->
+            <div id="mentor-teaser" class="hidden absolute bottom-24 right-0 max-w-[320px] min-w-[220px] rounded-2xl overflow-visible mb-4 z-[60]">
+                <!-- Fire Container -->
+                <div class="relative p-1 bg-gradient-to-t from-red-600 via-orange-500 to-yellow-400 rounded-2xl animate-fire-burn shadow-[0_0_20px_rgba(239,68,68,0.5)]">
+                    <div class="bg-white rounded-[14px] p-5 text-center relative z-10 border-b-4 border-orange-100">
+                        <span id="teaser-text" class="text-base font-black text-gray-800 leading-tight drop-shadow-sm">Hey! I have a tip for you.</span>
+                    </div>
+                    <!-- Flame Layers -->
+                    <div class="absolute inset-0 -z-10 bg-orange-500/20 blur-xl animate-fire-flicker"></div>
+                </div>
             </div>
+
+            <style>
+                @keyframes fire-burn {
+                    0%, 100% { 
+                        box-shadow: 
+                            0 -4px 10px rgba(255,165,0,0.6),
+                            0 -8px 20px rgba(255,69,0,0.4),
+                            2px -2px 15px rgba(255,215,0,0.3),
+                            -2px -2px 15px rgba(255,215,0,0.3);
+                        transform: scale(1) skewX(0deg);
+                    }
+                    25% { transform: scale(1.02) skewX(1deg); }
+                    50% { 
+                        box-shadow: 
+                            0 -6px 20px rgba(255,165,0,0.8),
+                            0 -12px 35px rgba(255,69,0,0.6),
+                            4px -4px 20px rgba(255,215,0,0.5),
+                            -4px -4px 20px rgba(255,215,0,0.5);
+                        transform: scale(1.03) skewX(-1.5deg);
+                    }
+                    75% { transform: scale(1.01) skewX(1deg); }
+                }
+                
+                @keyframes fire-flicker {
+                    0%, 100% { opacity: 0.3; transform: translateY(0) scale(1); }
+                    50% { opacity: 0.6; transform: translateY(-10px) scale(1.1); }
+                }
+
+                .animate-fire-burn {
+                    animation: fire-burn 0.8s infinite alternate ease-in-out;
+                }
+                
+                .animate-fire-flicker {
+                    animation: fire-flicker 0.2s infinite;
+                }
+
+                #teaser-text {
+                    display: block;
+                    word-wrap: break-word;
+                    white-space: normal;
+                }
+            </style>
 
             <!-- Mentor Panel -->
             <div id="mentor-panel" 
@@ -292,6 +344,89 @@ class StudyMentor {
         }
     }
 
+    startTimeBasedNudges() {
+        const earlyMessages = [
+            "পড় সোহান পড়, দেখায় দে তুই কি!",
+            "বাপের স্বপ্ন পূরণ করতেই হবে সোহান!",
+            "আজকের দিনটা কাজে লাগা, কালকের দিনটা তোর হবে।",
+            "থামা যাবে না, লক্ষ্য এখন অনেক দূরে!",
+            "সোহান, তুই পারবি, তোর মধ্যে সেই আগুন আছে!"
+        ];
+
+        const lateMessages = [
+            "সময় শেষ হয়ে যাচ্ছে, সবাই পড়ছে!",
+            "এখনো সময় আছে, একটু জোর দে সোহান!",
+            "ক্লান্ত হলে চলবে না, সফলতা দরজায় কড়া নাড়ছে।",
+            "শেষ মুহূর্তের পড়াটাই আসল, হাল ছাড়িস না!",
+            "সোহান, আজকের টার্গেট শেষ করেই ঘুাবি।"
+        ];
+
+        const getTimeRemainingStr = () => {
+            const now = new Date();
+            const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+            const diff = midnight.getTime() - now.getTime();
+
+            if (diff <= 0) return "";
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            let timeStr = "আর বাকি ";
+            if (hours > 0) {
+                timeStr += `${this.toBengaliNumber(hours)} ঘণ্টা `;
+            }
+            if (minutes > 0 || hours === 0) {
+                timeStr += `${this.toBengaliNumber(minutes)} মিনিট`;
+            }
+            return timeStr;
+        };
+
+        const showNudge = () => {
+            if (this.isOpen || this.isInitialGreeting) return;
+
+            const now = new Date();
+            const currentHour = now.getHours();
+
+            // Choose range based on time (Late-night mode starts at 8 PM)
+            const messages = currentHour >= 20 || currentHour < 5 ? lateMessages : earlyMessages;
+
+            // Randomize without repeating the same one twice in a row
+            let nextIndex;
+            do {
+                nextIndex = Math.floor(Math.random() * messages.length);
+            } while (nextIndex === this.lastMessageIndex && messages.length > 1);
+
+            this.lastMessageIndex = nextIndex;
+            const randomMsg = messages[nextIndex];
+            const timeRemaining = getTimeRemainingStr();
+
+            const teaser = document.getElementById('mentor-teaser');
+            const teaserText = document.getElementById('teaser-text');
+            const badge = document.getElementById('mentor-badge');
+
+            if (teaser && teaserText) {
+                this.isMotivationalNudgeActive = true;
+                teaserText.textContent = `${randomMsg} ${timeRemaining}`;
+                teaser.classList.remove('hidden');
+                badge?.classList.remove('hidden');
+
+                // Auto-hide after 15 seconds for these special nudges
+                setTimeout(() => {
+                    teaser.classList.add('hidden');
+                    this.isMotivationalNudgeActive = false;
+                }, 15000);
+            }
+        };
+
+        // Every 1 minute (60,000 ms)
+        setInterval(showNudge, 60000);
+    }
+
+    toBengaliNumber(n) {
+        const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+        return n.toString().split('').map(digit => bengaliDigits[parseInt(digit)] || digit).join('');
+    }
+
     renderRecommendations() {
         const container = document.getElementById('mentor-recommendations');
         const greeting = document.getElementById('mentor-greeting');
@@ -421,8 +556,8 @@ class StudyMentor {
         const teaser = document.getElementById('mentor-teaser');
         const teaserText = document.getElementById('teaser-text');
 
-        // Don't overwrite initial welcome greeting
-        if (this.isInitialGreeting) return;
+        // Don't overwrite higher priority greetings or active motivational nudges
+        if (this.isInitialGreeting || this.isMotivationalNudgeActive) return;
 
         if (nudge && !this.isOpen) {
             badge?.classList.remove('hidden');
