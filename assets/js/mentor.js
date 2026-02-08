@@ -988,9 +988,47 @@ class StudyMentor {
                             </span>
                         </div>
 
-                        <p class="text-sm font-black mb-3 leading-tight ${is_accepted ? 'text-white' : 'text-gray-800'}">
-                            Mission: Complete <strong>${targetExams} Exams</strong> and <strong>${targetSessions} Sessions</strong> today.
-                        </p>
+
+                        <div class="mb-3">
+                            <div class="flex items-center justify-between">
+                                <p class="text-sm font-black leading-tight ${is_accepted ? 'text-white' : 'text-gray-800'}">
+                                    Mission: Complete 
+                                    <span id="boss-exam-target" class="inline-flex items-center gap-1">
+                                        <strong>${targetExams}</strong>
+                                    </span> Exams and 
+                                    <span id="boss-session-target" class="inline-flex items-center gap-1">
+                                        <strong>${targetSessions}</strong>
+                                    </span> Sessions today.
+                                </p>
+                                ${!is_accepted ? `
+                                    <button onclick="studyMentor.toggleEditTargets()" class="text-[9px] font-bold ${is_accepted ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-700'} transition-colors">
+                                        ✏️ Edit
+                                    </button>
+                                ` : ''}
+                            </div>
+                            
+                            <!-- Edit Mode (Hidden by default) -->
+                            <div id="boss-edit-targets" class="hidden mt-3 p-3 bg-black/30 rounded-xl border border-white/10">
+                                <div class="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label class="text-[8px] uppercase font-black tracking-widest text-white/70 block mb-1">Exams</label>
+                                        <input type="number" id="boss-edit-exams" value="${targetExams}" min="1" max="20" class="w-full bg-black/40 border border-white/20 rounded-lg px-2 py-1 text-sm text-white font-bold focus:outline-none focus:border-red-500">
+                                    </div>
+                                    <div>
+                                        <label class="text-[8px] uppercase font-black tracking-widest text-white/70 block mb-1">Sessions</label>
+                                        <input type="number" id="boss-edit-sessions" value="${targetSessions}" min="1" max="20" class="w-full bg-black/40 border border-white/20 rounded-lg px-2 py-1 text-sm text-white font-bold focus:outline-none focus:border-indigo-500">
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="studyMentor.saveCustomTargets()" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-[9px] font-black uppercase py-1.5 rounded-lg transition-colors">
+                                        💾 Save
+                                    </button>
+                                    <button onclick="studyMentor.toggleEditTargets()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-[9px] font-black uppercase py-1.5 rounded-lg transition-colors">
+                                        ✖️ Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="grid grid-cols-2 gap-3 mb-4">
                             <div class="bg-black/20 p-2 rounded-xl border border-white/5">
@@ -1306,6 +1344,66 @@ class StudyMentor {
         } else {
             badge?.classList.add('hidden');
             teaser?.classList.add('hidden');
+        }
+    }
+
+    toggleEditTargets() {
+        const editPanel = document.getElementById('boss-edit-targets');
+        if (editPanel) {
+            editPanel.classList.toggle('hidden');
+        }
+    }
+
+    async saveCustomTargets() {
+        const examsInput = document.getElementById('boss-edit-exams');
+        const sessionsInput = document.getElementById('boss-edit-sessions');
+
+        if (!examsInput || !sessionsInput) return;
+
+        const exams = parseInt(examsInput.value);
+        const sessions = parseInt(sessionsInput.value);
+
+        // Validation
+        if (exams < 1 || exams > 20) {
+            alert('Exams must be between 1 and 20');
+            return;
+        }
+
+        if (sessions < 1 || sessions > 20) {
+            alert('Sessions must be between 1 and 20');
+            return;
+        }
+
+        try {
+            const response = await fetch('api/challenge/update-targets.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ exams, sessions })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Hide edit panel
+                this.toggleEditTargets();
+
+                // Refresh mentor data to show updated targets
+                await this.fetchMentorData();
+                this.renderRecommendations();
+
+                // Show success message
+                this.showNudge({
+                    title: 'TARGETS UPDATED',
+                    message: `New mission: ${exams} exams, ${sessions} sessions. Let's crush it! 💪`,
+                    icon: '🎯',
+                    theme: 'theme-electric'
+                });
+            } else {
+                alert('Error: ' + (result.error || 'Failed to update targets'));
+            }
+        } catch (error) {
+            console.error('Error updating targets:', error);
+            alert('Failed to update targets. Please try again.');
         }
     }
 
