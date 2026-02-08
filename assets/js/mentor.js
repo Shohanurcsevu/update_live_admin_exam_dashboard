@@ -19,6 +19,11 @@ class StudyMentor {
         this.startTimeBasedNudges();
     }
 
+    isFocusModeActive() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('page') === 'take-exam-interface';
+    }
+
     showWelcomeGreeting() {
         const greetings = [
             "পড়তে বস, বাইনচোদ, চাকরি না পেলে খাবি কি ?",
@@ -478,7 +483,15 @@ class StudyMentor {
         };
 
         const showNudge = () => {
-            if (this.isOpen || this.isInitialGreeting) return;
+            if (this.isOpen || this.isInitialGreeting || this.isFocusModeActive()) {
+                // If focus mode is active, make sure any existing teaser is hidden
+                if (this.isFocusModeActive()) {
+                    const teaser = document.getElementById('mentor-teaser');
+                    if (teaser) teaser.classList.add('hidden');
+                    this.isMotivationalNudgeActive = false;
+                }
+                return;
+            }
 
             const now = new Date();
             const currentHour = now.getHours();
@@ -541,7 +554,7 @@ class StudyMentor {
                 if (isStrictBossMode) {
                     widgetContent?.classList.add('strict-mode-pulse');
                     if (teaserEmoji) teaserEmoji.innerText = '👿';
-                    teaserText.innerHTML = `<span class="bg-red-600 text-[8px] font-black px-1.5 py-0.5 rounded-full inline-block mb-1 animate-pulse">STRICT MODE</span><br>${randomMsg}`;
+                    teaserText.innerHTML = `<span class="bg-red-600 text-[8px] font-black px-1.5 py-0.5 rounded-full inline-block mb-1 animate-pulse">STRICT MODE</span><br>${randomMsg} ${timeRemaining}`;
                 } else {
                     widgetContent?.classList.remove('strict-mode-pulse');
                     // Reset emoji and text content if not in strict mode
