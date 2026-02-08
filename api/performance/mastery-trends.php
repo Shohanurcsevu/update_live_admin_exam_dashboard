@@ -66,10 +66,45 @@ if ($result) {
         $this_week = $row['accuracy_this_week'] !== null ? round(floatval($row['accuracy_this_week']), 1) : null;
         $last_week = $row['accuracy_last_week'] !== null ? round(floatval($row['accuracy_last_week']), 1) : null;
         
+        // Get today's exams for this subject
+        $subject_id = $row['subject_id'];
+        $today_exams_sql = "
+            SELECT 
+                e.id,
+                e.exam_title,
+                e.total_marks,
+                COUNT(p.id) as attempt_count,
+                MAX(p.score_with_negative) as best_score
+            FROM exams e
+            LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
+            WHERE e.subject_id = $subject_id 
+                AND e.updated_at BETWEEN '$today_start' AND '$today_end'
+                AND e.is_deleted = 0
+            GROUP BY e.id, e.exam_title, e.total_marks
+        ";
+        
+        $today_exams_result = $conn->query($today_exams_sql);
+        $today_exams = [];
+        
+        if ($today_exams_result) {
+            while ($exam_row = $today_exams_result->fetch_assoc()) {
+                $today_exams[] = [
+                    'id' => $exam_row['id'],
+                    'title' => $exam_row['exam_title'],
+                    'total_marks' => $exam_row['total_marks'],
+                    'attempt_count' => intval($exam_row['attempt_count']),
+                    'best_score' => $exam_row['best_score'] !== null ? floatval($exam_row['best_score']) : null,
+                    'is_completed' => intval($exam_row['attempt_count']) > 0
+                ];
+            }
+        }
+        
         $subjects[] = [
+            'id' => $subject_id,
             'name' => $row['subject_name'],
             'this_week' => $this_week,
-            'last_week' => $last_week
+            'last_week' => $last_week,
+            'today_exams' => $today_exams
         ];
 
         // Generate Insights

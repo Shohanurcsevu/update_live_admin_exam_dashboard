@@ -1146,7 +1146,7 @@ class StudyMentor {
             }
         }
 
-        // --- NEW: Subject Discipline Badges Section ---
+        // --- NEW: Subject Discipline Badges Section (Collapsible with Exams) ---
         if (this.mentorData.subjects) {
             const subjects = this.mentorData.subjects;
             const created = this.mentorData.daily_stats?.exams_created || [];
@@ -1157,11 +1157,12 @@ class StudyMentor {
                 <div class="mb-4">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Subject Discipline (${subjects.length} Subjects)</p>
                     <div class="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
-                        ${subjects.map(subject => {
+                        ${subjects.map((subject, index) => {
                 const createdInfo = created.find(c => c.name === subject.name);
                 const takenInfo = taken.find(t => t.name === subject.name);
                 const sessionInfo = sessions.find(s => s.subject.trim().toLowerCase() === subject.name.trim().toLowerCase());
                 const sessionsCount = sessionInfo ? sessionInfo.count : 0;
+                const todayExams = subject.today_exams || [];
 
                 let statusIcon = '🔴';
                 let statusLabel = 'Ignored';
@@ -1180,24 +1181,63 @@ class StudyMentor {
                 }
 
                 return `
-                                <div class="flex items-center justify-between bg-gray-50 border border-gray-100 p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
+                    <div class="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden hover:bg-gray-100 transition-colors">
+                        <!-- Subject Header (Clickable) -->
+                        <div class="flex items-center justify-between p-2.5 cursor-pointer" onclick="studyMentor.toggleSubjectExams(${index})">
+                            <div class="flex items-center gap-2 flex-1">
+                                <span class="text-xs">${statusIcon}</span>
+                                <div class="flex flex-col flex-1">
                                     <div class="flex items-center gap-2">
-                                        <span class="text-xs">${statusIcon}</span>
-                                        <div class="flex flex-col">
-                                            <span class="text-sm font-semibold text-gray-800">${subject.name}</span>
-                                            ${sessionsCount > 0 ? `<span class="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">⏱️ ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'} today</span>` : ''}
-                                        </div>
+                                        <span class="text-sm font-semibold text-gray-800">${subject.name}</span>
+                                        ${todayExams.length > 0 ? `<span class="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-bold">${todayExams.length} ${todayExams.length === 1 ? 'exam' : 'exams'}</span>` : ''}
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-[9px] font-black uppercase tracking-tighter ${statusColor}">${statusLabel}</span>
-                                        <button onclick="studyMentor.startFocusSession('${subject.name}')" 
-                                            class="flex items-center justify-center ${statusLabel === 'Conquered' ? 'bg-green-50 text-green-600' : 'bg-indigo-50 text-indigo-600'} p-1.5 rounded-lg hover:brightness-95 transition-all"
-                                            title="${statusLabel === 'Conquered' ? 'Start Bonus Focus Session' : 'Start 25m Focus Session'}">
-                                            <span class="material-symbols-outlined text-sm">timer</span>
-                                        </button>
-                                    </div>
+                                    ${sessionsCount > 0 ? `<span class="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">⏱️ ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'} today</span>` : ''}
                                 </div>
-                            `;
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] font-black uppercase tracking-tighter ${statusColor}">${statusLabel}</span>
+                                <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${subject.name}')" 
+                                    class="flex items-center justify-center ${statusLabel === 'Conquered' ? 'bg-green-50 text-green-600' : 'bg-indigo-50 text-indigo-600'} p-1.5 rounded-lg hover:brightness-95 transition-all"
+                                    title="${statusLabel === 'Conquered' ? 'Start Bonus Focus Session' : 'Start 25m Focus Session'}">
+                                    <span class="material-symbols-outlined text-sm">timer</span>
+                                </button>
+                                <span class="text-gray-400 text-xs transition-transform" id="subject-arrow-${index}">▼</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Exams List (Collapsible) -->
+                        <div id="subject-exams-${index}" class="hidden border-t border-gray-200 bg-white/50">
+                            ${todayExams.length > 0 ? `
+                                <div class="p-2 space-y-1.5">
+                                    ${todayExams.map(exam => `
+                                        <div class="flex items-center justify-between bg-white border ${exam.is_completed ? 'border-green-200' : 'border-gray-200'} rounded-lg p-2 hover:shadow-sm transition-all">
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs">${exam.is_completed ? '✅' : '📝'}</span>
+                                                    <span class="text-xs font-semibold text-gray-800 truncate">${exam.title}</span>
+                                                </div>
+                                                <div class="flex items-center gap-2 mt-0.5">
+                                                    <span class="text-[8px] text-gray-500">${exam.total_marks} marks</span>
+                                                    ${exam.is_completed ? `<span class="text-[8px] text-green-600 font-bold">Score: ${exam.best_score}/${exam.total_marks}</span>` : ''}
+                                                    ${exam.attempt_count > 1 ? `<span class="text-[8px] text-blue-600">${exam.attempt_count} attempts</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <button onclick="studyMentor.startExam(${exam.id})" 
+                                                class="ml-2 flex items-center gap-1 ${exam.is_completed ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-blue-500 text-white hover:bg-blue-600'} px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight transition-all whitespace-nowrap">
+                                                <span class="material-symbols-outlined text-xs">${exam.is_completed ? 'refresh' : 'play_arrow'}</span>
+                                                ${exam.is_completed ? 'Retake' : 'Take Exam'}
+                                            </button>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : `
+                                <div class="p-3 text-center">
+                                    <p class="text-[10px] text-gray-400 italic">No exams created today</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `;
             }).join('')}
                     </div>
                 </div>
@@ -1405,6 +1445,21 @@ class StudyMentor {
             console.error('Error updating targets:', error);
             alert('Failed to update targets. Please try again.');
         }
+    }
+
+    toggleSubjectExams(index) {
+        const examsDiv = document.getElementById(`subject-exams-${index}`);
+        const arrow = document.getElementById(`subject-arrow-${index}`);
+
+        if (examsDiv && arrow) {
+            examsDiv.classList.toggle('hidden');
+            arrow.style.transform = examsDiv.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+    }
+
+    startExam(examId) {
+        // Navigate to take exam interface with the exam ID
+        window.loadPage('take-exam-interface', `exam_id=${examId}`);
     }
 
 }
