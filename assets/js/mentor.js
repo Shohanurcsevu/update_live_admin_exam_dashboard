@@ -1181,17 +1181,17 @@ class StudyMentor {
                 }
 
                 return `
-                    <div class="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden hover:bg-gray-100 transition-colors">
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden hover:bg-gray-100 transition-colors">
                         <!-- Subject Header (Clickable) -->
-                        <div class="flex items-center justify-between p-2.5 cursor-pointer" onclick="studyMentor.toggleSubjectExams(${index})">
-                            <div class="flex items-center gap-2 flex-1">
-                                <span class="text-xs">${statusIcon}</span>
-                                <div class="flex flex-col flex-1">
+                        <div class="flex items-center justify-between p-3 cursor-pointer" onclick="studyMentor.toggleSubjectExams(${index})">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <span class="text-base flex-shrink-0">${statusIcon}</span>
+                                <div class="flex flex-col flex-1 min-w-0">
                                     <div class="flex items-center gap-2">
-                                        <span class="text-sm font-semibold text-gray-800">${subject.name}</span>
-                                        ${todayExams.length > 0 ? `<span class="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-bold">${todayExams.length} ${todayExams.length === 1 ? 'exam' : 'exams'}</span>` : ''}
+                                        <span class="text-sm font-semibold text-gray-800 truncate">${subject.name}</span>
+                                        ${todayExams.length > 0 ? `<span class="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap">${todayExams.length}</span>` : ''}
                                     </div>
-                                    ${sessionsCount > 0 ? `<span class="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">⏱️ ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'} today</span>` : ''}
+                                    ${sessionsCount > 0 ? `<span class="text-[8px] text-indigo-500 font-bold uppercase tracking-tight">⏱️ ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'}</span>` : ''}
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -1206,33 +1206,33 @@ class StudyMentor {
                         </div>
                         
                         <!-- Exams List (Collapsible) -->
-                        <div id="subject-exams-${index}" class="hidden border-t border-gray-200 bg-white/50">
+                        <div id="subject-exams-${index}" class="hidden border-t-2 border-gray-200 bg-white/50">
                             ${todayExams.length > 0 ? `
-                                <div class="p-2 space-y-1.5">
+                                <div class="p-3 space-y-2">
                                     ${todayExams.map(exam => `
-                                        <div class="flex items-center justify-between bg-white border ${exam.is_completed ? 'border-green-200' : 'border-gray-200'} rounded-lg p-2 hover:shadow-sm transition-all">
+                                        <div class="flex items-center justify-between bg-white border-2 ${exam.is_completed ? 'border-green-200' : 'border-gray-200'} rounded-lg p-3 hover:shadow-md transition-all">
                                             <div class="flex-1 min-w-0">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-xs">${exam.is_completed ? '✅' : '📝'}</span>
-                                                    <span class="text-xs font-semibold text-gray-800 truncate">${exam.title}</span>
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <span class="text-sm">${exam.is_completed ? '✅' : '📝'}</span>
+                                                    <span class="text-sm font-bold text-gray-900 truncate">${exam.title}</span>
                                                 </div>
-                                                <div class="flex items-center gap-2 mt-0.5">
-                                                    <span class="text-[8px] text-gray-500">${exam.total_marks} marks</span>
-                                                    ${exam.is_completed ? `<span class="text-[8px] text-green-600 font-bold">Score: ${exam.best_score}/${exam.total_marks}</span>` : ''}
-                                                    ${exam.attempt_count > 1 ? `<span class="text-[8px] text-blue-600">${exam.attempt_count} attempts</span>` : ''}
+                                                <div class="flex items-center gap-3 flex-wrap">
+                                                    <span class="text-[10px] text-gray-600 font-semibold">📊 ${exam.total_marks} marks</span>
+                                                    ${exam.is_completed ? `<span class="text-[10px] text-green-700 font-bold bg-green-50 px-2 py-0.5 rounded">Score: ${exam.best_score}/${exam.total_marks}</span>` : ''}
+                                                    ${exam.attempt_count > 1 ? `<span class="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded">${exam.attempt_count} attempts</span>` : ''}
                                                 </div>
                                             </div>
                                             <button onclick="studyMentor.startExam(${exam.id})" 
-                                                class="ml-2 flex items-center gap-1 ${exam.is_completed ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-blue-500 text-white hover:bg-blue-600'} px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight transition-all whitespace-nowrap">
-                                                <span class="material-symbols-outlined text-xs">${exam.is_completed ? 'refresh' : 'play_arrow'}</span>
+                                                class="ml-3 flex items-center gap-1.5 ${exam.is_completed ? 'bg-green-50 text-green-700 hover:bg-green-100 border-2 border-green-200' : 'bg-blue-500 text-white hover:bg-blue-600'} px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all whitespace-nowrap shadow-sm">
+                                                <span class="material-symbols-outlined text-sm">${exam.is_completed ? 'refresh' : 'play_arrow'}</span>
                                                 ${exam.is_completed ? 'Retake' : 'Take Exam'}
                                             </button>
                                         </div>
                                     `).join('')}
                                 </div>
                             ` : `
-                                <div class="p-3 text-center">
-                                    <p class="text-[10px] text-gray-400 italic">No exams created today</p>
+                                <div class="p-4 text-center">
+                                    <p class="text-xs text-gray-400 italic">No exams created today</p>
                                 </div>
                             `}
                         </div>
