@@ -3,6 +3,47 @@
     </div>
 
 
+    <!-- Countdown Panel (NEW) -->
+    <div id="countdown-panel" class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <!-- Daily Study Countdown -->
+        <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="material-symbols-outlined bg-white/20 p-2 rounded-lg">schedule</span>
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-widest opacity-80">Today's Study Time Left</h4>
+                    <p id="daily-timer" class="text-2xl font-black tracking-tighter mt-1">00 : 00 : 00</p>
+                </div>
+            </div>
+            <div class="mt-2 h-1 bg-white/20 rounded-full overflow-hidden">
+                <div id="daily-progress" class="h-full bg-white transition-all duration-1000" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Target Job Countdown -->
+        <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="material-symbols-outlined bg-white/20 p-2 rounded-lg">target</span>
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-widest opacity-80">Target Job Countdown</h4>
+                    <p id="job-timer" class="text-2xl font-black tracking-tighter mt-1">00 Days : 00 Hours</p>
+                </div>
+            </div>
+            <p class="text-[10px] font-bold uppercase tracking-wider opacity-70">Deadline: April 30, 2026</p>
+        </div>
+
+        <!-- Year Remaining Countdown -->
+        <div class="bg-gradient-to-br from-purple-500 to-rose-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="material-symbols-outlined bg-white/20 p-2 rounded-lg">calendar_today</span>
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-widest opacity-80">Year Remaining</h4>
+                    <p id="year-timer" class="text-2xl font-black tracking-tighter mt-1">00 Days : 00 Hours</p>
+                </div>
+            </div>
+            <div id="year-progress-text" class="text-[10px] font-bold uppercase tracking-wider opacity-70">Loading...</div>
+        </div>
+    </div>
+
 
     <!-- Trophy Room (NEW: Gamification) -->
     <div id="trophy-room-section" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

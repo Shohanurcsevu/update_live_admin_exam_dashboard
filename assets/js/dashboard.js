@@ -782,7 +782,81 @@ function initializeDashboardPage() {
         checkRecentAttempt();
     }
 
+    // --- Section: Countdown Timers ---
+    function startCountdownTimers() {
+        const dailyTimerEl = document.getElementById('daily-timer');
+        const dailyProgressEl = document.getElementById('daily-progress');
+        const jobTimerEl = document.getElementById('job-timer');
+        const yearTimerEl = document.getElementById('year-timer');
+        const yearProgressTextEl = document.getElementById('year-progress-text');
+
+        if (!dailyTimerEl || !jobTimerEl || !yearTimerEl) {
+            console.warn("Countdown timer elements not found. Retrying in 100ms...");
+            setTimeout(startCountdownTimers, 100);
+            return;
+        }
+
+        const targetJobDate = new Date('2026-04-30T23:59:59').getTime();
+
+        const updateTimers = () => {
+            const now = new Date();
+            const nowTime = now.getTime();
+
+            // 1. Daily Study Countdown
+            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+            const dailyDiff = endOfDay - nowTime;
+
+            if (dailyDiff > 0) {
+                const hours = Math.floor((dailyDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((dailyDiff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((dailyDiff % (1000 * 60)) / 1000);
+                dailyTimerEl.textContent = `${hours.toString().padStart(2, '0')} : ${minutes.toString().padStart(2, '0')} : ${seconds.toString().padStart(2, '0')}`;
+
+                // Daily progress (time spent today)
+                const dailyProgress = Math.min(100, ((nowTime - startOfDay) / (endOfDay - startOfDay)) * 100);
+                if (dailyProgressEl) dailyProgressEl.style.width = `${dailyProgress}%`;
+            }
+
+            // 2. Target Job Countdown
+            const jobDiff = targetJobDate - nowTime;
+            if (jobDiff > 0) {
+                const days = Math.floor(jobDiff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((jobDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const mins = Math.floor((jobDiff % (1000 * 60 * 60)) / (1000 * 60));
+                jobTimerEl.textContent = `${days} Days : ${hours.toString().padStart(2, '0')} Hours : ${mins.toString().padStart(2, '0')} Mins`;
+            } else {
+                jobTimerEl.textContent = "Target date reached";
+            }
+
+            // 3. Year Remaining Countdown
+            const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59).getTime();
+            const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0).getTime();
+            const yearDiff = endOfYear - nowTime;
+
+            if (yearDiff > 0) {
+                const days = Math.floor(yearDiff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((yearDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const mins = Math.floor((yearDiff % (1000 * 60 * 60)) / (1000 * 60));
+                yearTimerEl.textContent = `${days} Days : ${hours.toString().padStart(2, '0')} Hours : ${mins.toString().padStart(2, '0')} Mins`;
+
+                const yearProgress = Math.min(100, ((nowTime - startOfYear) / (endOfYear - startOfYear)) * 100);
+                if (yearProgressTextEl) yearProgressTextEl.textContent = `${now.getFullYear()} is ${yearProgress.toFixed(1)}% complete`;
+            }
+        };
+
+        updateTimers();
+        const timerInterval = setInterval(updateTimers, 1000);
+
+        // Cleanup interval on page unload/navigation
+        const cleanup = () => clearInterval(timerInterval);
+        window.addEventListener('popstate', cleanup);
+        // Custom event for internal navigation if exists
+        document.addEventListener('pageBeforeChange', cleanup);
+    }
+
     function initializePage() {
+        startCountdownTimers();
         fetchAndDisplayMetrics();
         populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
         fetchAndDisplayExams();
