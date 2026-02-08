@@ -21,9 +21,16 @@ class StudyMentor {
         widget.innerHTML = `
             <!-- Floating Action Button -->
             <button id="mentor-fab" 
-                class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full w-14 h-14 shadow-2xl hover:shadow-purple-500/50 transition-all hover:scale-110 flex items-center justify-center group">
+                class="relative bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full w-14 h-14 shadow-2xl hover:shadow-purple-500/50 transition-all hover:scale-110 flex items-center justify-center group">
                 <span class="material-symbols-outlined text-2xl">psychology</span>
+                <!-- Notification Badge -->
+                <div id="mentor-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 border-2 border-white rounded-full animate-bounce"></div>
             </button>
+
+            <!-- Teaser Message -->
+            <div id="mentor-teaser" class="hidden absolute bottom-16 right-0 bg-white px-4 py-2 rounded-xl shadow-lg border border-gray-100 text-xs font-medium text-gray-700 whitespace-nowrap mb-2 animate-fade-in-up">
+                <span id="teaser-text">Hey! I have a tip for you.</span>
+            </div>
 
             <!-- Mentor Panel -->
             <div id="mentor-panel" 
@@ -105,9 +112,11 @@ class StudyMentor {
         } else {
             panel?.classList.remove('hidden');
             this.isOpen = true;
-            if (!this.mentorData) this.fetchMentorData();
+            // Always fetch fresh data when opening to reflect recent study sessions
+            this.fetchMentorData();
         }
     }
+
 
     closePanel() {
         const panel = document.getElementById('mentor-panel');
@@ -160,7 +169,18 @@ class StudyMentor {
         if (!activity || !activity.is_inactive) return null;
 
         const { minutes_since_last_exam, inactivity_level, streak_at_risk, current_hour } = activity;
-        const { mentor_advice } = this.mentorData;
+        const { mentor_advice, total_exams } = this.mentorData;
+
+        // Priority 0: Brand New User
+        if (total_exams === 0 || inactivity_level === 'new_user') {
+            return {
+                icon: '👋',
+                title: 'Welcome!',
+                message: 'Ready to start your first exam? I\'ll guide you from here.',
+                action: 'Take My First Exam',
+                link: 'take-exam-list'
+            };
+        }
 
         // Priority 1: Streak at risk
         if (streak_at_risk) {
@@ -241,10 +261,16 @@ class StudyMentor {
         const { mentor_advice, insights, subjects } = this.mentorData;
 
         // Update greeting based on overall performance
-        const avgAccuracy = subjects.reduce((sum, s) => sum + (s.this_week || 0), 0) / subjects.length;
+        const activeSubjects = subjects.filter(s => s.this_week !== null);
+        const avgAccuracy = activeSubjects.length > 0
+            ? activeSubjects.reduce((sum, s) => sum + s.this_week, 0) / activeSubjects.length
+            : null;
+
         let greetingMsg = '';
 
-        if (avgAccuracy >= 80) {
+        if (avgAccuracy === null) {
+            greetingMsg = "I'm ready to help you excel! Start by taking an exam or reviewing flashcards.";
+        } else if (avgAccuracy >= 80) {
             greetingMsg = "You're doing amazing! 🎉 Keep up the excellent work.";
         } else if (avgAccuracy >= 60) {
             greetingMsg = "Good progress! Let's focus on a few areas to boost your scores.";
@@ -346,12 +372,28 @@ class StudyMentor {
                                 class="mt-2 px-3 py-1 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-colors">
                                 ${nudge.action} →
                             </button>
-                        </div>
-                    </div>
                 </div>
             `;
         }
+
+        // Handle Badge and Teaser Visibility
+        const badge = document.getElementById('mentor-badge');
+        const teaser = document.getElementById('mentor-teaser');
+        const teaserText = document.getElementById('teaser-text');
+
+        if (nudge && !this.isOpen) {
+            badge?.classList.remove('hidden');
+            teaser?.classList.remove('hidden');
+            if (teaserText) teaserText.innerText = nudge.message;
+
+            // Auto-hide teaser after 8 seconds
+            setTimeout(() => teaser?.classList.add('hidden'), 8000);
+        } else {
+            badge?.classList.add('hidden');
+            teaser?.classList.add('hidden');
+        }
     }
+
 }
 
 // Initialize mentor when DOM is ready

@@ -48,8 +48,9 @@ try {
         // No exams taken yet
         $minutes_since = null;
         $inactivity_level = 'new_user';
-        $is_inactive = false;
+        $is_inactive = true; // Mark as true to trigger "Welcome" nudge
     }
+
     
     // Check if streak is at risk (no exam today and it's after 8 PM)
     $current_hour = intval(date('H'));

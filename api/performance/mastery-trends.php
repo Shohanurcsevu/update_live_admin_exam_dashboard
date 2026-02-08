@@ -9,7 +9,8 @@ $response = [
     'success' => true,
     'data' => [
         'subjects' => [],
-        'insights' => []
+        'insights' => [],
+        'total_exams' => 0
     ]
 ];
 
@@ -64,6 +65,14 @@ if ($result) {
         }
     }
 }
+
+// Get total exams count for the user
+$total_count_sql = "SELECT COUNT(*) as total FROM performance";
+$total_result = $conn->query($total_count_sql);
+if ($total_result) {
+    $response['data']['total_exams'] = intval($total_result->fetch_assoc()['total']);
+}
+
 
 $response['data']['subjects'] = $subjects;
 $response['data']['insights'] = $insights;
