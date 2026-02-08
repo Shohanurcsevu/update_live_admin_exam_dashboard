@@ -20,6 +20,7 @@ class StudyMentor {
             intervalId: null,
             currentActivity: null
         };
+        this.countdownRefreshInterval = null; // For Boss Challenge countdown updates
         this.init();
     }
 
@@ -929,10 +930,47 @@ class StudyMentor {
 
         // --- BOSS CHALLENGE CARD ---
         const challenge = this.mentorData.boss_challenge;
+
+        // Clear existing countdown refresh interval
+        if (this.countdownRefreshInterval) {
+            clearInterval(this.countdownRefreshInterval);
+        }
+
+        // Set up auto-refresh for countdown (every 60 seconds) if challenge is active
+        if (challenge && challenge.active && this.isOpen) {
+            this.countdownRefreshInterval = setInterval(() => {
+                if (this.isOpen) {
+                    this.renderRecommendations(); // Re-render to update countdown
+                }
+            }, 60000); // 60 seconds
+        }
         if (challenge && challenge.active) {
             const { exams: targetExams, sessions: targetSessions, deadline, is_accepted } = challenge.active;
             const { exams: currentExams, sessions: currentSessions } = challenge.progress;
             const isSuccess = currentExams >= targetExams && currentSessions >= targetSessions;
+
+            // Calculate time remaining until deadline
+            const now = new Date();
+            const deadlineTime = new Date();
+            deadlineTime.setHours(21, 0, 0, 0); // 9 PM
+
+            const msRemaining = deadlineTime - now;
+            const hoursRemaining = Math.floor(msRemaining / (1000 * 60 * 60));
+            const minutesRemaining = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
+
+            // Urgency levels
+            const isUrgent = hoursRemaining < 2; // Less than 2 hours
+            const isCritical = hoursRemaining < 1; // Less than 1 hour
+            const timeExpired = msRemaining < 0;
+
+            const timeRemainingText = timeExpired ? 'EXPIRED' :
+                hoursRemaining > 0 ? `${hoursRemaining}h ${minutesRemaining}m left` :
+                    `${minutesRemaining}m left`;
+
+            const urgencyColor = timeExpired ? 'bg-black text-red-500 animate-pulse' :
+                isCritical ? 'bg-red-600 text-white animate-pulse' :
+                    isUrgent ? 'bg-orange-500 text-white' :
+                        is_accepted ? 'bg-red-500' : 'bg-gray-400';
 
             recommendationsHTML += `
                 <div class="relative overflow-hidden bg-gradient-to-br ${is_accepted ? 'from-gray-900 to-red-950 text-white' : 'from-gray-50 to-gray-200 border border-gray-300'} p-4 rounded-2xl mb-4 shadow-xl group">
@@ -945,7 +983,9 @@ class StudyMentor {
                                 <span class="text-xl">${is_accepted ? '💀' : '🛡️'}</span>
                                 <span class="text-[10px] font-black uppercase tracking-widest ${is_accepted ? 'text-red-500' : 'text-gray-600'}">Boss Challenge</span>
                             </div>
-                            <span class="text-[9px] font-bold ${is_accepted ? 'bg-red-500' : 'bg-gray-400'} px-2 py-0.5 rounded-full text-white uppercase tracking-tighter">Deadline: 9 PM</span>
+                            <span class="text-[9px] font-bold ${urgencyColor} px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                ${timeExpired ? '⏰ EXPIRED' : `⏰ ${timeRemainingText}`}
+                            </span>
                         </div>
 
                         <p class="text-sm font-black mb-3 leading-tight ${is_accepted ? 'text-white' : 'text-gray-800'}">
