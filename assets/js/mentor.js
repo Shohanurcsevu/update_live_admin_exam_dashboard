@@ -37,10 +37,25 @@ class StudyMentor {
         // Show greeting in teaser after a short delay
         setTimeout(() => {
             const teaser = document.getElementById('mentor-teaser');
+            const teaserBorder = document.getElementById('teaser-border');
+            const teaserContent = document.getElementById('teaser-content');
+            const teaserDecor = document.getElementById('teaser-decor');
+            const teaserEmoji = document.getElementById('teaser-emoji');
             const teaserText = document.getElementById('teaser-text');
             const badge = document.getElementById('mentor-badge');
 
             if (teaser && teaserText && !this.isOpen) {
+                // Apply Champion Theme for Welcome Greeting
+                if (teaserBorder && teaserContent) {
+                    teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-champion-border`;
+                    teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-champion-bg`;
+
+                    if (teaserDecor) teaserDecor.innerHTML = '<div class="champion-sweep"></div>';
+                    if (teaserEmoji) teaserEmoji.innerText = '🏆';
+
+                    teaser.classList.add('animate-float');
+                }
+
                 teaserText.innerText = randomGreeting;
                 teaser.classList.remove('hidden');
                 badge?.classList.remove('hidden');
@@ -136,6 +151,12 @@ class StudyMentor {
                 }
 
                 .animate-float { animation: float 3s infinite ease-in-out; }
+
+                @keyframes pulse-subtle {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.95; transform: scale(0.99); }
+                }
+                .animate-pulse-subtle { animation: pulse-subtle 2s infinite ease-in-out; }
 
                 #teaser-text {
                     display: block;
@@ -402,23 +423,54 @@ class StudyMentor {
             return timeStr;
         };
 
+        const getDailyStatusMessage = () => {
+            if (!this.mentorData || !this.mentorData.daily_stats) return null;
+            const stats = this.mentorData.daily_stats;
+
+            // 1. Specific Exams created but not yet taken today
+            if (stats.uncompleted_exams && stats.uncompleted_exams.length > 0) {
+                const exam = stats.uncompleted_exams[0]; // Pick the first one
+                return `Sohan, the exam '${exam.title}' you created for ${exam.subject} today hasn't been taken yet. Let's finish it!`;
+            }
+
+            // 2. No activity today for a subject
+            if (stats.subjects_no_activity && stats.subjects_no_activity.length > 0) {
+                // Pick a random subject from those with no activity
+                const randomSubj = stats.subjects_no_activity[Math.floor(Math.random() * stats.subjects_no_activity.length)];
+                return `Sohan, no exam has been created for ${randomSubj.name} yet today. Let's start!`;
+            }
+
+            return null;
+        };
+
         const showNudge = () => {
             if (this.isOpen || this.isInitialGreeting) return;
 
             const now = new Date();
             const currentHour = now.getHours();
 
-            // Choose range based on time
-            const messages = currentHour >= 20 || currentHour < 5 ? lateMessages : earlyMessages;
+            // Decide whether to show a daily status message or a motivational one
+            const statusMsg = getDailyStatusMessage();
+            let randomMsg;
+            let isStatusMessage = false;
 
-            // Randomize message
-            let nextIndex;
-            do {
-                nextIndex = Math.floor(Math.random() * messages.length);
-            } while (nextIndex === this.lastMessageIndex && messages.length > 1);
+            if (statusMsg && Math.random() < 0.4) {
+                randomMsg = statusMsg;
+                isStatusMessage = true;
+            } else {
+                // Choose range based on time
+                const messages = currentHour >= 20 || currentHour < 5 ? lateMessages : earlyMessages;
 
-            this.lastMessageIndex = nextIndex;
-            const randomMsg = messages[nextIndex];
+                // Randomize message
+                let nextIndex;
+                do {
+                    nextIndex = Math.floor(Math.random() * messages.length);
+                } while (nextIndex === this.lastMessageIndex && messages.length > 1);
+
+                this.lastMessageIndex = nextIndex;
+                randomMsg = messages[nextIndex];
+            }
+
             const timeRemaining = getTimeRemainingStr();
 
             // Randomize Theme
@@ -436,25 +488,29 @@ class StudyMentor {
             if (teaser && teaserText) {
                 this.isMotivationalNudgeActive = true;
 
+                // For status messages, maybe override the theme to something distinct? 
+                // Let's keep the random theme for variety but maybe force 'focus' for status?
+                const nudgeTheme = isStatusMessage ? 'focus' : theme;
+
                 // Clear and Apply Theme Classes
-                teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${theme}-border`;
-                teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-${theme}-bg`;
+                teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${nudgeTheme}-border`;
+                teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-${nudgeTheme}-bg`;
                 teaser.classList.add('animate-float');
 
                 // Apply Decorations
                 teaserDecor.innerHTML = '';
-                if (theme === 'champion') {
+                if (nudgeTheme === 'champion') {
                     teaserDecor.innerHTML = '<div class="champion-sweep"></div>';
                     teaserEmoji.innerText = '🏆';
-                } else if (theme === 'focus') {
+                } else if (nudgeTheme === 'focus') {
                     teaserDecor.innerHTML = '<div class="focus-pulse"></div>';
                     teaserEmoji.innerText = '⚡';
-                } else if (theme === 'boss') {
+                } else if (nudgeTheme === 'boss') {
                     teaserBorder.classList.add('boss-heartbeat');
                     teaserEmoji.innerText = '💪';
                 }
 
-                teaserText.textContent = `${randomMsg} ${timeRemaining}`;
+                teaserText.textContent = isStatusMessage ? randomMsg : `${randomMsg} ${timeRemaining}`;
                 teaser.classList.remove('hidden');
                 badge?.classList.remove('hidden');
 
@@ -513,29 +569,88 @@ class StudyMentor {
         `;
 
         // Render specific recommendations
+        let recommendationsHTML = '';
+
+        // --- NEW: Daily Due Cards ---
+        const dailyStats = this.mentorData.daily_stats;
+        if (dailyStats) {
+            const { uncompleted_exams, subjects_no_activity } = dailyStats;
+
+            if ((uncompleted_exams && uncompleted_exams.length > 0) || (subjects_no_activity && subjects_no_activity.length > 0)) {
+                recommendationsHTML += `
+                <div class="mb-4">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Daily Targets</p>
+                    <div class="space-y-3">
+                        ${(uncompleted_exams || []).slice(0, 3).map(exam => `
+                            <div class="bg-orange-50 border-2 border-orange-200 p-4 rounded-2xl shadow-sm animate-pulse-subtle">
+                                <div class="flex items-start gap-3">
+                                    <div class="bg-orange-100 p-2 rounded-lg">
+                                        <span class="material-symbols-outlined text-orange-600 text-xl">pending_actions</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-xs font-black text-orange-900 uppercase tracking-tighter">${exam.subject}</p>
+                                        <p class="text-sm font-medium text-gray-800 mt-1">
+                                            Sohan, the exam <strong>'${exam.title}'</strong> you created for <strong>${exam.subject}</strong> today hasn't been taken yet. Let's finish it!
+                                        </p>
+                                        <button onclick="window.loadPage('take-exam-interface', '?exam_id=${exam.id}')" class="mt-3 text-xs font-bold text-orange-600 flex items-center gap-1 hover:underline">
+                                            Finish Now <span class="material-symbols-outlined text-xs">arrow_forward</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                        
+                        ${(subjects_no_activity || []).slice(0, 2).map(subj => `
+                            <div class="bg-blue-50 border-2 border-blue-200 p-4 rounded-2xl shadow-sm">
+                                <div class="flex items-start gap-3">
+                                    <div class="bg-blue-100 p-2 rounded-lg">
+                                        <span class="material-symbols-outlined text-blue-600 text-xl">edit_calendar</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-xs font-black text-blue-900 uppercase tracking-tighter">${subj.name}</p>
+                                        <p class="text-sm font-medium text-gray-800 mt-1">
+                                            Sohan, no exam has been created for <strong>${subj.name}</strong> yet today. Let's start!
+                                        </p>
+                                        <button onclick="window.location.href='https://bcspreli.free.nf/?page=exam'" class="mt-3 text-xs font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                                            Create Exam <span class="material-symbols-outlined text-xs">add_circle</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            }
+        }
+
         if (mentor_advice && mentor_advice.length > 0) {
-            container.innerHTML = mentor_advice.map(advice => {
+            recommendationsHTML += mentor_advice.map(advice => {
                 const priorityColor = advice.priority === 'high' ? 'red' : 'amber';
                 const priorityIcon = advice.priority === 'high' ? 'priority_high' : 'flag';
 
                 return `
-                    <div class="bg-${priorityColor}-50 border border-${priorityColor}-200 p-3 rounded-xl">
-                        <div class="flex items-start gap-2">
-                            <span class="material-symbols-outlined text-${priorityColor}-600 text-lg">${priorityIcon}</span>
-                            <div class="flex-1">
-                                <p class="text-xs font-bold text-${priorityColor}-900 uppercase tracking-wider">${advice.subject}</p>
-                                <p class="text-sm text-gray-700 mt-1">
-                                    Focus on <strong>${advice.weak_topic}</strong> 
-                                    <span class="text-xs text-gray-500">(${advice.topic_accuracy}% accuracy)</span>
-                                </p>
-                                <p class="text-xs text-gray-600 mt-2">
-                                    💡 I recommend doing 15-20 questions from this topic today.
-                                </p>
-                            </div>
+                <div class="bg-${priorityColor}-50 border border-${priorityColor}-200 p-3 rounded-xl mb-3 last:mb-0">
+                    <div class="flex items-start gap-2">
+                        <span class="material-symbols-outlined text-${priorityColor}-600 text-lg">${priorityIcon}</span>
+                        <div class="flex-1">
+                            <p class="text-xs font-bold text-${priorityColor}-900 uppercase tracking-wider">${advice.subject}</p>
+                            <p class="text-sm text-gray-700 mt-1">
+                                Focus on <strong>${advice.weak_topic}</strong> 
+                                <span class="text-xs text-gray-500">(${advice.topic_accuracy}% accuracy)</span>
+                            </p>
+                            <p class="text-xs text-gray-600 mt-2">
+                                💡 I recommend doing 15-20 questions from this topic today.
+                            </p>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
             }).join('');
+        }
+
+        if (recommendationsHTML) {
+            container.innerHTML = recommendationsHTML;
         } else if (insights && insights.length > 0) {
             // Fallback to general insights if no specific topic advice
             container.innerHTML = `

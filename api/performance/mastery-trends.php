@@ -10,7 +10,13 @@ $response = [
     'data' => [
         'subjects' => [],
         'insights' => [],
-        'total_exams' => 0
+        'total_exams' => 0,
+        'daily_stats' => [
+            'exams_created' => [],
+            'exams_taken' => [],
+            'subjects_no_activity' => [],
+            'uncompleted_exams' => []
+        ]
     ]
 ];
 
@@ -121,6 +127,82 @@ foreach ($subjects as $subject) {
 }
 
 $response['data']['mentor_advice'] = $mentor_advice;
+
+// --- DAILY EXAM STATUS TRACKING ---
+// Get subjects with exams created today (or updated, as a proxy for creation)
+$daily_exams_sql = "
+    SELECT 
+        s.id as subject_id,
+        s.subject_name,
+        COUNT(DISTINCT e.id) as created_count,
+        COUNT(DISTINCT p.id) as taken_count
+    FROM subjects s
+    LEFT JOIN exams e ON s.id = e.subject_id AND DATE(e.updated_at) = CURRENT_DATE AND e.is_deleted = 0
+    LEFT JOIN performance p ON e.id = p.exam_id AND DATE(p.attempt_time) = CURRENT_DATE
+    WHERE s.is_deleted = 0
+    GROUP BY s.id, s.subject_name
+";
+
+$daily_result = $conn->query($daily_exams_sql);
+$exams_created = [];
+$exams_taken = [];
+$subjects_no_activity = [];
+
+if ($daily_result) {
+    while ($row = $daily_result->fetch_assoc()) {
+        $created = (int)$row['created_count'];
+        $taken = (int)$row['taken_count'];
+        
+        if ($created > 0) {
+            $exams_created[] = [
+                'id' => $row['subject_id'],
+                'name' => $row['subject_name'],
+                'count' => $created
+            ];
+            if ($taken > 0) {
+                $exams_taken[] = [
+                    'id' => $row['subject_id'],
+                    'name' => $row['subject_name'],
+                    'count' => $taken
+                ];
+            }
+        } else {
+            $subjects_no_activity[] = [
+                'id' => $row['subject_id'],
+                'name' => $row['subject_name']
+            ];
+        }
+    }
+}
+
+$response['data']['daily_stats'] = [
+    'exams_created' => $exams_created,
+    'exams_taken' => $exams_taken,
+    'subjects_no_activity' => $subjects_no_activity,
+    'uncompleted_exams' => []
+];
+
+// --- GET SPECIFIC UNCOMPLETED EXAM TITLES ---
+$uncompleted_sql = "
+    SELECT e.id, e.exam_title, s.subject_name
+    FROM exams e
+    JOIN subjects s ON e.subject_id = s.id
+    LEFT JOIN performance p ON e.id = p.exam_id AND DATE(p.attempt_time) = CURRENT_DATE
+    WHERE DATE(e.updated_at) = CURRENT_DATE 
+    AND e.is_deleted = 0
+    AND p.id IS NULL
+";
+
+$uncompleted_result = $conn->query($uncompleted_sql);
+if ($uncompleted_result) {
+    while ($row = $uncompleted_result->fetch_assoc()) {
+        $response['data']['daily_stats']['uncompleted_exams'][] = [
+            'id' => $row['id'],
+            'title' => $row['exam_title'],
+            'subject' => $row['subject_name']
+        ];
+    }
+}
 
 echo json_encode($response);
 $conn->close();
