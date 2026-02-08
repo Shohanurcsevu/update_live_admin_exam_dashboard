@@ -158,31 +158,65 @@ class StudyMentor {
                 }
                 .animate-pulse-subtle { animation: pulse-subtle 2s infinite ease-in-out; }
 
+                @keyframes widget-heartbeat {
+                    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(220, 38, 38, 0)); }
+                    50% { transform: scale(1.02); filter: drop-shadow(0 0 15px rgba(220, 38, 38, 0.5)); }
+                }
+                .strict-mode-pulse { animation: widget-heartbeat 1.5s infinite ease-in-out !important; }
+
                 #teaser-text {
                     display: block;
                     word-wrap: break-word;
                     white-space: normal;
                     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 }
+
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: #f1f1f1;
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #c7d2fe;
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #818cf8;
+                }
             </style>
 
             <!-- Mentor Panel -->
-            <div id="mentor-panel" 
-                class="hidden absolute bottom-20 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-                
-                <!-- Header -->
-                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined">psychology</span>
-                            <h3 class="font-bold">AI Study Mentor</h3>
+        <div id="mentor-panel" 
+            class="hidden absolute bottom-20 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transition-all duration-300">
+            
+            <!-- Header with Discipline Ring -->
+            <div id="mentor-header" class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="relative w-12 h-12 flex items-center justify-center">
+                            <svg class="w-full h-full transform -rotate-90">
+                                <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,0.2)" stroke-width="4" fill="transparent" />
+                                <circle id="discipline-ring-inner" cx="24" cy="24" r="20" stroke="white" stroke-width="4" fill="transparent" 
+                                    stroke-dasharray="125.6" stroke-dashoffset="125.6" stroke-linecap="round" class="transition-all duration-1000" />
+                            </svg>
+                            <span id="discipline-ring-text" class="absolute text-[10px] font-bold">0%</span>
                         </div>
-                        <button id="mentor-close" class="hover:bg-white/20 rounded-full p-1 transition-colors">
-                            <span class="material-symbols-outlined text-sm">close</span>
-                        </button>
+                        <div>
+                            <h3 class="font-bold text-sm flex items-center gap-1">
+                                <span class="material-symbols-outlined text-lg">psychology</span>
+                                AI Study Mentor
+                            </h3>
+                            <p class="text-[9px] text-purple-100 uppercase tracking-widest opacity-80">Daily coverage</p>
+                        </div>
                     </div>
-                    <p class="text-xs text-purple-100 mt-1">Your personalized study guide</p>
+                    
+                    <button id="mentor-close" class="hover:bg-white/20 rounded-full p-1 transition-colors">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
                 </div>
+            </div>
 
                 <!-- Content -->
                 <div class="p-4 max-h-96 overflow-y-auto">
@@ -453,13 +487,25 @@ class StudyMentor {
             const statusMsg = getDailyStatusMessage();
             let randomMsg;
             let isStatusMessage = false;
+            let isStrictBossMode = false;
 
-            if (statusMsg && Math.random() < 0.4) {
+            // BOSS ACCOUNTABILITY (Strict Mode Logic)
+            if (currentHour >= 15 && (this.currentDailyCoverage || 0) < 50) {
+                isStrictBossMode = true;
+                isStatusMessage = true;
+                const bossMessages = [
+                    "Sohan, mortality is approaching! Finish your targets!",
+                    "Everyone else is studying, and you're falling behind. GET TO WORK!",
+                    "You want the dream? Then EARN IT. No more excuses tonight!",
+                    "Is this the effort of a champion? I don't think so. Finish your exams!"
+                ];
+                randomMsg = bossMessages[Math.floor(Math.random() * bossMessages.length)];
+            } else if (statusMsg && Math.random() < 0.4) {
                 randomMsg = statusMsg;
                 isStatusMessage = true;
             } else {
                 // Choose range based on time
-                const messages = currentHour >= 20 || currentHour < 5 ? lateMessages : earlyMessages;
+                const messages = currentHour >= 15 || currentHour < 5 ? lateMessages : earlyMessages;
 
                 // Randomize message
                 let nextIndex;
@@ -484,13 +530,24 @@ class StudyMentor {
             const teaserEmoji = document.getElementById('teaser-emoji');
             const teaserText = document.getElementById('teaser-text');
             const badge = document.getElementById('mentor-badge');
+            const widgetContent = document.getElementById('study-mentor-widget');
 
             if (teaser && teaserText) {
                 this.isMotivationalNudgeActive = true;
 
-                // For status messages, maybe override the theme to something distinct? 
-                // Let's keep the random theme for variety but maybe force 'focus' for status?
-                const nudgeTheme = isStatusMessage ? 'focus' : theme;
+                // Apply Strict Boss Mode visuals
+                const nudgeTheme = isStrictBossMode ? 'boss' : (isStatusMessage ? 'focus' : theme);
+
+                if (isStrictBossMode) {
+                    widgetContent?.classList.add('strict-mode-pulse');
+                    if (teaserEmoji) teaserEmoji.innerText = '👿';
+                    teaserText.innerHTML = `<span class="bg-red-600 text-[8px] font-black px-1.5 py-0.5 rounded-full inline-block mb-1 animate-pulse">STRICT MODE</span><br>${randomMsg}`;
+                } else {
+                    widgetContent?.classList.remove('strict-mode-pulse');
+                    // Reset emoji and text content if not in strict mode
+                    // The emoji will be set again by the theme logic below
+                    // The text content will be set by the final teaserText.textContent line
+                }
 
                 // Clear and Apply Theme Classes
                 teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${nudgeTheme}-border`;
@@ -507,10 +564,16 @@ class StudyMentor {
                     teaserEmoji.innerText = '⚡';
                 } else if (nudgeTheme === 'boss') {
                     teaserBorder.classList.add('boss-heartbeat');
-                    teaserEmoji.innerText = '💪';
+                    // Only set emoji here if not in strict mode, otherwise it's already '👿'
+                    if (!isStrictBossMode) {
+                        teaserEmoji.innerText = '💪';
+                    }
                 }
 
-                teaserText.textContent = isStatusMessage ? randomMsg : `${randomMsg} ${timeRemaining}`;
+                // Set teaser text, respecting strict mode's innerHTML
+                if (!isStrictBossMode) {
+                    teaserText.textContent = isStatusMessage ? randomMsg : `${randomMsg} ${timeRemaining}`;
+                }
                 teaser.classList.remove('hidden');
                 badge?.classList.remove('hidden');
 
@@ -571,6 +634,36 @@ class StudyMentor {
         // Render specific recommendations
         let recommendationsHTML = '';
 
+        const now = new Date();
+        const hour = now.getHours();
+        const morningRoadmap = this.mentorData.morning_roadmap;
+
+        // --- NEW: Morning Roadmap (Before 10 AM) ---
+        if (hour < 10 && morningRoadmap && morningRoadmap.length > 0) {
+            recommendationsHTML += `
+                <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-4 rounded-2xl mb-4 shadow-sm">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-xl">🗺️</span>
+                        <div>
+                            <p class="text-[10px] font-black text-indigo-900 uppercase tracking-widest leading-none">Morning Roadmap</p>
+                            <p class="text-[9px] text-indigo-600 mt-0.5">Focus areas from yesterday's performance</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        ${morningRoadmap.map(item => `
+                            <div class="flex items-center justify-between bg-white/60 p-2 rounded-lg border border-indigo-100">
+                                <span class="text-sm font-medium text-indigo-950">${item.subject}</span>
+                                <span class="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">${item.accuracy}%</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p class="text-[10px] text-indigo-600 mt-3 italic font-medium">
+                        "Sohan, yesterday these were tough. Let's finish them first today!"
+                    </p>
+                </div>
+            `;
+        }
+
         // --- NEW: Daily Due Cards ---
         const dailyStats = this.mentorData.daily_stats;
         if (dailyStats) {
@@ -624,6 +717,51 @@ class StudyMentor {
             }
         }
 
+        // --- NEW: Subject Discipline Badges Section ---
+        if (this.mentorData.subjects) {
+            const subjects = this.mentorData.subjects;
+            const created = this.mentorData.daily_stats?.exams_created || [];
+            const taken = this.mentorData.daily_stats?.exams_taken || [];
+
+            recommendationsHTML += `
+                <div class="mb-4">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Subject Discipline (${subjects.length} Subjects)</p>
+                    <div class="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                        ${subjects.map(subject => {
+                const createdInfo = created.find(c => c.name === subject.name);
+                const takenInfo = taken.find(t => t.name === subject.name);
+
+                let statusIcon = '🔴';
+                let statusLabel = 'Ignored';
+                let statusColor = 'text-red-500';
+
+                if (createdInfo) {
+                    if (takenInfo && takenInfo.count >= createdInfo.count) {
+                        statusIcon = '🟢';
+                        statusLabel = 'Conquered';
+                        statusColor = 'text-green-500';
+                    } else {
+                        statusIcon = '🟡';
+                        statusLabel = 'Pending';
+                        statusColor = 'text-yellow-600';
+                    }
+                }
+
+                return `
+                                <div class="flex items-center justify-between bg-gray-50 border border-gray-100 p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs">${statusIcon}</span>
+                                        <span class="text-sm font-semibold text-gray-800">${subject.name}</span>
+                                    </div>
+                                    <span class="text-[9px] font-black uppercase tracking-tighter ${statusColor}">${statusLabel}</span>
+                                </div>
+                            `;
+            }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
         if (mentor_advice && mentor_advice.length > 0) {
             recommendationsHTML += mentor_advice.map(advice => {
                 const priorityColor = advice.priority === 'high' ? 'red' : 'amber';
@@ -647,6 +785,37 @@ class StudyMentor {
                 </div>
             `;
             }).join('');
+        }
+
+        // --- NEW: Calculate Daily Coverage for Discipline Ring ---
+        if (this.mentorData.subjects) {
+            const totalSubjects = this.mentorData.subjects.length;
+            const conqueredSubjects = (this.mentorData.daily_stats?.exams_created || []).filter(subj => {
+                const taken = (this.mentorData.daily_stats?.exams_taken || []).find(t => t.id === subj.id);
+                return taken && taken.count >= subj.count;
+            }).length;
+
+            const coverage = totalSubjects > 0 ? Math.round((conqueredSubjects / totalSubjects) * 100) : 0;
+            this.currentDailyCoverage = coverage; // Save for Boss Mode logic
+
+            // Update Ring UI
+            const ringInner = document.getElementById('discipline-ring-inner');
+            const ringText = document.getElementById('discipline-ring-text');
+            if (ringInner && ringText) {
+                const circumference = 125.6; // 2 * PI * 20
+                const offset = circumference - (coverage / 100) * circumference;
+                ringInner.style.strokeDashoffset = offset;
+                ringText.textContent = `${coverage}%`;
+
+                // Color transition
+                if (coverage === 100) {
+                    ringInner.style.stroke = '#fcd34d'; // Gold
+                    ringText.classList.add('text-yellow-300');
+                } else {
+                    ringInner.style.stroke = 'white';
+                    ringText.classList.remove('text-yellow-300');
+                }
+            }
         }
 
         if (recommendationsHTML) {

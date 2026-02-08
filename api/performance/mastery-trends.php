@@ -16,7 +16,8 @@ $response = [
             'exams_taken' => [],
             'subjects_no_activity' => [],
             'uncompleted_exams' => []
-        ]
+        ],
+        'morning_roadmap' => []
     ]
 ];
 
@@ -33,8 +34,8 @@ $trends_sql = "
     FROM subjects s
     LEFT JOIN performance p ON s.id = p.subject_id
     LEFT JOIN exams e ON p.exam_id = e.id
+    WHERE s.is_deleted = 0
     GROUP BY s.id, s.subject_name
-    LIMIT 10
 ";
 
 $result = $conn->query($trends_sql);
@@ -102,6 +103,7 @@ foreach ($subjects as $subject) {
             JOIN performance p ON e.id = p.exam_id
             JOIN subjects s ON e.subject_id = s.id
             WHERE s.subject_name = ?
+            AND s.is_deleted = 0
             AND p.attempt_time >= DATE_SUB(CURRENT_DATE, INTERVAL 14 DAY)
             GROUP BY t.id, t.topic_name
             HAVING attempt_count >= 1
@@ -200,6 +202,31 @@ if ($uncompleted_result) {
             'id' => $row['id'],
             'title' => $row['exam_title'],
             'subject' => $row['subject_name']
+        ];
+    }
+}
+
+// --- MORNING ROADMAP: Weakest subjects from yesterday ---
+$roadmap_sql = "
+    SELECT 
+        s.subject_name,
+        AVG((p.score_with_negative / e.total_marks) * 100) as avg_accuracy
+    FROM performance p
+    JOIN exams e ON p.exam_id = e.id
+    JOIN subjects s ON e.subject_id = s.id
+    WHERE DATE(p.attempt_time) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY)
+    AND s.is_deleted = 0
+    GROUP BY s.id, s.subject_name
+    ORDER BY avg_accuracy ASC
+    LIMIT 3
+";
+
+$roadmap_result = $conn->query($roadmap_sql);
+if ($roadmap_result) {
+    while ($row = $roadmap_result->fetch_assoc()) {
+        $response['data']['morning_roadmap'][] = [
+            'subject' => $row['subject_name'],
+            'accuracy' => round(floatval($row['avg_accuracy']), 1)
         ];
     }
 }
