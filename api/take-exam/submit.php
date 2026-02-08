@@ -78,7 +78,7 @@ if ($stmt->execute()) {
 
     // ✅ Log the submission activity
     $exam_title = $exam_details['exam_title'] ?? 'Unknown Exam';
-    log_activity($conn, 'Exam Attempted', "Exam '{$exam_title}' submitted with score {$score_with_negative}");
+    log_activity($conn, 'boss_exam_completion', "Exam '{$exam_title}' submitted with score {$score_with_negative}");
 
     // --- NEW: Update Subject Discipline Tracking ---
     $update_subject = $conn->prepare("

@@ -4,6 +4,12 @@ require_once '../subject/db_connect.php';
 header('Content-Type: application/json');
 
 date_default_timezone_set('Asia/Dhaka');
+$today = date('Y-m-d');
+$yesterday = date('Y-m-d', strtotime('-1 day'));
+$today_start = $today . ' 00:00:00';
+$today_end = $today . ' 23:59:59';
+$yesterday_start = $yesterday . ' 00:00:00';
+$yesterday_end = $yesterday . ' 23:59:59';
 
 $response = [
     'success' => true,
@@ -18,7 +24,19 @@ $response = [
             'uncompleted_exams' => [],
             'pomodoro_sessions' => []
         ],
-        'morning_roadmap' => []
+        'morning_roadmap' => [],
+        'recent_sessions' => [],
+        'boss_challenge' => [
+            'active' => null,
+            'progress' => [
+                'exams' => 0,
+                'sessions' => 0
+            ],
+            'status' => [
+                'is_champion' => false,
+                'failed_yesterday' => false
+            ]
+        ]
     ]
 ];
 
@@ -140,8 +158,8 @@ $daily_exams_sql = "
         COUNT(DISTINCT e.id) as created_count,
         COUNT(DISTINCT p.id) as taken_count
     FROM subjects s
-    LEFT JOIN exams e ON s.id = e.subject_id AND DATE(e.updated_at) = CURRENT_DATE AND e.is_deleted = 0
-    LEFT JOIN performance p ON e.id = p.exam_id AND DATE(p.attempt_time) = CURRENT_DATE
+    LEFT JOIN exams e ON s.id = e.subject_id AND e.updated_at BETWEEN '$today_start' AND '$today_end' AND e.is_deleted = 0
+    LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
     WHERE s.is_deleted = 0
     GROUP BY s.id, s.subject_name
 ";
@@ -182,13 +200,29 @@ $response['data']['daily_stats']['exams_created'] = $exams_created;
 $response['data']['daily_stats']['exams_taken'] = $exams_taken;
 $response['data']['daily_stats']['subjects_no_activity'] = $subjects_no_activity;
 
+// --- TOTAL EXAMS TAKEN TODAY (Any Exam) ---
+$total_taken_today = 0;
+// We now use a more specific type to avoid any collisions
+$marker_type = 'boss_exam_completion';
+$taken_today_sql = "SELECT COUNT(*) as total FROM activity_log WHERE activity_type = '$marker_type' AND timestamp BETWEEN '$today_start' AND '$today_end'";
+$qb_res = $conn->query($taken_today_sql);
+if ($qb_res) {
+    $total_taken_today = intval($qb_res->fetch_assoc()['total']);
+}
+
+// Diagnostic Info
+$response['debug']['today_start'] = $today_start;
+$response['debug']['today_end'] = $today_end;
+$response['debug']['activity_log_count'] = $total_taken_today;
+$response['debug']['performance_total'] = $response['data']['total_exams'];
+
 // --- GET SPECIFIC UNCOMPLETED EXAM TITLES ---
 $uncompleted_sql = "
     SELECT e.id, e.exam_title, s.subject_name
     FROM exams e
     JOIN subjects s ON e.subject_id = s.id
-    LEFT JOIN performance p ON e.id = p.exam_id AND DATE(p.attempt_time) = CURRENT_DATE
-    WHERE DATE(e.updated_at) = CURRENT_DATE 
+    LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
+    WHERE e.updated_at BETWEEN '$today_start' AND '$today_end' 
     AND e.is_deleted = 0
     AND p.id IS NULL
 ";
@@ -234,7 +268,7 @@ $pomodoro_sql = "
     SELECT TRIM(activity_message) as subject_name, COUNT(*) as session_count
     FROM activity_log
     WHERE activity_type = 'pomodoro_session'
-    AND DATE(timestamp) = CURRENT_DATE
+    AND timestamp BETWEEN '$today_start' AND '$today_end'
     GROUP BY TRIM(activity_message)
 ";
 
@@ -245,6 +279,102 @@ if ($pomodoro_result) {
             'subject' => $row['subject_name'],
             'count' => intval($row['session_count'])
         ];
+    }
+}
+
+// --- RECENT SESSIONS: Get sequence for fatigue detection ---
+$recent_sessions_sql = "
+    SELECT TRIM(activity_message) as subject_name
+    FROM activity_log
+    WHERE activity_type = 'pomodoro_session'
+    AND timestamp BETWEEN '$today_start' AND '$today_end'
+    ORDER BY timestamp DESC
+    LIMIT 5
+";
+
+$recent_result = $conn->query($recent_sessions_sql);
+if ($recent_result) {
+    while ($row = $recent_result->fetch_assoc()) {
+        $response['data']['recent_sessions'][] = $row['subject_name'];
+    }
+}
+
+// 1. Check for Active Challenge today (Issue if missing)
+$challenge_sql = "SELECT activity_message FROM activity_log WHERE activity_type = 'boss_challenge_issued' AND timestamp BETWEEN '$today_start' AND '$today_end' LIMIT 1";
+$challenge_result = $conn->query($challenge_sql);
+$challenge_data = null;
+
+if ($challenge_result && $row = $challenge_result->fetch_assoc()) {
+    $challenge_data = json_decode($row['activity_message'], true);
+} else {
+    // Generate new mission if before 9 PM
+    $current_time = date('H:i:s');
+    if ($current_time < '21:00:00') {
+        $exams_target = rand(2, 4);
+        $sessions_target = rand(3, 6);
+        $deadline = "21:00:00";
+        
+        $challenge_data = [
+            'exams' => $exams_target,
+            'sessions' => $sessions_target,
+            'deadline' => $deadline,
+            'issued_at' => date('Y-m-d H:i:s')
+        ];
+        
+        $msg = $conn->real_escape_string(json_encode($challenge_data));
+        $conn->query("INSERT INTO activity_log (activity_type, activity_message, timestamp) VALUES ('boss_challenge_issued', '$msg', NOW())");
+    }
+}
+
+if ($challenge_data) {
+    // Check if accepted
+    $accepted_sql = "SELECT id FROM activity_log WHERE activity_type = 'boss_challenge_accepted' AND timestamp BETWEEN '$today_start' AND '$today_end' LIMIT 1";
+    $accepted_res = $conn->query($accepted_sql);
+    $is_accepted = ($accepted_res && $accepted_res->num_rows > 0);
+    
+    // Calculate current progress
+    $current_exams = $total_taken_today;
+    $current_sessions = 0;
+    if (isset($response['data']['daily_stats']['pomodoro_sessions'])) {
+        foreach ($response['data']['daily_stats']['pomodoro_sessions'] as $s) $current_sessions += $s['count'];
+    }
+    
+    $response['data']['boss_challenge']['active'] = array_merge($challenge_data, ['is_accepted' => $is_accepted]);
+    $response['data']['boss_challenge']['progress'] = [
+        'exams' => $current_exams,
+        'sessions' => $current_sessions
+    ];
+
+    // Log success if targets met first time
+    if ($is_accepted && $current_exams >= $challenge_data['exams'] && $current_sessions >= $challenge_data['sessions']) {
+        $check_success = $conn->query("SELECT id FROM activity_log WHERE activity_type = 'boss_challenge_success' AND timestamp BETWEEN '$today_start' AND '$today_end' LIMIT 1");
+        if ($check_success && $check_success->num_rows === 0) {
+            $conn->query("INSERT INTO activity_log (activity_type, activity_message, timestamp) VALUES ('boss_challenge_success', 'Won the Boss Challenge!', NOW())");
+        }
+    }
+}
+
+// 2. Champion Status (Success in last 24h)
+$champion_sql = "SELECT id FROM activity_log WHERE activity_type = 'boss_challenge_success' AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR) LIMIT 1";
+$champion_res = $conn->query($champion_sql);
+$response['data']['boss_challenge']['status']['is_champion'] = ($champion_res && $champion_res->num_rows > 0);
+
+// 3. Yesterday Failure (Accepted but targets not met)
+$yesterday_challenge_sql = "SELECT activity_message FROM activity_log WHERE activity_type = 'boss_challenge_issued' AND timestamp BETWEEN '$yesterday_start' AND '$yesterday_end' LIMIT 1";
+$y_chal_res = $conn->query($yesterday_challenge_sql);
+if ($y_chal_res && $row = $y_chal_res->fetch_assoc()) {
+    $y_data = json_decode($row['activity_message'], true);
+    
+    // Was it accepted?
+    $y_acc_sql = "SELECT id FROM activity_log WHERE activity_type = 'boss_challenge_accepted' AND timestamp BETWEEN '$yesterday_start' AND '$yesterday_end' LIMIT 1";
+    $y_acc_res = $conn->query($y_acc_sql);
+    if ($y_acc_res && $y_acc_res->num_rows > 0) {
+        // Did they succeed?
+        $y_succ_sql = "SELECT id FROM activity_log WHERE activity_type = 'boss_challenge_success' AND timestamp BETWEEN '$yesterday_start' AND '$yesterday_end' LIMIT 1";
+        $y_succ_res = $conn->query($y_succ_sql);
+        if ($y_succ_res && $y_succ_res->num_rows === 0) {
+            $response['data']['boss_challenge']['status']['failed_yesterday'] = true;
+        }
     }
 }
 

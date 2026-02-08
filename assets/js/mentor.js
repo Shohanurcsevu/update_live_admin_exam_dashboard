@@ -220,6 +220,17 @@ class StudyMentor {
     }
 
     showWelcomeGreeting() {
+        // --- NEW: Yesterday Failure Check ---
+        if (this.mentorData?.boss_challenge?.status?.failed_yesterday) {
+            this.showNudge({
+                title: "MISSION FAILED",
+                message: "You failed yesterday's mission, Sohan. No excuses today. GET TO WORK.",
+                icon: "👿",
+                theme: "boss"
+            });
+            return;
+        }
+
         const greetings = [
             "পড়তে বস, বাইনচোদ, চাকরি না পেলে খাবি কি ?",
             "বাপের, মায়ের অপমান এর শোধ লিতে হবে।",
@@ -473,6 +484,25 @@ class StudyMentor {
         });
     }
 
+    async acceptChallenge() {
+        try {
+            const response = await fetch('api/challenge/manage.php?action=accept');
+            const result = await response.json();
+            if (result.success) {
+                // Refresh data to show accepted state
+                await this.fetchMentorData();
+                this.showNudge({
+                    title: "MISSION ACCEPTED",
+                    message: "Good Choice, Sohan. Don't let me down. I'll be watching every move.",
+                    icon: "💀",
+                    theme: "boss"
+                });
+            }
+        } catch (error) {
+            console.error('Failed to accept challenge:', error);
+        }
+    }
+
     togglePanel() {
         const panel = document.getElementById('mentor-panel');
         if (this.isOpen) {
@@ -536,8 +566,21 @@ class StudyMentor {
         const activity = this.mentorData.activity_status;
         if (!activity || !activity.is_inactive) return null;
 
+        const { mentor_advice, total_exams, recent_sessions, morning_roadmap, subjects } = this.mentorData;
+
+        // --- NEW: Cognitive Fatigue Check (High Priority) ---
+        const fatigueSuggestion = this.detectFatigue(recent_sessions);
+        if (fatigueSuggestion) {
+            return {
+                icon: '🧠',
+                title: 'Cognitive Fatigue!',
+                message: fatigueSuggestion.message,
+                action: fatigueSuggestion.action,
+                link: 'take-exam-list' // Or focus session?
+            };
+        }
+
         const { minutes_since_last_exam, inactivity_level, streak_at_risk, current_hour } = activity;
-        const { mentor_advice, total_exams } = this.mentorData;
 
         // Priority 0: Brand New User
         if (total_exams === 0 || inactivity_level === 'new_user') {
@@ -620,6 +663,33 @@ class StudyMentor {
         }
     }
 
+    detectFatigue(sessions) {
+        if (!sessions || sessions.length < 3) return null;
+
+        // Check if last 3 sessions are the same
+        const lastThree = sessions.slice(0, 3);
+        const subject = lastThree[0];
+
+        if (lastThree.every(s => s === subject)) {
+            // Find a different subject to suggest
+            const otherSubjects = (this.mentorData.subjects || []).filter(s => s.name !== subject);
+            const roadmapSubjects = (this.mentorData.morning_roadmap || []).filter(r => r.subject !== subject);
+
+            let suggestion = "a different topic";
+            if (roadmapSubjects.length > 0) {
+                suggestion = roadmapSubjects[0].subject;
+            } else if (otherSubjects.length > 0) {
+                suggestion = otherSubjects[Math.floor(Math.random() * otherSubjects.length)].name;
+            }
+
+            return {
+                message: `Sohan, you've done 75 mins of ${subject}. Your brain is melting! Switch to <strong>${suggestion}</strong> for one session to stay sharp!`,
+                action: `Switch to ${suggestion}`
+            };
+        }
+        return null;
+    }
+
     startTimeBasedNudges() {
         const earlyMessages = [
             "পড় সোহান পড়, দেখায় দে তুই কি!",
@@ -678,6 +748,7 @@ class StudyMentor {
         };
 
         const showNudge = () => {
+            const challengeStatus = this.mentorData?.boss_challenge?.status;
             if (this.isOpen || this.isInitialGreeting || this.isFocusModeActive()) {
                 // If focus mode is active, make sure any existing teaser is hidden
                 if (this.isFocusModeActive()) {
@@ -743,18 +814,22 @@ class StudyMentor {
             if (teaser && teaserText) {
                 this.isMotivationalNudgeActive = true;
 
-                // Apply Strict Boss Mode visuals
-                const nudgeTheme = isStrictBossMode ? 'boss' : (isStatusMessage ? 'focus' : theme);
+                // Decide theme based on state
+                let nudgeTheme = theme;
+                if (isStrictBossMode || challengeStatus?.failed_yesterday) {
+                    nudgeTheme = 'boss';
+                } else if (challengeStatus?.is_champion) {
+                    nudgeTheme = 'champion';
+                } else if (isStatusMessage) {
+                    nudgeTheme = 'focus';
+                }
 
-                if (isStrictBossMode) {
+                if (nudgeTheme === 'boss') {
                     widgetContent?.classList.add('strict-mode-pulse');
                     if (teaserEmoji) teaserEmoji.innerText = '👿';
-                    teaserText.innerHTML = `<span class="bg-red-600 text-[8px] font-black px-1.5 py-0.5 rounded-full inline-block mb-1 animate-pulse">STRICT MODE</span><br>${randomMsg} ${timeRemaining}`;
+                    teaserText.innerHTML = `<span class="bg-red-600 text-[8px] font-black px-1.5 py-0.5 rounded-full inline-block mb-1 animate-pulse">${isStrictBossMode ? 'STRICT MODE' : 'MISSION FAILED'}</span><br>${randomMsg} ${timeRemaining}`;
                 } else {
                     widgetContent?.classList.remove('strict-mode-pulse');
-                    // Reset emoji and text content if not in strict mode
-                    // The emoji will be set again by the theme logic below
-                    // The text content will be set by the final teaserText.textContent line
                 }
 
                 // Clear and Apply Theme Classes
@@ -772,16 +847,16 @@ class StudyMentor {
                     teaserEmoji.innerText = '⚡';
                 } else if (nudgeTheme === 'boss') {
                     teaserBorder.classList.add('boss-heartbeat');
-                    // Only set emoji here if not in strict mode, otherwise it's already '👿'
-                    if (!isStrictBossMode) {
+                    if (!isStrictBossMode && !challengeStatus?.failed_yesterday) {
                         teaserEmoji.innerText = '💪';
                     }
                 }
 
-                // Set teaser text, respecting strict mode's innerHTML
-                if (!isStrictBossMode) {
+                // Set teaser text, respecting special innerHTML for boss
+                if (nudgeTheme !== 'boss') {
                     teaserText.textContent = isStatusMessage ? randomMsg : `${randomMsg} ${timeRemaining}`;
                 }
+
                 teaser.classList.remove('hidden');
                 badge?.classList.remove('hidden');
 
@@ -839,8 +914,65 @@ class StudyMentor {
             </div>
         `;
 
-        // Render specific recommendations
         let recommendationsHTML = '';
+
+        // --- BOSS CHALLENGE CARD ---
+        const challenge = this.mentorData.boss_challenge;
+        if (challenge && challenge.active) {
+            const { exams: targetExams, sessions: targetSessions, deadline, is_accepted } = challenge.active;
+            const { exams: currentExams, sessions: currentSessions } = challenge.progress;
+            const isSuccess = currentExams >= targetExams && currentSessions >= targetSessions;
+
+            recommendationsHTML += `
+                <div class="relative overflow-hidden bg-gradient-to-br ${is_accepted ? 'from-gray-900 to-red-950 text-white' : 'from-gray-50 to-gray-200 border border-gray-300'} p-4 rounded-2xl mb-4 shadow-xl group">
+                    <!-- Background Decor -->
+                    <div class="absolute -top-4 -right-4 text-6xl opacity-10 transform rotate-12 group-hover:scale-110 transition-transform">⚔️</div>
+                    
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">${is_accepted ? '💀' : '🛡️'}</span>
+                                <span class="text-[10px] font-black uppercase tracking-widest ${is_accepted ? 'text-red-500' : 'text-gray-600'}">Boss Challenge</span>
+                            </div>
+                            <span class="text-[9px] font-bold ${is_accepted ? 'bg-red-500' : 'bg-gray-400'} px-2 py-0.5 rounded-full text-white uppercase tracking-tighter">Deadline: 9 PM</span>
+                        </div>
+
+                        <p class="text-sm font-black mb-3 leading-tight ${is_accepted ? 'text-white' : 'text-gray-800'}">
+                            Mission: Complete <strong>${targetExams} Exams</strong> and <strong>${targetSessions} Sessions</strong> today.
+                        </p>
+
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="bg-black/20 p-2 rounded-xl border border-white/5">
+                                <div class="flex justify-between text-[8px] uppercase font-black tracking-widest mb-1">
+                                    <span>Exams</span>
+                                    <span>${currentExams}/${targetExams}</span>
+                                </div>
+                                <div class="h-1.5 w-full bg-black/40 rounded-full overflow-hidden">
+                                    <div class="h-full bg-red-500 transition-all duration-1000" style="width: ${Math.min((currentExams / targetExams) * 100, 100)}%"></div>
+                                </div>
+                            </div>
+                            <div class="bg-black/20 p-2 rounded-xl border border-white/5">
+                                <div class="flex justify-between text-[8px] uppercase font-black tracking-widest mb-1">
+                                    <span>Sessions</span>
+                                    <span>${currentSessions}/${targetSessions}</span>
+                                </div>
+                                <div class="h-1.5 w-full bg-black/40 rounded-full overflow-hidden">
+                                    <div class="h-full bg-indigo-500 transition-all duration-1000" style="width: ${Math.min((currentSessions / targetSessions) * 100, 100)}%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${!is_accepted ? `
+                            <button onclick="studyMentor.acceptChallenge()" class="w-full bg-gray-900 text-white text-[10px] font-black uppercase py-2.5 rounded-xl hover:bg-black transition-all shadow-lg shadow-black/20">Accept Mission</button>
+                        ` : isSuccess ? `
+                            <div class="w-full bg-green-500 text-white text-[10px] font-black uppercase py-2.5 rounded-xl text-center shadow-lg shadow-green-500/20 animate-pulse">Mission Accomplished! 🏆</div>
+                        ` : `
+                            <div class="w-full bg-red-600/20 border border-red-500/30 text-white text-[10px] font-black uppercase py-2.5 rounded-xl text-center tracking-widest">In Progress...</div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
 
         const now = new Date();
         const hour = now.getHours();

@@ -11,6 +11,13 @@ require_once '../subject/db_connect.php';
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+function log_activity($conn, $type, $message) {
+    $stmt = $conn->prepare("INSERT INTO activity_log (activity_type, activity_message) VALUES (?, ?)");
+    $stmt->bind_param("ss", $type, $message);
+    $stmt->execute();
+    $stmt->close();
+}
+
 header('Content-Type: application/json');
 
 $data = json_decode(file_get_contents("php://input"), true);
@@ -145,6 +152,10 @@ if ($stmt->execute()) {
     $update_subject->bind_param("i", $exam_info['subject_id']);
     $update_subject->execute();
     $update_subject->close();
+
+    // ✅ Log the submission activity
+    $exam_title = $exam_info['exam_title'] ?? 'Unknown Exam';
+    log_activity($conn, 'boss_exam_completion', "Exam '{$exam_title}' (offline sync) submitted");
 
     echo json_encode([
         'success' => true,

@@ -1,5 +1,13 @@
 <?php
 require_once '../subject/db_connect.php';
+date_default_timezone_set('Asia/Dhaka');
+
+function log_activity($conn, $type, $message) {
+    $stmt = $conn->prepare("INSERT INTO activity_log (activity_type, activity_message) VALUES (?, ?)");
+    $stmt->bind_param("ss", $type, $message);
+    $stmt->execute();
+    $stmt->close();
+}
 
 $data = json_decode(file_get_contents("php://input"), true);
 
@@ -68,6 +76,12 @@ if ($stmt->execute()) {
     $performance['attempt_number'] = $new_attempt_number;
     $performance['attempt_time'] = date('Y-m-d H:i:s');
     
+    // ✅ Log the submission activity
+    $exam_title_sql = "SELECT exam_title FROM exams WHERE id = $exam_id";
+    $et_res = $conn->query($exam_title_sql);
+    $exam_title = ($et_res && $row = $et_res->fetch_assoc()) ? $row['exam_title'] : 'Unknown Exam';
+    log_activity($conn, 'boss_exam_completion', "Exam '{$exam_title}' (legacy) submitted");
+
     echo json_encode([
         'success' => true, 
         'message' => 'Exam submitted successfully.',
