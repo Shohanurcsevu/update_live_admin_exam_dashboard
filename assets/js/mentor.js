@@ -14,6 +14,12 @@ class StudyMentor {
             subject: null,
             intervalId: null
         };
+        this.breakSession = {
+            isActive: false,
+            timeRemaining: 5 * 60, // 5 minutes in seconds
+            intervalId: null,
+            currentActivity: null
+        };
         this.init();
     }
 
@@ -28,7 +34,7 @@ class StudyMentor {
 
     isFocusModeActive() {
         const params = new URLSearchParams(window.location.search);
-        return params.get('page') === 'take-exam-interface' || this.focusSession.isActive;
+        return params.get('page') === 'take-exam-interface' || this.focusSession.isActive || this.breakSession.isActive;
     }
 
     startFocusSession(subject) {
@@ -127,23 +133,90 @@ class StudyMentor {
                 <div class="text-center">
                     <p class="text-xs font-black uppercase text-yellow-400 mb-1">VICTORY!</p>
                     <p class="text-sm font-bold">Sohan, you dominated ${this.focusSession.subject}! 25 minutes of pure focus.</p>
-                    <p class="text-[10px] mt-2 opacity-80">REST 5 mins, then GO AGAIN!</p>
+                    <p class="text-[10px] mt-2 opacity-80">TIME FOR REST!</p>
                 </div>
             `;
         }
 
-        // Keep celebration for 10 seconds then reset
+        // Wait 5 seconds for victory celebration, then start break
         setTimeout(() => {
-            const teaser = document.getElementById('mentor-teaser');
-            if (teaser && !this.isOpen) teaser.classList.add('hidden');
-        }, 10000);
+            this.startBreakSession();
+        }, 5000);
     }
 
     stopFocusSession() {
         clearInterval(this.focusSession.intervalId);
+        clearInterval(this.breakSession.intervalId);
         this.focusSession.isActive = false;
+        this.breakSession.isActive = false;
         const teaser = document.getElementById('mentor-teaser');
         if (teaser) teaser.classList.add('hidden');
+    }
+
+    startBreakSession() {
+        if (this.breakSession.isActive) return;
+
+        const activities = [
+            { text: "Drink a full glass of water and stretch your back. I'll wait for you.", emoji: "💧" },
+            { text: "Close your eyes for 2 minutes. Your brain needs to digest what you just learned.", emoji: "🧘‍♂️" },
+            { text: "Look at something 20 feet away for 20 seconds. Save your eyes!", emoji: "👀" },
+            { text: "Take 5 deep breaths. Inhale the dream, exhale the stress.", emoji: "🌬️" }
+        ];
+
+        this.breakSession.isActive = true;
+        this.breakSession.timeRemaining = 5 * 60;
+        this.breakSession.currentActivity = activities[Math.floor(Math.random() * activities.length)];
+
+        this.updateBreakUI();
+
+        this.breakSession.intervalId = setInterval(() => {
+            this.breakSession.timeRemaining--;
+            this.updateBreakUI();
+
+            if (this.breakSession.timeRemaining <= 0) {
+                this.stopFocusSession();
+                // Show a final "Back to work" nudge
+                this.showWelcomeGreeting();
+            }
+        }, 1000);
+    }
+
+    updateBreakUI() {
+        const teaserText = document.getElementById('teaser-text');
+        const teaser = document.getElementById('mentor-teaser');
+        const badge = document.getElementById('mentor-badge');
+
+        if (teaser && teaserText) {
+            const minutes = Math.floor(this.breakSession.timeRemaining / 60);
+            const seconds = this.breakSession.timeRemaining % 60;
+            const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            teaser.classList.remove('hidden');
+            badge?.classList.remove('hidden');
+
+            this.applyBreakTheme();
+
+            teaserText.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-1">Health Coach: Break Time</span>
+                    <span class="text-xs font-bold leading-tight mb-2">${this.breakSession.currentActivity.text}</span>
+                    <span class="text-2xl font-black text-white">${timeStr}</span>
+                    <button onclick="studyMentor.stopFocusSession()" class="mt-2 text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter">Skip Break</button>
+                </div>
+            `;
+        }
+    }
+
+    applyBreakTheme() {
+        const teaserBorder = document.getElementById('teaser-border');
+        const teaserContent = document.getElementById('teaser-content');
+        const teaserDecor = document.getElementById('teaser-decor');
+        const teaserEmoji = document.getElementById('teaser-emoji');
+
+        if (teaserBorder) teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-focus-border`;
+        if (teaserContent) teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-focus-bg`;
+        if (teaserDecor) teaserDecor.innerHTML = '<div class="focus-pulse"></div>';
+        if (teaserEmoji) teaserEmoji.innerText = this.breakSession.currentActivity.emoji;
     }
 
     showWelcomeGreeting() {
