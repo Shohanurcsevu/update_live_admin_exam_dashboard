@@ -70,57 +70,78 @@ class StudyMentor {
                 <div id="mentor-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 border-2 border-white rounded-full animate-bounce"></div>
             </button>
 
-            <!-- Teaser Message (Enhanced with Realistic Flames) -->
+            <!-- Teaser Message (Dynamic Theme) -->
             <div id="mentor-teaser" class="hidden absolute bottom-24 right-0 max-w-[320px] min-w-[220px] rounded-2xl overflow-visible mb-4 z-[60]">
-                <!-- Fire Container -->
-                <div class="relative p-1 bg-gradient-to-t from-red-600 via-orange-500 to-yellow-400 rounded-2xl animate-fire-burn shadow-[0_0_20px_rgba(239,68,68,0.5)]">
-                    <div class="bg-white rounded-[14px] p-5 text-center relative z-10 border-b-4 border-orange-100">
-                        <span id="teaser-text" class="text-base font-black text-gray-800 leading-tight drop-shadow-sm">Hey! I have a tip for you.</span>
+                <!-- Outer Border Container -->
+                <div id="teaser-border" class="relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500">
+                    <!-- Theme Specific Decor Elements (Animated) -->
+                    <div id="teaser-decor" class="absolute inset-0 pointer-events-none"></div>
+                    
+                    <!-- Inner Content -->
+                    <div id="teaser-content" class="rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500">
+                        <!-- Small Badge/Emoji Placeholder -->
+                        <div id="teaser-emoji" class="absolute -top-3 -right-2 text-xl filter drop-shadow-md"></div>
+                        
+                        <span id="teaser-text" class="text-base font-extrabold text-white leading-tight drop-shadow-md"></span>
                     </div>
-                    <!-- Flame Layers -->
-                    <div class="absolute inset-0 -z-10 bg-orange-500/20 blur-xl animate-fire-flicker"></div>
                 </div>
             </div>
 
             <style>
-                @keyframes fire-burn {
-                    0%, 100% { 
-                        box-shadow: 
-                            0 -4px 10px rgba(255,165,0,0.6),
-                            0 -8px 20px rgba(255,69,0,0.4),
-                            2px -2px 15px rgba(255,215,0,0.3),
-                            -2px -2px 15px rgba(255,215,0,0.3);
-                        transform: scale(1) skewX(0deg);
-                    }
-                    25% { transform: scale(1.02) skewX(1deg); }
-                    50% { 
-                        box-shadow: 
-                            0 -6px 20px rgba(255,165,0,0.8),
-                            0 -12px 35px rgba(255,69,0,0.6),
-                            4px -4px 20px rgba(255,215,0,0.5),
-                            -4px -4px 20px rgba(255,215,0,0.5);
-                        transform: scale(1.03) skewX(-1.5deg);
-                    }
-                    75% { transform: scale(1.01) skewX(1deg); }
-                }
-                
-                @keyframes fire-flicker {
-                    0%, 100% { opacity: 0.3; transform: translateY(0) scale(1); }
-                    50% { opacity: 0.6; transform: translateY(-10px) scale(1.1); }
+                /* Champion Theme */
+                .theme-champion-border { background: linear-gradient(135deg, #fcd34d, #eab308, #b45309); }
+                .theme-champion-bg { background: linear-gradient(135deg, #7e22ce, #4338ca); }
+                .champion-sweep { 
+                    position: absolute; inset: 0; 
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                    transform: skewX(-12deg);
+                    animation: light-sweep 4s infinite ease-in-out;
                 }
 
-                .animate-fire-burn {
-                    animation: fire-burn 0.8s infinite alternate ease-in-out;
+                /* Focus Theme */
+                .theme-focus-border { background: linear-gradient(135deg, #60a5fa, #22d3ee, #3b82f6); box-shadow: 0 0 20px rgba(34, 211, 238, 0.4); }
+                .theme-focus-bg { background: linear-gradient(135deg, #1e3a8a, #312e81); }
+                .focus-pulse {
+                    position: absolute; inset: 0;
+                    border: 2px solid #22d3ee;
+                    border-radius: 12px;
+                    animation: energy-pulse 2s infinite;
+                }
+
+                /* Boss Theme */
+                .theme-boss-border { background: linear-gradient(135deg, #dc2626, #9f1239, #be123c); }
+                .theme-boss-bg { background: linear-gradient(135deg, #030712, #450a0a); }
+                .boss-heartbeat { animation: heartbeat 1.5s infinite ease-in-out; }
+
+                /* Animations */
+                @keyframes light-sweep {
+                    0% { transform: translateX(-200%) skewX(-12deg); }
+                    30%, 100% { transform: translateX(200%) skewX(-12deg); }
                 }
                 
-                .animate-fire-flicker {
-                    animation: fire-flicker 0.2s infinite;
+                @keyframes energy-pulse {
+                    0% { transform: scale(1); opacity: 0.5; }
+                    50% { transform: scale(1.05); opacity: 0.2; }
+                    100% { transform: scale(1.1); opacity: 0; }
                 }
+
+                @keyframes heartbeat {
+                    0%, 100% { transform: scale(1); filter: brightness(1); }
+                    10%, 30% { transform: scale(1.05); filter: brightness(1.2); }
+                }
+
+                @keyframes float {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-10px); }
+                }
+
+                .animate-float { animation: float 3s infinite ease-in-out; }
 
                 #teaser-text {
                     display: block;
                     word-wrap: break-word;
                     white-space: normal;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 }
             </style>
 
@@ -387,10 +408,10 @@ class StudyMentor {
             const now = new Date();
             const currentHour = now.getHours();
 
-            // Choose range based on time (Late-night mode starts at 8 PM)
+            // Choose range based on time
             const messages = currentHour >= 20 || currentHour < 5 ? lateMessages : earlyMessages;
 
-            // Randomize without repeating the same one twice in a row
+            // Randomize message
             let nextIndex;
             do {
                 nextIndex = Math.floor(Math.random() * messages.length);
@@ -400,19 +421,47 @@ class StudyMentor {
             const randomMsg = messages[nextIndex];
             const timeRemaining = getTimeRemainingStr();
 
+            // Randomize Theme
+            const themes = ['champion', 'focus', 'boss'];
+            const theme = themes[Math.floor(Math.random() * themes.length)];
+
             const teaser = document.getElementById('mentor-teaser');
+            const teaserBorder = document.getElementById('teaser-border');
+            const teaserContent = document.getElementById('teaser-content');
+            const teaserDecor = document.getElementById('teaser-decor');
+            const teaserEmoji = document.getElementById('teaser-emoji');
             const teaserText = document.getElementById('teaser-text');
             const badge = document.getElementById('mentor-badge');
 
             if (teaser && teaserText) {
                 this.isMotivationalNudgeActive = true;
+
+                // Clear and Apply Theme Classes
+                teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${theme}-border`;
+                teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-${theme}-bg`;
+                teaser.classList.add('animate-float');
+
+                // Apply Decorations
+                teaserDecor.innerHTML = '';
+                if (theme === 'champion') {
+                    teaserDecor.innerHTML = '<div class="champion-sweep"></div>';
+                    teaserEmoji.innerText = '🏆';
+                } else if (theme === 'focus') {
+                    teaserDecor.innerHTML = '<div class="focus-pulse"></div>';
+                    teaserEmoji.innerText = '⚡';
+                } else if (theme === 'boss') {
+                    teaserBorder.classList.add('boss-heartbeat');
+                    teaserEmoji.innerText = '💪';
+                }
+
                 teaserText.textContent = `${randomMsg} ${timeRemaining}`;
                 teaser.classList.remove('hidden');
                 badge?.classList.remove('hidden');
 
-                // Auto-hide after 15 seconds for these special nudges
+                // Auto-hide after 15 seconds
                 setTimeout(() => {
                     teaser.classList.add('hidden');
+                    teaser.classList.remove('animate-float');
                     this.isMotivationalNudgeActive = false;
                 }, 15000);
             }
