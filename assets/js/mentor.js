@@ -5,6 +5,7 @@ class StudyMentor {
     constructor() {
         this.isOpen = false;
         this.mentorData = null;
+        this.isInitialGreeting = false;
         this.init();
     }
 
@@ -12,7 +13,46 @@ class StudyMentor {
         this.createWidget();
         this.attachEventListeners();
         this.fetchMentorData();
+        this.showWelcomeGreeting();
     }
+
+    showWelcomeGreeting() {
+        const greetings = [
+            "পড়তে বস, বাইনচোদ, চাকরি না পেলে খাবি কি ?",
+            "বাপের, মায়ের অপমান এর শোধ লিতে হবে।",
+            "শাহেদ যদি BCS ক্যাডার হয় তুই কোন মুখে বাড়ির সামনে রাস্তায় হাটবি।",
+            "আরাফাত বলেছিলো , কালকে চাকরি তে যেতে হবে।",
+            "নিশা বলেসে তোর সময় দিয়ে কি করলি।",
+            "সোহান, তোকে দেখায় দিতেই হবে",
+
+        ];
+
+        const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+
+        this.isInitialGreeting = true;
+
+        // Show greeting in teaser after a short delay
+        setTimeout(() => {
+            const teaser = document.getElementById('mentor-teaser');
+            const teaserText = document.getElementById('teaser-text');
+            const badge = document.getElementById('mentor-badge');
+
+            if (teaser && teaserText && !this.isOpen) {
+                teaserText.innerText = randomGreeting;
+                teaser.classList.remove('hidden');
+                badge?.classList.remove('hidden');
+
+                // Hide teaser after 10 seconds
+                setTimeout(() => {
+                    teaser.classList.add('hidden');
+                    this.isInitialGreeting = false;
+                }, 10000);
+            } else {
+                this.isInitialGreeting = false;
+            }
+        }, 1500);
+    }
+
 
     createWidget() {
         const widget = document.createElement('div');
@@ -380,6 +420,9 @@ class StudyMentor {
         const badge = document.getElementById('mentor-badge');
         const teaser = document.getElementById('mentor-teaser');
         const teaserText = document.getElementById('teaser-text');
+
+        // Don't overwrite initial welcome greeting
+        if (this.isInitialGreeting) return;
 
         if (nudge && !this.isOpen) {
             badge?.classList.remove('hidden');
