@@ -939,7 +939,7 @@ class StudyMentor {
                         ${subjects.map(subject => {
                 const createdInfo = created.find(c => c.name === subject.name);
                 const takenInfo = taken.find(t => t.name === subject.name);
-                const sessionInfo = sessions.find(s => s.subject === subject.name);
+                const sessionInfo = sessions.find(s => s.subject.trim().toLowerCase() === subject.name.trim().toLowerCase());
                 const sessionsCount = sessionInfo ? sessionInfo.count : 0;
 
                 let statusIcon = '🔴';

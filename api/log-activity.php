@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (isset($data['type']) && isset($data['message'])) {
         $type = $conn->real_escape_string($data['type']);
-        $message = $conn->real_escape_string($data['message']);
+        $message = trim($conn->real_escape_string($data['message']));
         $details = isset($data['details']) ? $conn->real_escape_string(json_encode($data['details'])) : null;
         
         $sql = "INSERT INTO activity_log (activity_type, activity_message, activity_details, timestamp) VALUES (?, ?, ?, NOW())";

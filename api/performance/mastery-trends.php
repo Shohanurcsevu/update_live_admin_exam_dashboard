@@ -178,12 +178,9 @@ if ($daily_result) {
     }
 }
 
-$response['data']['daily_stats'] = [
-    'exams_created' => $exams_created,
-    'exams_taken' => $exams_taken,
-    'subjects_no_activity' => $subjects_no_activity,
-    'uncompleted_exams' => []
-];
+$response['data']['daily_stats']['exams_created'] = $exams_created;
+$response['data']['daily_stats']['exams_taken'] = $exams_taken;
+$response['data']['daily_stats']['subjects_no_activity'] = $subjects_no_activity;
 
 // --- GET SPECIFIC UNCOMPLETED EXAM TITLES ---
 $uncompleted_sql = "
@@ -234,11 +231,11 @@ if ($roadmap_result) {
 
 // --- POMODORO SESSIONS: Get counts for today ---
 $pomodoro_sql = "
-    SELECT activity_message as subject_name, COUNT(*) as session_count
+    SELECT TRIM(activity_message) as subject_name, COUNT(*) as session_count
     FROM activity_log
     WHERE activity_type = 'pomodoro_session'
     AND DATE(timestamp) = CURRENT_DATE
-    GROUP BY activity_message
+    GROUP BY TRIM(activity_message)
 ";
 
 $pomodoro_result = $conn->query($pomodoro_sql);
