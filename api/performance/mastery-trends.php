@@ -15,7 +15,8 @@ $response = [
             'exams_created' => [],
             'exams_taken' => [],
             'subjects_no_activity' => [],
-            'uncompleted_exams' => []
+            'uncompleted_exams' => [],
+            'pomodoro_sessions' => []
         ],
         'morning_roadmap' => []
     ]
@@ -227,6 +228,25 @@ if ($roadmap_result) {
         $response['data']['morning_roadmap'][] = [
             'subject' => $row['subject_name'],
             'accuracy' => round(floatval($row['avg_accuracy']), 1)
+        ];
+    }
+}
+
+// --- POMODORO SESSIONS: Get counts for today ---
+$pomodoro_sql = "
+    SELECT activity_message as subject_name, COUNT(*) as session_count
+    FROM activity_log
+    WHERE activity_type = 'pomodoro_session'
+    AND DATE(timestamp) = CURRENT_DATE
+    GROUP BY activity_message
+";
+
+$pomodoro_result = $conn->query($pomodoro_sql);
+if ($pomodoro_result) {
+    while ($row = $pomodoro_result->fetch_assoc()) {
+        $response['data']['daily_stats']['pomodoro_sessions'][] = [
+            'subject' => $row['subject_name'],
+            'count' => intval($row['session_count'])
         ];
     }
 }

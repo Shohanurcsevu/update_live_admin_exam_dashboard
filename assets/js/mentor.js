@@ -8,10 +8,17 @@ class StudyMentor {
         this.isInitialGreeting = false;
         this.isMotivationalNudgeActive = false;
         this.lastMessageIndex = -1;
+        this.focusSession = {
+            isActive: false,
+            timeRemaining: 25 * 60, // 25 minutes in seconds
+            subject: null,
+            intervalId: null
+        };
         this.init();
     }
 
     init() {
+        window.studyMentor = this; // Expose for onclick handlers
         this.createWidget();
         this.attachEventListeners();
         this.fetchMentorData();
@@ -21,7 +28,122 @@ class StudyMentor {
 
     isFocusModeActive() {
         const params = new URLSearchParams(window.location.search);
-        return params.get('page') === 'take-exam-interface';
+        return params.get('page') === 'take-exam-interface' || this.focusSession.isActive;
+    }
+
+    startFocusSession(subject) {
+        if (this.focusSession.isActive) return;
+
+        this.focusSession.isActive = true;
+        this.focusSession.subject = subject;
+        this.focusSession.timeRemaining = 25 * 60;
+        this.closePanel();
+
+        // Show intense Bos Mode Nudge to start
+        this.showFocusTeaser();
+
+        this.focusSession.intervalId = setInterval(() => {
+            this.focusSession.timeRemaining--;
+            this.updateFocusUI();
+
+            if (this.focusSession.timeRemaining <= 0) {
+                this.completeFocusSession();
+            }
+        }, 1000);
+    }
+
+    updateFocusUI() {
+        const teaserText = document.getElementById('teaser-text');
+        const badge = document.getElementById('mentor-badge');
+        const teaser = document.getElementById('mentor-teaser');
+
+        if (teaser && teaserText) {
+            const minutes = Math.floor(this.focusSession.timeRemaining / 60);
+            const seconds = this.focusSession.timeRemaining % 60;
+            const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            teaser.classList.remove('hidden');
+            badge?.classList.remove('hidden');
+
+            // Force Boss Theme Visuals for Timer
+            this.applyTimerTheme();
+
+            teaserText.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Focusing: ${this.focusSession.subject}</span>
+                    <span class="text-3xl font-black">${timeStr}</span>
+                    <button onclick="studyMentor.stopFocusSession()" class="mt-2 text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter">Cancel Session</button>
+                </div>
+            `;
+        }
+    }
+
+    applyTimerTheme() {
+        const teaserBorder = document.getElementById('teaser-border');
+        const teaserContent = document.getElementById('teaser-content');
+        const teaserDecor = document.getElementById('teaser-decor');
+        const teaserEmoji = document.getElementById('teaser-emoji');
+
+        if (teaserBorder) teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-boss-border boss-heartbeat`;
+        if (teaserContent) teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-boss-bg`;
+        if (teaserDecor) teaserDecor.innerHTML = '<div class="boss-heartbeat"></div>';
+        if (teaserEmoji) teaserEmoji.innerText = '⏱️';
+    }
+
+    showFocusTeaser() {
+        // Initial "GO!" message
+        const teaser = document.getElementById('mentor-teaser');
+        if (teaser) teaser.classList.remove('hidden');
+    }
+
+    completeFocusSession() {
+        clearInterval(this.focusSession.intervalId);
+        const completedSubject = this.focusSession.subject;
+        this.focusSession.isActive = false;
+
+        // Log completion to backend
+        fetch('api/log-activity.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'pomodoro_session',
+                message: completedSubject,
+                details: { duration: 25, timestamp: new Date().toISOString() }
+            })
+        }).then(() => this.fetchMentorData()); // Refresh to update counts
+
+        // Celebrate!
+        if (typeof confetti !== 'undefined') {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        const teaserText = document.getElementById('teaser-text');
+        if (teaserText) {
+            teaserText.innerHTML = `
+                <div class="text-center">
+                    <p class="text-xs font-black uppercase text-yellow-400 mb-1">VICTORY!</p>
+                    <p class="text-sm font-bold">Sohan, you dominated ${this.focusSession.subject}! 25 minutes of pure focus.</p>
+                    <p class="text-[10px] mt-2 opacity-80">REST 5 mins, then GO AGAIN!</p>
+                </div>
+            `;
+        }
+
+        // Keep celebration for 10 seconds then reset
+        setTimeout(() => {
+            const teaser = document.getElementById('mentor-teaser');
+            if (teaser && !this.isOpen) teaser.classList.add('hidden');
+        }, 10000);
+    }
+
+    stopFocusSession() {
+        clearInterval(this.focusSession.intervalId);
+        this.focusSession.isActive = false;
+        const teaser = document.getElementById('mentor-teaser');
+        if (teaser) teaser.classList.add('hidden');
     }
 
     showWelcomeGreeting() {
@@ -735,6 +857,7 @@ class StudyMentor {
             const subjects = this.mentorData.subjects;
             const created = this.mentorData.daily_stats?.exams_created || [];
             const taken = this.mentorData.daily_stats?.exams_taken || [];
+            const sessions = this.mentorData.daily_stats?.pomodoro_sessions || [];
 
             recommendationsHTML += `
                 <div class="mb-4">
@@ -743,6 +866,8 @@ class StudyMentor {
                         ${subjects.map(subject => {
                 const createdInfo = created.find(c => c.name === subject.name);
                 const takenInfo = taken.find(t => t.name === subject.name);
+                const sessionInfo = sessions.find(s => s.subject === subject.name);
+                const sessionsCount = sessionInfo ? sessionInfo.count : 0;
 
                 let statusIcon = '🔴';
                 let statusLabel = 'Ignored';
@@ -764,9 +889,19 @@ class StudyMentor {
                                 <div class="flex items-center justify-between bg-gray-50 border border-gray-100 p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
                                     <div class="flex items-center gap-2">
                                         <span class="text-xs">${statusIcon}</span>
-                                        <span class="text-sm font-semibold text-gray-800">${subject.name}</span>
+                                        <div class="flex flex-col">
+                                            <span class="text-sm font-semibold text-gray-800">${subject.name}</span>
+                                            ${sessionsCount > 0 ? `<span class="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">⏱️ ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'} today</span>` : ''}
+                                        </div>
                                     </div>
-                                    <span class="text-[9px] font-black uppercase tracking-tighter ${statusColor}">${statusLabel}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[9px] font-black uppercase tracking-tighter ${statusColor}">${statusLabel}</span>
+                                        <button onclick="studyMentor.startFocusSession('${subject.name}')" 
+                                            class="flex items-center justify-center ${statusLabel === 'Conquered' ? 'bg-green-50 text-green-600' : 'bg-indigo-50 text-indigo-600'} p-1.5 rounded-lg hover:brightness-95 transition-all"
+                                            title="${statusLabel === 'Conquered' ? 'Start Bonus Focus Session' : 'Start 25m Focus Session'}">
+                                            <span class="material-symbols-outlined text-sm">timer</span>
+                                        </button>
+                                    </div>
                                 </div>
                             `;
             }).join('')}
