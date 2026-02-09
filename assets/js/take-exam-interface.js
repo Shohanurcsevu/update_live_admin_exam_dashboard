@@ -235,7 +235,8 @@ function initializeTakeExamInterface() {
     function scrollToQuestion(id) {
         if (!id) return;
         const el = document.getElementById(`question-${id}`);
-        if (!el) return;
+        const mainContent = document.getElementById('main-content');
+        if (!el || !mainContent) return;
 
         const navSidebar = document.getElementById('navigator-sidebar');
         if (navSidebar && window.innerWidth < 768) {
@@ -243,9 +244,18 @@ function initializeTakeExamInterface() {
             navSidebar.classList.remove('translate-y-0');
         }
 
-        const delay = window.innerWidth < 768 ? 300 : 0;
+        const delay = window.innerWidth < 768 ? 200 : 0;
         setTimeout(() => {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Manual calculation of scroll position relative to the scroll container
+            const containerRect = mainContent.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            // Calculate where el is relative to mainContent's current scroll
+            const scrollTarget = (elRect.top - containerRect.top) + mainContent.scrollTop - 20;
+
+            mainContent.scrollTo({
+                top: scrollTarget,
+                behavior: 'smooth'
+            });
         }, delay);
     }
     window.scrollToQuestion = scrollToQuestion;
