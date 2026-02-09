@@ -1141,12 +1141,16 @@ class StudyMentor {
             const taken = this.mentorData.daily_stats?.exams_taken || [];
 
             const missionRoadmap = subjects.map(subj => {
-                const createdInfo = created.find(c => c.name === subj.name);
-                const takenInfo = taken.find(t => t.name === subj.name);
-                const isCreated = createdInfo && createdInfo.count > 0;
-                const isTaken = takenInfo && takenInfo.count > 0;
+                const todayExams = subj.today_exams || [];
+                const isCreated = todayExams.length > 0;
+                const isTaken = isCreated && todayExams.every(exam => exam.is_completed);
+
                 // Find AI Progression/Revision Advice
                 const advice = (this.mentorData.mentor_advice || []).find(a => a.subject === subj.name);
+
+                // Mastery Level Logic
+                const accuracy = subj.this_week || 0;
+                const mastery = accuracy >= 80 ? 'gold' : accuracy >= 50 ? 'silver' : 'bronze';
 
                 return {
                     name: subj.name,
@@ -1154,6 +1158,8 @@ class StudyMentor {
                     isTaken,
                     target_topic: advice ? advice.target_topic : null,
                     target_type: advice ? advice.type : null,
+                    mastery,
+                    accuracy,
                     today_exams: subj.today_exams || [],
                     status: (isCreated && isTaken) ? 'success' : (isCreated ? 'pending_take' : 'pending_create')
                 };
@@ -1228,6 +1234,16 @@ class StudyMentor {
                                                                 <span class="material-symbols-outlined text-[10px]">${item.isTaken ? 'check_circle' : 'circle'}</span> Taken
                                                             </span>
                                                         </div>
+                                                        <div class="flex items-center gap-2 mt-0.5">
+                                                            <span class="material-symbols-outlined text-[14px] ${item.mastery === 'gold' ? 'text-yellow-400' : item.mastery === 'silver' ? 'text-slate-300' : 'text-orange-600'} drop-shadow-[0_0_5px_rgba(var(--badge-glow),0.5)]" 
+                                                                  style="--badge-glow: ${item.mastery === 'gold' ? '250,204,21' : item.mastery === 'silver' ? '203,213,225' : '234,88,12'}"
+                                                                  title="${item.mastery.toUpperCase()} Mastery (${Math.round(item.accuracy)}%)">
+                                                                military_tech
+                                                            </span>
+                                                            <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${item.name}')" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-indigo-400 hover:text-indigo-300 transition-colors" title="Start Focus Session">
+                                                                <span class="material-symbols-outlined text-[12px]">timer</span> Start Focus
+                                                            </button>
+                                                        </div>
                                                         ${item.target_topic ? `
                                                             <div class="flex">
                                                                 <span class="flex items-center gap-1 text-[7px] font-black uppercase tracking-tighter ${item.target_type === 'progression' ? 'text-blue-300' : 'text-yellow-400'} px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
@@ -1235,26 +1251,28 @@ class StudyMentor {
                                                                 </span>
                                                             </div>
                                                         ` : ''}
+
+                                                        <div class="flex items-center gap-3 mt-1.5 pt-1.5 border-t border-white/5">
+                                                            ${item.status === 'pending_create' ? `
+                                                                <button onclick="event.stopPropagation(); window.location.href='https://bcspreli.free.nf/?page=exam'" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-indigo-400 hover:text-indigo-300 transition-colors">
+                                                                    <span class="material-symbols-outlined text-[12px]">add_circle</span> Create: ${item.target_topic ? item.target_topic.split(' ')[0] : 'Exam'}
+                                                                </button>
+                                                            ` : item.status === 'pending_take' ? `
+                                                                <button onclick="event.stopPropagation(); window.loadPage('take-exam-list')" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-yellow-500 hover:text-yellow-400 transition-colors animate-pulse-subtle">
+                                                                    <span class="material-symbols-outlined text-[12px]">play_circle</span> Take Now
+                                                                </button>
+                                                            ` : `
+                                                                <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-green-400">
+                                                                    <span class="material-symbols-outlined text-[12px]">check_circle</span> Mission Completed
+                                                                </span>
+                                                            `}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
-                                                <button onclick="studyMentor.startFocusSession('${item.name}')" class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40 transition-all group/focus" title="Start Focus Session">
-                                                    <span class="material-symbols-outlined text-lg group-hover/focus:scale-110 transition-transform">timer</span>
-                                                </button>
-
-                                                ${item.status === 'pending_create' ? `
-                                                    <button onclick="window.location.href='https://bcspreli.free.nf/?page=exam'" class="text-[8px] font-black uppercase bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1.5 rounded-lg transition-all min-w-[100px]">
-                                                        Create: ${item.target_topic ? item.target_topic.split(' ')[0] : 'Exam'}
-                                                    </button>
-                                                ` : item.status === 'pending_take' ? `
-                                                    <button onclick="window.loadPage('take-exam-list')" class="text-[8px] font-black uppercase bg-yellow-600 hover:bg-yellow-500 text-white px-2 py-1.5 rounded-lg transition-all animate-pulse-subtle">
-                                                        Take Now
-                                                    </button>
-                                                ` : `
-                                                    <span class="text-green-400 text-sm">✅</span>
-                                                `}
+                                            <div class="flex items-start pt-1" onclick="event.stopPropagation()">
+                                                <span class="material-symbols-outlined text-gray-500 text-sm opacity-50">more_vert</span>
                                             </div>
                                         </div>
 
