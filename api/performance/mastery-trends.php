@@ -138,47 +138,45 @@ if ($total_result) {
 $response['data']['subjects'] = $subjects;
 $response['data']['insights'] = $insights;
 
-// 3. AI Mentor: Identify weak topics for personalized recommendations
+// 3. AI Mentor: Progression & Revision Advice
 $mentor_advice = [];
 foreach ($subjects as $subject) {
-    $this_week = $subject['this_week'];
-    $last_week = $subject['last_week'];
+    $subject_id = $subject['id'];
     
-    // Only analyze subjects with recent activity and performance issues
-    if ($this_week !== null && ($this_week < 70 || ($last_week !== null && ($this_week - $last_week) <= -10))) {
-        // Find the weakest topic in this subject
-        $weak_topic_sql = "
-            SELECT 
-                t.topic_name,
-                AVG((p.score_with_negative / e.total_marks) * 100) as topic_accuracy,
-                COUNT(p.id) as attempt_count
-            FROM topics t
-            JOIN exams e ON t.id = e.topic_id
-            JOIN performance p ON e.id = p.exam_id
-            JOIN subjects s ON e.subject_id = s.id
-            WHERE s.subject_name = ?
-            AND s.is_deleted = 0
-            AND p.attempt_time >= DATE_SUB(CURRENT_DATE, INTERVAL 14 DAY)
-            GROUP BY t.id, t.topic_name
-            HAVING attempt_count >= 1
-            ORDER BY topic_accuracy ASC
-            LIMIT 1
-        ";
+    // Logic: 
+    // 1. First, look for a topic that has NEVER been tested today or ever (Progression)
+    // 2. If all topics have tests, look for the weakest one (Revision)
+    
+    $progression_sql = "
+        SELECT 
+            t.topic_name,
+            COUNT(e.id) as exam_count,
+            AVG((p.score_with_negative / e.total_marks) * 100) as topic_accuracy
+        FROM topics t
+        LEFT JOIN exams e ON t.id = e.topic_id AND e.is_deleted = 0
+        LEFT JOIN performance p ON e.id = p.exam_id
+        WHERE t.subject_id = ?
+        GROUP BY t.id, t.topic_name
+        ORDER BY exam_count ASC, topic_accuracy ASC
+        LIMIT 1
+    ";
+    
+    $stmt = $conn->prepare($progression_sql);
+    $stmt->bind_param("i", $subject_id);
+    $stmt->execute();
+    $topic_result = $stmt->get_result();
+    
+    if ($topic_row = $topic_result->fetch_assoc()) {
+        $exam_count = (int)$topic_row['exam_count'];
+        $accuracy = $topic_row['topic_accuracy'] !== null ? round(floatval($topic_row['topic_accuracy']), 1) : null;
         
-        $stmt = $conn->prepare($weak_topic_sql);
-        $stmt->bind_param("s", $subject['name']);
-        $stmt->execute();
-        $topic_result = $stmt->get_result();
-        
-        if ($topic_row = $topic_result->fetch_assoc()) {
-            $mentor_advice[] = [
-                'subject' => $subject['name'],
-                'weak_topic' => $topic_row['topic_name'],
-                'topic_accuracy' => round(floatval($topic_row['topic_accuracy']), 1),
-                'current_accuracy' => $this_week,
-                'priority' => $this_week < 60 ? 'high' : 'medium'
-            ];
-        }
+        $mentor_advice[] = [
+            'subject' => $subject['name'],
+            'target_topic' => $topic_row['topic_name'],
+            'type' => ($exam_count === 0) ? 'progression' : 'revision',
+            'accuracy' => $accuracy,
+            'exam_count' => $exam_count
+        ];
     }
 }
 

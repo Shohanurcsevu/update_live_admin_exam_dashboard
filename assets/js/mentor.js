@@ -1114,13 +1114,15 @@ class StudyMentor {
                 const takenInfo = taken.find(t => t.name === subj.name);
                 const isCreated = createdInfo && createdInfo.count > 0;
                 const isTaken = takenInfo && takenInfo.count > 0;
-                const accuracy = subj.this_week; // Use this week's accuracy for guidance
+                // Find AI Progression/Revision Advice
+                const advice = (this.mentorData.mentor_advice || []).find(a => a.subject === subj.name);
 
                 return {
                     name: subj.name,
                     isCreated,
                     isTaken,
-                    accuracy,
+                    target_topic: advice ? advice.target_topic : null,
+                    target_type: advice ? advice.type : null,
                     today_exams: subj.today_exams || [],
                     status: (isCreated && isTaken) ? 'success' : (isCreated ? 'pending_take' : 'pending_create')
                 };
@@ -1182,21 +1184,30 @@ class StudyMentor {
                                                         <span class="text-xs font-bold text-gray-200 break-words">${item.name}</span>
                                                         <span class="text-gray-500 text-[10px] transition-transform" id="mission-arrow-${index}">▼</span>
                                                     </div>
-                                                    <div class="flex items-center gap-3 mt-1">
-                                                        <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isCreated ? 'text-green-400' : 'text-gray-500'}">
-                                                            <span class="material-symbols-outlined text-[10px]">${item.isCreated ? 'check_circle' : 'circle'}</span> Created
-                                                        </span>
-                                                        <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isTaken ? 'text-blue-400' : 'text-gray-500'}">
-                                                            <span class="material-symbols-outlined text-[10px]">${item.isTaken ? 'check_circle' : 'circle'}</span> Taken
-                                                        </span>
+                                                    <div class="flex flex-col gap-1 mt-1">
+                                                        <div class="flex items-center gap-3">
+                                                            <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isCreated ? 'text-green-400' : 'text-gray-500'}">
+                                                                <span class="material-symbols-outlined text-[10px]">${item.isCreated ? 'check_circle' : 'circle'}</span> Created
+                                                            </span>
+                                                            <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isTaken ? 'text-blue-400' : 'text-gray-500'}">
+                                                                <span class="material-symbols-outlined text-[10px]">${item.isTaken ? 'check_circle' : 'circle'}</span> Taken
+                                                            </span>
+                                                        </div>
+                                                        ${item.target_topic ? `
+                                                            <div class="flex">
+                                                                <span class="flex items-center gap-1 text-[7px] font-black uppercase tracking-tighter ${item.target_type === 'progression' ? 'text-blue-300' : 'text-yellow-400'} px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
+                                                                    🎯 ${item.target_type === 'progression' ? 'New Coverage' : 'Revision Focus'}: ${item.target_topic}
+                                                                </span>
+                                                            </div>
+                                                        ` : ''}
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div class="flex items-center gap-2" onclick="event.stopPropagation()">
                                                 ${item.status === 'pending_create' ? `
-                                                    <button onclick="window.location.href='https://bcspreli.free.nf/?page=exam'" class="text-[8px] font-black uppercase bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1.5 rounded-lg transition-all">
-                                                        Create Exam
+                                                    <button onclick="window.location.href='https://bcspreli.free.nf/?page=exam'" class="text-[8px] font-black uppercase bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1.5 rounded-lg transition-all min-w-[100px]">
+                                                        Create: ${item.target_topic ? item.target_topic.split(' ')[0] : 'Exam'}
                                                     </button>
                                                 ` : item.status === 'pending_take' ? `
                                                     <button onclick="window.loadPage('take-exam-list')" class="text-[8px] font-black uppercase bg-yellow-600 hover:bg-yellow-500 text-white px-2 py-1.5 rounded-lg transition-all animate-pulse-subtle">
