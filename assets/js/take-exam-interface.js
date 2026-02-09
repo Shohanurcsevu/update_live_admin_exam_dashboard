@@ -208,12 +208,12 @@ function initializeTakeExamInterface() {
         if (!el) return;
 
         const navSidebar = document.getElementById('navigator-sidebar');
-        if (navSidebar && window.innerWidth < 1024) {
+        if (navSidebar && window.innerWidth < 768) {
             navSidebar.classList.add('translate-x-full', 'pointer-events-none');
             navSidebar.classList.remove('translate-x-0', 'pointer-events-auto');
         }
 
-        const delay = window.innerWidth < 1024 ? 300 : 0;
+        const delay = window.innerWidth < 768 ? 300 : 0;
         setTimeout(() => {
             el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, delay);

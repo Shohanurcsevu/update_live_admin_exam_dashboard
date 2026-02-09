@@ -1,7 +1,7 @@
 <div id="toast-container" class="fixed top-5 right-5 z-[210]"></div>
 
 <div class="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
-    <div class="flex flex-col lg:flex-row gap-6">
+    <div class="flex flex-col md:flex-row gap-6">
         <!-- Main Exam Area -->
         <div id="exam-container" class="flex-grow bg-white p-2 sm:p-6 rounded-lg shadow-md sm:pb-6">
             <!-- Header -->
@@ -26,7 +26,7 @@
 
             <!-- Sticky Timer Wrapper for Mobile -->
             <div
-                class="sticky top-0 z-40 bg-white/80 backdrop-blur-md -mx-2 px-2 py-2 mb-4 lg:static lg:bg-transparent lg:backdrop-blur-none lg:mx-0 lg:px-0 lg:py-0 lg:mb-6 lg:z-auto">
+                class="sticky top-0 z-40 bg-white/80 backdrop-blur-md -mx-2 px-2 py-2 mb-4 md:static md:bg-transparent md:backdrop-blur-none md:mx-0 md:px-0 md:py-0 md:mb-6 md:z-auto">
                 <!-- Timer and Instructions -->
                 <div
                     class="flex flex-col sm:flex-row justify-between items-center p-4 rounded-xl bg-blue-50 border border-blue-200 gap-4 shadow-sm">
@@ -53,11 +53,11 @@
             </div>
 
             <!-- Spacer DIV for mobile view -->
-            <div class="h-24 lg:hidden"></div>
+            <div class="h-24 md:hidden"></div>
 
             <!-- Submission Footer (Sticky on Mobile) -->
             <div
-                class="fixed bottom-0 left-0 right-0 w-full bg-white p-4 border-t border-gray-200 shadow-[0_-2px_5px_rgba(0,0,0,0.05)] lg:relative lg:bg-transparent lg:p-0 lg:mt-10 lg:border-0 lg:shadow-none flex justify-center lg:justify-end">
+                class="fixed bottom-0 left-0 right-0 w-full bg-white p-4 border-t border-gray-200 shadow-[0_-2px_5px_rgba(0,0,0,0.05)] md:relative md:bg-transparent md:p-0 md:mt-10 md:border-0 md:shadow-none flex justify-center md:justify-end">
                 <button id="submit-exam-btn"
                     class="w-full max-w-xs sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-10 rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-95">
                     <span class="material-symbols-outlined mr-2">check_circle</span>
@@ -68,18 +68,18 @@
 
         <!-- Question Navigator Sidebar / Mobile Drawer -->
         <aside id="navigator-sidebar"
-            class="fixed inset-0 z-[80] transform translate-x-full transition-transform duration-300 pointer-events-none lg:pointer-events-auto lg:relative lg:translate-x-0 lg:inset-auto lg:z-auto lg:w-72 flex-shrink-0">
+            class="fixed inset-0 z-[80] transform translate-x-full transition-transform duration-300 pointer-events-none md:pointer-events-auto md:sticky md:top-6 lg:top-8 md:h-[calc(100vh-100px)] md:translate-x-0 md:inset-auto md:z-auto md:w-64 lg:w-72 flex-shrink-0">
             <!-- Mobile Overlay Background -->
-            <div id="nav-overlay" class="absolute inset-0 bg-black/50 lg:hidden"></div>
+            <div id="nav-overlay" class="absolute inset-0 bg-black/50 md:hidden"></div>
 
             <div
-                class="relative h-full lg:h-auto bg-white p-5 lg:rounded-xl shadow-2xl lg:shadow-md border border-gray-100 flex flex-col w-4/5 ml-auto lg:w-full">
+                class="relative h-full md:h-auto max-h-full bg-white p-5 md:rounded-xl shadow-2xl md:shadow-md border border-gray-100 flex flex-col w-4/5 ml-auto md:w-full overflow-hidden">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-bold text-gray-800 flex items-center">
                         <span class="material-symbols-outlined mr-2 text-blue-600">grid_view</span>
                         Navigator
                     </h3>
-                    <button id="close-nav-btn" class="lg:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-full">
+                    <button id="close-nav-btn" class="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-full">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
@@ -110,7 +110,7 @@
 
 <!-- Floating Action Button for Navigator (Mobile Only) -->
 <button id="open-nav-btn"
-    class="lg:hidden fixed bottom-24 right-6 z-[85] bg-blue-600 text-white p-4 rounded-full shadow-2xl active:scale-95 transition-transform flex items-center justify-center">
+    class="md:hidden fixed bottom-24 right-6 z-[85] bg-blue-600 text-white p-4 rounded-full shadow-2xl active:scale-95 transition-transform flex items-center justify-center">
     <span class="material-symbols-outlined">grid_view</span>
 </button>
 
