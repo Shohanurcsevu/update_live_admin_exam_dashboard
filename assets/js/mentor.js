@@ -1213,7 +1213,7 @@ class StudyMentor {
                 return `
                                     <div class="mb-2 last:mb-0">
                                         <div class="flex items-start justify-between p-2.5 rounded-xl border ${statusClass} transition-all cursor-pointer hover:bg-white/5" onclick="studyMentor.toggleMissionSubject(${index})">
-                                            <div class="flex items-start gap-3 flex-1 min-w-0">
+                                            <div class="flex items-start gap-3 flex-1 min-w-0 pr-2">
                                                 <div class="flex flex-col">
                                                     <div class="flex items-center gap-2">
                                                         <span class="text-xs font-bold text-gray-200 break-words">${item.name}</span>
@@ -1239,7 +1239,11 @@ class StudyMentor {
                                                 </div>
                                             </div>
 
-                                            <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                                            <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
+                                                <button onclick="studyMentor.startFocusSession('${item.name}')" class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40 transition-all group/focus" title="Start Focus Session">
+                                                    <span class="material-symbols-outlined text-lg group-hover/focus:scale-110 transition-transform">timer</span>
+                                                </button>
+
                                                 ${item.status === 'pending_create' ? `
                                                     <button onclick="window.location.href='https://bcspreli.free.nf/?page=exam'" class="text-[8px] font-black uppercase bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1.5 rounded-lg transition-all min-w-[100px]">
                                                         Create: ${item.target_topic ? item.target_topic.split(' ')[0] : 'Exam'}
