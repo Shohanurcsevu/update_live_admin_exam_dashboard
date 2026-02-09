@@ -1484,119 +1484,7 @@ class StudyMentor {
             }
         }
 
-        // --- NEW: Subject Discipline Badges Section (Collapsible with Exams) ---
-        if (this.mentorData.subjects) {
-            const subjects = this.mentorData.subjects;
-            const created = this.mentorData.daily_stats?.exams_created || [];
-            const taken = this.mentorData.daily_stats?.exams_taken || [];
-            const sessions = this.mentorData.daily_stats?.pomodoro_sessions || [];
 
-            recommendationsHTML += `
-                <div class="mb-4">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">Subject Discipline (${subjects.length} Subjects)</p>
-                    <div class="grid grid-cols-1 gap-3 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
-                        ${subjects.map((subject, index) => {
-                const createdInfo = created.find(c => c.name === subject.name);
-                const takenInfo = taken.find(t => t.name === subject.name);
-                const sessionInfo = sessions.find(s => s.subject.trim().toLowerCase() === subject.name.trim().toLowerCase());
-                const sessionsCount = sessionInfo ? sessionInfo.count : 0;
-                const todayExams = subject.today_exams || [];
-
-                let statusIcon = 'radio_button_unchecked';
-                let statusLabel = 'Ignored';
-                let statusColor = 'text-red-500';
-                let statusBg = 'bg-red-50';
-
-                if (createdInfo) {
-                    if (takenInfo && takenInfo.count >= createdInfo.count) {
-                        statusIcon = 'check_circle';
-                        statusLabel = 'Conquered';
-                        statusColor = 'text-green-500';
-                        statusBg = 'bg-green-50';
-                    } else {
-                        statusIcon = 'pending';
-                        statusLabel = 'InProgress';
-                        statusColor = 'text-yellow-600';
-                        statusBg = 'bg-yellow-50';
-                    }
-                }
-
-                return `
-                    <div class="bg-white/60 border border-gray-100 rounded-2xl overflow-hidden hover:bg-white/80 transition-all shadow-sm">
-                        <!-- Subject Header -->
-                        <div class="flex items-start gap-3 p-4 cursor-pointer" onclick="studyMentor.toggleSubjectExams(${index})">
-                            <div class="${statusBg} p-2.5 rounded-xl flex-shrink-0">
-                                <span class="material-symbols-outlined ${statusColor} text-xl">${statusIcon}</span>
-                            </div>
-                            
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-start justify-between">
-                                    <div class="flex items-start gap-2">
-                                        <p class="text-xs font-bold text-gray-900 uppercase tracking-wider break-words">${subject.name}</p>
-                                        ${todayExams.length > 0 ? `<span class="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold whitespace-nowrap mt-0.5">${todayExams.length} Today</span>` : ''}
-                                    </div>
-                                    <span class="text-gray-300 text-xs transition-transform" id="subject-arrow-${index}">▼</span>
-                                </div>
-                                
-                                <div class="flex items-center gap-3 mt-1.5 flex-wrap">
-                                    <span class="text-[10px] uppercase font-black tracking-tighter ${statusColor}">${statusLabel}</span>
-                                    ${sessionsCount > 0 ? `<span class="text-[10px] text-indigo-500 font-bold uppercase tracking-tight flex items-center gap-1">⏱️ ${sessionsCount} Sessions</span>` : ''}
-                                </div>
-
-                                <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${subject.name}')" 
-                                    class="mt-3 text-[11px] font-bold text-indigo-600 flex items-center gap-1 hover:underline group">
-                                    Start Focus Session 
-                                    <span class="material-symbols-outlined text-[14px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Exams List (Collapsible) -->
-                        <div id="subject-exams-${index}" class="hidden border-t border-gray-100 bg-gray-50/50 p-4 space-y-3">
-                            ${todayExams.length > 0 ? `
-                                ${todayExams.map(exam => `
-                                    <div class="bg-white border ${exam.is_completed ? 'border-green-100' : 'border-gray-200'} rounded-xl p-3 shadow-sm hover:shadow-md transition-all flex items-start gap-3">
-                                        <div class="${exam.is_completed ? 'bg-green-50' : 'bg-gray-100'} p-2 rounded-lg flex-shrink-0">
-                                            <span class="material-symbols-outlined ${exam.is_completed ? 'text-green-500' : 'text-gray-400'} text-lg">
-                                                ${exam.is_completed ? 'check_circle' : 'edit_document'}
-                                            </span>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-2">
-                                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-tighter">${subject.name}</p>
-                                                ${exam.is_completed ? '<span class="text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase">Done</span>' : ''}
-                                            </div>
-                                            <p class="text-sm font-bold text-gray-800 mt-0.5 break-words">${exam.title}</p>
-                                            
-                                            <div class="flex items-center gap-2 mt-1 text-[10px] text-gray-500 font-medium">
-                                                <span class="flex items-center gap-1">📊 ${exam.total_marks} Marks</span>
-                                                ${exam.is_completed ? `
-                                                    <span class="text-gray-200">|</span> 
-                                                    <span class="text-green-600 font-bold">Score: ${exam.best_score}/${exam.total_marks}</span>
-                                                ` : ''}
-                                                ${exam.attempt_count > 1 ? `<span class="text-gray-200">|</span> <span>${exam.attempt_count} Attempts</span>` : ''}
-                                            </div>
-                                            
-                                            <button onclick="studyMentor.startExam(${exam.id})" class="mt-2 text-xs font-bold ${exam.is_completed ? 'text-green-600' : 'text-indigo-600'} flex items-center gap-1 hover:underline group">
-                                                ${exam.is_completed ? 'Retake Exam' : 'Take Exam'} 
-                                                <span class="material-symbols-outlined text-xs group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            ` : `
-                                <div class="py-2 text-center">
-                                    <p class="text-[10px] text-gray-400 italic">No exams created for this subject today</p>
-                                </div>
-                            `}
-                        </div>
-                    </div>
-                `;
-            }).join('')}
-                    </div>
-                </div>
-            `;
-        }
 
         if (mentor_advice && mentor_advice.length > 0) {
             recommendationsHTML += mentor_advice.map(advice => {
@@ -1804,15 +1692,7 @@ class StudyMentor {
         }
     }
 
-    toggleSubjectExams(index) {
-        const examsDiv = document.getElementById(`subject-exams-${index}`);
-        const arrow = document.getElementById(`subject-arrow-${index}`);
 
-        if (examsDiv && arrow) {
-            examsDiv.classList.toggle('hidden');
-            arrow.style.transform = examsDiv.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
-        }
-    }
 
     toggleRevisionSubject(index) {
         const examsDiv = document.getElementById(`revision-exams-${index}`);
