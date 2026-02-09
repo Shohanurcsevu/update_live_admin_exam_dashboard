@@ -1142,8 +1142,10 @@ class StudyMentor {
 
             const missionRoadmap = subjects.map(subj => {
                 const todayExams = subj.today_exams || [];
-                const isCreated = todayExams.length > 0;
-                const isTaken = isCreated && todayExams.every(exam => exam.is_completed);
+                const totalCount = todayExams.length;
+                const completedCount = todayExams.filter(exam => exam.is_completed).length;
+                const isCreated = totalCount > 0;
+                const isTaken = isCreated && totalCount === completedCount;
 
                 // Find AI Progression/Revision Advice
                 const advice = (this.mentorData.mentor_advice || []).find(a => a.subject === subj.name);
@@ -1156,11 +1158,13 @@ class StudyMentor {
                     name: subj.name,
                     isCreated,
                     isTaken,
+                    totalCount,
+                    completedCount,
                     target_topic: advice ? advice.target_topic : null,
                     target_type: advice ? advice.type : null,
                     mastery,
                     accuracy,
-                    today_exams: subj.today_exams || [],
+                    today_exams: todayExams,
                     status: (isCreated && isTaken) ? 'success' : (isCreated ? 'pending_take' : 'pending_create')
                 };
             });
@@ -1226,13 +1230,26 @@ class StudyMentor {
                                                         <span class="text-gray-500 text-[10px] transition-transform" id="mission-arrow-${index}">▼</span>
                                                     </div>
                                                     <div class="flex flex-col gap-1 mt-1">
-                                                        <div class="flex items-center gap-3">
-                                                            <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isCreated ? 'text-green-400' : 'text-gray-500'}">
-                                                                <span class="material-symbols-outlined text-[10px]">${item.isCreated ? 'check_circle' : 'circle'}</span> Created
-                                                            </span>
-                                                            <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isTaken ? 'text-blue-400' : 'text-gray-500'}">
-                                                                <span class="material-symbols-outlined text-[10px]">${item.isTaken ? 'check_circle' : 'circle'}</span> Taken
-                                                            </span>
+                                                        <div class="flex flex-col gap-1.5">
+                                                            <div class="flex items-center gap-3">
+                                                                <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isCreated ? 'text-green-400' : 'text-gray-500'}">
+                                                                    <span class="material-symbols-outlined text-[10px]">${item.isCreated ? 'check_circle' : 'circle'}</span> Created
+                                                                </span>
+                                                                <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isTaken ? 'text-blue-400' : 'text-gray-500'}">
+                                                                    <span class="material-symbols-outlined text-[10px]">${item.isTaken ? 'check_circle' : 'circle'}</span> Taken
+                                                                </span>
+                                                            </div>
+                                                            ${item.totalCount > 0 ? `
+                                                                <div class="flex flex-col gap-1 mb-1">
+                                                                    <div class="flex justify-between items-center text-[7px] font-black uppercase tracking-tighter text-gray-400">
+                                                                        <span>Progress</span>
+                                                                        <span>${item.completedCount}/${item.totalCount} Completed</span>
+                                                                    </div>
+                                                                    <div class="h-1 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                                                        <div class="h-full ${item.isTaken ? 'bg-green-400' : 'bg-indigo-500'} transition-all duration-700" style="width: ${(item.completedCount / item.totalCount) * 100}%"></div>
+                                                                    </div>
+                                                                </div>
+                                                            ` : ''}
                                                         </div>
                                                         <div class="flex items-center gap-2 mt-0.5">
                                                             <span class="material-symbols-outlined text-[14px] ${item.mastery === 'gold' ? 'text-yellow-400' : item.mastery === 'silver' ? 'text-slate-300' : 'text-orange-600'} drop-shadow-[0_0_5px_rgba(var(--badge-glow),0.5)]" 
