@@ -103,6 +103,40 @@ class StudyMentor {
         if (teaser) teaser.classList.remove('hidden');
     }
 
+    showCustomNudge({ title, message, icon = '🎯', theme = 'boss' }) {
+        const teaser = document.getElementById('mentor-teaser');
+        const teaserBorder = document.getElementById('teaser-border');
+        const teaserContent = document.getElementById('teaser-content');
+        const teaserDecor = document.getElementById('teaser-decor');
+        const teaserEmoji = document.getElementById('teaser-emoji');
+        const teaserText = document.getElementById('teaser-text');
+        const badge = document.getElementById('mentor-badge');
+
+        if (teaser && teaserText) {
+            // Apply theme
+            teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${theme}-border`;
+            teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-${theme}-bg`;
+
+            // Set emoji and text
+            if (teaserEmoji) teaserEmoji.innerText = icon;
+            teaserText.innerHTML = `
+                <div class="text-center">
+                    <p class="text-xs font-black uppercase text-yellow-400 mb-1">${title}</p>
+                    <p class="text-sm font-bold">${message}</p>
+                </div>
+            `;
+
+            // Show teaser
+            teaser.classList.remove('hidden');
+            badge?.classList.remove('hidden');
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                teaser.classList.add('hidden');
+            }, 5000);
+        }
+    }
+
     completeFocusSession() {
         clearInterval(this.focusSession.intervalId);
         const completedSubject = this.focusSession.subject || "General Focus";
@@ -1432,11 +1466,11 @@ class StudyMentor {
                 this.renderRecommendations();
 
                 // Show success message
-                this.showNudge({
+                this.showCustomNudge({
                     title: 'TARGETS UPDATED',
                     message: `New mission: ${exams} exams, ${sessions} sessions. Let's crush it! 💪`,
                     icon: '🎯',
-                    theme: 'theme-electric'
+                    theme: 'boss'
                 });
             } else {
                 alert('Error: ' + (result.error || 'Failed to update targets'));
