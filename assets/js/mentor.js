@@ -1600,18 +1600,19 @@ class StudyMentor {
 
         if (mentor_advice && mentor_advice.length > 0) {
             recommendationsHTML += mentor_advice.map(advice => {
-                const priorityColor = advice.priority === 'high' ? 'red' : 'amber';
-                const priorityIcon = advice.priority === 'high' ? 'priority_high' : 'flag';
+                const priorityColor = advice.type === 'revision' ? 'red' : 'amber';
+                const priorityIcon = advice.type === 'revision' ? 'priority_high' : 'flag';
+                const accuracyDisplay = advice.accuracy !== null ? `${advice.accuracy}% accuracy` : 'New Topic';
 
                 return `
                 <div class="bg-${priorityColor}-50 border border-${priorityColor}-200 p-3 rounded-xl mb-3 last:mb-0">
                     <div class="flex items-start gap-2">
                         <span class="material-symbols-outlined text-${priorityColor}-600 text-lg">${priorityIcon}</span>
                         <div class="flex-1">
-                            <p class="text-xs font-bold text-${priorityColor}-900 uppercase tracking-wider">${advice.subject}</p>
+                            <p class="text-xs font-bold text-${priorityColor}-900 uppercase tracking-wider">${advice.subject} ${advice.accuracy !== null ? `- ${advice.accuracy}%` : ''}</p>
                             <p class="text-sm text-gray-700 mt-1">
-                                Focus on <strong>${advice.weak_topic}</strong> 
-                                <span class="text-xs text-gray-500">(${advice.topic_accuracy}% accuracy)</span>
+                                Focus on <strong>${advice.target_topic}</strong> 
+                                <span class="text-xs text-gray-500">(${accuracyDisplay})</span>
                             </p>
                             <p class="text-xs text-gray-600 mt-2">
                                 💡 I recommend doing 15-20 questions from this topic today.
