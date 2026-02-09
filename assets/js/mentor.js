@@ -31,6 +31,37 @@ class StudyMentor {
         this.fetchMentorData();
         this.showWelcomeGreeting();
         this.startTimeBasedNudges();
+        this.injectPressureCSS();
+    }
+
+    injectPressureCSS() {
+        if (document.getElementById('boss-pressure-css')) return;
+        const style = document.createElement('style');
+        style.id = 'boss-pressure-css';
+        style.innerHTML = `
+            @keyframes blood-pulse {
+                0%, 100% { border-color: rgba(220, 38, 38, 0.3); box-shadow: 0 0 15px rgba(220, 38, 38, 0.2); }
+                50% { border-color: rgba(220, 38, 38, 0.8); box-shadow: 0 0 30px rgba(220, 38, 38, 0.5); }
+            }
+            @keyframes pressure-glitch {
+                0% { transform: translate(0); text-shadow: none; }
+                20% { transform: translate(-1px, 1px); text-shadow: 1px 0 #ef4444; }
+                40% { transform: translate(-1px, -1px); text-shadow: -1px 0 #991b1b; }
+                60% { transform: translate(1px, 1px); }
+                80% { transform: translate(1px, -1px); }
+                100% { transform: translate(0); }
+            }
+            .boss-pressure-card {
+                animation: blood-pulse 2s infinite ease-in-out !important;
+                background: linear-gradient(to bottom right, #0f172a, #450a0a) !important;
+                border-width: 2px !important;
+            }
+            .pressure-glitch-text {
+                animation: pressure-glitch 0.3s infinite linear alternate-reverse;
+                color: #ef4444 !important;
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     isFocusModeActive() {
@@ -1132,17 +1163,21 @@ class StudyMentor {
             const completedMissionSubjects = missionRoadmap.filter(m => m.status === 'success').length;
             const missionProgress = Math.round((completedMissionSubjects / totalMissionSubjects) * 100);
 
+            // Check for Boss Pressure Mode
+            const currentHour = new Date().getHours();
+            const isBossPressure = currentHour >= 16 && missionProgress < 50;
+
             recommendationsHTML += `
-                <div class="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 p-4 rounded-2xl mb-4 shadow-2xl relative overflow-hidden group">
+                <div class="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 p-4 rounded-2xl mb-4 shadow-2xl relative overflow-hidden group ${isBossPressure ? 'boss-pressure-card' : ''}">
                     <!-- Tech Decor -->
                     <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/20 transition-all"></div>
                     
                     <div class="relative z-10">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-2">
-                                <span class="text-xl">⚔️</span>
+                                <span class="text-xl">${isBossPressure ? '💀' : '⚔️'}</span>
                                 <div>
-                                    <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none">Mission Dashboard</p>
+                                    <p class="text-[10px] font-black ${isBossPressure ? 'pressure-glitch-text' : 'text-indigo-400'} uppercase tracking-widest leading-none">Mission Dashboard</p>
                                     <p class="text-[9px] text-gray-400 mt-0.5">Daily Coverage: ${completedMissionSubjects}/${totalMissionSubjects} Subjects</p>
                                 </div>
                             </div>
@@ -1162,7 +1197,7 @@ class StudyMentor {
                                     <span class="text-[10px] font-black ${missionProgress === 100 ? 'text-green-400' : 'text-indigo-300'}">${missionProgress}%</span>
                                 </div>
                                 <div class="h-1 w-12 bg-white/10 rounded-full mt-1 overflow-hidden">
-                                    <div class="h-full ${missionProgress === 100 ? 'bg-green-400' : 'bg-indigo-500'} transition-all duration-1000" style="width: ${missionProgress}%"></div>
+                                    <div class="h-full ${missionProgress === 100 ? 'bg-green-400' : (isBossPressure ? 'bg-red-500' : 'bg-indigo-500')} transition-all duration-1000" style="width: ${missionProgress}%"></div>
                                 </div>
                             </div>
                         </div>
