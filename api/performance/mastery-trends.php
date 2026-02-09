@@ -418,6 +418,36 @@ if ($y_chal_res && $row = $y_chal_res->fetch_assoc()) {
     }
 }
 
+// --- STREAK CALCULATION ---
+$streak_count = 0;
+// Check if mission success is logged for today or yesterday
+$streak_check_date = $today;
+$done = false;
+
+while (!$done) {
+    $check_start = $streak_check_date . ' 00:00:00';
+    $check_end = $streak_check_date . ' 23:59:59';
+    $streak_sql = "SELECT id FROM activity_log WHERE activity_type = 'mission_success' AND timestamp BETWEEN '$check_start' AND '$check_end' LIMIT 1";
+    $st_res = $conn->query($streak_sql);
+    
+    if ($st_res && $st_res->num_rows > 0) {
+        $streak_count++;
+        $streak_check_date = date('Y-m-d', strtotime($streak_check_date . ' -1 day'));
+    } else {
+        // If we haven't found a success for today, check yesterday. If yesterday also has none, streak is 0.
+        // If we found successes for previous days but today is not yet done, we still count the streak ending yesterday.
+        if ($streak_check_date === $today) {
+            $streak_check_date = date('Y-m-d', strtotime($streak_check_date . ' -1 day'));
+            continue;
+        }
+        $done = true;
+    }
+    
+    // Safety break to prevent infinite loop (max 365 days)
+    if ($streak_count > 365) $done = true;
+}
+$response['data']['mission_streak'] = $streak_count;
+
 echo json_encode($response);
 $conn->close();
 ?>

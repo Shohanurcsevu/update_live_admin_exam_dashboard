@@ -1104,28 +1104,139 @@ class StudyMentor {
         const hour = now.getHours();
         const morningRoadmap = this.mentorData.morning_roadmap;
 
-        // --- NEW: Morning Roadmap (Before 10 AM) ---
-        if (hour < 10 && morningRoadmap && morningRoadmap.length > 0) {
+        // --- NEW: Mission Dashboard: Today's Subject Roadmap ---
+        if (subjects && subjects.length > 0) {
+            const created = this.mentorData.daily_stats?.exams_created || [];
+            const taken = this.mentorData.daily_stats?.exams_taken || [];
+
+            const missionRoadmap = subjects.map(subj => {
+                const createdInfo = created.find(c => c.name === subj.name);
+                const takenInfo = taken.find(t => t.name === subj.name);
+                const isCreated = createdInfo && createdInfo.count > 0;
+                const isTaken = takenInfo && takenInfo.count > 0;
+                const accuracy = subj.this_week; // Use this week's accuracy for guidance
+
+                return {
+                    name: subj.name,
+                    isCreated,
+                    isTaken,
+                    accuracy,
+                    today_exams: subj.today_exams || [],
+                    status: (isCreated && isTaken) ? 'success' : (isCreated ? 'pending_take' : 'pending_create')
+                };
+            });
+
+            const totalMissionSubjects = missionRoadmap.length;
+            const completedMissionSubjects = missionRoadmap.filter(m => m.status === 'success').length;
+            const missionProgress = Math.round((completedMissionSubjects / totalMissionSubjects) * 100);
+
             recommendationsHTML += `
-                <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-4 rounded-2xl mb-4 shadow-sm">
-                    <div class="flex items-center gap-2 mb-3">
-                        <span class="text-xl">🗺️</span>
-                        <div>
-                            <p class="text-[10px] font-black text-indigo-900 uppercase tracking-widest leading-none">Morning Roadmap</p>
-                            <p class="text-[9px] text-indigo-600 mt-0.5">Focus areas from yesterday's performance</p>
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        ${morningRoadmap.map(item => `
-                            <div class="flex items-center justify-between bg-white/60 p-2 rounded-lg border border-indigo-100">
-                                <span class="text-sm font-medium text-indigo-950">${item.subject}</span>
-                                <span class="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">${item.accuracy}%</span>
+                <div class="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 p-4 rounded-2xl mb-4 shadow-2xl relative overflow-hidden group">
+                    <!-- Tech Decor -->
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/20 transition-all"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">⚔️</span>
+                                <div>
+                                    <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none">Mission Dashboard</p>
+                                    <p class="text-[9px] text-gray-400 mt-0.5">Daily Coverage: ${completedMissionSubjects}/${totalMissionSubjects} Subjects</p>
+                                </div>
                             </div>
-                        `).join('')}
+                            <div class="text-right flex flex-col items-end">
+                                <div class="flex items-center gap-1.5">
+                                    ${this.mentorData.mission_streak > 0 ? `
+                                        <div class="relative group/flame">
+                                            <span class="material-symbols-outlined text-lg ${this.mentorData.mission_streak >= 8 ? 'text-purple-500 animate-pulse' : this.mentorData.mission_streak >= 3 ? 'text-orange-500' : 'text-blue-400'} drop-shadow-[0_0_8px_rgba(var(--streak-color),0.8)]" 
+                                                  style="--streak-color: ${this.mentorData.mission_streak >= 8 ? '168,85,247' : this.mentorData.mission_streak >= 3 ? '249,115,22' : '96,165,250'}">
+                                                local_fire_department
+                                            </span>
+                                            <div class="absolute bottom-full right-0 mb-2 hidden group-hover/flame:block bg-gray-900 text-white text-[8px] py-1 px-2 rounded whitespace-nowrap z-50">
+                                                ${this.mentorData.mission_streak} Day Streak! ${this.mentorData.mission_streak >= 8 ? '🔥 UNSTOPPABLE' : this.mentorData.mission_streak >= 3 ? '⚡ HEATING UP' : '🧊 COLD START'}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                    <span class="text-[10px] font-black ${missionProgress === 100 ? 'text-green-400' : 'text-indigo-300'}">${missionProgress}%</span>
+                                </div>
+                                <div class="h-1 w-12 bg-white/10 rounded-full mt-1 overflow-hidden">
+                                    <div class="h-full ${missionProgress === 100 ? 'bg-green-400' : 'bg-indigo-500'} transition-all duration-1000" style="width: ${missionProgress}%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${missionProgress === 100 ? this.handleMissionSuccess() : ''}
+
+                        <div class="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                            ${missionRoadmap.map((item, index) => {
+                const statusClass = item.status === 'success' ? 'border-green-500/30 bg-green-500/10' :
+                    item.status === 'pending_take' ? 'border-yellow-500/30 bg-yellow-500/5' :
+                        'border-white/10 bg-white/5';
+
+                return `
+                                    <div class="mb-2 last:mb-0">
+                                        <div class="flex items-start justify-between p-2.5 rounded-xl border ${statusClass} transition-all cursor-pointer hover:bg-white/5" onclick="studyMentor.toggleMissionSubject(${index})">
+                                            <div class="flex items-start gap-3 flex-1 min-w-0">
+                                                <div class="flex flex-col">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-xs font-bold text-gray-200 break-words">${item.name}</span>
+                                                        <span class="text-gray-500 text-[10px] transition-transform" id="mission-arrow-${index}">▼</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-3 mt-1">
+                                                        <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isCreated ? 'text-green-400' : 'text-gray-500'}">
+                                                            <span class="material-symbols-outlined text-[10px]">${item.isCreated ? 'check_circle' : 'circle'}</span> Created
+                                                        </span>
+                                                        <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isTaken ? 'text-blue-400' : 'text-gray-500'}">
+                                                            <span class="material-symbols-outlined text-[10px]">${item.isTaken ? 'check_circle' : 'circle'}</span> Taken
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                                                ${item.status === 'pending_create' ? `
+                                                    <button onclick="window.location.href='https://bcspreli.free.nf/?page=exam'" class="text-[8px] font-black uppercase bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1.5 rounded-lg transition-all">
+                                                        Create Exam
+                                                    </button>
+                                                ` : item.status === 'pending_take' ? `
+                                                    <button onclick="window.loadPage('take-exam-list')" class="text-[8px] font-black uppercase bg-yellow-600 hover:bg-yellow-500 text-white px-2 py-1.5 rounded-lg transition-all animate-pulse-subtle">
+                                                        Take Now
+                                                    </button>
+                                                ` : `
+                                                    <span class="text-green-400 text-sm">✅</span>
+                                                `}
+                                            </div>
+                                        </div>
+
+                                        <!-- Collapsible Exams List -->
+                                        <div id="mission-exams-${index}" class="hidden mt-1 ml-4 space-y-1.5 border-l-2 border-white/5 pl-3 py-1">
+                                            ${item.today_exams.length > 0 ? item.today_exams.map(exam => `
+                                                <div class="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/5">
+                                                    <div class="flex-1 min-w-0">
+                                                        <p class="text-[10px] font-bold text-gray-300 truncate">${exam.title}</p>
+                                                        <p class="text-[8px] text-gray-500 mt-0.5">${exam.total_marks} Marks | ${exam.is_completed ? '✅ Done' : '⏳ Pending'}</p>
+                                                    </div>
+                                                    <button onclick="studyMentor.startExam(${exam.id})" class="text-[8px] font-bold text-indigo-400 hover:text-indigo-300">
+                                                        ${exam.is_completed ? 'Retake' : 'Start'} →
+                                                    </button>
+                                                </div>
+                                            `).join('') : `
+                                                <p class="text-[8px] text-gray-500 italic">No exams created for this subject yet.</p>
+                                            `}
+                                        </div>
+                                    </div>
+                                `;
+            }).join('')}
+                        </div>
+                        
+                        ${missionProgress === 100 ? `
+                            <div class="mt-3 p-2 bg-green-500/20 border border-green-500/30 rounded-xl text-center">
+                                <p class="text-[9px] font-bold text-green-400">🔥 DOMINATION! You have conquered all subjects today!</p>
+                            </div>
+                        ` : `
+                            <p class="mt-3 text-[9px] text-gray-500 italic text-center">"Sohan, the goal is simple: 1 Exam per Subject. Keep going!"</p>
+                        `}
                     </div>
-                    <p class="text-[10px] text-indigo-600 mt-3 italic font-medium">
-                        "Sohan, yesterday these were tough. Let's finish them first today!"
-                    </p>
                 </div>
             `;
         }
@@ -1627,6 +1738,34 @@ class StudyMentor {
         }
     }
 
+    toggleMissionSubject(index) {
+        const examsDiv = document.getElementById(`mission-exams-${index}`);
+        const arrow = document.getElementById(`mission-arrow-${index}`);
+
+        if (examsDiv && arrow) {
+            examsDiv.classList.toggle('hidden');
+            arrow.style.transform = examsDiv.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+    }
+
+    handleMissionSuccess() {
+        if (this.missionSuccessTriggered) return '';
+        this.missionSuccessTriggered = true;
+
+        // Log success via API
+        fetch('api/log-activity.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'mission_success',
+                message: 'Achieved 100% Subject Coverage Roadmap!',
+                details: { timestamp: new Date().toISOString() }
+            })
+        }).catch(err => console.error('Streak logging failed:', err));
+
+        return ''; // Template helper
+    }
+
     startExam(examId) {
         // Navigate to take exam interface with the exam ID
         window.loadPage('take-exam-interface', `exam_id=${examId}`);
@@ -1636,7 +1775,9 @@ class StudyMentor {
 
 // Initialize mentor when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => new StudyMentor());
+    document.addEventListener('DOMContentLoaded', () => {
+        window.studyMentor = new StudyMentor();
+    });
 } else {
-    new StudyMentor();
+    window.studyMentor = new StudyMentor();
 }
