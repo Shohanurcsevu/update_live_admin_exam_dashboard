@@ -379,6 +379,11 @@ function initializeTakeExamInterface() {
                 closeResultModalBtn.dataset.attemptId = result.data.attempt_id;
                 displayExamResult(result.data);
 
+                // --- NEW: Record activity for Streak ---
+                if (typeof streakManager !== 'undefined') {
+                    streakManager.recordActivity();
+                }
+
                 // --- NEW: Sync mistakes to Mistake Bank ---
                 if (performance.mistakes && performance.mistakes.length > 0) {
                     try {

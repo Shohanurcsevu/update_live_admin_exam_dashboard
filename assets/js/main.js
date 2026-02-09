@@ -202,6 +202,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- FIX: The function to start the notification system is now being called. ---
         initializeNotifications();
 
+        // Initialize Streak Manager
+        if (typeof streakManager !== 'undefined') {
+            streakManager.init();
+        }
+
         // Initialize Auto-Sync
         if (typeof syncManager !== 'undefined') {
             syncManager.initAutoSync();

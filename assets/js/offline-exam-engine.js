@@ -301,6 +301,11 @@ function initializeOfflineExamEngine() {
 
                 if (syncResult && syncResult.success) {
                     displayExamResult(performanceData, true, syncResult.data?.attempt_id);
+
+                    // --- NEW: Record activity for Streak ---
+                    if (typeof streakManager !== 'undefined') {
+                        streakManager.recordActivity();
+                    }
                 } else {
                     displayExamResult(performanceData, false);
                 }
