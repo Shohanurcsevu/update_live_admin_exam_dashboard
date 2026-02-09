@@ -13,7 +13,10 @@ function initializeTakeExamInterface() {
     const resultModal = document.getElementById('result-modal');
     const closeResultModalBtn = document.getElementById('close-result-modal-btn');
     const submitExamBtn = document.getElementById('submit-exam-btn');
+    const submitExamBtnMobile = document.getElementById('submit-exam-btn-mobile');
     const questionsArea = document.getElementById('questions-area');
+
+    let questionObserver;
 
     const shuffle = (array) => {
         let currentIndex = array.length, randomIndex;
@@ -79,6 +82,33 @@ function initializeTakeExamInterface() {
         setupExitPrevention();
         startTimer(details.duration * 60);
         updateNavigator();
+        setupProgressTracking();
+    }
+
+    function setupProgressTracking() {
+        if (questionObserver) questionObserver.disconnect();
+
+        const progressText = document.getElementById('mobile-progress-text');
+        if (!progressText) return;
+
+        questionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const qId = entry.target.id.replace('question-', '');
+                    const qIndex = examData.questions.findIndex(q => q.id == qId);
+                    if (qIndex !== -1) {
+                        progressText.innerHTML = `Question ${qIndex + 1} of ${examData.questions.length} <span class="material-symbols-outlined text-sm ml-1">expand_less</span>`;
+                    }
+                }
+            });
+        }, {
+            threshold: 0.5,
+            rootMargin: '-20% 0px -60% 0px'
+        });
+
+        document.querySelectorAll('[id^="question-"]').forEach(el => {
+            questionObserver.observe(el);
+        });
     }
 
     function setupExitPrevention() {
@@ -209,8 +239,8 @@ function initializeTakeExamInterface() {
 
         const navSidebar = document.getElementById('navigator-sidebar');
         if (navSidebar && window.innerWidth < 768) {
-            navSidebar.classList.add('translate-x-full', 'pointer-events-none');
-            navSidebar.classList.remove('translate-x-0', 'pointer-events-auto');
+            navSidebar.classList.add('translate-y-full');
+            navSidebar.classList.remove('translate-y-0');
         }
 
         const delay = window.innerWidth < 768 ? 300 : 0;
@@ -253,6 +283,10 @@ function initializeTakeExamInterface() {
         if (resultModal) {
             resultModal.classList.remove('hidden');
             resultModal.classList.add('flex');
+
+            // Hide mobile bottom bar to prevent overlap
+            const mobileBottomBar = document.getElementById('mobile-bottom-bar');
+            if (mobileBottomBar) mobileBottomBar.classList.add('hidden');
         }
     }
 
@@ -314,8 +348,14 @@ function initializeTakeExamInterface() {
         if (setupExitPrevention._popStateCleanup) setupExitPrevention._popStateCleanup();
         if (setupExitPrevention._visibilityCleanup) setupExitPrevention._visibilityCleanup();
 
-        submitExamBtn.disabled = true;
-        submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">autorenew</span>Submitting...`;
+        if (submitExamBtn) {
+            submitExamBtn.disabled = true;
+            submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">autorenew</span>Submitting...`;
+        }
+        if (submitExamBtnMobile) {
+            submitExamBtnMobile.disabled = true;
+            submitExamBtnMobile.textContent = `Submitting...`;
+        }
 
         const performance = calculatePerformance();
         try {
@@ -366,8 +406,14 @@ function initializeTakeExamInterface() {
             } else showToast(result.message || 'Submission failed.', 'error');
         } catch (e) { showToast('A network error occurred.', 'error'); }
         finally {
-            submitExamBtn.disabled = false;
-            submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2">check_circle</span>Submit Exam`;
+            if (submitExamBtn) {
+                submitExamBtn.disabled = false;
+                submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2">check_circle</span>Submit Exam`;
+            }
+            if (submitExamBtnMobile) {
+                submitExamBtnMobile.disabled = false;
+                submitExamBtnMobile.textContent = `Submit`;
+            }
         }
     }
 
@@ -406,28 +452,29 @@ function initializeTakeExamInterface() {
         });
     }
     if (submitExamBtn) submitExamBtn.addEventListener('click', submitExam);
+    if (submitExamBtnMobile) submitExamBtnMobile.addEventListener('click', submitExam);
 
-    const openNavBtn = document.getElementById('open-nav-btn');
+    const mobileNavTrigger = document.getElementById('mobile-nav-trigger');
     const closeNavBtn = document.getElementById('close-nav-btn');
     const navOverlay = document.getElementById('nav-overlay');
     const navSidebar = document.getElementById('navigator-sidebar');
 
-    if (openNavBtn && navSidebar) {
-        openNavBtn.addEventListener('click', () => {
-            navSidebar.classList.remove('translate-x-full', 'pointer-events-none');
-            navSidebar.classList.add('translate-x-0', 'pointer-events-auto');
+    if (mobileNavTrigger && navSidebar) {
+        mobileNavTrigger.addEventListener('click', () => {
+            navSidebar.classList.remove('translate-y-full');
+            navSidebar.classList.add('translate-y-0');
         });
     }
     if (closeNavBtn && navSidebar) {
         closeNavBtn.addEventListener('click', () => {
-            navSidebar.classList.remove('translate-x-0', 'pointer-events-auto');
-            navSidebar.classList.add('translate-x-full', 'pointer-events-none');
+            navSidebar.classList.add('translate-y-full');
+            navSidebar.classList.remove('translate-y-0');
         });
     }
     if (navOverlay && navSidebar) {
         navOverlay.addEventListener('click', () => {
-            navSidebar.classList.remove('translate-x-0', 'pointer-events-auto');
-            navSidebar.classList.add('translate-x-full', 'pointer-events-none');
+            navSidebar.classList.add('translate-y-full');
+            navSidebar.classList.remove('translate-y-0');
         });
     }
 
