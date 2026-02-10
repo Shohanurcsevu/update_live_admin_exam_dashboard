@@ -64,8 +64,7 @@
                 Badges</span>
         </div>
 
-        <div id="badge-grid" cla
-            ss="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+        <div id="badge-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
             <!-- Badges will be injected here -->
             <div
                 class="flex flex-col items-center text-center p-4 rounded-xl border-2 border-dashed border-gray-100 opacity-40 animate-pulse">
@@ -147,7 +146,7 @@
         </div>
 
         <!-- Rapid Fire Card -->
-        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-3.5 text-white shadow-lg">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <span
@@ -156,11 +155,11 @@
                     <h3 class="text-xl font-bold mt-2">Daily 15 Challenge</h3>
                     <p class="text-emerald-50 text-sm opacity-90">15 random questions from all subjects</p>
                 </div>
-                <div class="bg-white/20 p-2 rounded-lg">
+                <div class="bg-white/20 p-1.5 rounded-lg">
                     <span class="material-symbols-outlined text-3xl">bolt</span>
                 </div>
             </div>
-            <div class="mt-6">
+            <div class="mt-3">
                 <button id="daily-10-btn"
                     onclick="if(window.loadPage) window.loadPage('take-offline-exam', '?mode=daily_15')"
                     class="bg-white text-emerald-600 px-6 py-2 rounded-lg font-bold hover:bg-emerald-50 transition-colors shadow-sm flex items-center gap-2">
@@ -171,7 +170,7 @@
         </div>
 
         <!-- Mistake Bank Card -->
-        <div class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-xl p-3.5 text-white shadow-lg">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <span class="bg-white/20 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">Adaptive
@@ -180,11 +179,11 @@
                     <p class="text-rose-50 text-sm opacity-90"><span id="mistake-count">0</span> persistent errors
                         tracked</p>
                 </div>
-                <div class="bg-white/20 p-2 rounded-lg">
+                <div class="bg-white/20 p-1.5 rounded-lg">
                     <span class="material-symbols-outlined text-3xl">psychology</span>
                 </div>
             </div>
-            <div class="mt-6">
+            <div class="mt-3">
                 <button id="mastery-quiz-btn" onclick="if(window.loadPage) window.loadPage('mistake-bank')"
                     class="bg-white text-rose-600 px-6 py-2 rounded-lg font-bold hover:bg-rose-50 transition-colors shadow-sm flex items-center gap-2">
                     <span class="material-symbols-outlined text-lg">manage_history</span>
@@ -194,7 +193,7 @@
         </div>
 
         <!-- Study Time Card (Daily Focus) -->
-        <div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+        <div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-xl p-3.5 text-white shadow-lg">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <span class="bg-white/20 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">Today's
@@ -206,13 +205,13 @@
                             class="hidden text-xs font-bold px-2 py-0.5 rounded-full"></span>
                     </div>
                 </div>
-                <div class="bg-white/20 p-2 rounded-lg">
+                <div class="bg-white/20 p-1.5 rounded-lg">
                     <span class="material-symbols-outlined text-3xl">schedule</span>
                 </div>
             </div>
 
             <!-- Per-Subject Breakdown -->
-            <div id="study-subjects-container" class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+            <div id="study-subjects-container" class="space-y-1 mb-1.5 max-h-28 overflow-y-auto">
                 <!-- Subject bars will be injected here -->
                 <div class="text-center py-4 text-violet-100 text-sm opacity-70">
                     <span class="material-symbols-outlined text-2xl mb-1 opacity-50">hourglass_empty</span>
@@ -220,7 +219,7 @@
                 </div>
             </div>
 
-            <div class="mt-4 pt-4 border-t border-white/20">
+            <div class="mt-1.5 pt-1.5 border-t border-white/20">
                 <button id="view-study-time-btn" onclick="if(window.loadPage) window.loadPage('times')"
                     class="w-full bg-white text-violet-600 px-6 py-2 rounded-lg font-bold hover:bg-violet-50 transition-colors shadow-sm flex items-center justify-center gap-2">
                     <span class="material-symbols-outlined text-lg">insights</span>
