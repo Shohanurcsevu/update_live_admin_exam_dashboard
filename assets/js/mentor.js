@@ -1364,9 +1364,10 @@ class StudyMentor {
                                                     </div>
                                                     <div class="flex items-center gap-2">
                                                         ${exam.completion_type !== 'online' ? `
-                                                            <label class="flex items-center gap-1 cursor-pointer" title="Mark as completed manually (offline)">
+                                                            <label class="flex items-center gap-1 ${exam.is_completed ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}" 
+                                                                   title="${exam.is_completed ? 'Completed (Manual)' : 'Mark as completed manually (offline)'}">
                                                                 <input type="checkbox" id="manual-check-${exam.id}" 
-                                                                    ${exam.is_completed ? 'checked' : ''} 
+                                                                    ${exam.is_completed ? 'checked disabled' : ''} 
                                                                     onchange="studyMentor.toggleExamCompletion(${exam.id}, this.checked)"
                                                                     class="form-checkbox h-3 w-3 text-indigo-500 rounded border-gray-600 bg-gray-700 focus:ring-indigo-500 focus:ring-offset-gray-900">
                                                             </label>
