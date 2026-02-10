@@ -949,8 +949,8 @@ class StudyMentor {
             }
         };
 
-        // Every 1 minute (60,000 ms)
-        setInterval(showNudge, 60000);
+        // Every 1 hour (3600000 ms)
+        setInterval(showNudge, 3600000);
     }
 
     toBengaliNumber(n) {
