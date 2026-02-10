@@ -86,15 +86,33 @@ if ($result) {
         $today_exams_result = $conn->query($today_exams_sql);
         $today_exams = [];
         
+        // Fetch manual completions for this subject's exams today
+        $manual_ids = [];
+        $man_sql = "SELECT activity_message FROM activity_log WHERE activity_type = 'manual_exam_completion' AND timestamp BETWEEN '$today_start' AND '$today_end'";
+        $man_res = $conn->query($man_sql);
+        if ($man_res) {
+            while ($man_row = $man_res->fetch_assoc()) {
+                $data = json_decode($man_row['activity_message'], true);
+                if (isset($data['exam_id'])) {
+                    $manual_ids[] = intval($data['exam_id']);
+                }
+            }
+        }
+
         if ($today_exams_result) {
             while ($exam_row = $today_exams_result->fetch_assoc()) {
+                $exam_id = intval($exam_row['id']);
+                $is_online_completed = intval($exam_row['attempt_count']) > 0;
+                $is_manual_completed = in_array($exam_id, $manual_ids);
+
                 $today_exams[] = [
-                    'id' => $exam_row['id'],
+                    'id' => $exam_id,
                     'title' => $exam_row['exam_title'],
                     'total_marks' => $exam_row['total_marks'],
                     'attempt_count' => intval($exam_row['attempt_count']),
                     'best_score' => $exam_row['best_score'] !== null ? floatval($exam_row['best_score']) : null,
-                    'is_completed' => intval($exam_row['attempt_count']) > 0
+                    'is_completed' => $is_online_completed || $is_manual_completed,
+                    'completion_type' => $is_online_completed ? 'online' : ($is_manual_completed ? 'manual' : null)
                 ];
             }
         }

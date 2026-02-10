@@ -597,6 +597,35 @@ class StudyMentor {
     }
 
 
+    async toggleExamCompletion(examId, isChecked) {
+        try {
+            // Optimistic Update? Ideally. But let's fetch to be safe to update progress bars correctly.
+            // Or better: call API, then fetch.
+            const response = await fetch('api/exam/toggle-manual-completion.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ exam_id: examId })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                // Refresh data to update progress bars and mission status
+                await this.fetchMentorData();
+            } else {
+                console.error('Failed to toggle completion:', result.error);
+                // Revert UI if needed (though we are re-fetching anyway)
+                alert('Failed to update status. Please try again.');
+                // Helper to revert checkbox if we didn't re-fetch
+                const checkbox = document.getElementById(`manual-check-${examId}`);
+                if (checkbox) checkbox.checked = !isChecked;
+            }
+        } catch (error) {
+            console.error('Error toggling exam completion:', error);
+            const checkbox = document.getElementById(`manual-check-${examId}`);
+            if (checkbox) checkbox.checked = !isChecked;
+        }
+    }
+
     closePanel() {
         const panel = document.getElementById('mentor-panel');
         panel?.classList.add('hidden');
@@ -1331,11 +1360,21 @@ class StudyMentor {
                                                 <div class="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/5">
                                                     <div class="flex-1 min-w-0">
                                                         <p class="text-[10px] font-bold text-gray-300 truncate">${exam.title}</p>
-                                                        <p class="text-[8px] text-gray-500 mt-0.5">${exam.total_marks} Marks | ${exam.is_completed ? '✅ Done' : '⏳ Pending'}</p>
+                                                        <p class="text-[8px] text-gray-500 mt-0.5">${exam.total_marks} Marks | ${exam.is_completed ? (exam.completion_type === 'manual' ? '✅ Manual' : '✅ Online') : '⏳ Pending'}</p>
                                                     </div>
-                                                    <button onclick="studyMentor.startExam(${exam.id})" class="text-[8px] font-bold text-indigo-400 hover:text-indigo-300">
-                                                        ${exam.is_completed ? 'Retake' : 'Start'} →
-                                                    </button>
+                                                    <div class="flex items-center gap-2">
+                                                        ${exam.completion_type !== 'online' ? `
+                                                            <label class="flex items-center gap-1 cursor-pointer" title="Mark as completed manually (offline)">
+                                                                <input type="checkbox" id="manual-check-${exam.id}" 
+                                                                    ${exam.is_completed ? 'checked' : ''} 
+                                                                    onchange="studyMentor.toggleExamCompletion(${exam.id}, this.checked)"
+                                                                    class="form-checkbox h-3 w-3 text-indigo-500 rounded border-gray-600 bg-gray-700 focus:ring-indigo-500 focus:ring-offset-gray-900">
+                                                            </label>
+                                                        ` : ''}
+                                                        <button onclick="studyMentor.startExam(${exam.id})" class="text-[8px] font-bold text-indigo-400 hover:text-indigo-300">
+                                                            ${exam.is_completed ? 'Retake' : 'Start'} →
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             `).join('') : `
                                                 <p class="text-[8px] text-gray-500 italic">No exams created for this subject yet.</p>
