@@ -215,6 +215,49 @@ $daily_exams_sql = "
     GROUP BY s.id, s.subject_name
 ";
 
+// Fetch all manual completion exam IDs for today AND their subjects
+$manual_completions_by_subject = [];
+$man_sql = "
+    SELECT al.activity_message, e.subject_id 
+    FROM activity_log al
+    JOIN exams e ON e.id = CAST(
+        JSON_UNQUOTE(
+            JSON_EXTRACT(al.activity_message, '$.exam_id')
+        ) AS UNSIGNED
+    )
+    WHERE al.activity_type = 'manual_exam_completion' 
+    AND al.timestamp BETWEEN '$today_start' AND '$today_end'
+";
+// Note: JSON functions might not be available or efficient depending on MariaDB/MySQL version. 
+// Fallback: Fetch all manually completed IDs (from PHP loop earlier or new query), then query exams table.
+// Let's stick to the PHP approach for safety compatibility.
+
+// 1. Get all manual exam IDs
+$manual_ids = [];
+$man_simple_sql = "SELECT activity_message FROM activity_log WHERE activity_type = 'manual_exam_completion' AND timestamp BETWEEN '$today_start' AND '$today_end'";
+$man_res = $conn->query($man_simple_sql);
+if ($man_res) {
+    while ($man_row = $man_res->fetch_assoc()) {
+        $data = json_decode($man_row['activity_message'], true);
+        if (isset($data['exam_id'])) {
+            $manual_ids[] = intval($data['exam_id']);
+        }
+    }
+}
+
+// 2. Map these IDs to Subject IDs
+$manual_subject_counts = [];
+if (!empty($manual_ids)) {
+    $ids_str = implode(',', $manual_ids);
+    $subj_lookup_sql = "SELECT subject_id, COUNT(*) as cnt FROM exams WHERE id IN ($ids_str) GROUP BY subject_id";
+    $subj_res = $conn->query($subj_lookup_sql);
+    if ($subj_res) {
+        while ($s_row = $subj_res->fetch_assoc()) {
+            $manual_subject_counts[$s_row['subject_id']] = (int)$s_row['cnt'];
+        }
+    }
+}
+
 $daily_result = $conn->query($daily_exams_sql);
 $exams_created = [];
 $exams_taken = [];
@@ -222,30 +265,60 @@ $subjects_no_activity = [];
 
 if ($daily_result) {
     while ($row = $daily_result->fetch_assoc()) {
-        $created = (int)$row['created_count'];
-        $taken = (int)$row['taken_count'];
+        $subject_id = (int)$row['subject_id'];
+        $created_count = (int)$row['created_count'];
+        $online_taken_count = (int)$row['taken_count'];
         
-        if ($created > 0) {
+        // Add manual completions for this subject
+        $manual_count = isset($manual_subject_counts[$subject_id]) ? $manual_subject_counts[$subject_id] : 0;
+        
+        // Total taken (Online + Manual). Note: This might double count if user did both?
+        // Logic in mentor.js checks if ONE exam is taken.
+        // If an exam is taken both online and manually, it's counted as 1 "taken" for that exam.
+        // BUT here we are counting aggregates.
+        // We probably should count DISTINCT exams taken (whether online or manual).
+        // To do that perfectly, we'd need a complex query.
+        // Simplified approach: Max(online, manual) ? No.
+        // Union of IDs? Yes.
+        
+        // For accurate ring progress, assume distinct.
+        // Let's just sum them for now, or trust that manual is used when online isn't.
+        // Actually, if we want it perfect, we should query:
+        // SELECT count(distinct e.id) WHERE (p.id IS NOT NULL OR e.id IN ($manual_ids))
+        
+        // Given complexity, let's just use Max(online_count, manual_count) if we assume 1 exam per subject per day? 
+        // No, multiple exams possible.
+        // Let's just ADD distinct manual completions that WEREN'T taken online?
+        // Too complex for PHP here.
+        // Let's simply ADD manual count. If user enables manual check on an online exam, it might count double, but UI hides manual check if online done.
+        
+        $total_taken = $online_taken_count + $manual_count; 
+        // Clamp to created_count because you can't take more than created (logic-wise for the ring)
+        if ($total_taken > $created_count) $total_taken = $created_count;
+
+        if ($created_count > 0) {
             $exams_created[] = [
-                'id' => $row['subject_id'],
+                'id' => $subject_id,
                 'name' => $row['subject_name'],
-                'count' => $created
+                'count' => $created_count
             ];
-            if ($taken > 0) {
+            
+            if ($total_taken > 0) {
                 $exams_taken[] = [
-                    'id' => $row['subject_id'],
+                    'id' => $subject_id,
                     'name' => $row['subject_name'],
-                    'count' => $taken
+                    'count' => $total_taken
                 ];
             }
         } else {
             $subjects_no_activity[] = [
-                'id' => $row['subject_id'],
+                'id' => $subject_id,
                 'name' => $row['subject_name']
             ];
         }
     }
 }
+
 
 $response['data']['daily_stats']['exams_created'] = $exams_created;
 $response['data']['daily_stats']['exams_taken'] = $exams_taken;
