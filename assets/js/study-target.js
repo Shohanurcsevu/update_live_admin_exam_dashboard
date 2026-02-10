@@ -277,8 +277,16 @@ const StudyTargetTracker = {
         const slider = document.getElementById('pace-slider');
         const label = document.getElementById('pace-multiplier-label');
         const simBar = document.getElementById('sim-ghost-bar');
+        const resetBtn = document.getElementById('reset-pace-btn');
 
         if (!slider) return;
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                slider.value = 1.0;
+                slider.dispatchEvent(new Event('input'));
+            });
+        }
 
         slider.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);

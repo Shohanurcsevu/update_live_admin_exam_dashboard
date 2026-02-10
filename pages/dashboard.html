@@ -116,8 +116,15 @@
                                 <label for="pace-slider"
                                     class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Time-Travel
                                     Pace Simulator</label>
-                                <span id="pace-multiplier-label"
-                                    class="text-[9px] font-black text-indigo-600 uppercase">1.0x (Normal)</span>
+                                <div class="flex items-center gap-2">
+                                    <span id="pace-multiplier-label"
+                                        class="text-[9px] font-black text-indigo-600 uppercase">1.0x (Normal)</span>
+                                    <button id="reset-pace-btn" title="Reset to Normal"
+                                        class="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                                        <span
+                                            class="material-symbols-outlined text-[10px] text-gray-400">restart_alt</span>
+                                    </button>
+                                </div>
                             </div>
                             <input type="range" id="pace-slider" min="0.5" max="2.0" step="0.1" value="1.0"
                                 class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer pace-slider-input bg-gradient-to-r from-indigo-500 to-emerald-500">
