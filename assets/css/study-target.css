@@ -71,18 +71,6 @@
     }
 }
 
-/* Responsive Grid for Distribution Cards */
-#study-target-subjects {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1rem;
-}
-
-@media (max-width: 640px) {
-    #study-target-subjects {
-        grid-template-columns: 1fr 1fr;
-    }
-}
 
 /* Ghost Runner Visuals */
 #ghost-progress-bar {

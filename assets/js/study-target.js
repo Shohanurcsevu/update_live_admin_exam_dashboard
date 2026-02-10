@@ -488,7 +488,7 @@ const StudyTargetTracker = {
             };
 
             return `
-                <div class="bg-white p-4 rounded-xl border border-gray-100 subject-mini-card group transition-all hover:shadow-md">
+                <div class="relative bg-white p-4 rounded-xl border border-gray-100 subject-mini-card group transition-all hover:shadow-md">
                     <div class="flex justify-between items-start mb-3">
                         <h4 class="font-black text-gray-800 text-sm truncate flex-1">${subject.subject_name}</h4>
                         <div class="flex items-center gap-1" title="${eff.reason}">
