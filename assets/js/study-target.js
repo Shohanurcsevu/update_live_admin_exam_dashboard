@@ -16,6 +16,8 @@ const StudyTargetTracker = {
     currentPaceMultiplier: 1.0,
     protocolActive: false,
     protocolTriggered: false,
+    estimatedFinishLabel: "Calculating...",
+    paceTimer: null,
 
     async init() {
         console.log("Initializing Study Target Tracker...");
@@ -24,6 +26,7 @@ const StudyTargetTracker = {
         this.fetchYesterdayProgress(); // Fetch ghost runner data
         this.fetchAIInsights(); // Fetch AI recommendations
         this.fetchSubjectEfficiency(); // Fetch efficiency patterns
+        this.fetchEstimatedFinish(); // Fetch server-side finish time estimate
         this.startUpdateLoop();
         this.initECG();
         this.initFlowOrb();
@@ -33,6 +36,7 @@ const StudyTargetTracker = {
             this.fetchData();
             this.fetchYesterdayProgress();
             this.fetchSubjectEfficiency();
+            this.fetchEstimatedFinish();
         }, 30000);
     },
 
@@ -174,7 +178,7 @@ const StudyTargetTracker = {
         }
 
         // --- NEW: Predicted Finish Clock ---
-        this.updatePredictedFinish(remainingStudySeconds);
+        this.renderPredictedFinish();
 
         // --- NEW: Flow Orb Pace State ---
         this.updateFlowOrbState();
@@ -284,31 +288,34 @@ const StudyTargetTracker = {
         }
     },
 
-    updatePredictedFinish(remainingSeconds) {
+
+
+    async fetchEstimatedFinish(pace = null) {
+        const multiplier = pace || this.currentPaceMultiplier || 1.0;
+        try {
+            const response = await fetch(`api/analytics/get-estimated-finish.php?pace=${multiplier}`);
+            const result = await response.json();
+            if (result.success) {
+                this.estimatedFinishLabel = result.formatted_time;
+                this.renderPredictedFinish();
+            }
+        } catch (e) {
+            console.error("Est. Finish API Error:", e);
+        }
+    },
+
+    renderPredictedFinish() {
         const clockEl = document.getElementById('predicted-finish-clock');
         if (!clockEl) return;
 
-        if (remainingSeconds <= 0) {
-            clockEl.textContent = "Goal Reached! 🎉";
+        clockEl.textContent = this.estimatedFinishLabel;
+
+        const multiplier = this.currentPaceMultiplier || 1.0;
+
+        if (this.estimatedFinishLabel.includes("Goal")) {
             clockEl.className = "text-xl font-black text-emerald-600";
             return;
         }
-
-        // Calculation: Now + (Remaining Time / Multiplier) + Break Buffer
-        const bufferMultiplier = 1.1;
-        const multiplier = this.currentPaceMultiplier || 1.0;
-        const simulatedRemaining = (remainingSeconds / multiplier);
-        const totalSecondsToGoal = simulatedRemaining * bufferMultiplier;
-
-        const finishDate = new Date();
-        finishDate.setSeconds(finishDate.getSeconds() + totalSecondsToGoal);
-
-        const h = finishDate.getHours();
-        const m = finishDate.getMinutes();
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const displayH = h % 12 || 12;
-
-        clockEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
 
         if (multiplier > 1) {
             clockEl.className = "text-xl font-black text-emerald-600 animate-pulse";
@@ -369,8 +376,10 @@ const StudyTargetTracker = {
                 }
             }
 
-            const remainingStudySeconds = Math.max(0, this.DAILY_TARGET_SECONDS - this.studiedSeconds);
-            this.updatePredictedFinish(remainingStudySeconds);
+            if (this.paceTimer) clearTimeout(this.paceTimer);
+            this.paceTimer = setTimeout(() => {
+                this.fetchEstimatedFinish(val);
+            }, 500);
         });
     },
 
