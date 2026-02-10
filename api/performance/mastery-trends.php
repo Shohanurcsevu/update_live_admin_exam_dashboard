@@ -324,15 +324,48 @@ $response['data']['daily_stats']['exams_created'] = $exams_created;
 $response['data']['daily_stats']['exams_taken'] = $exams_taken;
 $response['data']['daily_stats']['subjects_no_activity'] = $subjects_no_activity;
 
-// --- TOTAL EXAMS TAKEN TODAY (Any Exam) ---
+// --- TOTAL EXAMS TAKEN TODAY (Online + Manual, Exclude Deleted) ---
 $total_taken_today = 0;
-// We now use a more specific type to avoid any collisions
-$marker_type = 'boss_exam_completion';
-$taken_today_sql = "SELECT COUNT(*) as total FROM activity_log WHERE activity_type = '$marker_type' AND timestamp BETWEEN '$today_start' AND '$today_end'";
-$qb_res = $conn->query($taken_today_sql);
-if ($qb_res) {
-    $total_taken_today = intval($qb_res->fetch_assoc()['total']);
+
+// 1. Online: Get distinct exam IDs from performance table joined with exams (is_deleted=0)
+$online_sql = "
+    SELECT DISTINCT p.exam_id 
+    FROM performance p 
+    JOIN exams e ON p.exam_id = e.id 
+    WHERE p.attempt_time BETWEEN '$today_start' AND '$today_end' 
+    AND e.is_deleted = 0
+";
+
+// 2. Manual: Get distinct exam IDs from activity_log joined with exams (is_deleted=0)
+$manual_sql = "
+    SELECT DISTINCT e.id 
+    FROM activity_log al
+    JOIN exams e ON e.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.activity_message, '$.exam_id')) AS UNSIGNED)
+    WHERE al.activity_type = 'manual_exam_completion' 
+    AND al.timestamp BETWEEN '$today_start' AND '$today_end'
+    AND e.is_deleted = 0
+";
+
+// Execute both and merge IDs to avoid double counting
+$completed_exam_ids = [];
+
+$online_res = $conn->query($online_sql);
+if ($online_res) {
+    while ($row = $online_res->fetch_row()) {
+        $completed_exam_ids[] = intval($row[0]);
+    }
 }
+
+$manual_res = $conn->query($manual_sql);
+if ($manual_res) {
+    while ($row = $manual_res->fetch_row()) {
+        $completed_exam_ids[] = intval($row[0]);
+    }
+}
+
+// Unique IDs count
+$completed_exam_ids = array_unique($completed_exam_ids);
+$total_taken_today = count($completed_exam_ids);
 
 // Diagnostic Info
 $response['debug']['today_start'] = $today_start;
