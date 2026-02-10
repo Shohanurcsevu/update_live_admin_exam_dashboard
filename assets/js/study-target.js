@@ -167,6 +167,9 @@ const StudyTargetTracker = {
             firstActivityEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
         }
 
+        // --- NEW: Predicted Finish Clock ---
+        this.updatePredictedFinish(remainingStudySeconds);
+
         // --- NEW: Ghost Runner & Pace Logic ---
         const mainBar = document.getElementById('main-progress-bar');
         const ghostBar = document.getElementById('ghost-progress-bar');
@@ -227,6 +230,32 @@ const StudyTargetTracker = {
         } catch (e) {
             console.error("Efficiency API Error:", e);
         }
+    },
+
+    updatePredictedFinish(remainingSeconds) {
+        const clockEl = document.getElementById('predicted-finish-clock');
+        if (!clockEl) return;
+
+        if (remainingSeconds <= 0) {
+            clockEl.textContent = "Goal Reached! 🎉";
+            clockEl.className = "text-xs font-black text-emerald-600";
+            return;
+        }
+
+        // Calculation: Now + Remaining Time + Break Buffer (allow 10% for breaks/distractions)
+        const bufferMultiplier = 1.1;
+        const totalSecondsToGoal = remainingSeconds * bufferMultiplier;
+
+        const finishDate = new Date();
+        finishDate.setSeconds(finishDate.getSeconds() + totalSecondsToGoal);
+
+        const h = finishDate.getHours();
+        const m = finishDate.getMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 || 12;
+
+        clockEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
+        clockEl.className = "text-xs font-black text-indigo-600 animate-pulse";
     },
 
     checkFeasibility(timeLeft, studyNeeded) {
