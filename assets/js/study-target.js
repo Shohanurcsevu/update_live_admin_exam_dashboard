@@ -12,6 +12,7 @@ const StudyTargetTracker = {
     studiedSeconds: 0,
     subjects: [],
     allSubjects: [],
+    efficiency: {},
 
     async init() {
         console.log("Initializing Study Target Tracker...");
@@ -19,11 +20,13 @@ const StudyTargetTracker = {
         this.fetchData(); // Then fetch daily data
         this.fetchYesterdayProgress(); // Fetch ghost runner data
         this.fetchAIInsights(); // Fetch AI recommendations
+        this.fetchSubjectEfficiency(); // Fetch efficiency patterns
         this.startUpdateLoop();
         this.initECG();
         setInterval(() => {
             this.fetchData();
             this.fetchYesterdayProgress();
+            this.fetchSubjectEfficiency();
         }, 30000);
     },
 
@@ -213,6 +216,19 @@ const StudyTargetTracker = {
         }
     },
 
+    async fetchSubjectEfficiency() {
+        try {
+            const response = await fetch('api/analytics/get-subject-efficiency.php');
+            const result = await response.json();
+            if (result.success) {
+                this.efficiency = result.data;
+                this.renderSubjectCards(); // Re-render to show indicators
+            }
+        } catch (e) {
+            console.error("Efficiency API Error:", e);
+        }
+    },
+
     checkFeasibility(timeLeft, studyNeeded) {
         const statusEl = document.getElementById('feasibility-status');
         const iconContainer = document.getElementById('feasibility-icon-container');
@@ -289,10 +305,23 @@ const StudyTargetTracker = {
         container.innerHTML = this.subjects.map(subject => {
             const studied = this.formatTime(subject.seconds);
             const remaining = this.formatTime(equalLoad);
+            const eff = this.efficiency[subject.subject_id] || { status: 'neutral', reason: 'No data' };
+
+            const statusColors = {
+                efficient: 'bg-emerald-500',
+                grinding: 'bg-amber-500',
+                empty: 'bg-rose-500',
+                neutral: 'bg-slate-400'
+            };
 
             return `
-                <div class="bg-white p-4 rounded-xl border border-gray-100 subject-mini-card">
-                    <h4 class="font-black text-gray-800 text-sm mb-3 truncate">${subject.subject_name}</h4>
+                <div class="bg-white p-4 rounded-xl border border-gray-100 subject-mini-card group transition-all hover:shadow-md">
+                    <div class="flex justify-between items-start mb-3">
+                        <h4 class="font-black text-gray-800 text-sm truncate flex-1">${subject.subject_name}</h4>
+                        <div class="flex items-center gap-1" title="${eff.reason}">
+                            <span class="efficiency-pulse efficiency-${eff.status}"></span>
+                        </div>
+                    </div>
                     <div class="space-y-2">
                         <div class="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
                             <span class="text-gray-400">Studied</span>
@@ -306,6 +335,11 @@ const StudyTargetTracker = {
                     <div class="mt-3 pt-3 border-t border-gray-50 flex justify-between items-center">
                          <span class="text-[9px] font-black text-gray-300 uppercase">Sessions: ${subject.session_count}</span>
                          <span class="material-symbols-outlined text-sm text-blue-200">monitoring</span>
+                    </div>
+                    <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute top-0 left-0 w-full h-full bg-white/95 rounded-xl p-4 flex flex-col justify-center gap-1 pointer-events-none">
+                        <p class="text-[9px] font-black text-gray-400 uppercase">Efficiency Status</p>
+                        <p class="text-[10px] font-bold text-gray-800">${eff.reason}</p>
+                        ${eff.accuracy ? `<p class="text-[9px] font-black text-indigo-600 uppercase">Accuracy: ${eff.accuracy}%</p>` : ''}
                     </div>
                 </div>
             `;
