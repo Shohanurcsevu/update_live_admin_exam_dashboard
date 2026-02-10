@@ -79,6 +79,11 @@ function initializeDashboardPage() {
             fetchAndRenderDisciplineTracker();
             fetchAndRenderBadges();
             fetchAndRenderMasteryTrends(); // NEW: Mastery Trends
+
+            // Initialize Study Target Tracker (NEW)
+            if (window.StudyTargetTracker) {
+                window.StudyTargetTracker.init();
+            }
         } catch (error) { console.error("Error fetching metrics:", error); }
     }
 
