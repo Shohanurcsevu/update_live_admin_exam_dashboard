@@ -14,6 +14,8 @@ const StudyTargetTracker = {
     allSubjects: [],
     efficiency: {},
     currentPaceMultiplier: 1.0,
+    protocolActive: false,
+    protocolTriggered: false,
 
     async init() {
         console.log("Initializing Study Target Tracker...");
@@ -26,6 +28,7 @@ const StudyTargetTracker = {
         this.initECG();
         this.initFlowOrb();
         this.initPaceSlider();
+        this.initMissionControl();
         setInterval(() => {
             this.fetchData();
             this.fetchYesterdayProgress();
@@ -194,6 +197,13 @@ const StudyTargetTracker = {
                 ghostBar.style.width = `${yesterdayPercent}%`;
             }
 
+            const diffSeconds = this.studiedSeconds - this.yesterdaySeconds;
+
+            // Trigger Comeback Protocol if > 1 hour behind
+            if (diffSeconds < -3600 && !this.protocolActive && !this.protocolTriggered) {
+                this.showMissionBanner();
+            }
+
             if (paceEl) {
                 const diffSeconds = this.studiedSeconds - this.yesterdaySeconds;
                 const absDiff = Math.abs(diffSeconds);
@@ -304,34 +314,56 @@ const StudyTargetTracker = {
             if (simBar) {
                 if (val !== 1.0) {
                     simBar.classList.remove('hidden');
-                    // Calculate where we would be at 100% of target if we finish at this pace
-                    // For visualization, we show how much "ahead" or "behind" the finish point moves
                     const dailyTargetSeconds = 15 * 3600;
                     const remainingSeconds = Math.max(0, dailyTargetSeconds - this.studiedSeconds);
-
-                    // The "simulated" percentage is basically showing the projected finish line
-                    // But to keep it simple, let's just show a highlight of the "boost"
                     const currentPercent = (this.studiedSeconds / dailyTargetSeconds) * 100;
                     const simulatedGain = ((remainingSeconds - (remainingSeconds / val)) / dailyTargetSeconds) * 100;
 
                     if (val > 1.0) {
                         simBar.style.left = `${currentPercent}%`;
                         simBar.style.width = `${simulatedGain}%`;
-                        simBar.style.background = 'rgba(16, 185, 129, 0.2)'; // Emerald ghost
+                        simBar.style.background = 'rgba(16, 185, 129, 0.2)';
                     } else {
                         simBar.style.left = `${currentPercent + (simulatedGain)}%`;
                         simBar.style.width = `${Math.abs(simulatedGain)}%`;
-                        simBar.style.background = 'rgba(244, 63, 94, 0.2)'; // Rose ghost
+                        simBar.style.background = 'rgba(244, 63, 94, 0.2)';
                     }
                 } else {
                     simBar.classList.add('hidden');
                 }
             }
 
-            // Force immediate UI update for prediction
             const remainingStudySeconds = Math.max(0, this.DAILY_TARGET_SECONDS - this.studiedSeconds);
             this.updatePredictedFinish(remainingStudySeconds);
         });
+    },
+
+    initMissionControl() {
+        const btn = document.getElementById('initiate-protocol-btn');
+        const container = document.getElementById('mission-theme-container');
+        const banner = document.getElementById('mission-control-banner');
+
+        if (btn) {
+            btn.addEventListener('click', () => {
+                this.protocolActive = true;
+                if (container) container.classList.add('mission-stealth');
+                if (banner) banner.classList.remove('active');
+                this.showToast("Comeback Protocol Initiated. Stealth Mode Active.", "info");
+            });
+        }
+    },
+
+    showMissionBanner() {
+        const banner = document.getElementById('mission-control-banner');
+        if (banner) {
+            banner.classList.add('active');
+            this.protocolTriggered = true;
+            this.showToast("Critical Lag Detected. Initiate Protocol?", "warning");
+        }
+    },
+
+    showToast(msg, type) {
+        console.log(`[ST-TRACKER] ${type.toUpperCase()}: ${msg}`);
     },
 
     checkFeasibility(timeLeft, studyNeeded) {
@@ -502,10 +534,14 @@ const StudyTargetTracker = {
                 y += (Math.random() - 0.5) * 3; // Nervous baseline
             }
 
+            // Dynamic Accent Colors
+            const accentHex = this.protocolActive ? '#22d3ee' : '#ef4444';
+            const accentRgb = this.protocolActive ? '34, 211, 238' : '239, 68, 68';
+
             // Sync card pulse with big spikes
             if (activeSpike && containerRoot) {
                 containerRoot.style.transform = 'scale(1.005)';
-                containerRoot.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                containerRoot.style.borderColor = `rgba(${accentRgb}, 0.4)`;
             } else if (containerRoot) {
                 containerRoot.style.transform = 'scale(1)';
                 containerRoot.style.borderColor = 'rgba(15, 23, 42, 0.1)';
@@ -526,7 +562,7 @@ const StudyTargetTracker = {
             }
 
             // Draw Neon Grid
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.05)';
+            ctx.strokeStyle = `rgba(${accentRgb}, 0.05)`;
             ctx.lineWidth = 0.5;
             for (let i = 0; i < canvas.width; i += 30) {
                 ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
@@ -535,7 +571,7 @@ const StudyTargetTracker = {
             // Draw Particles
             particles.forEach((p, idx) => {
                 ctx.beginPath();
-                ctx.fillStyle = `rgba(239, 68, 68, ${p.life})`;
+                ctx.fillStyle = `rgba(${accentRgb}, ${p.life})`;
                 ctx.arc(p.x, p.y, 1, 0, Math.PI * 2);
                 ctx.fill();
                 p.x += p.vx;
@@ -546,13 +582,13 @@ const StudyTargetTracker = {
 
             // Draw Main ECG Line with Glow
             ctx.shadowBlur = 12;
-            ctx.shadowColor = '#ef4444';
+            ctx.shadowColor = accentHex;
             ctx.beginPath();
 
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.1)');
-            gradient.addColorStop(0.8, 'rgba(239, 68, 68, 0.8)');
-            gradient.addColorStop(1, '#ef4444');
+            gradient.addColorStop(0, `rgba(${accentRgb}, 0.1)`);
+            gradient.addColorStop(0.8, `rgba(${accentRgb}, 0.8)`);
+            gradient.addColorStop(1, accentHex);
 
             ctx.strokeStyle = gradient;
             ctx.lineWidth = 2.5;
@@ -572,13 +608,13 @@ const StudyTargetTracker = {
 
             ctx.shadowBlur = 20;
             ctx.beginPath();
-            ctx.fillStyle = '#ef4444';
+            ctx.fillStyle = accentHex;
             ctx.arc(lx, lastPoint.y, 3.5, 0, Math.PI * 2);
             ctx.fill();
 
             // Outer Ring
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+            ctx.strokeStyle = `rgba(${accentRgb}, 0.5)`;
             ctx.arc(lx, lastPoint.y, 7 + Math.sin(frameCount * 0.1) * 3, 0, Math.PI * 2);
             ctx.stroke();
 
@@ -629,10 +665,14 @@ const StudyTargetTracker = {
 
             // Set properties based on state
             let speed = 0.02;
-            let color = '#ef4444'; // Neutral/Red
+            let color = this.protocolActive ? '#22d3ee' : '#ef4444'; // Use Cyan in Stealth Mode
             let viscosity = 0.5;
 
-            if (this.orbState === 'heaven') {
+            if (this.protocolActive) {
+                speed = 0.1; // Maximum overdrive
+                viscosity = 0.9;
+                color = '#a855f7'; // Shift to Violet in Overdrive
+            } else if (this.orbState === 'heaven') {
                 speed = 0.08;
                 color = '#10b981'; // Emerald
                 viscosity = 0.8;

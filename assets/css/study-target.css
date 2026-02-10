@@ -263,6 +263,71 @@
     box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
 }
 
+/* The Comeback Protocol: Stealth Mode */
+#mission-theme-container.mission-stealth {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
+    border-color: rgba(34, 211, 238, 0.3) !important;
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.2), inset 0 0 20px rgba(34, 211, 238, 0.1) !important;
+}
+
+.mission-stealth h2,
+.mission-stealth p,
+.mission-stealth span,
+.mission-stealth div:not(.ecg-container):not(.orb-container) {
+    color: #f8fafc !important;
+}
+
+.mission-stealth .text-gray-400,
+.mission-stealth .text-slate-400 {
+    color: #cbd5e1 !important;
+}
+
+.mission-stealth .bg-white\/40,
+.mission-stealth .bg-slate-900\/5 {
+    background: rgba(30, 41, 59, 0.5) !important;
+    border-color: rgba(34, 211, 238, 0.2) !important;
+}
+
+.mission-stealth #target-percentage {
+    color: #22d3ee !important;
+    text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+}
+
+.mission-stealth #feasibility-status {
+    color: #22d3ee !important;
+}
+
+#mission-control-banner.active {
+    display: flex !important;
+    animation: bannerSlideDown 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes bannerSlideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-spin-slow {
+    animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @keyframes fadeInSlide {
     from {
         opacity: 0;
