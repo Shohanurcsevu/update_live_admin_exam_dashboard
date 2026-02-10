@@ -216,7 +216,7 @@ const StudyTargetTracker = {
             if (bufferDisplay) {
                 if (bufferSeconds >= 0) {
                     bufferDisplay.textContent = `+${bufferFormatted}`;
-                    bufferDisplay.className = "text-xs font-black text-emerald-600";
+                    bufferDisplay.className = "text-xl font-black text-emerald-600";
                     if (bufferBadge) {
                         bufferBadge.textContent = "Safe Margin";
                         bufferBadge.className = "text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter";
@@ -227,7 +227,7 @@ const StudyTargetTracker = {
                     }
                 } else {
                     bufferDisplay.textContent = `-${bufferFormatted}`;
-                    bufferDisplay.className = "text-xs font-black text-rose-600";
+                    bufferDisplay.className = "text-xl font-black text-rose-600";
                     if (bufferBadge) {
                         bufferBadge.textContent = "Overdue";
                         bufferBadge.className = "text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter";
@@ -290,7 +290,7 @@ const StudyTargetTracker = {
 
         if (remainingSeconds <= 0) {
             clockEl.textContent = "Goal Reached! 🎉";
-            clockEl.className = "text-xs font-black text-emerald-600";
+            clockEl.className = "text-xl font-black text-emerald-600";
             return;
         }
 
@@ -311,11 +311,11 @@ const StudyTargetTracker = {
         clockEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
 
         if (multiplier > 1) {
-            clockEl.className = "text-xs font-black text-emerald-600 animate-pulse";
+            clockEl.className = "text-xl font-black text-emerald-600 animate-pulse";
         } else if (multiplier < 1) {
-            clockEl.className = "text-xs font-black text-rose-600 animate-pulse";
+            clockEl.className = "text-xl font-black text-rose-600 animate-pulse";
         } else {
-            clockEl.className = "text-xs font-black text-indigo-600 animate-pulse";
+            clockEl.className = "text-xl font-black text-indigo-600 animate-pulse";
         }
     },
 
