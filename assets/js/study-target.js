@@ -411,7 +411,7 @@ const StudyTargetTracker = {
 
             // Draw ECG line
             ctx.beginPath();
-            ctx.strokeStyle = '#3b82f6';
+            ctx.strokeStyle = '#ef4444'; // Changed to Red
             ctx.lineWidth = 2;
             ctx.lineJoin = 'round';
 
@@ -425,7 +425,7 @@ const StudyTargetTracker = {
             // Leading dot with glow
             const lastPoint = points[points.length - 1];
             ctx.beginPath();
-            ctx.fillStyle = '#3b82f6';
+            ctx.fillStyle = '#ef4444'; // Changed to Red
             ctx.arc((points.length - 1) / maxPoints * canvas.width, lastPoint.y, 3, 0, Math.PI * 2);
             ctx.fill();
 
