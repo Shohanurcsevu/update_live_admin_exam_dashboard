@@ -26,6 +26,10 @@ class StudyMentor {
 
     init() {
         window.studyMentor = this; // Expose for onclick handlers
+        // Request notification permission
+        if ("Notification" in window && Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
         this.createWidget();
         this.attachEventListeners();
         this.fetchMentorData();
@@ -770,6 +774,31 @@ class StudyMentor {
         return null;
     }
 
+    checkMissionProgressAndNotify() {
+        if (!this.mentorData || !this.mentorData.subjects) return;
+
+        const subjects = this.mentorData.subjects;
+        const missionRoadmap = subjects.map(subj => {
+            const todayExams = subj.today_exams || [];
+            const isCreated = todayExams.length > 0;
+            const completedCount = todayExams.filter(exam => exam.is_completed).length;
+            const isTaken = isCreated && (completedCount === todayExams.length);
+            return { isCreated, isTaken };
+        });
+
+        const totalSubjects = missionRoadmap.length;
+        const completedSubjects = missionRoadmap.filter(m => m.isTaken).length;
+        const remaining = totalSubjects - completedSubjects;
+
+        if (remaining > 0) {
+            if (Notification.permission === "granted") {
+                new Notification("AI Study Mentor", {
+                    body: `Sohan, you have ${remaining} subject missions left to complete! Stay focused.`,
+                });
+            }
+        }
+    }
+
     startTimeBasedNudges() {
         const earlyMessages = [
             "পড় সোহান পড়, দেখায় দে তুই কি!",
@@ -950,7 +979,10 @@ class StudyMentor {
         };
 
         // Every 1 hour (3600000 ms)
-        setInterval(showNudge, 3600000);
+        setInterval(() => {
+            showNudge();
+            this.checkMissionProgressAndNotify();
+        }, 3600000);
     }
 
     toBengaliNumber(n) {
