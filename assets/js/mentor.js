@@ -540,6 +540,21 @@ class StudyMentor {
                     <div class="mt-4 pt-4 border-t border-gray-100">
                         <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</p>
                         <div class="space-y-2">
+                            <button onclick="window.loadPage('exam')" 
+                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
+                                <span class="material-symbols-outlined text-emerald-500 text-lg">assignment</span>
+                                <span>Create Exams</span>
+                            </button>
+                            <button onclick="window.loadPage('take-exam-list')" 
+                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm bg-purple-50 group border border-purple-100">
+                                <span class="material-symbols-outlined text-purple-600 text-lg group-hover:scale-110 transition-transform">school</span>
+                                <span class="font-bold text-purple-700">Take a New Exam</span>
+                            </button>
+                            <button onclick="window.loadPage('import-questions')" 
+                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
+                                <span class="material-symbols-outlined text-emerald-500 text-lg">upload_file</span>
+                                <span>Import Questions</span>
+                            </button>
                             <button onclick="window.loadPage('mistake-bank')" 
                                 class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
                                 <span class="material-symbols-outlined text-rose-500 text-lg">psychology</span>
