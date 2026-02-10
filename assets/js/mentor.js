@@ -88,6 +88,11 @@ class StudyMentor {
             this.focusSession.timeRemaining--;
             this.updateFocusUI();
 
+            // 5-Minute Warning
+            if (this.focusSession.timeRemaining === 300) { // 300 seconds = 5 minutes
+                this.sendNotification("AI Mentor: Focus Check", `5 minutes left! Finish strong, Sohan. You're crushing ${this.focusSession.subject}!`);
+            }
+
             if (this.focusSession.timeRemaining <= 0) {
                 this.completeFocusSession();
             }
@@ -208,6 +213,9 @@ class StudyMentor {
             });
         }
 
+        // Notification
+        this.sendNotification("AI Mentor: Session Complete", `Victory! 25 minutes of ${completedSubject} completed.`);
+
         const teaserText = document.getElementById('teaser-text');
         if (teaserText) {
             teaserText.innerHTML = `
@@ -255,6 +263,7 @@ class StudyMentor {
             this.updateBreakUI();
 
             if (this.breakSession.timeRemaining <= 0) {
+                this.sendNotification("AI Mentor: Break Over", "Time to get back to work! Let's go.");
                 this.stopFocusSession();
                 // Show a final "Back to work" nudge
                 this.showWelcomeGreeting();
@@ -630,6 +639,20 @@ class StudyMentor {
         const panel = document.getElementById('mentor-panel');
         panel?.classList.add('hidden');
         this.isOpen = false;
+    }
+
+    sendNotification(title, body) {
+        if (!("Notification" in window)) return;
+
+        if (Notification.permission === "granted") {
+            new Notification(title, { body: body, icon: 'assets/img/icon.png' });
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification(title, { body: body, icon: 'assets/img/icon.png' });
+                }
+            });
+        }
     }
 
     async fetchMentorData() {
