@@ -13,6 +13,7 @@ const StudyTargetTracker = {
     subjects: [],
     allSubjects: [],
     efficiency: {},
+    currentPaceMultiplier: 1.0,
 
     async init() {
         console.log("Initializing Study Target Tracker...");
@@ -24,6 +25,7 @@ const StudyTargetTracker = {
         this.startUpdateLoop();
         this.initECG();
         this.initFlowOrb();
+        this.initPaceSlider();
         setInterval(() => {
             this.fetchData();
             this.fetchYesterdayProgress();
@@ -246,9 +248,11 @@ const StudyTargetTracker = {
             return;
         }
 
-        // Calculation: Now + Remaining Time + Break Buffer (allow 10% for breaks/distractions)
+        // Calculation: Now + (Remaining Time / Multiplier) + Break Buffer
         const bufferMultiplier = 1.1;
-        const totalSecondsToGoal = remainingSeconds * bufferMultiplier;
+        const multiplier = this.currentPaceMultiplier || 1.0;
+        const simulatedRemaining = (remainingSeconds / multiplier);
+        const totalSecondsToGoal = simulatedRemaining * bufferMultiplier;
 
         const finishDate = new Date();
         finishDate.setSeconds(finishDate.getSeconds() + totalSecondsToGoal);
@@ -259,7 +263,67 @@ const StudyTargetTracker = {
         const displayH = h % 12 || 12;
 
         clockEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
-        clockEl.className = "text-xs font-black text-indigo-600 animate-pulse";
+
+        if (multiplier > 1) {
+            clockEl.className = "text-xs font-black text-emerald-600 animate-pulse";
+        } else if (multiplier < 1) {
+            clockEl.className = "text-xs font-black text-rose-600 animate-pulse";
+        } else {
+            clockEl.className = "text-xs font-black text-indigo-600 animate-pulse";
+        }
+    },
+
+    initPaceSlider() {
+        const slider = document.getElementById('pace-slider');
+        const label = document.getElementById('pace-multiplier-label');
+        const simBar = document.getElementById('sim-ghost-bar');
+
+        if (!slider) return;
+
+        slider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            this.currentPaceMultiplier = val;
+
+            if (label) {
+                let text = `${val.toFixed(1)}x`;
+                if (val === 1.0) text += " (Normal)";
+                else if (val > 1.0) text += " (Speed)";
+                else text += " (Slow)";
+                label.textContent = text;
+            }
+
+            // Update Ghost Bar Visibility
+            if (simBar) {
+                if (val !== 1.0) {
+                    simBar.classList.remove('hidden');
+                    // Calculate where we would be at 100% of target if we finish at this pace
+                    // For visualization, we show how much "ahead" or "behind" the finish point moves
+                    const dailyTargetSeconds = 15 * 3600;
+                    const remainingSeconds = Math.max(0, dailyTargetSeconds - this.studiedSeconds);
+
+                    // The "simulated" percentage is basically showing the projected finish line
+                    // But to keep it simple, let's just show a highlight of the "boost"
+                    const currentPercent = (this.studiedSeconds / dailyTargetSeconds) * 100;
+                    const simulatedGain = ((remainingSeconds - (remainingSeconds / val)) / dailyTargetSeconds) * 100;
+
+                    if (val > 1.0) {
+                        simBar.style.left = `${currentPercent}%`;
+                        simBar.style.width = `${simulatedGain}%`;
+                        simBar.style.background = 'rgba(16, 185, 129, 0.2)'; // Emerald ghost
+                    } else {
+                        simBar.style.left = `${currentPercent + (simulatedGain)}%`;
+                        simBar.style.width = `${Math.abs(simulatedGain)}%`;
+                        simBar.style.background = 'rgba(244, 63, 94, 0.2)'; // Rose ghost
+                    }
+                } else {
+                    simBar.classList.add('hidden');
+                }
+            }
+
+            // Force immediate UI update for prediction
+            const remainingStudySeconds = Math.max(0, this.DAILY_TARGET_SECONDS - this.studiedSeconds);
+            this.updatePredictedFinish(remainingStudySeconds);
+        });
     },
 
     checkFeasibility(timeLeft, studyNeeded) {

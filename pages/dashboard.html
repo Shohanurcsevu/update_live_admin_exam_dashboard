@@ -100,10 +100,27 @@
                             <div id="ghost-progress-bar"
                                 class="absolute top-0 left-0 h-full bg-amber-400/30 transition-all duration-1000 ease-out"
                                 style="width: 0%"></div>
+                            <!-- Simulation Ghost (NEW) -->
+                            <div id="sim-ghost-bar"
+                                class="absolute top-0 left-0 h-full bg-indigo-400/20 transition-all duration-300 ease-out hidden"
+                                style="width: 0%"></div>
                             <!-- Today's Actual Progress -->
                             <div id="main-progress-bar"
                                 class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-600 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out"
                                 style="width: 0%"></div>
+                        </div>
+
+                        <!-- Pace Simulation Slider (NEW) -->
+                        <div class="mt-4 px-2">
+                            <div class="flex justify-between items-center mb-1">
+                                <label for="pace-slider"
+                                    class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Time-Travel
+                                    Pace Simulator</label>
+                                <span id="pace-multiplier-label"
+                                    class="text-[9px] font-black text-indigo-600 uppercase">1.0x (Normal)</span>
+                            </div>
+                            <input type="range" id="pace-slider" min="0.5" max="2.0" step="0.1" value="1.0"
+                                class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer pace-slider-input bg-gradient-to-r from-indigo-500 to-emerald-500">
                         </div>
                         <div
                             class="flex justify-between text-[8px] font-black text-gray-400 uppercase tracking-tighter">
