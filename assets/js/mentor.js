@@ -21,6 +21,7 @@ class StudyMentor {
             currentActivity: null
         };
         this.countdownRefreshInterval = null; // For Boss Challenge countdown updates
+        this.reportRefreshInterval = null; // For real-time study report updates
         this.init();
     }
 
@@ -602,6 +603,12 @@ class StudyMentor {
             this.isOpen = true;
             // Always fetch fresh data when opening to reflect recent study sessions
             this.fetchMentorData();
+
+            // Refresh the study report every 10 seconds while open
+            if (this.reportRefreshInterval) clearInterval(this.reportRefreshInterval);
+            this.reportRefreshInterval = setInterval(() => {
+                if (this.isOpen) this.renderRecommendations();
+            }, 10000);
         }
     }
 
@@ -639,6 +646,11 @@ class StudyMentor {
         const panel = document.getElementById('mentor-panel');
         panel?.classList.add('hidden');
         this.isOpen = false;
+
+        if (this.reportRefreshInterval) {
+            clearInterval(this.reportRefreshInterval);
+            this.reportRefreshInterval = null;
+        }
     }
 
     sendNotification(title, body) {
@@ -1079,6 +1091,46 @@ class StudyMentor {
         `;
 
         let recommendationsHTML = '';
+
+        // --- NEW: Daily Study Report ---
+        if (window.StudyTargetTracker) {
+            const studiedSeconds = window.StudyTargetTracker.studiedSeconds || 0;
+            const targetSeconds = window.StudyTargetTracker.DAILY_TARGET_SECONDS || (15 * 3600);
+            const studiedFormatted = window.StudyTargetTracker.formatTime(studiedSeconds);
+            const percent = Math.min(100, Math.round((studiedSeconds / targetSeconds) * 100));
+
+            // Get predicted finish from the tracker's logic or DOM
+            const predictedFinish = document.getElementById('predicted-finish-clock')?.textContent || "--:--";
+            const isMissionMode = window.StudyTargetTracker.protocolActive;
+
+            recommendationsHTML += `
+                <div class="bg-gradient-to-br ${isMissionMode ? 'from-slate-900 to-indigo-950 border-indigo-500/30' : 'from-indigo-50 to-blue-50 border-indigo-100'} border p-4 rounded-2xl mb-4 shadow-sm relative overflow-hidden">
+                    ${isMissionMode ? '<div class="absolute top-0 left-0 w-full h-0.5 bg-cyan-500 animate-pulse"></div>' : ''}
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-indigo-600 ${isMissionMode ? 'text-cyan-400' : ''} text-lg">timer</span>
+                            <span class="text-[10px] font-black uppercase tracking-widest ${isMissionMode ? 'text-indigo-300' : 'text-indigo-900/60'}">Daily Study Report</span>
+                        </div>
+                        <span class="text-[10px] font-bold ${isMissionMode ? 'text-cyan-400' : 'text-indigo-600'} uppercase">${percent}% Goal</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="bg-white/50 ${isMissionMode ? 'bg-slate-800/50' : ''} p-2 rounded-xl">
+                            <p class="text-[8px] font-black ${isMissionMode ? 'text-slate-400' : 'text-gray-400'} uppercase tracking-tighter">Time Studied</p>
+                            <p class="text-sm font-black ${isMissionMode ? 'text-white' : 'text-gray-900'}">${studiedFormatted}</p>
+                        </div>
+                        <div class="bg-white/50 ${isMissionMode ? 'bg-slate-800/50' : ''} p-2 rounded-xl">
+                            <p class="text-[8px] font-black ${isMissionMode ? 'text-slate-400' : 'text-gray-400'} uppercase tracking-tighter">Est. Finish</p>
+                            <p class="text-sm font-black ${isMissionMode ? 'text-indigo-500' : 'text-indigo-600'}">${predictedFinish}</p>
+                        </div>
+                    </div>
+
+                    <div class="w-full h-1.5 bg-gray-200/50 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-1000" style="width: ${percent}%"></div>
+                    </div>
+                </div>
+            `;
+        }
 
         // --- BOSS CHALLENGE CARD ---
         const challenge = this.mentorData.boss_challenge;
