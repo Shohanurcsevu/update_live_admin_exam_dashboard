@@ -15,14 +15,16 @@ const StudyTargetTracker = {
 
     async init() {
         console.log("Initializing Study Target Tracker...");
-        await this.fetchAllSubjects();
-        this.fetchData();
+        await this.fetchAllSubjects(); // Fetch all subjects first
+        this.fetchData(); // Then fetch daily data
+        this.fetchYesterdayProgress(); // Fetch ghost runner data
         this.fetchAIInsights(); // Fetch AI recommendations
         this.startUpdateLoop();
         this.initECG();
-
-        // Fetch every 30 seconds for data, but update UI every second
-        setInterval(() => this.fetchData(), 30000);
+        setInterval(() => {
+            this.fetchData();
+            this.fetchYesterdayProgress();
+        }, 30000);
     },
 
     async fetchAIInsights() {
@@ -162,7 +164,53 @@ const StudyTargetTracker = {
             firstActivityEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
         }
 
+        // --- NEW: Ghost Runner & Pace Logic ---
+        const mainBar = document.getElementById('main-progress-bar');
+        const ghostBar = document.getElementById('ghost-progress-bar');
+        const percentageEl = document.getElementById('target-percentage');
+        const paceEl = document.getElementById('pace-indicator');
+
+        const dailyTargetSeconds = 15 * 3600;
+        const todayPercent = Math.min(100, (this.studiedSeconds / dailyTargetSeconds) * 100);
+
+        if (mainBar) mainBar.style.width = `${todayPercent}%`;
+        if (percentageEl) percentageEl.textContent = `${Math.round(todayPercent)}%`;
+
+        if (this.yesterdaySeconds !== undefined) {
+            const yesterdayPercent = Math.min(100, (this.yesterdaySeconds / dailyTargetSeconds) * 100);
+            if (ghostBar) {
+                ghostBar.style.width = `${yesterdayPercent}%`;
+            }
+
+            if (paceEl) {
+                const diffSeconds = this.studiedSeconds - this.yesterdaySeconds;
+                const absDiff = Math.abs(diffSeconds);
+                const diffFormatted = this.formatTime(absDiff);
+
+                paceEl.classList.remove('hidden');
+                if (diffSeconds >= 0) {
+                    paceEl.textContent = `${diffFormatted} ahead of yesterday`;
+                    paceEl.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600";
+                } else {
+                    paceEl.textContent = `${diffFormatted} behind yesterday`;
+                    paceEl.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600";
+                }
+            }
+        }
+
         this.checkFeasibility(secondsUntilMidnight, remainingStudySeconds);
+    },
+
+    async fetchYesterdayProgress() {
+        try {
+            const response = await fetch('api/analytics/get-yesterday-progress.php');
+            const result = await response.json();
+            if (result.success) {
+                this.yesterdaySeconds = result.data.yesterday_total_seconds;
+            }
+        } catch (e) {
+            console.error("Ghost Runner Error:", e);
+        }
     },
 
     checkFeasibility(timeLeft, studyNeeded) {

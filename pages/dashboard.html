@@ -64,6 +64,43 @@
                         </div>
                     </div>
 
+                    <!-- Progress Visualization & Ghost Runner (NEW) -->
+                    <div class="mt-8 space-y-2">
+                        <div class="flex justify-between items-end mb-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Daily Goal
+                                    Progress</span>
+                                <span id="pace-indicator"
+                                    class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hidden">Checking
+                                    pace...</span>
+                            </div>
+                            <span id="target-percentage" class="text-xs font-black text-gray-900">0%</span>
+                        </div>
+                        <div
+                            class="relative w-full h-4 bg-gray-100/50 rounded-full overflow-hidden border border-gray-100">
+                            <!-- Ghost Runner (Yesterday's Progress Shadow) -->
+                            <div id="ghost-progress-bar"
+                                class="absolute top-0 left-0 h-full bg-amber-400/30 transition-all duration-1000 ease-out"
+                                style="width: 0%"></div>
+                            <!-- Today's Actual Progress -->
+                            <div id="main-progress-bar"
+                                class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-600 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out"
+                                style="width: 0%"></div>
+                        </div>
+                        <div
+                            class="flex justify-between text-[8px] font-black text-gray-400 uppercase tracking-tighter">
+                            <span>0h</span>
+                            <div class="flex gap-4">
+                                <span class="flex items-center gap-1"><i
+                                        class="w-1.5 h-1.5 rounded-full bg-indigo-500"></i> Today</span>
+                                <span class="flex items-center gap-1"><i
+                                        class="w-1.5 h-1.5 rounded-full bg-amber-300"></i> Ghost Runner
+                                    (Yesterday)</span>
+                            </div>
+                            <span>15h</span>
+                        </div>
+                    </div>
+
                     <!-- AI Insights Section (NEW) -->
                     <div id="ai-insights-container" class="mt-6 pt-6 border-t border-white/30 hidden">
                         <div class="flex flex-col sm:flex-row gap-4">

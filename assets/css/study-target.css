@@ -83,3 +83,30 @@
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* Ghost Runner Visuals */
+#ghost-progress-bar {
+    filter: blur(1px);
+    z-index: 1;
+}
+
+#main-progress-bar {
+    z-index: 2;
+}
+
+#pace-indicator {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: fadeInSlide 0.5s ease-out;
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
