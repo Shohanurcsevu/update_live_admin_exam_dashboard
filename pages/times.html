@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics | Rethink</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg: #05060b;
+            --card-bg: rgba(13, 17, 23, 0.7);
+            --accent: 79, 70, 229;
+            /* Indigo-600 */
+            --accent-glow: rgba(79, 70, 229, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: #f8fafc;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        h1,
+        h2,
+        h3,
+        .font-display {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Decorative background elements */
+        .glow-blob {
+            position: fixed;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.05) 50%, transparent 70%);
+            border-radius: 50%;
+            z-index: -1;
+            filter: blur(60px);
+            pointer-events: none;
+        }
+
+        .blob-1 {
+            top: -10%;
+            right: -10%;
+        }
+
+        .blob-2 {
+            bottom: -10%;
+            left: -10%;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .segmented-control {
+            background: rgba(30, 41, 59, 0.6);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .range-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .range-btn.active {
+            background: white;
+            color: #0f172a;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .premium-gradient {
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .progress-glow {
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <div id="analytics-root" class="min-h-screen bg-[#05060b] text-[#f8fafc] relative overflow-hidden">
+        <!-- Background Blobs -->
+        <div class="glow-blob blob-1"></div>
+        <div class="glow-blob blob-2"></div>
+
+        <div class="max-w-7xl mx-auto px-6 py-12 relative z-10">
+            <!-- Header -->
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-16">
+                <div class="space-y-2">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="p-2 bg-indigo-500/20 rounded-lg">
+                            <i data-lucide="bar-chart-3" class="w-6 h-6 text-indigo-400"></i>
+                        </div>
+                        <span class="text-xs font-bold uppercase tracking-[0.2em] text-indigo-400/80">Performance
+                            Hub</span>
+                    </div>
+                    <h1 class="text-4xl md:text-5xl font-black text-white leading-tight">Study <span
+                            class="gradient-text">Analytics</span></h1>
+                    <p class="text-gray-400 max-w-md">Comprehensive insights into your learning patterns and focus
+                        journey.
+                    </p>
+                </div>
+
+                <div class="segmented-control flex items-center">
+                    <button onclick="loadAnalytics('today')"
+                        class="range-btn py-2 px-6 rounded-lg text-sm font-semibold text-gray-400 active"
+                        id="btn-today">Today</button>
+                    <button onclick="loadAnalytics('week')"
+                        class="range-btn py-2 px-6 rounded-lg text-sm font-semibold text-gray-400"
+                        id="btn-week">Week</button>
+                    <button onclick="loadAnalytics('month')"
+                        class="range-btn py-2 px-6 rounded-lg text-sm font-semibold text-gray-400"
+                        id="btn-month">Month</button>
+                    <button onclick="loadAnalytics('last_month')"
+                        class="range-btn py-2 px-5 rounded-lg text-sm font-semibold text-gray-400"
+                        id="btn-last_month">Last
+                        Month</button>
+                    <button onclick="loadAnalytics('year')"
+                        class="range-btn py-2 px-6 rounded-lg text-sm font-semibold text-gray-400"
+                        id="btn-year">Year</button>
+                </div>
+            </header>
+
+            <!-- Main Dashboard Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+
+                <!-- Sidebar Stats -->
+                <div class="lg:col-span-1 space-y-8">
+                    <!-- Total Card -->
+                    <div class="glass-card p-8 rounded-3xl relative overflow-hidden group">
+                        <div
+                            class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all duration-500">
+                        </div>
+
+                        <div class="relative z-10">
+                            <p class="text-xs font-bold text-indigo-200/50 uppercase tracking-wider mb-2">Total
+                                Dedication
+                            </p>
+                            <h2 id="total-time-display" class="text-5xl font-black text-white mb-4">--h --m</h2>
+
+                            <div class="flex items-center gap-3">
+                                <span id="trend-indicator"
+                                    class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-800/80 text-gray-300">
+                                    --%
+                                </span>
+                                <span id="trend-text" class="text-[10px] text-gray-400 font-medium italic">vs
+                                    previous</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Efficiency Metrics Card -->
+                    <div class="glass-card p-8 rounded-3xl">
+                        <h3 class="text-sm font-bold text-indigo-100 mb-6 flex items-center gap-2">
+                            <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i>
+                            Efficiency Metrics
+                        </h3>
+                        <div id="total-breakdown" class="space-y-4">
+                            <!-- Polpulated by JS -->
+                            <div class="animate-pulse space-y-4">
+                                <div class="h-4 bg-white/5 rounded w-3/4"></div>
+                                <div class="h-4 bg-white/5 rounded w-1/2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Source Split Card -->
+                    <div class="glass-card p-8 rounded-3xl">
+                        <h3 class="text-sm font-bold text-indigo-100 mb-6 flex items-center gap-2">
+                            <i data-lucide="layers" class="w-4 h-4 text-indigo-400"></i>
+                            Source Split
+                        </h3>
+                        <div id="study-sources" class="space-y-6">
+                            <!-- Populated by JS -->
+                            <div class="animate-pulse space-y-4">
+                                <div class="h-10 bg-white/5 rounded-xl"></div>
+                                <div class="h-10 bg-white/5 rounded-xl"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="lg:col-span-3">
+                    <div class="glass-card p-10 rounded-[2.5rem] h-full">
+                        <div class="flex justify-between items-center mb-10">
+                            <h3 class="text-2xl font-black text-white">Subject Mastery</h3>
+                            <div class="text-xs text-indigo-300/40 font-bold uppercase tracking-widest">Ranked by
+                                duration</div>
+                        </div>
+
+                        <div id="subject-list" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Subject cards injected here -->
+                            <div class="col-span-full text-center py-20">
+                                <i data-lucide="loader-2"
+                                    class="w-10 h-10 text-indigo-500 animate-spin mx-auto mb-4"></i>
+                                <p class="text-gray-500">Curating your data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <a href="../dashboard.html"
+            class="fixed bottom-10 right-10 p-5 rounded-2xl glass-card flex items-center justify-center group hover:scale-110 active:scale-95 transition-all">
+            <i data-lucide="arrow-left" class="w-6 h-6 text-white group-hover:-translate-x-1 transition-transform"></i>
+        </a>
+    </div>
+
+    <script>
+        // Logic handled by assets/js/times.js
+    </script>
+</body>
+
+</html>

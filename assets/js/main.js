@@ -123,8 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
             'lesson-wise-exams': 'assets/js/lesson-wise-exams.js', 'offline-exams': 'assets/js/offline-exams.js',
             'take-offline-exam': 'assets/js/offline-exam-engine.js', 'mistake-bank': 'assets/js/mistake-bank.js',
             'discipline-tracker': 'assets/js/discipline-tracker.js', 'flashcards': 'assets/js/flashcards.js',
-            'analytics': 'assets/js/analytics.js'
+            'analytics': 'assets/js/analytics.js', 'times': 'assets/js/times.js'
         };
+
 
         if (pageScripts[page]) {
             try {

@@ -6,7 +6,8 @@
     <!-- Countdown Panel (NEW) -->
     <div id="countdown-panel" class="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <!-- Daily Study Countdown -->
-        <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+        <div
+            class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
             <div class="flex items-center gap-3 mb-2">
                 <span class="material-symbols-outlined bg-white/20 p-2 rounded-lg">schedule</span>
                 <div>
@@ -20,7 +21,8 @@
         </div>
 
         <!-- Target Job Countdown -->
-        <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+        <div
+            class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
             <div class="flex items-center gap-3 mb-2">
                 <span class="material-symbols-outlined bg-white/20 p-2 rounded-lg">target</span>
                 <div>
@@ -32,7 +34,8 @@
         </div>
 
         <!-- Year Remaining Countdown -->
-        <div class="bg-gradient-to-br from-purple-500 to-rose-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+        <div
+            class="bg-gradient-to-br from-purple-500 to-rose-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
             <div class="flex items-center gap-3 mb-2">
                 <span class="material-symbols-outlined bg-white/20 p-2 rounded-lg">calendar_today</span>
                 <div>
@@ -40,7 +43,8 @@
                     <p id="year-timer" class="text-2xl font-black tracking-tighter mt-1">00 Days : 00 Hours</p>
                 </div>
             </div>
-            <div id="year-progress-text" class="text-[10px] font-bold uppercase tracking-wider opacity-70">Loading...</div>
+            <div id="year-progress-text" class="text-[10px] font-bold uppercase tracking-wider opacity-70">Loading...
+            </div>
         </div>
     </div>
 
@@ -60,7 +64,8 @@
                 Badges</span>
         </div>
 
-        <div id="badge-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+        <div id="badge-grid" cla
+            ss="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
             <!-- Badges will be injected here -->
             <div
                 class="flex flex-col items-center text-center p-4 rounded-xl border-2 border-dashed border-gray-100 opacity-40 animate-pulse">
@@ -184,6 +189,42 @@
                     class="bg-white text-rose-600 px-6 py-2 rounded-lg font-bold hover:bg-rose-50 transition-colors shadow-sm flex items-center gap-2">
                     <span class="material-symbols-outlined text-lg">manage_history</span>
                     Manage Mistakes
+                </button>
+            </div>
+        </div>
+
+        <!-- Study Time Card (Daily Focus) -->
+        <div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <span class="bg-white/20 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">Today's
+                        Analytics</span>
+                    <h3 class="text-xl font-bold mt-2">Study Time</h3>
+                    <div class="flex items-center gap-2 mt-1">
+                        <p class="text-violet-50 text-2xl font-black"><span id="study-today-total">0h 0m</span></p>
+                        <span id="study-improvement-badge"
+                            class="hidden text-xs font-bold px-2 py-0.5 rounded-full"></span>
+                    </div>
+                </div>
+                <div class="bg-white/20 p-2 rounded-lg">
+                    <span class="material-symbols-outlined text-3xl">schedule</span>
+                </div>
+            </div>
+
+            <!-- Per-Subject Breakdown -->
+            <div id="study-subjects-container" class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                <!-- Subject bars will be injected here -->
+                <div class="text-center py-4 text-violet-100 text-sm opacity-70">
+                    <span class="material-symbols-outlined text-2xl mb-1 opacity-50">hourglass_empty</span>
+                    <p>No study sessions today yet</p>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-white/20">
+                <button id="view-study-time-btn" onclick="if(window.loadPage) window.loadPage('times')"
+                    class="w-full bg-white text-violet-600 px-6 py-2 rounded-lg font-bold hover:bg-violet-50 transition-colors shadow-sm flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-lg">insights</span>
+                    View Full Analytics
                 </button>
             </div>
         </div>

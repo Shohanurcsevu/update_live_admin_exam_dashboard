@@ -74,6 +74,7 @@ function initializeDashboardPage() {
 
             // Mistake Bank Stats
             fetchMistakeStats();
+            fetchStudyTimeStats(); // NEW: Study Time Stats
             fetchAndRenderHeatmap();
             fetchAndRenderDisciplineTracker();
             fetchAndRenderBadges();
@@ -369,6 +370,68 @@ function initializeDashboardPage() {
                 }
             }
         } catch (error) { console.error("Error fetching mistake stats:", error); }
+    }
+
+    async function fetchStudyTimeStats() {
+        try {
+            const response = await fetch('api/analytics/daily-study-time.php');
+            const result = await response.json();
+
+            if (result.success) {
+                const totalEl = document.getElementById('study-today-total');
+                const improvementBadge = document.getElementById('study-improvement-badge');
+                const subjectsContainer = document.getElementById('study-subjects-container');
+
+                // Update total time
+                if (totalEl) {
+                    totalEl.textContent = result.total_today_formatted || '0h 0m';
+                }
+
+                // Update improvement badge
+                if (improvementBadge && result.improvement_type !== 'neutral') {
+                    improvementBadge.classList.remove('hidden');
+                    const percent = Math.abs(result.improvement_percent);
+                    const arrow = result.improvement_type === 'positive' ? '↑' : '↓';
+                    const bgColor = result.improvement_type === 'positive' ? 'bg-green-400' : 'bg-orange-400';
+
+                    improvementBadge.className = `text-xs font-bold px-2 py-0.5 rounded-full ${bgColor} text-white`;
+                    improvementBadge.textContent = `${arrow} ${percent}%`;
+                    improvementBadge.title = `vs yesterday (${result.yesterday_formatted})`;
+                } else if (improvementBadge) {
+                    improvementBadge.classList.add('hidden');
+                }
+
+                // Render per-subject bars
+                if (subjectsContainer && result.subjects && result.subjects.length > 0) {
+                    const maxSeconds = Math.max(...result.subjects.map(s => s.seconds));
+
+                    subjectsContainer.innerHTML = result.subjects.map(subject => {
+                        const widthPercent = maxSeconds > 0 ? (subject.seconds / maxSeconds) * 100 : 0;
+
+                        return `
+                            <div class="bg-white/10 rounded-lg p-2.5 hover:bg-white/15 transition-colors">
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <span class="text-xs font-bold text-white truncate flex-1">${subject.subject_name}</span>
+                                    <span class="text-xs font-black text-violet-100 ml-2">${subject.formatted}</span>
+                                </div>
+                                <div class="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
+                                    <div class="bg-white h-full rounded-full transition-all duration-500" style="width: ${widthPercent}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else if (subjectsContainer) {
+                    subjectsContainer.innerHTML = `
+                        <div class="text-center py-4 text-violet-100 text-sm opacity-70">
+                            <span class="material-symbols-outlined text-2xl mb-1 opacity-50">hourglass_empty</span>
+                            <p>No study sessions today yet</p>
+                        </div>
+                    `;
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching daily study time stats:", error);
+        }
     }
 
     // --- Section 2: Exam Selection Logic ---
