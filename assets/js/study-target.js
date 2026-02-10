@@ -17,11 +17,37 @@ const StudyTargetTracker = {
         console.log("Initializing Study Target Tracker...");
         await this.fetchAllSubjects();
         this.fetchData();
+        this.fetchAIInsights(); // Fetch AI recommendations
         this.startUpdateLoop();
         this.initECG();
 
         // Fetch every 30 seconds for data, but update UI every second
         setInterval(() => this.fetchData(), 30000);
+    },
+
+    async fetchAIInsights() {
+        try {
+            const response = await fetch('api/analytics/get-ai-insights.php');
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const container = document.getElementById('ai-insights-container');
+                const textEl = document.getElementById('ai-recommendation-text');
+
+                if (container && textEl) {
+                    textEl.innerHTML = result.data.recommendation.replace(
+                        result.data.peak_window,
+                        `<span class="text-blue-600 font-black">${result.data.peak_window}</span>`
+                    ).replace(
+                        result.data.toughest_subject,
+                        `<span class="text-indigo-600 font-black">${result.data.toughest_subject}</span>`
+                    );
+                    container.classList.remove('hidden');
+                }
+            }
+        } catch (e) {
+            console.error("AI Insights Error:", e);
+        }
     },
 
     async fetchAllSubjects() {
