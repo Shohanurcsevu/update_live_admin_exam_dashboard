@@ -23,6 +23,7 @@ const StudyTargetTracker = {
         this.fetchSubjectEfficiency(); // Fetch efficiency patterns
         this.startUpdateLoop();
         this.initECG();
+        this.initFlowOrb();
         setInterval(() => {
             this.fetchData();
             this.fetchYesterdayProgress();
@@ -169,6 +170,9 @@ const StudyTargetTracker = {
 
         // --- NEW: Predicted Finish Clock ---
         this.updatePredictedFinish(remainingStudySeconds);
+
+        // --- NEW: Flow Orb Pace State ---
+        this.updateFlowOrbState();
 
         // --- NEW: Ghost Runner & Pace Logic ---
         const mainBar = document.getElementById('main-progress-bar');
@@ -511,6 +515,115 @@ const StudyTargetTracker = {
         };
 
         requestAnimationFrame(animate);
+    },
+
+    updateFlowOrbState() {
+        const container = document.querySelector('.orb-container');
+        if (!container) return;
+
+        if (this.yesterdaySeconds === undefined) return;
+
+        const diff = this.studiedSeconds - this.yesterdaySeconds;
+
+        container.classList.remove('orb-heaven', 'orb-struggle', 'orb-neutral');
+
+        if (diff > 1800) { // More than 30 mins ahead
+            container.classList.add('orb-heaven');
+            this.orbState = 'heaven';
+        } else if (diff < -1800) { // More than 30 mins behind
+            container.classList.add('orb-struggle');
+            this.orbState = 'struggle';
+        } else {
+            container.classList.add('orb-neutral');
+            this.orbState = 'neutral';
+        }
+    },
+
+    initFlowOrb() {
+        const canvas = document.getElementById('flow-orb-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = 18;
+
+        let angle = 0;
+        this.orbState = 'neutral';
+
+        const animateOrb = () => {
+            ctx.clearRect(0, 0, width, height);
+
+            // Set properties based on state
+            let speed = 0.02;
+            let color = '#ef4444'; // Neutral/Red
+            let viscosity = 0.5;
+
+            if (this.orbState === 'heaven') {
+                speed = 0.08;
+                color = '#10b981'; // Emerald
+                viscosity = 0.8;
+            } else if (this.orbState === 'struggle') {
+                speed = 0.01;
+                color = '#f59e0b'; // Amber
+                viscosity = 0.2;
+            }
+
+            angle += speed;
+
+            // Draw Liquid Sphere Background
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.1)';
+            ctx.fill();
+
+            // Draw Liquid Waves
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.clip();
+
+            // Wave 1
+            ctx.beginPath();
+            const waveHeight = radius * (1 - viscosity);
+            ctx.moveTo(0, centerY + waveHeight);
+
+            for (let x = 0; x <= width; x++) {
+                const y = centerY + Math.sin(x * 0.1 + angle) * (radius * 0.2) + (radius * (0.2 - viscosity * 0.4));
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(width, height);
+            ctx.lineTo(0, height);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.6;
+            ctx.fill();
+
+            // Wave 2 (Offset)
+            ctx.beginPath();
+            ctx.moveTo(0, centerY + waveHeight);
+            for (let x = 0; x <= width; x++) {
+                const y = centerY + Math.cos(x * 0.15 + angle * 0.8) * (radius * 0.15) + (radius * (0.3 - viscosity * 0.5));
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(width, height);
+            ctx.lineTo(0, height);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.4;
+            ctx.fill();
+
+            ctx.restore();
+
+            // Reflection/Gloss
+            ctx.beginPath();
+            ctx.arc(centerX - 5, centerY - 5, 4, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fill();
+
+            requestAnimationFrame(animateOrb);
+        };
+
+        animateOrb();
     }
 };
 

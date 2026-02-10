@@ -71,8 +71,13 @@
                                     class="text-[8px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-100/50">Active
                                     Pulse</span>
                             </div>
-                            <div class="ecg-container h-10 overflow-hidden">
-                                <canvas id="ecg-canvas" class="ecg-canvas"></canvas>
+                            <div class="flex gap-4 items-center">
+                                <div class="ecg-container flex-1 h-12 overflow-hidden rounded-lg bg-black/5">
+                                    <canvas id="ecg-canvas" class="w-full h-full"></canvas>
+                                </div>
+                                <div class="orb-container w-12 h-12 flex-shrink-0 relative">
+                                    <canvas id="flow-orb-canvas" width="48" height="48"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>

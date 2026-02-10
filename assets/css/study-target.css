@@ -168,12 +168,31 @@
     }
 }
 
-.ecg-container {
+.ecg-container,
+.mini-ecg-container {
     position: relative;
-    background: radial-gradient(circle at center, rgba(239, 68, 68, 0.03) 0%, transparent 70%);
+    background: radial-gradient(circle at center, rgba(15, 23, 42, 0.03) 0%, transparent 80%);
 }
 
-.ecg-container::after {
+.orb-container {
+    filter: drop-shadow(0 0 10px var(--orb-glow, rgba(239, 68, 68, 0.4)));
+    transition: filter 0.5s ease;
+}
+
+.orb-heaven {
+    --orb-glow: rgba(16, 185, 129, 0.6);
+}
+
+.orb-struggle {
+    --orb-glow: rgba(245, 158, 11, 0.6);
+}
+
+.orb-neutral {
+    --orb-glow: rgba(239, 68, 68, 0.4);
+}
+
+.ecg-container::after,
+.mini-ecg-container::after {
     content: "";
     position: absolute;
     top: 0;
