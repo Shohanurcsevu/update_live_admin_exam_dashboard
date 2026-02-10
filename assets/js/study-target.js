@@ -546,8 +546,13 @@ const StudyTargetTracker = {
         const ctx = canvas.getContext('2d');
         const container = canvas.parentElement;
 
-        canvas.width = container.clientWidth;
-        canvas.height = 80;
+        const resizeCanvas = () => {
+            canvas.width = container.clientWidth;
+            canvas.height = 80;
+        };
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Initial set
 
         let points = [];
         let particles = [];
@@ -555,11 +560,15 @@ const StudyTargetTracker = {
         let frameCount = 0;
 
         const animate = () => {
+            // Check if context/canvas is still valid
+            if (!ctx || !document.body.contains(canvas)) return;
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // Pulse intensity based on study today
             const studyBoost = (this.studiedSeconds / 3600);
             const baseIntensity = 15;
+            // Clamped to 35 max intensity
             const intensity = Math.min(35, baseIntensity + studyBoost * 4);
             const pulseInterval = Math.max(50, 100 - studyBoost * 8);
 
@@ -567,18 +576,19 @@ const StudyTargetTracker = {
             let y = canvas.height / 2;
             const phase = frameCount % Math.floor(pulseInterval);
 
-            // Exotic Pulse Logic
+            // Exotic Pulse Logic - Scaled for 80px Height (Canvas Center = 40px)
+            // Max safe amplitude = ~35px
             let activeSpike = false;
             if (phase > 10 && phase < 15) {
-                y -= intensity * 0.4; // P wave
+                y -= intensity * 0.2; // P wave (was 0.4)
             } else if (phase >= 15 && phase < 18) {
-                y += intensity * 1.8; // QRS Deep Spike
+                y += intensity * 0.9; // QRS Deep Spike (was 1.8) -> Max: ~31.5px down
                 activeSpike = true;
             } else if (phase >= 18 && phase < 22) {
-                y -= intensity * 2.2; // QRS High Spike
+                y -= intensity * 1.1; // QRS High Spike (was 2.2) -> Max: ~38.5px up
                 activeSpike = true;
             } else if (phase >= 22 && phase < 26) {
-                y += intensity * 0.6; // Recovery
+                y += intensity * 0.3; // Recovery (was 0.6)
             } else {
                 y += (Math.random() - 0.5) * 3; // Nervous baseline
             }
