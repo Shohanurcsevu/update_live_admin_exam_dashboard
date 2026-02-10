@@ -204,6 +204,42 @@ const StudyTargetTracker = {
                 this.showMissionBanner();
             }
 
+            // --- NEW: Time Buffer Logic ---
+            const bufferSeconds = secondsUntilMidnight - remainingStudySeconds;
+            const absBuffer = Math.abs(bufferSeconds);
+            const bufferFormatted = this.formatTime(absBuffer);
+
+            const bufferDisplay = document.getElementById('buffer-time-display');
+            const bufferBadge = document.getElementById('buffer-status-badge');
+            const bufferIcon = document.getElementById('buffer-status-icon');
+
+            if (bufferDisplay) {
+                if (bufferSeconds >= 0) {
+                    bufferDisplay.textContent = `+${bufferFormatted}`;
+                    bufferDisplay.className = "text-xs font-black text-emerald-600";
+                    if (bufferBadge) {
+                        bufferBadge.textContent = "Safe Margin";
+                        bufferBadge.className = "text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter";
+                    }
+                    if (bufferIcon) {
+                        bufferIcon.textContent = "verified_user";
+                        bufferIcon.className = "material-symbols-outlined text-[10px] text-emerald-500";
+                    }
+                } else {
+                    bufferDisplay.textContent = `-${bufferFormatted}`;
+                    bufferDisplay.className = "text-xs font-black text-rose-600";
+                    if (bufferBadge) {
+                        bufferBadge.textContent = "Overdue";
+                        bufferBadge.className = "text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter";
+                    }
+                    if (bufferIcon) {
+                        bufferIcon.textContent = "warning";
+                        bufferIcon.className = "material-symbols-outlined text-[10px] text-rose-500 animate-pulse";
+                    }
+                }
+            }
+
+            // Keep Pace Indicator for Ghost Runner (Subtle)
             if (paceEl) {
                 const diffSeconds = this.studiedSeconds - this.yesterdaySeconds;
                 const absDiff = Math.abs(diffSeconds);

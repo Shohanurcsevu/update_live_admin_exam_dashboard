@@ -72,7 +72,7 @@
                             <p id="target-time-left" class="text-xl font-black text-gray-700">00:00:00</p>
                         </div>
                         <div id="tomorrow-planner-container"
-                            class="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 hidden">
+                            class="bg-white/40 p-3 rounded-xl border border-white/50 hidden">
                             <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Tomorrow Start
                             </p>
                             <p id="tomorrow-start-time" class="text-xl font-black text-indigo-600">--:-- --</p>
@@ -80,7 +80,7 @@
 
                         <!-- Predicted Finish -->
                         <div
-                            class="col-span-2 lg:col-span-1 bg-slate-900/5 p-3 rounded-xl border border-slate-900/10 flex flex-col justify-between min-h-[80px] shadow-inner">
+                            class="col-span-2 lg:col-span-1 bg-white/40 p-3 rounded-xl border border-white/50 flex flex-col justify-between min-h-[80px]">
                             <div class="flex justify-between items-center mb-1">
                                 <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Est. Finish
                                 </p>
@@ -89,6 +89,22 @@
                             <div class="text-xs font-black text-slate-800" id="predicted-finish-clock">Calculating...
                             </div>
                             <p class="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Goal: 15h</p>
+                        </div>
+
+                        <!-- Time Buffer Tracker -->
+                        <div id="buffer-tracker-card"
+                            class="col-span-2 lg:col-span-1 bg-white/40 p-3 rounded-xl border border-white/50 flex flex-col justify-between min-h-[80px]">
+                            <div class="flex justify-between items-center mb-1">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Time Buffer
+                                </p>
+                                <span id="buffer-status-icon"
+                                    class="material-symbols-outlined text-[10px] text-slate-400">hourglass_empty</span>
+                            </div>
+                            <div class="text-xs font-black text-slate-800" id="buffer-time-display">Calculating...</div>
+                            <div id="buffer-status-badge"
+                                class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-slate-100 text-slate-500 w-fit uppercase tracking-tighter">
+                                Safety Margin
+                            </div>
                         </div>
 
                         <!-- Momentum Live Card -->
