@@ -384,80 +384,129 @@ const StudyTargetTracker = {
 
     initECG() {
         const canvas = document.getElementById('ecg-canvas');
+        const containerRoot = canvas ? canvas.closest('.bg-slate-900\\/5') : null;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const container = canvas.parentElement;
 
-        // Set fixed resolution
         canvas.width = container.clientWidth;
-        canvas.height = 60;
+        canvas.height = 80;
 
         let points = [];
-        const maxPoints = 100;
+        let particles = [];
+        const maxPoints = 150;
         let frameCount = 0;
 
         const animate = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Background grid
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.03)';
-            ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 20) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-            }
-            for (let j = 0; j < canvas.height; j += 20) {
-                ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke();
-            }
-
             // Pulse intensity based on study today
-            const baseIntensity = 10;
             const studyBoost = (this.studiedSeconds / 3600);
-            const intensity = Math.min(25, baseIntensity + studyBoost * 3);
-
-            // Frequency of main pulse peaks. Slower update rate.
-            const pulseInterval = Math.max(60, 120 - studyBoost * 10);
+            const baseIntensity = 15;
+            const intensity = Math.min(35, baseIntensity + studyBoost * 4);
+            const pulseInterval = Math.max(50, 100 - studyBoost * 8);
 
             frameCount++;
-
             let y = canvas.height / 2;
-            const phase = frameCount % pulseInterval;
+            const phase = frameCount % Math.floor(pulseInterval);
 
-            // Simulate ECG QRS complex spikes
+            // Exotic Pulse Logic
+            let activeSpike = false;
             if (phase > 10 && phase < 15) {
-                y -= intensity; // P wave or start of complex
+                y -= intensity * 0.4; // P wave
             } else if (phase >= 15 && phase < 18) {
-                y += intensity * 1.5; // Deep spike
+                y += intensity * 1.8; // QRS Deep Spike
+                activeSpike = true;
             } else if (phase >= 18 && phase < 22) {
-                y -= intensity * 0.5; // Return spike
+                y -= intensity * 2.2; // QRS High Spike
+                activeSpike = true;
+            } else if (phase >= 22 && phase < 26) {
+                y += intensity * 0.6; // Recovery
             } else {
-                // Subtle baseline wobble
-                y += (Math.random() - 0.5) * 2;
+                y += (Math.random() - 0.5) * 3; // Nervous baseline
+            }
+
+            // Sync card pulse with big spikes
+            if (activeSpike && containerRoot) {
+                containerRoot.style.transform = 'scale(1.005)';
+                containerRoot.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            } else if (containerRoot) {
+                containerRoot.style.transform = 'scale(1)';
+                containerRoot.style.borderColor = 'rgba(15, 23, 42, 0.1)';
             }
 
             points.push({ y, time: Date.now() });
-
             if (points.length > maxPoints) points.shift();
 
-            // Draw ECG line
+            // Create Spark Particles on spikes
+            if (activeSpike && Math.random() > 0.5) {
+                particles.push({
+                    x: (points.length - 1) / maxPoints * canvas.width,
+                    y: y,
+                    vx: -Math.random() * 2,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: 1
+                });
+            }
+
+            // Draw Neon Grid
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.05)';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i < canvas.width; i += 30) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+
+            // Draw Particles
+            particles.forEach((p, idx) => {
+                ctx.beginPath();
+                ctx.fillStyle = `rgba(239, 68, 68, ${p.life})`;
+                ctx.arc(p.x, p.y, 1, 0, Math.PI * 2);
+                ctx.fill();
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+                if (p.life <= 0) particles.splice(idx, 1);
+            });
+
+            // Draw Main ECG Line with Glow
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#ef4444';
             ctx.beginPath();
-            ctx.strokeStyle = '#ef4444'; // Changed to Red
-            ctx.lineWidth = 2;
+
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.1)');
+            gradient.addColorStop(0.8, 'rgba(239, 68, 68, 0.8)');
+            gradient.addColorStop(1, '#ef4444');
+
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 2.5;
             ctx.lineJoin = 'round';
 
-            for (let i = 0; i < points.length; i++) {
+            for (let i = 0; i < (points.length - 1); i++) {
                 const px = (i / maxPoints) * canvas.width;
-                if (i === 0) ctx.moveTo(px, points[i].y);
-                else ctx.lineTo(px, points[i].y);
+                const nextPx = ((i + 1) / maxPoints) * canvas.width;
+                ctx.moveTo(px, points[i].y);
+                ctx.lineTo(nextPx, points[i + 1].y);
             }
             ctx.stroke();
 
-            // Leading dot with glow
+            // Leading Eye
             const lastPoint = points[points.length - 1];
+            const lx = (points.length - 1) / maxPoints * canvas.width;
+
+            ctx.shadowBlur = 20;
             ctx.beginPath();
-            ctx.fillStyle = '#ef4444'; // Changed to Red
-            ctx.arc((points.length - 1) / maxPoints * canvas.width, lastPoint.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444';
+            ctx.arc(lx, lastPoint.y, 3.5, 0, Math.PI * 2);
             ctx.fill();
 
+            // Outer Ring
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+            ctx.arc(lx, lastPoint.y, 7 + Math.sin(frameCount * 0.1) * 3, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
             requestAnimationFrame(animate);
         };
 
