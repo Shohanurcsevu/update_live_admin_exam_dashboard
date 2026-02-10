@@ -79,30 +79,24 @@ const StudyTargetTracker = {
             return;
         }
 
-        // Otherwise, fetch from activity log
+        // Otherwise, fetch from our new first-activity API
         try {
-            const response = await fetch('api/recent-activity.php');
+            const response = await fetch('api/analytics/get-first-activity.php');
             const result = await response.json();
-            if (result.success && result.data.length > 0) {
-                // Find oldest activity of today
-                const todayActivities = result.data.filter(a => {
-                    // Check if it's a study activity (pomodoro or exam)
-                    const isStudy = a.activity_type.includes('Exam') || a.activity_type.includes('Subject') || a.activity_type.includes('pomodoro');
-                    return isStudy;
-                });
-
-                if (todayActivities.length > 0) {
-                    // Note: api/recent-activity.php might not provide exact timestamps in a way we can parse perfectly here
-                    // Let's assume the first activity we find in the list (which is usually ordered DESC) that's from today
-                    // is a good indicator. For now, let's use current time if we can't find it, or better, 
-                    // set it to 1 hour ago if we just started.
+            if (result.success && result.timestamp) {
+                // Correct for MySQL timestamp format
+                this.firstStartTime = new Date(result.timestamp.replace(/-/g, '/'));
+                localStorage.setItem('study_first_start_today', this.firstStartTime.getTime());
+                localStorage.setItem('study_first_start_date', today);
+            } else {
+                // If no activity found, we don't set firstStartTime yet
+                // But we can back-calculate if they have already studied
+                if (this.studiedSeconds > 0) {
                     this.firstStartTime = new Date(Date.now() - (this.studiedSeconds * 1000));
-                    localStorage.setItem('study_first_start_today', this.firstStartTime.getTime());
-                    localStorage.setItem('study_first_start_date', today);
                 }
             }
         } catch (e) {
-            this.firstStartTime = new Date(Date.now() - (this.studiedSeconds * 1000));
+            console.error("Failed to detect first start time:", e);
         }
     },
 
@@ -131,6 +125,15 @@ const StudyTargetTracker = {
             const m = Math.floor((secondsUntilMidnight % 3600) / 60);
             const s = Math.floor(secondsUntilMidnight % 60);
             timeLeftEl.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        const firstActivityEl = document.getElementById('first-activity-time');
+        if (firstActivityEl && this.firstStartTime) {
+            const h = this.firstStartTime.getHours();
+            const m = this.firstStartTime.getMinutes();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const displayH = h % 12 || 12;
+            firstActivityEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
         }
 
         this.checkFeasibility(secondsUntilMidnight, remainingStudySeconds);
