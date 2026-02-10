@@ -164,18 +164,22 @@ const StudyTargetTracker = {
         const tomorrowStartTimeEl = document.getElementById('tomorrow-start-time');
         if (!tomorrowStartTimeEl) return;
 
-        // Recommendation logic:
-        // Baseline start is 9 AM (to finish 15h by midnight)
-        // If they have carryover, start earlier.
+        // Baseline: Use today's first activity time if available, otherwise default to 9 AM
         let baseStartHour = 9;
+        if (this.firstStartTime) {
+            // Get today's start as a decimal (e.g., 7:30 AM = 7.5)
+            baseStartHour = this.firstStartTime.getHours() + (this.firstStartTime.getMinutes() / 60);
+        }
+
         let carryOverHours = carryoverSeconds / 3600;
 
-        // If they started today at say 8 AM, then maybe suggest 8 AM or earlier.
-        let startHour = baseStartHour - (carryOverHours / 2); // Spread extra load
-        if (this.firstStartTime) {
-            const todayStartHour = this.firstStartTime.getHours();
-            startHour = Math.min(startHour, todayStartHour - 0.5);
-        }
+        // Recommendation: Shift back from their "natural" start time to accommodate extra load
+        // We subtract the carryover to ensure they have enough total hours tomorrow.
+        let startHour = baseStartHour - carryOverHours;
+
+        // Final sanity check: To finish 15h + carryover by midnight, 
+        // they MUST start no later than (24 - 15 - carryover) = (9 - carryover)
+        startHour = Math.min(startHour, 9 - carryOverHours);
 
         // Clamp to sane hours (not earlier than 4 AM)
         startHour = Math.max(4, startHour);
