@@ -140,22 +140,29 @@
     // Load all exams directly with date filter
     async function loadAllExams() {
         try {
-            // Build URL with date filter
-            let url = `${API_EXAMS}`;
+            console.log('Current date filter:', currentDateFilter);
+
+            // Build URL with date filter - increased limit to 100
+            let url = `${API_EXAMS}&limit=100`;
             if (currentDateFilter.from && currentDateFilter.to) {
                 url += `&from=${currentDateFilter.from}&to=${currentDateFilter.to}`;
             }
 
             console.log('Fetching all exams from:', url);
+            console.log('Date range:', currentDateFilter.from, 'to', currentDateFilter.to);
 
             const response = await fetch(url);
             const result = await response.json();
+
+            console.log('API Response:', result);
 
             if (!result.success) {
                 throw new Error(result.message || 'Failed to fetch exams');
             }
 
             const exams = result.data;
+
+            console.log('📊 Total exams received:', exams.length);
 
             hierarchyTree.innerHTML = '';
 
@@ -172,11 +179,17 @@
                     groupedBySubject[subjectName].push(exam);
                 });
 
+                console.log('📁 Grouped by subject:', groupedBySubject);
+                console.log('📁 Number of subjects:', Object.keys(groupedBySubject).length);
+
                 // Create expandable sections for each subject
                 Object.entries(groupedBySubject).forEach(([subjectName, subjectExams]) => {
+                    console.log(`  Creating section for "${subjectName}" with ${subjectExams.length} exams`);
                     const subjectDiv = createExpandableSection(subjectName, subjectExams, 'subject');
                     hierarchyTree.appendChild(subjectDiv);
                 });
+
+                console.log('✅ All sections created and appended');
             }
         } catch (error) {
             console.error('Error loading exams:', error);
@@ -264,6 +277,7 @@
                 <div class="flex-1 cursor-pointer" onclick="this.previousElementSibling.click()">
                     <div class="font-semibold text-gray-800">${exam.exam_title}</div>
                     ${breadcrumb ? `<div class="text-xs text-gray-500 mt-1">${breadcrumb}</div>` : ''}
+                    <div class="text-xs text-blue-600 mt-0.5 font-medium">Date: ${exam.updated_at ? exam.updated_at.split(' ')[0] : 'N/A'}</div>
                     <div class="text-sm text-gray-600">Available Questions: ${exam.total_questions}</div>
                 </div>
             </div>
@@ -466,6 +480,8 @@
     presetButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             const days = parseInt(btn.dataset.days);
+            console.log('📅 Preset button clicked:', days, 'days');
+
             setDateRange(days);
 
             // Update active button style
