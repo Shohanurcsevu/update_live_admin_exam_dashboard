@@ -4,8 +4,8 @@
  */
 
 const StudyTargetTracker = {
-    DAILY_TARGET_HOURS: 15,
-    DAILY_TARGET_SECONDS: 15 * 3600,
+    DAILY_TARGET_HOURS: 12,
+    DAILY_TARGET_SECONDS: 12 * 3600,
     updateInterval: null,
     ecgInterval: null,
     firstStartTime: null,
@@ -189,7 +189,7 @@ const StudyTargetTracker = {
         const percentageEl = document.getElementById('target-percentage');
         const paceEl = document.getElementById('pace-indicator');
 
-        const dailyTargetSeconds = 15 * 3600;
+        const dailyTargetSeconds = 12 * 3600;
         const todayPercent = Math.min(100, (this.studiedSeconds / dailyTargetSeconds) * 100);
 
         if (mainBar) mainBar.style.width = `${todayPercent}%`;
@@ -357,7 +357,7 @@ const StudyTargetTracker = {
             if (simBar) {
                 if (val !== 1.0) {
                     simBar.classList.remove('hidden');
-                    const dailyTargetSeconds = 15 * 3600;
+                    const dailyTargetSeconds = 12 * 3600;
                     const remainingSeconds = Math.max(0, dailyTargetSeconds - this.studiedSeconds);
                     const currentPercent = (this.studiedSeconds / dailyTargetSeconds) * 100;
                     const simulatedGain = ((remainingSeconds - (remainingSeconds / val)) / dailyTargetSeconds) * 100;
@@ -420,13 +420,13 @@ const StudyTargetTracker = {
         if (!statusEl) return;
 
         if (timeLeft >= studyNeeded) {
-            statusEl.textContent = "You can still complete today’s 15-hour target";
+            statusEl.textContent = "You can still complete today’s 12-hour target";
             statusEl.className = "text-sm font-bold text-emerald-600 uppercase tracking-wider";
             iconContainer.className = "w-12 h-12 rounded-xl flex items-center justify-center text-white achievable-badge shadow-lg";
             iconEl.textContent = "task_alt";
             tomorrowContainer.classList.add('hidden');
         } else {
-            statusEl.textContent = "Not enough time left today to complete 15 hours";
+            statusEl.textContent = "Not enough time left today to complete 12 hours";
             statusEl.className = "text-sm font-bold text-rose-600 uppercase tracking-wider";
             iconContainer.className = "w-12 h-12 rounded-xl flex items-center justify-center text-white danger-badge shadow-lg stat-pulse";
             iconEl.textContent = "warning";
@@ -452,9 +452,9 @@ const StudyTargetTracker = {
         // We subtract the carryover to ensure they have enough total hours tomorrow.
         let startHour = baseStartHour - carryOverHours;
 
-        // Final sanity check: To finish 15h + carryover by midnight, 
-        // they MUST start no later than (24 - 15 - carryover) = (9 - carryover)
-        startHour = Math.min(startHour, 9 - carryOverHours);
+        // Final sanity check: To finish 12h + carryover by midnight, 
+        // they MUST start no later than (24 - 12 - carryover) = (12 - carryover)
+        startHour = Math.min(startHour, 12 - carryOverHours);
 
         // Clamp to sane hours (not earlier than 4 AM)
         startHour = Math.max(4, startHour);

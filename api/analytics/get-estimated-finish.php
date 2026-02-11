@@ -9,7 +9,7 @@ require_once '../subject/db_connect.php';
 date_default_timezone_set('Asia/Dhaka');
 
 // --- Configuration ---
-$DAILY_TARGET_HOURS = 15;
+$DAILY_TARGET_HOURS = 12;
 $DAILY_TARGET_SECONDS = $DAILY_TARGET_HOURS * 3600;
 $BUFFER_MULTIPLIER = 1.1; // 10% buffer for breaks/transitions
 
