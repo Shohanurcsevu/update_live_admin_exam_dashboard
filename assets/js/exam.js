@@ -21,8 +21,12 @@ function initializeExamPage() {
     const modalSubjectSelector = document.getElementById('modal-subject-selector');
     const modalLessonSelector = document.getElementById('modal-lesson-selector');
     const modalTopicSelector = document.getElementById('modal-topic-selector');
+    const modalQuestionsJson = document.getElementById('modal-questions-json');
+    const previewQuestionsBtn = document.getElementById('preview-imported-questions-btn');
+    const previewContainer = document.getElementById('imported-questions-preview');
 
     let examIdToDelete = null;
+    let importedQuestions = [];
     const defaultInstructions = 'প্রতিটি প্রশ্নের ৪ (চার) টি উত্তরের মধ্যে ১ (এক) টি সঠিক উত্তর রয়েছে। প্রতিটি শুদ্ধ উত্তরের জন্য প্রার্থী ১ (এক) নম্বর পাবেন। প্রতিটি ভুল উত্তরের জন্য ০.৫ ( শূন্য দশমিক পাঁচ ) নম্বর কাটা যাবে।';
 
     function showToast(message, type = 'success') {
@@ -169,13 +173,30 @@ function initializeExamPage() {
         loadMoreBtn.innerHTML = originalContent;
     }
 
-    function closeModal(modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    function closeModal(modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        if (modal === examModal) {
+            importedQuestions = [];
+            if (modalQuestionsJson) modalQuestionsJson.value = '';
+            if (previewContainer) {
+                previewContainer.innerHTML = '';
+                previewContainer.classList.add('hidden');
+            }
+        }
+    }
     function openModal(modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
 
     async function handleFormSubmit(e) {
         e.preventDefault();
         const formData = new FormData(examForm);
         const data = Object.fromEntries(formData.entries());
+
+        // Include imported questions if any
+        if (importedQuestions.length > 0) {
+            data.questions = importedQuestions;
+        }
+
         const url = data.id ? `${EXAM_API_URL}?action=update` : `${EXAM_API_URL}?action=create`;
 
         try {
@@ -271,6 +292,37 @@ function initializeExamPage() {
     document.getElementById('cancel-exam-modal-btn').addEventListener('click', () => closeModal(examModal));
     document.getElementById('cancel-exam-delete-btn').addEventListener('click', () => closeModal(deleteModal));
     document.getElementById('confirm-exam-delete-btn').addEventListener('click', handleDeleteConfirm);
+
+    // Question Import Handlers
+    if (previewQuestionsBtn) {
+        previewQuestionsBtn.addEventListener('click', () => {
+            const jsonText = modalQuestionsJson.value;
+            const result = QuestionUtils.parseQuestionsJSON(jsonText);
+
+            if (result.success) {
+                importedQuestions = result.data;
+                renderQuestionsPreview();
+            } else {
+                showToast(result.message, 'error');
+            }
+        });
+    }
+
+    function renderQuestionsPreview() {
+        previewContainer.innerHTML = QuestionUtils.renderPreview(importedQuestions);
+        previewContainer.classList.remove('hidden');
+
+        // Add remove handlers
+        previewContainer.querySelectorAll('.remove-question-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(btn.dataset.index);
+                importedQuestions.splice(index, 1);
+                renderQuestionsPreview();
+                // Update JSON textarea to reflect removal (optional but good for sync)
+                modalQuestionsJson.value = JSON.stringify(importedQuestions, null, 2);
+            });
+        });
+    }
 
     // --- Initial Load ---
     populateSubjects(subjectFilter);

@@ -149,17 +149,59 @@ function get_exam($conn) {
 
 function create_exam($conn) {
     $data = json_decode(file_get_contents('php://input'), true);
-    $stmt = $conn->prepare("INSERT INTO exams (subject_id, lesson_id, topic_id, exam_title, duration, instructions, total_marks, pass_mark, negative_mark_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.5)");
-    $stmt->bind_param("iiisissd", $data['subject_id'], $data['lesson_id'], $data['topic_id'], $data['exam_title'], $data['duration'], $data['instructions'], $data['total_marks'], $data['pass_mark']);
-    if ($stmt->execute()) {
-        // --- NEW: Log this activity ---
+    
+    $conn->begin_transaction();
+    try {
+        $stmt = $conn->prepare("INSERT INTO exams (subject_id, lesson_id, topic_id, exam_title, duration, instructions, total_marks, pass_mark, negative_mark_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.5)");
+        $stmt->bind_param("iiisissd", $data['subject_id'], $data['lesson_id'], $data['topic_id'], $data['exam_title'], $data['duration'], $data['instructions'], $data['total_marks'], $data['pass_mark']);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to create exam metadata.");
+        }
+        
+        $exam_id = $conn->insert_id;
+        $stmt->close();
+
+        // Handle question importing if provided
+        if (!empty($data['questions']) && is_array($data['questions'])) {
+            $questions = $data['questions'];
+            
+            // Get metadata names for logging (similar to import.php)
+            $subject_id = $data['subject_id'];
+            $lesson_id = $data['lesson_id'];
+            $topic_id = $data['topic_id'];
+
+            $q_stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            
+            foreach ($questions as $index => $q) {
+                if (empty($q['question']) || empty($q['options']) || !is_array($q['options']) || empty($q['answer'])) {
+                    throw new Exception("Import failed: Question #" . ($index + 1) . " is missing required fields.");
+                }
+
+                $options_json = json_encode($q['options']);
+                $explanation = isset($q['explanation']) ? $q['explanation'] : '';
+
+                $q_stmt->bind_param("iiiissss", $subject_id, $lesson_id, $topic_id, $exam_id, $q['question'], $options_json, $q['answer'], $explanation);
+
+                if (!$q_stmt->execute()) {
+                    throw new Exception("Database error on question #" . ($index + 1) . ": " . $q_stmt->error);
+                }
+            }
+            $q_stmt->close();
+            
+            $message = count($questions) . " questions were imported during creation of Exam '" . $data['exam_title'] . "'.";
+            log_activity($conn, 'Questions Imported', $message);
+        }
+
         $message = "Exam '" . $data['exam_title'] . "' has been created successfully.";
         log_activity($conn, 'Exam Created', $message);
-        echo json_encode(['success' => true, 'message' => 'Exam created successfully.']);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to create exam.']);
+        
+        $conn->commit();
+        echo json_encode(['success' => true, 'message' => 'Exam and questions created successfully.', 'id' => $exam_id]);
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
-    $stmt->close();
 }
 
 // function update_exam($conn) {

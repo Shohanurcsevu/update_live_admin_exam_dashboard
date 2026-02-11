@@ -8,8 +8,6 @@ function initializeImportQuestionsPage() {
     // DOM Elements
     const tableBody = document.getElementById('exams-table-body');
     const toastContainer = document.getElementById('toast-container');
-    const importModal = document.getElementById('import-modal');
-    const importForm = document.getElementById('import-form');
 
     // Filters
     const subjectFilter = document.getElementById('subject-filter');
@@ -190,11 +188,8 @@ function initializeImportQuestionsPage() {
                     <td class="py-3 px-6 text-left">${exam.subject_name || 'N/A'}</td>
                     <td class="py-3 px-6 text-center">
                         <div class="flex item-center justify-center space-x-2">
-                            <button class="import-btn bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-full flex items-center" data-id="${exam.id}" data-title="${exam.exam_title}">
-                                <span class="material-symbols-outlined text-sm mr-1">upload_file</span> Import
-                            </button>
-                            <button class="edit-questions-btn bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded-full flex items-center" data-id="${exam.id}" data-title="${exam.exam_title}">
-                                <span class="material-symbols-outlined text-sm mr-1">edit</span> Manage
+                            <button class="edit-questions-btn bg-green-500 hover:bg-green-600 text-white text-xs px-4 py-1.5 rounded-full flex items-center shadow-sm transition-all" data-id="${exam.id}" data-title="${exam.exam_title}">
+                                <span class="material-symbols-outlined text-sm mr-1">edit</span> Manage Questions
                             </button>
                         </div>
                     </td>
@@ -237,24 +232,11 @@ function initializeImportQuestionsPage() {
     }
 
     function handleTableClick(e) {
-        const importBtn = e.target.closest('.import-btn');
         const editBtn = e.target.closest('.edit-questions-btn');
-
-        if (importBtn) {
-            const examId = importBtn.dataset.id;
-            const examTitle = importBtn.dataset.title;
-            document.getElementById('import-modal-title').textContent = `Import Questions for: ${examTitle}`;
-            document.getElementById('import-exam-id').value = examId;
-            importForm.reset();
-            openModal(importModal);
-        }
 
         if (editBtn) {
             const examId = editBtn.dataset.id;
             const examTitle = encodeURIComponent(editBtn.dataset.title);
-            // This is where we need a way to navigate. Since we don't have a router,
-            // we will simulate navigation by calling the main loader function.
-            // This assumes `window.loadPage` is exposed globally from main.js or passed down.
             if (window.loadPage) {
                 window.loadPage('questions-list', `?exam_id=${examId}&exam_title=${examTitle}`);
             } else {
@@ -275,9 +257,6 @@ function initializeImportQuestionsPage() {
     topicFilter.addEventListener('change', () => fetchAndDisplayExams(false));
 
     tableBody.addEventListener('click', handleTableClick);
-    importForm.addEventListener('submit', handleImportFormSubmit);
-    document.getElementById('close-import-modal-btn').addEventListener('click', () => closeModal(importModal));
-    document.getElementById('cancel-import-modal-btn').addEventListener('click', () => closeModal(importModal));
 
     // Delegation for Load More button
     const pageContainer = document.getElementById('import-questions-container');

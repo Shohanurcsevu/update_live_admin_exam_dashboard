@@ -105,6 +105,32 @@
                 <input type="text" value="0.5 for each wrong answer" readonly
                     class="mt-1 block w-full px-3 py-2 border-gray-200 bg-gray-100 rounded-md shadow-sm">
             </div>
+
+            <!-- Import Questions Section -->
+            <div class="border-t pt-4 mt-6">
+                <h4 class="text-lg font-semibold text-gray-800 mb-2 flex items-center">
+                    <span class="material-symbols-outlined mr-2">upload_file</span>
+                    Import Questions
+                </h4>
+                <div class="space-y-4">
+                    <div>
+                        <label for="modal-questions-json" class="block text-sm font-medium text-gray-700">Paste Question
+                            JSON Array</label>
+                        <textarea id="modal-questions-json" rows="6"
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm font-mono text-xs"
+                            placeholder='[{"question":"...","options":{"A":"..."},"answer":"...","explanation":"..."}]'></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" id="preview-imported-questions-btn"
+                            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold py-1.5 px-4 rounded border transition">
+                            Preview Questions
+                        </button>
+                    </div>
+                    <!-- Preview Container -->
+                    <div id="imported-questions-preview" class="hidden border rounded-md p-3 bg-gray-50">
+                    </div>
+                </div>
+            </div>
             <div class="flex justify-end pt-4 border-t sticky bottom-0 bg-white py-4 px-6 -mx-6">
                 <button type="button" id="cancel-exam-modal-btn"
                     class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg mr-2">Cancel</button>
