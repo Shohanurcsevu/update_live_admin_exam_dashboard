@@ -135,7 +135,8 @@ function getPeriodStats($conn, $start, $end) {
         
         $stats['subjects'][$row['subject_name']] = [
             'seconds' => $sec,
-            'subject' => $row['subject_name']
+            'subject' => $row['subject_name'],
+            'subject_id' => $row['subject_id'] // Add subject_id
         ];
     }
     
@@ -177,6 +178,7 @@ try {
 
         $breakdown[] = [
             'subject' => $subject,
+            'subject_id' => $data['subject_id'], // Pass subject_id to response
             'seconds' => $data['seconds'],
             'percent_change' => round(abs($s_pct), 1),
             'trend' => $s_trend

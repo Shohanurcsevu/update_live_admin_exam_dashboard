@@ -201,7 +201,8 @@ function initializeTimesPage() {
                 }
 
                 const div = document.createElement('div');
-                div.className = 'stat-card p-6 md:p-8 flex flex-col justify-between group cursor-default';
+                div.className = 'stat-card p-6 md:p-8 flex flex-col justify-between group cursor-pointer hover:border-indigo-300 transition-all hover:shadow-lg hover:-translate-y-1';
+                div.onclick = () => window.openSubjectDetails(item.subject_id, item.subject);
                 const safeId = item.subject.replace(/[^a-zA-Z0-9]/g, '');
 
                 div.innerHTML = `
@@ -245,6 +246,65 @@ function initializeTimesPage() {
 
     // Initialize with default range
     loadAnalytics('today');
+
+    // Modal Logic
+    window.openSubjectDetails = async function (subjectId, subjectName) {
+        const modal = document.getElementById('subject-modal');
+        const titleEl = document.getElementById('modal-subject-title');
+        const listEl = document.getElementById('modal-activity-list');
+
+        // Get current range
+        const activeBtn = document.querySelector('.range-btn.active');
+        const range = activeBtn ? (activeBtn.id.replace('btn-', '') || 'today') : 'today';
+
+        if (modal) modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = `${subjectName} Breakdown`;
+
+        if (listEl) {
+            listEl.innerHTML = `
+                <div class="animate-pulse space-y-3">
+                    <div class="h-16 bg-slate-50 rounded-xl"></div>
+                    <div class="h-16 bg-slate-50 rounded-xl"></div>
+                    <div class="h-16 bg-slate-50 rounded-xl"></div>
+                </div>
+            `;
+        }
+
+        try {
+            const response = await fetch(`api/analytics/get-subject-details.php?subject_id=${subjectId}&range=${range}`);
+            const result = await response.json();
+
+            if (result.success) {
+                if (result.data.length === 0) {
+                    listEl.innerHTML = `<div class="text-center text-slate-400 py-8 italic font-medium">No sessions recorded for this period.</div>`;
+                    return;
+                }
+
+                listEl.innerHTML = result.data.map(item => `
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center group hover:border-indigo-200 transition-colors">
+                        <div>
+                            <p class="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors">${item.title}</p>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">${item.timestamp.split(' ')[0]} • ${item.formatted_time}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-lg font-black text-slate-900">${Math.floor(item.seconds / 60)}<span class="text-xs text-slate-400 ml-0.5 font-bold">m</span></p>
+                            ${item.score !== null ? `<p class="text-[10px] font-black uppercase tracking-wider ${item.score >= 80 ? 'text-emerald-500' : 'text-slate-400'}">Score: ${item.score}%</p>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                listEl.innerHTML = `<div class="text-rose-500 text-center py-4 font-bold text-sm">Error: ${result.error}</div>`;
+            }
+        } catch (e) {
+            console.error(e);
+            if (listEl) listEl.innerHTML = `<div class="text-rose-500 text-center py-4 font-bold text-sm">Failed to load details.</div>`;
+        }
+    }
+
+    window.closeSubjectModal = function () {
+        const modal = document.getElementById('subject-modal');
+        if (modal) modal.classList.add('hidden');
+    }
 }
 
 // Global invocation

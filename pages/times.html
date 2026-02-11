@@ -271,6 +271,49 @@
         </a>
     </div>
 
+    <!-- Subject Details Modal -->
+    <div id="subject-modal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog"
+        aria-modal="true">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeSubjectModal()">
+        </div>
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div
+                    class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-100">
+                    <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div
+                                class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-indigo-50 sm:mx-0 sm:h-12 sm:w-12">
+                                <i data-lucide="layers" class="h-6 w-6 text-indigo-600"></i>
+                            </div>
+                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-xl font-black leading-6 text-slate-900" id="modal-subject-title">Subject
+                                    Details</h3>
+                                <p class="text-xs text-slate-500 font-medium mt-1 mb-4">Activity breakdown for the
+                                    selected period</p>
+
+                                <div class="mt-4 space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar"
+                                    id="modal-activity-list">
+                                    <!-- Activity Items Injected Here -->
+                                    <div class="animate-pulse space-y-3">
+                                        <div class="h-16 bg-slate-50 rounded-xl"></div>
+                                        <div class="h-16 bg-slate-50 rounded-xl"></div>
+                                        <div class="h-16 bg-slate-50 rounded-xl"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <button type="button"
+                            class="mt-3 inline-flex w-full justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-colors"
+                            onclick="closeSubjectModal()">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
         // Logic handled by assets/js/times.js
