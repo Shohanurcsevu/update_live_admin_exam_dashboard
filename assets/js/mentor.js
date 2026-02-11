@@ -762,7 +762,7 @@ class StudyMentor {
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
                             <div class="flex flex-wrap justify-between gap-y-4 px-1">
                                 <!-- Home/Dashboard -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('dashboard')" title="Home Dashboard">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('dashboard')" title="Home Dashboard">
                                     <div class="quick-action-btn bg-indigo-50 text-indigo-600">
                                         <span class="material-symbols-outlined text-xl">home</span>
                                     </div>
@@ -770,7 +770,7 @@ class StudyMentor {
                                 </div>
 
                                 <!-- Create Exams -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('exam')" title="Create Exams">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('exam')" title="Create Exams">
                                     <div class="quick-action-btn bg-emerald-50 text-emerald-600">
                                         <span class="material-symbols-outlined text-xl">assignment</span>
                                     </div>
@@ -778,7 +778,7 @@ class StudyMentor {
                                 </div>
                                 
                                 <!-- Take a New Exam -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('take-exam-list')" title="Take a New Exam">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('take-exam-list')" title="Take a New Exam">
                                     <div class="quick-action-btn bg-purple-50 text-purple-600">
                                         <span class="material-symbols-outlined text-xl">school</span>
                                     </div>
@@ -786,7 +786,7 @@ class StudyMentor {
                                 </div>
 
                                 <!-- Timely Model Exam -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('timely-model-exam')" title="Timely Model Exam">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('timely-model-exam')" title="Timely Model Exam">
                                     <div class="quick-action-btn bg-orange-50 text-orange-600">
                                         <span class="material-symbols-outlined text-xl">timer</span>
                                     </div>
@@ -794,7 +794,7 @@ class StudyMentor {
                                 </div>
 
                                 <!-- Topic Wise Exams -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('topic-wise-exams')" title="Topic Wise Exams">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('topic-wise-exams')" title="Topic Wise Exams">
                                     <div class="quick-action-btn bg-sky-50 text-sky-600">
                                         <span class="material-symbols-outlined text-xl">grid_view</span>
                                     </div>
@@ -802,7 +802,7 @@ class StudyMentor {
                                 </div>
 
                                 <!-- Lesson Wise Exams -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('lesson-wise-exams')" title="Lesson Wise Exams">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('lesson-wise-exams')" title="Lesson Wise Exams">
                                     <div class="quick-action-btn bg-violet-50 text-violet-600">
                                         <span class="material-symbols-outlined text-xl">auto_stories</span>
                                     </div>
@@ -810,7 +810,7 @@ class StudyMentor {
                                 </div>
 
                                 <!-- Import Questions -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('import-questions')" title="Import Questions">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('import-questions')" title="Import Questions">
                                     <div class="quick-action-btn bg-teal-50 text-teal-600">
                                         <span class="material-symbols-outlined text-xl">upload_file</span>
                                     </div>
@@ -818,7 +818,7 @@ class StudyMentor {
                                 </div>
 
                                 <!-- Review Mistake Bank -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('mistake-bank')" title="Review Mistake Bank">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('mistake-bank')" title="Review Mistake Bank">
                                     <div class="quick-action-btn bg-rose-50 text-rose-600">
                                         <span class="material-symbols-outlined text-xl">psychology</span>
                                     </div>
@@ -2178,6 +2178,13 @@ class StudyMentor {
         }).catch(err => console.error('Streak logging failed:', err));
 
         return ''; // Template helper
+    }
+
+    async handleQuickAction(pageName) {
+        if (typeof window.loadPage === 'function') {
+            await window.loadPage(pageName);
+            this.closePanel();
+        }
     }
 
     startExam(examId) {
