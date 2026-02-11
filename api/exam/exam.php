@@ -4,6 +4,7 @@ header('Access-Control-Allow-Origin: *'); // Consider restricting this in produc
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 require_once '../subject/db_connect.php';
+require_once '../question/question_utils.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
@@ -164,33 +165,10 @@ function create_exam($conn) {
 
         // Handle question importing if provided
         if (!empty($data['questions']) && is_array($data['questions'])) {
-            $questions = $data['questions'];
-            
-            // Get metadata names for logging (similar to import.php)
-            $subject_id = $data['subject_id'];
-            $lesson_id = $data['lesson_id'];
-            $topic_id = $data['topic_id'];
-
-            $q_stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            
-            foreach ($questions as $index => $q) {
-                if (empty($q['question']) || empty($q['options']) || !is_array($q['options']) || empty($q['answer'])) {
-                    throw new Exception("Import failed: Question #" . ($index + 1) . " is missing required fields.");
-                }
-
-                $options_json = json_encode($q['options']);
-                $explanation = isset($q['explanation']) ? $q['explanation'] : '';
-
-                $q_stmt->bind_param("iiiissss", $subject_id, $lesson_id, $topic_id, $exam_id, $q['question'], $options_json, $q['answer'], $explanation);
-
-                if (!$q_stmt->execute()) {
-                    throw new Exception("Database error on question #" . ($index + 1) . ": " . $q_stmt->error);
-                }
+            $insert_result = insert_questions($conn, $exam_id, $data['questions']);
+            if (!$insert_result['success']) {
+                throw new Exception($insert_result['message']);
             }
-            $q_stmt->close();
-            
-            $message = count($questions) . " questions were imported during creation of Exam '" . $data['exam_title'] . "'.";
-            log_activity($conn, 'Questions Imported', $message);
         }
 
         $message = "Exam '" . $data['exam_title'] . "' has been created successfully.";
@@ -249,8 +227,20 @@ function update_exam($conn) {
         $data['pass_mark'],
         $data['id']
     );
+    
+    $conn->begin_transaction();
+    try {
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to update exam metadata.");
+        }
 
-    if ($stmt->execute()) {
+        // Handle question importing if provided (appends to existing exam)
+        if (!empty($data['questions']) && is_array($data['questions'])) {
+            $insert_result = insert_questions($conn, $data['id'], $data['questions']);
+            if (!$insert_result['success']) {
+                throw new Exception($insert_result['message']);
+            }
+        }
         // ✅ Step 3: Compare fields and prepare log message
         $changes = [];
 
@@ -284,9 +274,11 @@ function update_exam($conn) {
             log_activity($conn, 'Exam Updated', $message);
         }
 
+        $conn->commit();
         echo json_encode(['success' => true, 'message' => 'Exam updated successfully.']);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to update exam.']);
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
 
     $stmt->close();

@@ -43,6 +43,18 @@ function initializeExamPage() {
         setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s ease'; setTimeout(() => toast.remove(), 500); }, 3000);
     }
 
+    function updateExamMetrics(count) {
+        if (count > 0) {
+            const durationInput = document.getElementById('duration');
+            const totalMarksInput = document.getElementById('total-marks');
+            const passMarkInput = document.getElementById('pass-mark');
+
+            if (durationInput) durationInput.value = count;
+            if (totalMarksInput) totalMarksInput.value = count;
+            if (passMarkInput) passMarkInput.value = (count * 0.99).toFixed(2);
+        }
+    }
+
     async function populateSubjects(selector) {
         try {
             const response = await fetch(SUBJECT_API_URL);
@@ -303,8 +315,25 @@ function initializeExamPage() {
             if (result.success) {
                 importedQuestions = result.data;
                 renderQuestionsPreview();
+                updateExamMetrics(importedQuestions.length);
             } else {
                 showToast(result.message, 'error');
+            }
+        });
+    }
+
+    if (modalQuestionsJson) {
+        modalQuestionsJson.addEventListener('input', () => {
+            const jsonText = modalQuestionsJson.value.trim();
+            if (!jsonText) {
+                importedQuestions = [];
+                return;
+            }
+
+            const result = QuestionUtils.parseQuestionsJSON(jsonText);
+            if (result.success) {
+                importedQuestions = result.data;
+                updateExamMetrics(importedQuestions.length);
             }
         });
     }
@@ -319,6 +348,7 @@ function initializeExamPage() {
                 const index = parseInt(btn.dataset.index);
                 importedQuestions.splice(index, 1);
                 renderQuestionsPreview();
+                updateExamMetrics(importedQuestions.length);
                 // Update JSON textarea to reflect removal (optional but good for sync)
                 modalQuestionsJson.value = JSON.stringify(importedQuestions, null, 2);
             });

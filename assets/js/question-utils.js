@@ -16,8 +16,13 @@ const QuestionUtils = {
         let questions;
         try {
             questions = JSON.parse(jsonText);
+            // If it's a single object, wrap it in an array
+            if (questions && typeof questions === 'object' && !Array.isArray(questions)) {
+                questions = [questions];
+            }
+
             if (!Array.isArray(questions)) {
-                return { success: false, data: null, message: 'Invalid format. Please provide an array of questions.' };
+                return { success: false, data: null, message: 'Invalid format. Please provide a question object or an array of questions.' };
             }
         } catch (error) {
             return { success: false, data: null, message: 'Invalid JSON format. Please check your syntax.' };
