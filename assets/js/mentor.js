@@ -698,8 +698,29 @@ class StudyMentor {
                     background: #c7d2fe;
                     border-radius: 10px;
                 }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #818cf8;
+                /* Quick Actions Redesign */
+                .quick-action-btn {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 9999px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    position: relative;
+                }
+                .quick-action-btn:hover {
+                    transform: scale(1.15);
+                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                }
+                .quick-action-label {
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: #64748b;
+                    margin-top: 6px;
+                    text-align: center;
+                    width: 64px;
+                    line-height: 1.1;
                 }
             </style>
 
@@ -735,7 +756,77 @@ class StudyMentor {
                     </div>
 
                     <!-- Content -->
-                    <div class="p-4 max-h-96 overflow-y-auto">
+                    <div class="p-4 max-h-96 overflow-y-auto custom-scrollbar">
+                        <!-- Quick Actions Section at Top -->
+                        <div class="mb-5 pb-4 border-b border-gray-100">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
+                            <div class="flex flex-wrap justify-between gap-y-4 px-1">
+                                <!-- Home/Dashboard -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('dashboard')" title="Home Dashboard">
+                                    <div class="quick-action-btn bg-indigo-50 text-indigo-600">
+                                        <span class="material-symbols-outlined text-xl">home</span>
+                                    </div>
+                                    <span class="quick-action-label">Dashboard</span>
+                                </div>
+
+                                <!-- Create Exams -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('exam')" title="Create Exams">
+                                    <div class="quick-action-btn bg-emerald-50 text-emerald-600">
+                                        <span class="material-symbols-outlined text-xl">assignment</span>
+                                    </div>
+                                    <span class="quick-action-label">Create Exams</span>
+                                </div>
+                                
+                                <!-- Take a New Exam -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('take-exam-list')" title="Take a New Exam">
+                                    <div class="quick-action-btn bg-purple-50 text-purple-600">
+                                        <span class="material-symbols-outlined text-xl">school</span>
+                                    </div>
+                                    <span class="quick-action-label">Take New Exam</span>
+                                </div>
+
+                                <!-- Timely Model Exam -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('timely-model-exam')" title="Timely Model Exam">
+                                    <div class="quick-action-btn bg-orange-50 text-orange-600">
+                                        <span class="material-symbols-outlined text-xl">timer</span>
+                                    </div>
+                                    <span class="quick-action-label">Timely Exam</span>
+                                </div>
+
+                                <!-- Topic Wise Exams -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('topic-wise-exams')" title="Topic Wise Exams">
+                                    <div class="quick-action-btn bg-sky-50 text-sky-600">
+                                        <span class="material-symbols-outlined text-xl">grid_view</span>
+                                    </div>
+                                    <span class="quick-action-label">Topic-wise</span>
+                                </div>
+
+                                <!-- Lesson Wise Exams -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('lesson-wise-exams')" title="Lesson Wise Exams">
+                                    <div class="quick-action-btn bg-violet-50 text-violet-600">
+                                        <span class="material-symbols-outlined text-xl">auto_stories</span>
+                                    </div>
+                                    <span class="quick-action-label">Lesson-wise</span>
+                                </div>
+
+                                <!-- Import Questions -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('import-questions')" title="Import Questions">
+                                    <div class="quick-action-btn bg-teal-50 text-teal-600">
+                                        <span class="material-symbols-outlined text-xl">upload_file</span>
+                                    </div>
+                                    <span class="quick-action-label">Import Qs</span>
+                                </div>
+
+                                <!-- Review Mistake Bank -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="window.loadPage('mistake-bank')" title="Review Mistake Bank">
+                                    <div class="quick-action-btn bg-rose-50 text-rose-600">
+                                        <span class="material-symbols-outlined text-xl">psychology</span>
+                                    </div>
+                                    <span class="quick-action-label">Mistake Bank</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="mentor-greeting" class="mb-4">
                             <div class="flex items-start gap-3 bg-purple-50 p-3 rounded-xl">
                                 <span class="material-symbols-outlined text-purple-600 text-2xl">waving_hand</span>
@@ -748,38 +839,6 @@ class StudyMentor {
 
                         <div id="mentor-recommendations" class="space-y-3">
                             <!-- Recommendations will be injected here -->
-                        </div>
-
-                        <!-- Quick Actions -->
-                        <div class="mt-4 pt-4 border-t border-gray-100">
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</p>
-                            <div class="space-y-2">
-                                <button onclick="window.loadPage('exam')"
-                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                    <span class="material-symbols-outlined text-emerald-500 text-lg">assignment</span>
-                                    <span>Create Exams</span>
-                                </button>
-                                <button onclick="window.loadPage('take-exam-list')"
-                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm bg-purple-50 group border border-purple-100">
-                                    <span class="material-symbols-outlined text-purple-600 text-lg group-hover:scale-110 transition-transform">school</span>
-                                    <span class="font-bold text-purple-700">Take a New Exam</span>
-                                </button>
-                                <button onclick="window.loadPage('import-questions')"
-                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                    <span class="material-symbols-outlined text-emerald-500 text-lg">upload_file</span>
-                                    <span>Import Questions</span>
-                                </button>
-                                <button onclick="window.loadPage('mistake-bank')"
-                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                    <span class="material-symbols-outlined text-rose-500 text-lg">psychology</span>
-                                    <span>Review Mistake Bank</span>
-                                </button>
-                                <button onclick="window.loadPage('discipline-tracker')"
-                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                    <span class="material-symbols-outlined text-blue-500 text-lg">analytics</span>
-                                    <span>View Full Analytics</span>
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
