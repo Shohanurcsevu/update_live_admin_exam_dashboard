@@ -24,7 +24,9 @@ try {
         // We reuse the existing /api/log-activity.php logic or insert directly.
         // Inserting directly is safer transactionally here.
         
-        $logSql = "INSERT INTO activity_log (activity_type, activity_message, activity_details, timestamp) VALUES ('pomodoro_session', ?, ?, NOW())";
+        $sessionType = $row['session_type'] ?? 'focus';
+        $activityType = ($sessionType === 'break') ? 'pomodoro_break' : 'pomodoro_session';
+        $logSql = "INSERT INTO activity_log (activity_type, activity_message, activity_details, timestamp) VALUES ('$activityType', ?, ?, NOW())";
         
         $durationToLog = ($customDuration !== null) ? $customDuration : floatval($row['duration_minutes']);
         

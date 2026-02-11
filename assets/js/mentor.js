@@ -1524,6 +1524,8 @@ class StudyMentor {
                     mastery,
                     accuracy,
                     today_exams: todayExams,
+                    focus_sessions: subj.focus_sessions || 0,
+                    break_sessions: subj.break_sessions || 0,
                     status: (isCreated && isTaken) ? 'success' : (isCreated ? 'pending_take' : 'pending_create')
                 };
             });
@@ -1609,6 +1611,17 @@ class StudyMentor {
                                                                     </div>
                                                                 </div>
                                                             ` : ''}
+                                                            <div class="flex items-center gap-2 text-[7px] font-black uppercase tracking-tighter text-indigo-300">
+                                                                <span class="flex items-center gap-0.5">
+                                                                    <span class="material-symbols-outlined text-[10px]">timer</span>
+                                                                    ${item.focus_sessions} Sessions
+                                                                </span>
+                                                                <span class="text-white/20">•</span>
+                                                                <span class="flex items-center gap-0.5">
+                                                                    <span class="material-symbols-outlined text-[10px]">self_care</span>
+                                                                    ${item.break_sessions} Breaks
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                         <div class="flex items-center gap-2 mt-0.5">
                                                             <span class="material-symbols-outlined text-[14px] ${item.mastery === 'gold' ? 'text-yellow-400' : item.mastery === 'silver' ? 'text-slate-300' : 'text-orange-600'} drop-shadow-[0_0_5px_rgba(var(--badge-glow),0.5)]" 
@@ -1627,9 +1640,8 @@ class StudyMentor {
                                                                 </span>
                                                             </div>
                                                         ` : ''}
-
                                                         <div class="flex items-center gap-3 mt-1.5 pt-1.5 border-t border-white/5">
-                                                            ${item.status === 'pending_create' ? `
+            ${item.status === 'pending_create' ? `
                                                                 <button onclick="event.stopPropagation(); window.location.href='https://bcspreli.free.nf/?page=exam'" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-indigo-400 hover:text-indigo-300 transition-colors">
                                                                     <span class="material-symbols-outlined text-[12px]">add_circle</span> Create: ${item.target_topic ? item.target_topic.split(' ')[0] : 'Exam'}
                                                                 </button>
@@ -1647,14 +1659,14 @@ class StudyMentor {
                                                 </div>
                                             </div>
 
-                                            <div class="flex items-start pt-1" onclick="event.stopPropagation()">
-                                                <span class="material-symbols-outlined text-gray-500 text-sm opacity-50">more_vert</span>
-                                            </div>
+                <div class="flex items-start pt-1" onclick="event.stopPropagation()">
+                    <span class="material-symbols-outlined text-gray-500 text-sm opacity-50">more_vert</span>
+                </div>
                                         </div>
 
-                                        <!-- Collapsible Exams List -->
-                                        <div id="mission-exams-${index}" class="hidden mt-1 ml-4 space-y-1.5 border-l-2 border-white/5 pl-3 py-1">
-                                            ${item.today_exams.length > 0 ? item.today_exams.map(exam => `
+                                        <!--Collapsible Exams List-->
+            <div id="mission-exams-${index}" class="hidden mt-1 ml-4 space-y-1.5 border-l-2 border-white/5 pl-3 py-1">
+                ${item.today_exams.length > 0 ? item.today_exams.map(exam => `
                                                 <div class="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/5">
                                                     <div class="flex-1 min-w-0">
                                                         <p class="text-[10px] font-bold text-gray-300 truncate">${exam.title}</p>
@@ -1678,9 +1690,9 @@ class StudyMentor {
                                             `).join('') : `
                                                 <p class="text-[8px] text-gray-500 italic">No exams created for this subject yet.</p>
                                             `}
-                                        </div>
+            </div>
                                     </div>
-                                `;
+                `;
             }).join('')}
                         </div>
                         

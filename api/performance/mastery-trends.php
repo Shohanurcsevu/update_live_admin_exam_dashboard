@@ -117,12 +117,36 @@ if ($result) {
             }
         }
         
+        // Fetch pomodoro sessions for this subject today
+        $focus_count = 0;
+        $break_count = 0;
+        
+        $pom_sql = "
+            SELECT 
+                SUM(CASE WHEN activity_type = 'pomodoro_session' THEN 1 ELSE 0 END) as focus_cnt,
+                SUM(CASE WHEN activity_type = 'pomodoro_break' THEN 1 ELSE 0 END) as break_cnt
+            FROM activity_log 
+            WHERE TRIM(activity_message) = ? 
+            AND timestamp BETWEEN '$today_start' AND '$today_end'
+        ";
+        $pom_stmt = $conn->prepare($pom_sql);
+        $subject_name_val = $row['subject_name'];
+        $pom_stmt->bind_param("s", $subject_name_val);
+        $pom_stmt->execute();
+        $pom_res = $pom_stmt->get_result();
+        if ($p_row = $pom_res->fetch_assoc()) {
+            $focus_count = (int)$p_row['focus_cnt'];
+            $break_count = (int)$p_row['break_cnt'];
+        }
+
         $subjects[] = [
             'id' => $subject_id,
             'name' => $row['subject_name'],
             'this_week' => $this_week,
             'last_week' => $last_week,
-            'today_exams' => $today_exams
+            'today_exams' => $today_exams,
+            'focus_sessions' => $focus_count,
+            'break_sessions' => $break_count
         ];
 
         // Generate Insights
