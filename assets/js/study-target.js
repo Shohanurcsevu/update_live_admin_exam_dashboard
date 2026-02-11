@@ -635,16 +635,8 @@ const StudyTargetTracker = {
             points.push({ y, time: Date.now() });
             if (points.length > maxPoints) points.shift();
 
-            // Create Spark Particles on spikes
-            if (activeSpike && Math.random() > 0.5) {
-                particles.push({
-                    x: (points.length - 1) / maxPoints * canvas.width,
-                    y: y,
-                    vx: -Math.random() * 2,
-                    vy: (Math.random() - 0.5) * 4,
-                    life: 1
-                });
-            }
+
+
 
             // Draw Classic Red ECG Grid (Graph Paper Effect)
             const gridSize = 10;
@@ -682,15 +674,32 @@ const StudyTargetTracker = {
                 ctx.stroke();
             }
 
-            // Draw Particles
+            // Create Blood Particles on spikes (Burst) and occasional baseline (Drip)
+            const burstCount = activeSpike ? Math.floor(Math.random() * 3) + 2 : (Math.random() > 0.9 ? 1 : 0);
+
+            for (let i = 0; i < burstCount; i++) {
+                particles.push({
+                    x: ((points.length - 1) / maxPoints * canvas.width) + (Math.random() - 0.5) * 5,
+                    y: y + (Math.random() - 0.5) * 5,
+                    vx: -Math.random() * 2 - 0.5, // Move left with flow
+                    vy: (Math.random() - 0.5) * (activeSpike ? 6 : 2), // Violent spread on spike, gentle on baseline
+                    life: 1.0,
+                    size: Math.random() * 1.5 + 0.5 // Varied sizes for organic look
+                });
+            }
+
+            // Draw Particles with Bloom
             particles.forEach((p, idx) => {
                 ctx.beginPath();
                 ctx.fillStyle = `rgba(${accentRgb}, ${p.life})`;
-                ctx.arc(p.x, p.y, 1, 0, Math.PI * 2);
+                const size = p.size || 1;
+                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
                 ctx.fill();
+
                 p.x += p.vx;
                 p.y += p.vy;
-                p.life -= 0.02;
+                p.life -= (activeSpike ? 0.03 : 0.015); // Longer trail for baseline drips
+
                 if (p.life <= 0) particles.splice(idx, 1);
             });
 
