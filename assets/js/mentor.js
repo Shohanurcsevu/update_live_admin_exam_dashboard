@@ -35,8 +35,78 @@ class StudyMentor {
         this.attachEventListeners();
         this.fetchMentorData();
         this.showWelcomeGreeting();
+        this.restoreSession();
         this.startTimeBasedNudges();
         this.injectPressureCSS();
+    }
+
+    async restoreSession() {
+        try {
+            const response = await fetch('api/pomodoro/status.php');
+            const result = await response.json();
+
+            if (result.success && result.session) {
+                const session = result.session;
+                this.focusSession.subject = session.subject_name;
+                this.focusSession.timeRemaining = session.remaining_seconds;
+
+                // If active, we might need to adjust for elapsed time if we wanted strict wall-clock time.
+                // But per user request "resume from there", we trust the stored remaining seconds.
+
+                // Check session type
+                const type = session.session_type || 'focus'; // Default to focus for old sessions
+
+                if (type === 'focus') {
+                    if (session.status === 'active') {
+                        this.focusSession.isActive = true;
+                        this.startFocusTimer(true);
+                        console.log('Restored active focus session:', session);
+                    } else if (session.status === 'paused') {
+                        this.focusSession.isActive = true;
+                        this.updateFocusUI(true); // true = paused
+                        console.log('Restored paused focus session:', session);
+                    }
+                } else if (type === 'break') {
+                    // Restore Break Session
+                    this.breakSession.isActive = true;
+                    this.breakSession.timeRemaining = session.remaining_seconds;
+                    // Mock activity since DB doesn't store it yet - or store in subject_name?
+                    this.breakSession.currentActivity = { text: "Resuming your break...", emoji: "☕" };
+
+                    if (session.status === 'paused') {
+                        this.updateBreakUI(true);
+                    } else {
+                        this.startBreakTimer(true);
+                    }
+                    console.log('Restored break session:', session);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to restore session:', e);
+        }
+    }
+
+    async saveSession(action, data = {}) {
+        // Actions: start, pause, resume, update, complete
+        // meaningful data: subject_id, subject_name, duration (for start)
+        // remaining_seconds (for update/pause)
+
+        const payload = { action: action, ...data };
+
+        // Map to specific endpoints
+        let endpoint = 'api/pomodoro/update.php';
+        if (action === 'start') endpoint = 'api/pomodoro/start.php';
+        if (action === 'complete') endpoint = 'api/pomodoro/complete.php';
+
+        try {
+            await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (e) {
+            console.error('Failed to save session state:', e);
+        }
     }
 
     injectPressureCSS() {
@@ -74,16 +144,53 @@ class StudyMentor {
         return params.get('page') === 'take-exam-interface' || this.focusSession.isActive || this.breakSession.isActive;
     }
 
-    startFocusSession(subject) {
-        if (this.focusSession.isActive) return;
+    async startFocusSession(subjectId, subjectName) {
+        // If there's an active session (even if different subject), stop it first
+        if (this.focusSession.isActive || this.breakSession.isActive) {
+            if (this.focusSession.isActive && this.focusSession.subject === subjectName) {
+                // Same subject, maybe just accidentally closed the widget? Just toggling would be enough
+                // However, we want "Start" to be a clean start or a resume.
+                // Let's check status. If it's active in our memory, we just return.
+                return;
+            }
+            // Stop current session (focus or break)
+            await this.stopFocusSession();
+        }
 
         this.focusSession.isActive = true;
-        this.focusSession.subject = subject;
+        this.focusSession.subject = subjectName;
         this.focusSession.timeRemaining = 25 * 60;
-        this.closePanel();
 
-        // Show intense Bos Mode Nudge to start
-        this.showFocusTeaser();
+        // DB Call to Start
+        await this.saveSession('start', {
+            subject_id: subjectId,
+            subject_name: subjectName,
+            duration: 25,
+            type: 'focus'
+        });
+
+        this.startFocusTimer();
+        this.updateFocusUI();
+        this.closePanel();
+    }
+
+    pauseFocusSession() {
+        clearInterval(this.focusSession.intervalId);
+        this.focusSession.intervalId = null;
+        this.saveSession('pause', { remaining_seconds: this.focusSession.timeRemaining });
+        this.updateFocusUI(true); // Show paused state
+    }
+
+    resumeFocusSession() {
+        this.saveSession('resume');
+        this.startFocusTimer(true);
+    }
+
+    startFocusTimer(resuming = false) {
+        if (this.focusSession.intervalId) clearInterval(this.focusSession.intervalId);
+
+        // Initial UI update
+        this.updateFocusUI();
 
         this.focusSession.intervalId = setInterval(() => {
             this.focusSession.timeRemaining--;
@@ -92,6 +199,11 @@ class StudyMentor {
             // 5-Minute Warning
             if (this.focusSession.timeRemaining === 300) { // 300 seconds = 5 minutes
                 this.sendNotification("AI Mentor: Focus Check", `5 minutes left! Finish strong, Sohan. You're crushing ${this.focusSession.subject}!`);
+            }
+
+            // Sync to DB every 10 seconds
+            if (this.focusSession.timeRemaining % 10 === 0) {
+                this.saveSession('update', { remaining_seconds: this.focusSession.timeRemaining, type: 'focus' });
             }
 
             if (this.focusSession.timeRemaining <= 0) {
@@ -116,11 +228,21 @@ class StudyMentor {
             // Force Boss Theme Visuals for Timer
             this.applyTimerTheme();
 
+            const isPaused = arguments[0] === true;
+
             teaserText.innerHTML = `
                 <div class="flex flex-col items-center">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Focusing: ${this.focusSession.subject}</span>
-                    <span class="text-3xl font-black">${timeStr}</span>
-                    <button onclick="studyMentor.stopFocusSession()" class="mt-2 text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter">Cancel Session</button>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">
+                        ${isPaused ? '⏸️ PAUSED' : `Focusing: ${this.focusSession.subject}`}
+                    </span>
+                    <span class="text-3xl font-black ${isPaused ? 'opacity-50' : ''}">${timeStr}</span>
+                    <div class="flex gap-2 mt-2">
+                        ${isPaused
+                    ? `<button onclick="studyMentor.resumeFocusSession()" class="text-[8px] font-bold text-white bg-emerald-600 px-2 py-1 rounded uppercase tracking-tighter">Resume</button>`
+                    : `<button onclick="studyMentor.pauseFocusSession()" class="text-[8px] font-bold text-white bg-amber-600 px-2 py-1 rounded uppercase tracking-tighter">Pause</button>`
+                }
+                        <button onclick="studyMentor.stopFocusSession()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Stop</button>
+                    </div>
                 </div>
             `;
         }
@@ -183,27 +305,14 @@ class StudyMentor {
         const completedSubject = this.focusSession.subject || "General Focus";
         this.focusSession.isActive = false;
 
-        // Log completion to backend
-        console.log('Logging session for:', completedSubject);
-        fetch('api/log-activity.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'pomodoro_session',
-                message: completedSubject,
-                details: { duration: 25, timestamp: new Date().toISOString() }
-            })
-        })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Session log response:', data);
-                if (data.success) {
-                    this.fetchMentorData(); // Refresh to update counts
-                } else {
-                    console.error('Session log failed:', data.error);
-                }
-            })
-            .catch(err => console.error('Session log network error:', err));
+        // DB Call to Complete
+        this.saveSession('complete', {
+            remaining_seconds: 0
+        });
+
+        // Backend log is handled by complete.php now, so we can remove the manual fetch here
+        // But we DO need to fetch fresh data to update the UI
+        setTimeout(() => this.fetchMentorData(), 1000);
 
         // Celebrate!
         if (typeof confetti !== 'undefined') {
@@ -257,19 +366,48 @@ class StudyMentor {
         this.breakSession.timeRemaining = 5 * 60;
         this.breakSession.currentActivity = activities[Math.floor(Math.random() * activities.length)];
 
+        // DB Call to Start Break
+        this.saveSession('start', {
+            type: 'break',
+            duration: 5
+        });
+
+        this.startBreakTimer();
+    }
+
+    startBreakTimer(resuming = false) {
+        if (this.breakSession.intervalId) clearInterval(this.breakSession.intervalId);
+
         this.updateBreakUI();
 
         this.breakSession.intervalId = setInterval(() => {
             this.breakSession.timeRemaining--;
             this.updateBreakUI();
 
+            // Sync to DB every 10 seconds
+            if (this.breakSession.timeRemaining % 10 === 0) {
+                this.saveSession('update', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
+            }
+
             if (this.breakSession.timeRemaining <= 0) {
                 this.sendNotification("AI Mentor: Break Over", "Time to get back to work! Let's go.");
-                this.stopFocusSession();
+                this.stopFocusSession(); // This clears session too
                 // Show a final "Back to work" nudge
                 this.showWelcomeGreeting();
             }
         }, 1000);
+    }
+
+    pauseBreakSession() {
+        clearInterval(this.breakSession.intervalId);
+        this.breakSession.intervalId = null;
+        this.saveSession('pause', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
+        this.updateBreakUI(true); // Show paused state
+    }
+
+    resumeBreakSession() {
+        this.saveSession('resume', { type: 'break' });
+        this.startBreakTimer(true);
     }
 
     updateBreakUI() {
@@ -287,12 +425,24 @@ class StudyMentor {
 
             this.applyBreakTheme();
 
+            const isPaused = arguments[0] === true;
+
             teaserText.innerHTML = `
                 <div class="flex flex-col items-center">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-1">Health Coach: Break Time</span>
-                    <span class="text-xs font-bold leading-tight mb-2">${this.breakSession.currentActivity.text}</span>
-                    <span class="text-2xl font-black text-white">${timeStr}</span>
-                    <button onclick="studyMentor.stopFocusSession()" class="mt-2 text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter">Skip Break</button>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-1">
+                        ${isPaused ? '⏸️ PAUSED' : 'Health Coach: Break Time'}
+                    </span>
+                    <span class="text-xs font-bold leading-tight mb-2 ${isPaused ? 'opacity-50' : ''}">
+                        ${this.breakSession.currentActivity.text}
+                    </span>
+                    <span class="text-2xl font-black text-white ${isPaused ? 'opacity-50' : ''}">${timeStr}</span>
+                    <div class="flex gap-2 mt-2">
+                        ${isPaused
+                    ? `<button onclick="studyMentor.resumeBreakSession()" class="text-[8px] font-bold text-white bg-emerald-600 px-2 py-1 rounded uppercase tracking-tighter">Resume</button>`
+                    : `<button onclick="studyMentor.pauseBreakSession()" class="text-[8px] font-bold text-white bg-amber-600 px-2 py-1 rounded uppercase tracking-tighter">Pause</button>`
+                }
+                        <button onclick="studyMentor.stopFocusSession()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Skip Break</button>
+                    </div>
                 </div>
             `;
         }
@@ -379,7 +529,7 @@ class StudyMentor {
         widget.id = 'study-mentor-widget';
         widget.className = 'fixed bottom-6 right-6 z-50';
         widget.innerHTML = `
-            <!-- Floating Action Button -->
+                <!-- Floating Action Button -->
             <button id="mentor-fab" 
                 class="relative bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full w-14 h-14 shadow-2xl hover:shadow-purple-500/50 transition-all hover:scale-110 flex items-center justify-center group">
                 <span class="material-symbols-outlined text-2xl">psychology</span>
@@ -490,86 +640,86 @@ class StudyMentor {
             </style>
 
             <!-- Mentor Panel -->
-        <div id="mentor-panel" 
-            class="hidden absolute bottom-20 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transition-all duration-300">
-            
-            <!-- Header with Discipline Ring -->
-            <div id="mentor-header" class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="relative w-12 h-12 flex items-center justify-center">
-                            <svg class="w-full h-full transform -rotate-90">
-                                <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,0.2)" stroke-width="4" fill="transparent" />
-                                <circle id="discipline-ring-inner" cx="24" cy="24" r="20" stroke="white" stroke-width="4" fill="transparent" 
-                                    stroke-dasharray="125.6" stroke-dashoffset="125.6" stroke-linecap="round" class="transition-all duration-1000" />
-                            </svg>
-                            <span id="discipline-ring-text" class="absolute text-[10px] font-bold">0%</span>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-sm flex items-center gap-1">
-                                <span class="material-symbols-outlined text-lg">psychology</span>
-                                AI Study Mentor
-                            </h3>
-                            <p class="text-[9px] text-purple-100 uppercase tracking-widest opacity-80">Daily coverage</p>
+                <div id="mentor-panel"
+                    class="hidden absolute bottom-20 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transition-all duration-300">
+
+                    <!-- Header with Discipline Ring -->
+                    <div id="mentor-header" class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="relative w-12 h-12 flex items-center justify-center">
+                                    <svg class="w-full h-full transform -rotate-90">
+                                        <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,0.2)" stroke-width="4" fill="transparent" />
+                                        <circle id="discipline-ring-inner" cx="24" cy="24" r="20" stroke="white" stroke-width="4" fill="transparent"
+                                            stroke-dasharray="125.6" stroke-dashoffset="125.6" stroke-linecap="round" class="transition-all duration-1000" />
+                                    </svg>
+                                    <span id="discipline-ring-text" class="absolute text-[10px] font-bold">0%</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-sm flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-lg">psychology</span>
+                                        AI Study Mentor
+                                    </h3>
+                                    <p class="text-[9px] text-purple-100 uppercase tracking-widest opacity-80">Daily coverage</p>
+                                </div>
+                            </div>
+
+                            <button id="mentor-close" class="hover:bg-white/20 rounded-full p-1 transition-colors">
+                                <span class="material-symbols-outlined text-sm">close</span>
+                            </button>
                         </div>
                     </div>
-                    
-                    <button id="mentor-close" class="hover:bg-white/20 rounded-full p-1 transition-colors">
-                        <span class="material-symbols-outlined text-sm">close</span>
-                    </button>
-                </div>
-            </div>
 
-                <!-- Content -->
-                <div class="p-4 max-h-96 overflow-y-auto">
-                    <div id="mentor-greeting" class="mb-4">
-                        <div class="flex items-start gap-3 bg-purple-50 p-3 rounded-xl">
-                            <span class="material-symbols-outlined text-purple-600 text-2xl">waving_hand</span>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-800">Hey there!</p>
-                                <p class="text-xs text-gray-600 mt-1">Let me analyze your performance...</p>
+                    <!-- Content -->
+                    <div class="p-4 max-h-96 overflow-y-auto">
+                        <div id="mentor-greeting" class="mb-4">
+                            <div class="flex items-start gap-3 bg-purple-50 p-3 rounded-xl">
+                                <span class="material-symbols-outlined text-purple-600 text-2xl">waving_hand</span>
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-800">Hey there!</p>
+                                    <p class="text-xs text-gray-600 mt-1">Let me analyze your performance...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="mentor-recommendations" class="space-y-3">
+                            <!-- Recommendations will be injected here -->
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="mt-4 pt-4 border-t border-gray-100">
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</p>
+                            <div class="space-y-2">
+                                <button onclick="window.loadPage('exam')"
+                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
+                                    <span class="material-symbols-outlined text-emerald-500 text-lg">assignment</span>
+                                    <span>Create Exams</span>
+                                </button>
+                                <button onclick="window.loadPage('take-exam-list')"
+                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm bg-purple-50 group border border-purple-100">
+                                    <span class="material-symbols-outlined text-purple-600 text-lg group-hover:scale-110 transition-transform">school</span>
+                                    <span class="font-bold text-purple-700">Take a New Exam</span>
+                                </button>
+                                <button onclick="window.loadPage('import-questions')"
+                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
+                                    <span class="material-symbols-outlined text-emerald-500 text-lg">upload_file</span>
+                                    <span>Import Questions</span>
+                                </button>
+                                <button onclick="window.loadPage('mistake-bank')"
+                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
+                                    <span class="material-symbols-outlined text-rose-500 text-lg">psychology</span>
+                                    <span>Review Mistake Bank</span>
+                                </button>
+                                <button onclick="window.loadPage('discipline-tracker')"
+                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
+                                    <span class="material-symbols-outlined text-blue-500 text-lg">analytics</span>
+                                    <span>View Full Analytics</span>
+                                </button>
                             </div>
                         </div>
                     </div>
-
-                    <div id="mentor-recommendations" class="space-y-3">
-                        <!-- Recommendations will be injected here -->
-                    </div>
-
-                    <!-- Quick Actions -->
-                    <div class="mt-4 pt-4 border-t border-gray-100">
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</p>
-                        <div class="space-y-2">
-                            <button onclick="window.loadPage('exam')" 
-                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                <span class="material-symbols-outlined text-emerald-500 text-lg">assignment</span>
-                                <span>Create Exams</span>
-                            </button>
-                            <button onclick="window.loadPage('take-exam-list')" 
-                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm bg-purple-50 group border border-purple-100">
-                                <span class="material-symbols-outlined text-purple-600 text-lg group-hover:scale-110 transition-transform">school</span>
-                                <span class="font-bold text-purple-700">Take a New Exam</span>
-                            </button>
-                            <button onclick="window.loadPage('import-questions')" 
-                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                <span class="material-symbols-outlined text-emerald-500 text-lg">upload_file</span>
-                                <span>Import Questions</span>
-                            </button>
-                            <button onclick="window.loadPage('mistake-bank')" 
-                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                <span class="material-symbols-outlined text-rose-500 text-lg">psychology</span>
-                                <span>Review Mistake Bank</span>
-                            </button>
-                            <button onclick="window.loadPage('discipline-tracker')" 
-                                class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                                <span class="material-symbols-outlined text-blue-500 text-lg">analytics</span>
-                                <span>View Full Analytics</span>
-                            </button>
-                        </div>
-                    </div>
                 </div>
-            </div>
-        `;
+            `;
         document.body.appendChild(widget);
     }
 
@@ -1306,6 +1456,7 @@ class StudyMentor {
                 const mastery = accuracy >= 80 ? 'gold' : accuracy >= 50 ? 'silver' : 'bronze';
 
                 return {
+                    id: subj.id,
                     name: subj.name,
                     isCreated,
                     isTaken,
@@ -1408,7 +1559,7 @@ class StudyMentor {
                                                                   title="${item.mastery.toUpperCase()} Mastery (${Math.round(item.accuracy)}%)">
                                                                 military_tech
                                                             </span>
-                                                            <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${item.name}')" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-indigo-400 hover:text-indigo-300 transition-colors" title="Start Focus Session">
+                                                            <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${item.id}', '${item.name}')" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-indigo-400 hover:text-indigo-300 transition-colors" title="Start Focus Session">
                                                                 <span class="material-symbols-outlined text-[12px]">timer</span> Start Focus
                                                             </button>
                                                         </div>
