@@ -13,11 +13,14 @@ class StudyMentor {
             timeRemaining: 25 * 60, // 25 minutes in seconds
             totalDuration: 25 * 60, // Track original duration
             subject: null,
+            subjectId: null,
             intervalId: null
         };
         this.breakSession = {
             isActive: false,
             timeRemaining: 5 * 60, // 5 minutes in seconds
+            subject: null,
+            subjectId: null,
             intervalId: null,
             currentActivity: null
         };
@@ -62,31 +65,26 @@ class StudyMentor {
 
             if (result.success && result.session) {
                 const session = result.session;
-                this.focusSession.subject = session.subject_name;
-                this.focusSession.timeRemaining = session.remaining_seconds;
-                this.focusSession.totalDuration = (session.duration_minutes || 25) * 60;
-
-                // If active, we might need to adjust for elapsed time if we wanted strict wall-clock time.
-                // But per user request "resume from there", we trust the stored remaining seconds.
-
-                // Check session type
-                const type = session.session_type || 'focus'; // Default to focus for old sessions
+                const type = session.session_type || 'focus';
 
                 if (type === 'focus') {
+                    this.focusSession.subject = session.subject_name;
+                    this.focusSession.subjectId = session.subject_id;
+                    this.focusSession.timeRemaining = session.remaining_seconds;
+                    this.focusSession.totalDuration = (session.duration_minutes || 25) * 60;
+
                     if (session.status === 'active') {
                         this.focusSession.isActive = true;
                         this.startFocusTimer(true);
-                        console.log('Restored active focus session:', session);
                     } else if (session.status === 'paused') {
                         this.focusSession.isActive = true;
-                        this.updateFocusUI(true); // true = paused
-                        console.log('Restored paused focus session:', session);
+                        this.updateFocusUI(true);
                     }
                 } else if (type === 'break') {
-                    // Restore Break Session
                     this.breakSession.isActive = true;
+                    this.breakSession.subject = session.subject_name;
+                    this.breakSession.subjectId = session.subject_id;
                     this.breakSession.timeRemaining = session.remaining_seconds;
-                    // Mock activity since DB doesn't store it yet - or store in subject_name?
                     this.breakSession.currentActivity = { text: "Resuming your break...", emoji: "☕" };
 
                     if (session.status === 'paused') {
@@ -94,8 +92,8 @@ class StudyMentor {
                     } else {
                         this.startBreakTimer(true);
                     }
-                    console.log('Restored break session:', session);
                 }
+                console.log('Restored session:', session);
             }
         } catch (e) {
             console.error('Failed to restore session:', e);
@@ -176,6 +174,7 @@ class StudyMentor {
 
         this.focusSession.isActive = true;
         this.focusSession.subject = subjectName;
+        this.focusSession.subjectId = subjectId;
         this.focusSession.timeRemaining = 25 * 60;
         this.focusSession.totalDuration = 25 * 60;
 
@@ -365,7 +364,7 @@ class StudyMentor {
 
         // Wait 5 seconds for victory celebration, then start break
         setTimeout(() => {
-            this.startBreakSession();
+            this.startBreakSession(this.focusSession.subjectId, this.focusSession.subject);
         }, 5000);
     }
 
@@ -397,8 +396,12 @@ class StudyMentor {
         if (teaser) teaser.classList.add('hidden');
     }
 
-    startBreakSession() {
+    startBreakSession(subjectId = null, subjectName = null) {
         if (this.breakSession.isActive) return;
+
+        // Reuse focus subject data if not provided (transition case)
+        const finalSubjectId = subjectId || this.focusSession.subjectId;
+        const finalSubjectName = subjectName || this.focusSession.subject;
 
         const activities = [
             { text: "Drink a full glass of water and stretch your back. I'll wait for you.", emoji: "💧" },
@@ -408,12 +411,16 @@ class StudyMentor {
         ];
 
         this.breakSession.isActive = true;
+        this.breakSession.subject = finalSubjectName;
+        this.breakSession.subjectId = finalSubjectId;
         this.breakSession.timeRemaining = 5 * 60;
         this.breakSession.currentActivity = activities[Math.floor(Math.random() * activities.length)];
 
         // DB Call to Start Break
         this.saveSession('start', {
             type: 'break',
+            subject_id: finalSubjectId,
+            subject_name: finalSubjectName,
             duration: 5
         });
 
