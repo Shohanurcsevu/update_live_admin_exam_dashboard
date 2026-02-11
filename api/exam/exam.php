@@ -46,6 +46,16 @@ function list_exams($conn) {
         $params[] = intval($_GET['topic_id']);
         $types .= 'i';
     }
+    
+    // Date filtering for Timely Model Exam Creator
+    // Note: Using updated_at since created_at column doesn't exist
+    if (!empty($_GET['from']) && !empty($_GET['to'])) {
+        $where_clauses[] = "DATE(e.updated_at) BETWEEN ? AND ?";
+        $params[] = $_GET['from'];
+        $params[] = $_GET['to'];
+        $types .= 'ss';
+    }
+
 
     $where_clauses[] = "e.is_deleted = 0";
     $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
@@ -71,11 +81,21 @@ function list_exams($conn) {
     $types .= 'ii';
 
     $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'SQL prepare error: ' . $conn->error, 'sql' => $sql]);
+        return;
+    }
+    
     if (!empty($params)) {
         $stmt->bind_param($types, ...$params);
     }
     
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        echo json_encode(['success' => false, 'message' => 'SQL execute error: ' . $stmt->error]);
+        $stmt->close();
+        return;
+    }
+    
     $result = $stmt->get_result();
     $exams = [];
     while ($row = $result->fetch_assoc()) {
