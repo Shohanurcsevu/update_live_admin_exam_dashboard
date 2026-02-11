@@ -25,7 +25,7 @@ class StudyMentor {
         this.init();
     }
 
-    init() {
+    async init() {
         window.studyMentor = this; // Expose for onclick handlers
         // Request notification permission
         if ("Notification" in window && Notification.permission !== "granted") {
@@ -33,9 +33,14 @@ class StudyMentor {
         }
         this.createWidget();
         this.attachEventListeners();
-        this.fetchMentorData();
-        this.showWelcomeGreeting();
-        this.restoreSession();
+        await this.fetchMentorData();
+        await this.restoreSession();
+
+        // Only show greeting if no session was restored
+        if (!this.focusSession.isActive && !this.breakSession.isActive) {
+            this.showWelcomeGreeting();
+        }
+
         this.startTimeBasedNudges();
         this.injectPressureCSS();
 
@@ -312,6 +317,7 @@ class StudyMentor {
 
             // Auto-hide after 5 seconds
             setTimeout(() => {
+                if (this.isFocusModeActive()) return;
                 teaser.classList.add('hidden');
             }, 5000);
         }
@@ -485,6 +491,8 @@ class StudyMentor {
     }
 
     showWelcomeGreeting() {
+        if (this.isFocusModeActive()) return;
+
         // --- NEW: Yesterday Failure Check ---
         if (this.mentorData?.boss_challenge?.status?.failed_yesterday) {
             this.showNudge({
@@ -538,6 +546,7 @@ class StudyMentor {
 
                 // Hide teaser after 10 seconds
                 setTimeout(() => {
+                    if (this.isFocusModeActive()) return;
                     teaser.classList.add('hidden');
                     this.isInitialGreeting = false;
                 }, 10000);
@@ -1112,12 +1121,6 @@ class StudyMentor {
         const showNudge = () => {
             const challengeStatus = this.mentorData?.boss_challenge?.status;
             if (this.isOpen || this.isInitialGreeting || this.isFocusModeActive()) {
-                // If focus mode is active, make sure any existing teaser is hidden
-                if (this.isFocusModeActive()) {
-                    const teaser = document.getElementById('mentor-teaser');
-                    if (teaser) teaser.classList.add('hidden');
-                    this.isMotivationalNudgeActive = false;
-                }
                 return;
             }
 
@@ -1224,6 +1227,7 @@ class StudyMentor {
 
                 // Auto-hide after 15 seconds
                 setTimeout(() => {
+                    if (this.isFocusModeActive()) return;
                     teaser.classList.add('hidden');
                     teaser.classList.remove('animate-float');
                     this.isMotivationalNudgeActive = false;
@@ -1962,10 +1966,15 @@ class StudyMentor {
             if (teaserText) teaserText.innerText = nudge.message;
 
             // Auto-hide teaser after 8 seconds
-            setTimeout(() => teaser?.classList.add('hidden'), 8000);
+            setTimeout(() => {
+                if (this.isFocusModeActive()) return;
+                teaser?.classList.add('hidden');
+            }, 8000);
         } else {
-            badge?.classList.add('hidden');
-            teaser?.classList.add('hidden');
+            if (!this.isFocusModeActive()) {
+                badge?.classList.add('hidden');
+                teaser?.classList.add('hidden');
+            }
         }
     }
 
