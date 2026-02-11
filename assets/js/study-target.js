@@ -424,7 +424,8 @@ const StudyTargetTracker = {
             statusEl.className = "text-sm font-bold text-emerald-600 uppercase tracking-wider";
             iconContainer.className = "w-12 h-12 rounded-xl flex items-center justify-center text-white achievable-badge shadow-lg";
             iconEl.textContent = "task_alt";
-            tomorrowContainer.classList.add('hidden');
+            tomorrowContainer.classList.remove('hidden');
+            this.updateTomorrowPlan(0); // On Track = No Carryover
         } else {
             statusEl.textContent = "Not enough time left today to complete 12 hours";
             statusEl.className = "text-sm font-bold text-rose-600 uppercase tracking-wider";
@@ -465,6 +466,18 @@ const StudyTargetTracker = {
         const displayH = h % 12 || 12;
 
         tomorrowStartTimeEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
+
+        // Visual indicator for carryover
+        const label = tomorrowStartTimeEl.previousElementSibling;
+        if (carryoverSeconds > 0) {
+            tomorrowStartTimeEl.classList.remove('text-emerald-600');
+            tomorrowStartTimeEl.classList.add('text-rose-600');
+            if (label) label.textContent = "Recovery Start";
+        } else {
+            tomorrowStartTimeEl.classList.remove('text-rose-600');
+            tomorrowStartTimeEl.classList.add('text-emerald-600');
+            if (label) label.textContent = "Optimal Start";
+        }
     },
 
     renderSubjectCards() {
