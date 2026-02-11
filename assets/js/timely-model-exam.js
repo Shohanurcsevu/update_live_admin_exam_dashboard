@@ -403,6 +403,15 @@
             examTotalQuestionsInput.value = totalQuestions;
             examDurationInput.value = totalQuestions;
             examMarksInput.value = totalQuestions;
+
+            // Pre-fill exam name based on date filter
+            if (currentDateFilter.from && currentDateFilter.to) {
+                if (currentDateFilter.from === currentDateFilter.to) {
+                    examNameInput.value = `Exams from ${currentDateFilter.from}`;
+                } else {
+                    examNameInput.value = `Exams from ${currentDateFilter.from} to ${currentDateFilter.to}`;
+                }
+            }
         } else if (step === 3) {
             step3Content.classList.remove('hidden');
             step3Indicator.classList.remove('opacity-50');

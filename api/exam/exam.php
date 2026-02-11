@@ -57,6 +57,10 @@ function list_exams($conn) {
     }
 
 
+    // Filter out custom exams (those not linked to full hierarchy)
+    $where_clauses[] = "e.subject_id IS NOT NULL";
+    $where_clauses[] = "e.lesson_id IS NOT NULL";
+    $where_clauses[] = "e.topic_id IS NOT NULL";
     $where_clauses[] = "e.is_deleted = 0";
     $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
 
