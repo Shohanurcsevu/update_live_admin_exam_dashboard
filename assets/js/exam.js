@@ -192,7 +192,8 @@ function initializeExamPage() {
         const formData = new FormData(examForm);
         const data = Object.fromEntries(formData.entries());
 
-        // Include imported questions if any
+        // Enforce default instructions and include imported questions if any
+        data.instructions = defaultInstructions;
         if (importedQuestions.length > 0) {
             data.questions = importedQuestions;
         }
