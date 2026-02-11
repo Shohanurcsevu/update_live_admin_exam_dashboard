@@ -33,8 +33,8 @@ try {
                 s.subject_name,
                 s.id as subject_id,
                 CASE 
-                    WHEN p.time_used_seconds > 0 THEN p.time_used_seconds 
-                    ELSE (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.id AND q.is_deleted = 0) * 60 
+                    WHEN p.time_used_seconds > 0 THEN CEIL(p.time_used_seconds / 60) * 60
+                    ELSE 0 
                 END as calculated_seconds,
                 1 as sessions,
                 (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.id AND q.is_deleted = 0) as questions
@@ -95,8 +95,8 @@ try {
         FROM (
             SELECT 
                 CASE 
-                    WHEN p.time_used_seconds > 0 THEN p.time_used_seconds 
-                    ELSE (SELECT COUNT(*) FROM questions q WHERE q.exam_id = p.exam_id AND q.is_deleted = 0) * 60 
+                    WHEN p.time_used_seconds > 0 THEN CEIL(p.time_used_seconds / 60) * 60
+                    ELSE 0 
                 END as calculated_seconds,
                 (SELECT COUNT(*) FROM questions q WHERE q.exam_id = p.exam_id AND q.is_deleted = 0) as total_questions
             FROM performance p

@@ -27,8 +27,8 @@ try {
             -- Exam Performance
             SELECT 
                 CASE 
-                    WHEN p.time_used_seconds > 0 THEN p.time_used_seconds 
-                    ELSE (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.id AND q.is_deleted = 0) * 60 
+                    WHEN p.time_used_seconds > 0 THEN CEIL(p.time_used_seconds / 60) * 60
+                    ELSE 0 
                 END as calculated_seconds
             FROM performance p
             JOIN exams e ON p.exam_id = e.id
