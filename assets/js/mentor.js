@@ -159,6 +159,10 @@ class StudyMentor {
         return params.get('page') === 'take-exam-interface' || this.focusSession.isActive || this.breakSession.isActive;
     }
 
+    isBreakModeActive() {
+        return this.breakSession.isActive;
+    }
+
     async startFocusSession(subjectId, subjectName) {
         // If there's an active session (even if different subject), stop it first
         if (this.focusSession.isActive || this.breakSession.isActive) {
@@ -291,6 +295,8 @@ class StudyMentor {
     }
 
     showCustomNudge({ title, message, icon = '🎯', theme = 'boss' }) {
+        if (this.isFocusModeActive() || this.isBreakModeActive()) return;
+
         const teaser = document.getElementById('mentor-teaser');
         const teaserBorder = document.getElementById('teaser-border');
         const teaserContent = document.getElementById('teaser-content');
@@ -300,9 +306,24 @@ class StudyMentor {
         const badge = document.getElementById('mentor-badge');
 
         if (teaser && teaserText) {
+            this.isMotivationalNudgeActive = true;
+
             // Apply theme
             teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${theme}-border`;
             teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-${theme}-bg`;
+            teaser.classList.add('animate-float');
+
+            // Apply Decorations
+            if (teaserDecor) {
+                teaserDecor.innerHTML = '';
+                if (theme === 'champion') {
+                    teaserDecor.innerHTML = '<div class="champion-sweep"></div>';
+                } else if (theme === 'focus') {
+                    teaserDecor.innerHTML = '<div class="focus-pulse"></div>';
+                } else if (theme === 'boss') {
+                    teaserBorder.classList.add('boss-heartbeat');
+                }
+            }
 
             // Set emoji and text
             if (teaserEmoji) teaserEmoji.innerText = icon;
@@ -317,11 +338,14 @@ class StudyMentor {
             teaser.classList.remove('hidden');
             badge?.classList.remove('hidden');
 
-            // Auto-hide after 5 seconds
+            // Auto-hide after 10 seconds
             setTimeout(() => {
-                if (this.isFocusModeActive()) return;
+                if (this.isFocusModeActive() || this.isBreakModeActive()) return;
                 teaser.classList.add('hidden');
-            }, 5000);
+                teaser.classList.remove('animate-float');
+                teaserBorder.classList.remove('boss-heartbeat');
+                this.isMotivationalNudgeActive = false;
+            }, 10000);
         }
     }
 
@@ -520,11 +544,11 @@ class StudyMentor {
     }
 
     showWelcomeGreeting() {
-        if (this.isFocusModeActive()) return;
+        if (this.isFocusModeActive() || this.isBreakModeActive()) return;
 
         // --- NEW: Yesterday Failure Check ---
         if (this.mentorData?.boss_challenge?.status?.failed_yesterday) {
-            this.showNudge({
+            this.showCustomNudge({
                 title: "MISSION FAILED",
                 message: "You failed yesterday's mission, Sohan. No excuses today. GET TO WORK.",
                 icon: "👿",
@@ -549,39 +573,17 @@ class StudyMentor {
 
         // Show greeting in teaser after a short delay
         setTimeout(() => {
-            const teaser = document.getElementById('mentor-teaser');
-            const teaserBorder = document.getElementById('teaser-border');
-            const teaserContent = document.getElementById('teaser-content');
-            const teaserDecor = document.getElementById('teaser-decor');
-            const teaserEmoji = document.getElementById('teaser-emoji');
-            const teaserText = document.getElementById('teaser-text');
-            const badge = document.getElementById('mentor-badge');
-
-            if (teaser && teaserText && !this.isOpen) {
-                // Apply Champion Theme for Welcome Greeting
-                if (teaserBorder && teaserContent) {
-                    teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-champion-border`;
-                    teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-champion-bg`;
-
-                    if (teaserDecor) teaserDecor.innerHTML = '<div class="champion-sweep"></div>';
-                    if (teaserEmoji) teaserEmoji.innerText = '🏆';
-
-                    teaser.classList.add('animate-float');
-                }
-
-                teaserText.innerText = randomGreeting;
-                teaser.classList.remove('hidden');
-                badge?.classList.remove('hidden');
-
-                // Hide teaser after 10 seconds
-                setTimeout(() => {
-                    if (this.isFocusModeActive()) return;
-                    teaser.classList.add('hidden');
-                    this.isInitialGreeting = false;
-                }, 10000);
-            } else {
+            if (this.isOpen) {
                 this.isInitialGreeting = false;
+                return;
             }
+            this.showCustomNudge({
+                title: "WELCOME BACK",
+                message: randomGreeting,
+                icon: "🏆",
+                theme: "champion"
+            });
+            this.isInitialGreeting = false;
         }, 1500);
     }
 
@@ -1149,7 +1151,7 @@ class StudyMentor {
 
         const showNudge = () => {
             const challengeStatus = this.mentorData?.boss_challenge?.status;
-            if (this.isOpen || this.isInitialGreeting || this.isFocusModeActive()) {
+            if (this.isOpen || this.isInitialGreeting || this.isFocusModeActive() || this.isBreakModeActive()) {
                 return;
             }
 
@@ -2008,11 +2010,11 @@ class StudyMentor {
 
             // Auto-hide teaser after 8 seconds
             setTimeout(() => {
-                if (this.isFocusModeActive()) return;
+                if (this.isFocusModeActive() || this.isBreakModeActive()) return;
                 teaser?.classList.add('hidden');
             }, 8000);
         } else {
-            if (!this.isFocusModeActive()) {
+            if (!this.isFocusModeActive() && !this.isBreakModeActive()) {
                 badge?.classList.add('hidden');
                 teaser?.classList.add('hidden');
             }
