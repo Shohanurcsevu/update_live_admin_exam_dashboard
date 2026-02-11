@@ -646,11 +646,40 @@ const StudyTargetTracker = {
                 });
             }
 
-            // Draw Neon Grid
-            ctx.strokeStyle = `rgba(${accentRgb}, 0.05)`;
+            // Draw Classic Red ECG Grid (Graph Paper Effect)
+            const gridSize = 10;
             ctx.lineWidth = 0.5;
-            for (let i = 0; i < canvas.width; i += 30) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+
+            // Draw Vertical Lines
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                // Every 5th line is thicker (Major Grid)
+                if (x % (gridSize * 5) === 0) {
+                    ctx.strokeStyle = `rgba(239, 68, 68, 0.2)`; // Red Major
+                    ctx.lineWidth = 1;
+                } else {
+                    ctx.strokeStyle = `rgba(239, 68, 68, 0.05)`; // Red Minor
+                    ctx.lineWidth = 0.5;
+                }
+                ctx.stroke();
+            }
+
+            // Draw Horizontal Lines
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                // Every 5th line is thicker (Major Grid)
+                if (y % (gridSize * 5) === 0) {
+                    ctx.strokeStyle = `rgba(239, 68, 68, 0.2)`; // Red Major
+                    ctx.lineWidth = 1;
+                } else {
+                    ctx.strokeStyle = `rgba(239, 68, 68, 0.05)`; // Red Minor
+                    ctx.lineWidth = 0.5;
+                }
+                ctx.stroke();
             }
 
             // Draw Particles
