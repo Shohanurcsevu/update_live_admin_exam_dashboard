@@ -7,6 +7,7 @@ date_default_timezone_set('Asia/Dhaka');
 $data = json_decode(file_get_contents('php://input'), true);
 // Even if we don't pass ID, complete the active one
 $remaining = $data['remaining_seconds'] ?? 0;
+$customDuration = isset($data['duration']) ? floatval($data['duration']) : null;
 
 try {
     // 1. Get the active session to log it correctly
@@ -24,8 +25,11 @@ try {
         // Inserting directly is safer transactionally here.
         
         $logSql = "INSERT INTO activity_log (activity_type, activity_message, activity_details, timestamp) VALUES ('pomodoro_session', ?, ?, NOW())";
+        
+        $durationToLog = ($customDuration !== null) ? $customDuration : floatval($row['duration_minutes']);
+        
         $details = json_encode([
-            'duration' => $row['duration_minutes'],
+            'duration' => $durationToLog,
             'subject_id' => $row['subject_id'],
             'completed_at' => date('Y-m-d H:i:s')
         ]);

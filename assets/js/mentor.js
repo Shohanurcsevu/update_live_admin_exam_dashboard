@@ -11,6 +11,7 @@ class StudyMentor {
         this.focusSession = {
             isActive: false,
             timeRemaining: 25 * 60, // 25 minutes in seconds
+            totalDuration: 25 * 60, // Track original duration
             subject: null,
             intervalId: null
         };
@@ -63,6 +64,7 @@ class StudyMentor {
                 const session = result.session;
                 this.focusSession.subject = session.subject_name;
                 this.focusSession.timeRemaining = session.remaining_seconds;
+                this.focusSession.totalDuration = (session.duration_minutes || 25) * 60;
 
                 // If active, we might need to adjust for elapsed time if we wanted strict wall-clock time.
                 // But per user request "resume from there", we trust the stored remaining seconds.
@@ -175,6 +177,7 @@ class StudyMentor {
         this.focusSession.isActive = true;
         this.focusSession.subject = subjectName;
         this.focusSession.timeRemaining = 25 * 60;
+        this.focusSession.totalDuration = 25 * 60;
 
         // DB Call to Start
         await this.saveSession('start', {
@@ -367,6 +370,25 @@ class StudyMentor {
     }
 
     stopFocusSession() {
+        // If stopping a focus session manually, calculate and log elapsed time
+        if (this.focusSession.isActive && !this.breakSession.isActive) {
+            const elapsedSeconds = this.focusSession.totalDuration - this.focusSession.timeRemaining;
+            const elapsedMinutes = Math.ceil(elapsedSeconds / 60);
+
+            if (elapsedMinutes > 0) {
+                this.saveSession('complete', {
+                    duration: elapsedMinutes,
+                    remaining_seconds: 0
+                });
+            } else {
+                // If stopped instantly, just clear it without logging study time
+                this.saveSession('complete', { remaining_seconds: 0 });
+            }
+        } else if (this.breakSession.isActive) {
+            // If stopping a break, just clear the server session
+            this.saveSession('complete', { remaining_seconds: 0 });
+        }
+
         clearInterval(this.focusSession.intervalId);
         clearInterval(this.breakSession.intervalId);
         this.focusSession.isActive = false;
