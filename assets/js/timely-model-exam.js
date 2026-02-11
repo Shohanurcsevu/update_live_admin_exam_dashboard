@@ -119,172 +119,142 @@
         return result.data;
     }
 
-    // Build hierarchy tree
+    // Build hierarchy tree - SIMPLIFIED: Load exams directly
     async function buildHierarchy() {
         try {
             hierarchyLoading.classList.remove('hidden');
             hierarchyTree.classList.add('hidden');
 
-            const subjectsData = await fetchData(API_SUBJECTS);
-            const subjects = subjectsData.sort((a, b) => a.id - b.id);
+            // Load exams directly without hierarchy
+            await loadAllExams();
 
-            hierarchyData = {};
-            subjects.forEach(subject => {
-                hierarchyData[subject.id] = {
-                    ...subject,
-                    lessons: null
-                };
-            });
-
-            renderHierarchy();
             hierarchyLoading.classList.add('hidden');
             hierarchyTree.classList.remove('hidden');
         } catch (error) {
-            console.error('Error building hierarchy:', error);
-            showToast('Failed to load exam subjects', 'error');
+            console.error('Error loading exams:', error);
+            showToast('Failed to load exams', 'error');
             hierarchyLoading.innerHTML = '<p class="text-red-500 text-center">Failed to load data. Please refresh the page.</p>';
         }
     }
 
-    // Render hierarchy tree
-    function renderHierarchy() {
-        hierarchyTree.innerHTML = '';
-
-        Object.values(hierarchyData).forEach(subject => {
-            const subjectDiv = createHierarchyItem(
-                subject.subject_name,
-                'subject',
-                `subject-${subject.id}`,
-                () => renderLessons(subject, subjectDiv)
-            );
-            hierarchyTree.appendChild(subjectDiv);
-        });
-    }
-
-    async function renderLessons(subject, parentDiv) {
-        const container = parentDiv.querySelector('.children-container');
-        if (container.children.length > 0) return;
-
+    // Load all exams directly with date filter
+    async function loadAllExams() {
         try {
-            container.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading lessons...</div>';
-
-            if (!subject.lessons) {
-                const lessons = await fetchData(`${API_LESSONS}?subject_id=${subject.id}`);
-                subject.lessons = {};
-                lessons.forEach(l => {
-                    subject.lessons[l.id] = { ...l, topics: null };
-                });
-            }
-
-            container.innerHTML = '';
-            Object.values(subject.lessons).forEach(lesson => {
-                const lessonDiv = createHierarchyItem(
-                    lesson.lesson_name,
-                    'lesson',
-                    `lesson-${lesson.id}`,
-                    () => renderTopics(lesson, lessonDiv)
-                );
-                container.appendChild(lessonDiv);
-            });
-        } catch (error) {
-            container.innerHTML = '<div class="py-2 text-sm text-red-500">Failed to load lessons.</div>';
-        }
-    }
-
-    async function renderTopics(lesson, parentDiv) {
-        const container = parentDiv.querySelector('.children-container');
-        if (container.children.length > 0) return;
-
-        try {
-            container.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading topics...</div>';
-
-            if (!lesson.topics) {
-                const topics = await fetchData(`${API_TOPICS}?lesson_id=${lesson.id}`);
-                lesson.topics = {};
-                topics.forEach(t => {
-                    lesson.topics[t.id] = { ...t, exams: null };
-                });
-            }
-
-            container.innerHTML = '';
-            Object.values(lesson.topics).forEach(topic => {
-                const topicDiv = createHierarchyItem(
-                    topic.topic_name,
-                    'topic',
-                    `topic-${topic.id}`,
-                    () => renderExams(topic, topicDiv)
-                );
-                container.appendChild(topicDiv);
-            });
-        } catch (error) {
-            container.innerHTML = '<div class="py-2 text-sm text-red-500">Failed to load topics.</div>';
-        }
-    }
-
-    async function renderExams(topic, parentDiv) {
-        const container = parentDiv.querySelector('.children-container');
-
-        try {
-            container.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading exams...</div>';
-
             // Build URL with date filter
-            let url = `${API_EXAMS}&topic_id=${topic.id}`;
+            let url = `${API_EXAMS}`;
             if (currentDateFilter.from && currentDateFilter.to) {
                 url += `&from=${currentDateFilter.from}&to=${currentDateFilter.to}`;
             }
 
-            console.log('Fetching exams from:', url);
+            console.log('Fetching all exams from:', url);
 
-            // Always fetch fresh data when date filter is applied
-            const exams = await fetchData(url, true);
-            topic.exams = exams;
+            const response = await fetch(url);
+            const result = await response.json();
 
-            container.innerHTML = '';
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to fetch exams');
+            }
+
+            const exams = result.data;
+
+            hierarchyTree.innerHTML = '';
+
             if (exams.length === 0) {
-                container.innerHTML = '<div class="py-2 text-sm text-gray-500">No exams found for selected date range.</div>';
+                hierarchyTree.innerHTML = '<div class="p-4 text-center text-gray-500">No exams found for selected date range.</div>';
             } else {
+                // Group exams by subject
+                const groupedBySubject = {};
                 exams.forEach(exam => {
-                    const examDiv = createExamItem(exam);
-                    container.appendChild(examDiv);
+                    const subjectName = exam.subject_name || 'Unknown Subject';
+                    if (!groupedBySubject[subjectName]) {
+                        groupedBySubject[subjectName] = [];
+                    }
+                    groupedBySubject[subjectName].push(exam);
+                });
+
+                // Create expandable sections for each subject
+                Object.entries(groupedBySubject).forEach(([subjectName, subjectExams]) => {
+                    const subjectDiv = createExpandableSection(subjectName, subjectExams, 'subject');
+                    hierarchyTree.appendChild(subjectDiv);
                 });
             }
         } catch (error) {
             console.error('Error loading exams:', error);
-            container.innerHTML = `<div class="py-2 text-sm text-red-500">Failed to load exams: ${error.message}</div>`;
+            hierarchyTree.innerHTML = `<div class="p-4 text-center text-red-500">Failed to load exams: ${error.message}</div>`;
         }
     }
 
-    function createHierarchyItem(name, type, id, onExpand) {
+    // Create expandable section for grouped exams
+    function createExpandableSection(title, exams, type) {
         const div = document.createElement('div');
-        div.className = 'hierarchy-item';
-        div.innerHTML = `
-            <div class="hierarchy-header" data-id="${id}">
-                <span class="material-symbols-outlined expand-icon text-gray-600 mr-2">chevron_right</span>
-                <span class="material-symbols-outlined mr-2 text-blue-600">${getIcon(type)}</span>
-                <span class="font-semibold text-gray-800">${name}</span>
-            </div>
-            <div class="children-container ml-6 hidden"></div>
+        div.className = 'mb-3';
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center p-3 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition';
+        header.innerHTML = `
+            <span class="material-symbols-outlined expand-icon text-gray-600 mr-2 transition-transform">chevron_right</span>
+            <span class="material-symbols-outlined mr-2 text-blue-600">${getIcon(type)}</span>
+            <span class="font-bold text-gray-800">${title}</span>
+            <span class="ml-auto text-sm text-gray-600">${exams.length} exam${exams.length !== 1 ? 's' : ''}</span>
         `;
 
-        const header = div.querySelector('.hierarchy-header');
-        const icon = div.querySelector('.expand-icon');
-        const childrenContainer = div.querySelector('.children-container');
+        const content = document.createElement('div');
+        content.className = 'hidden ml-6 mt-2 space-y-2';
+
+        exams.forEach(exam => {
+            const examDiv = createExamItem(exam);
+            content.appendChild(examDiv);
+        });
 
         header.addEventListener('click', () => {
-            icon.classList.toggle('expanded');
-            childrenContainer.classList.toggle('hidden');
-            if (!childrenContainer.classList.contains('hidden')) {
-                onExpand();
+            const icon = header.querySelector('.expand-icon');
+            const isExpanded = content.classList.contains('hidden');
+
+            if (isExpanded) {
+                content.classList.remove('hidden');
+                icon.style.transform = 'rotate(90deg)';
+            } else {
+                content.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
             }
         });
 
+        div.appendChild(header);
+        div.appendChild(content);
+
         return div;
     }
+
+    // Reload exams with new date filter
+    async function reloadExamsWithDateFilter() {
+        hierarchyLoading.classList.remove('hidden');
+        hierarchyTree.classList.add('hidden');
+
+        await loadAllExams();
+
+        hierarchyLoading.classList.add('hidden');
+        hierarchyTree.classList.remove('hidden');
+
+        showToast('Exam list updated with new date filter');
+    }
+
+    // Remove unused hierarchy functions
+    function renderHierarchy() { }
+    async function renderLessons() { }
+    async function renderTopics() { }
+    async function renderExams() { }
+    function createHierarchyItem() { }
 
     function createExamItem(exam) {
         const isChecked = !!selectedExams[exam.id];
         const div = document.createElement('div');
         div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2';
+
+        // Build breadcrumb path
+        const breadcrumb = [exam.subject_name, exam.lesson_name, exam.topic_name]
+            .filter(Boolean)
+            .join(' → ');
+
         div.innerHTML = `
             <div class="flex items-center gap-3 flex-1">
                 <input type="checkbox" 
@@ -293,6 +263,7 @@
                        ${isChecked ? 'checked' : ''}>
                 <div class="flex-1 cursor-pointer" onclick="this.previousElementSibling.click()">
                     <div class="font-semibold text-gray-800">${exam.exam_title}</div>
+                    ${breadcrumb ? `<div class="text-xs text-gray-500 mt-1">${breadcrumb}</div>` : ''}
                     <div class="text-sm text-gray-600">Available Questions: ${exam.total_questions}</div>
                 </div>
             </div>
@@ -385,41 +356,6 @@
         }
     }
 
-    // Reload all expanded topics with new date filter
-    async function reloadExamsWithDateFilter() {
-        // Find all expanded topics and reload their exams
-        const expandedTopics = document.querySelectorAll('.hierarchy-item .expand-icon.expanded');
-
-        for (const icon of expandedTopics) {
-            const header = icon.closest('.hierarchy-header');
-            const topicId = header.dataset.id;
-
-            if (topicId && topicId.startsWith('topic-')) {
-                const parentDiv = icon.closest('.hierarchy-item');
-                const container = parentDiv.querySelector('.children-container');
-
-                // Find the topic in hierarchyData
-                for (const subject of Object.values(hierarchyData)) {
-                    if (subject.lessons) {
-                        for (const lesson of Object.values(subject.lessons)) {
-                            if (lesson.topics) {
-                                for (const topic of Object.values(lesson.topics)) {
-                                    if (`topic-${topic.id}` === topicId) {
-                                        // Clear cached exams
-                                        topic.exams = null;
-                                        // Reload exams
-                                        await renderExams(topic, parentDiv);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        showToast('Exam list updated with new date filter');
-    }
 
     // Step navigation
     function showStep(step) {
