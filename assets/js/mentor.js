@@ -38,6 +38,15 @@ class StudyMentor {
         this.restoreSession();
         this.startTimeBasedNudges();
         this.injectPressureCSS();
+
+        // Save session on page unload/refresh
+        window.addEventListener('beforeunload', () => {
+            if (this.focusSession.isActive && this.focusSession.intervalId) {
+                this.saveSession('update', { remaining_seconds: this.focusSession.timeRemaining, type: 'focus' });
+            } else if (this.breakSession.isActive && this.breakSession.intervalId) {
+                this.saveSession('update', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
+            }
+        });
     }
 
     async restoreSession() {
@@ -102,7 +111,8 @@ class StudyMentor {
             await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                keepalive: true
             });
         } catch (e) {
             console.error('Failed to save session state:', e);
@@ -201,13 +211,20 @@ class StudyMentor {
                 this.sendNotification("AI Mentor: Focus Check", `5 minutes left! Finish strong, Sohan. You're crushing ${this.focusSession.subject}!`);
             }
 
-            // Sync to DB every 10 seconds
-            if (this.focusSession.timeRemaining % 10 === 0) {
+            // Sync to DB every 5 seconds
+            if (this.focusSession.timeRemaining % 5 === 0) {
                 this.saveSession('update', { remaining_seconds: this.focusSession.timeRemaining, type: 'focus' });
             }
 
             if (this.focusSession.timeRemaining <= 0) {
                 this.completeFocusSession();
+            }
+        }, 1000);
+
+        // Immediate sync after 1s if just started
+        setTimeout(() => {
+            if (this.focusSession.isActive) {
+                this.saveSession('update', { remaining_seconds: this.focusSession.timeRemaining, type: 'focus' });
             }
         }, 1000);
     }
@@ -384,8 +401,8 @@ class StudyMentor {
             this.breakSession.timeRemaining--;
             this.updateBreakUI();
 
-            // Sync to DB every 10 seconds
-            if (this.breakSession.timeRemaining % 10 === 0) {
+            // Sync to DB every 5 seconds
+            if (this.breakSession.timeRemaining % 5 === 0) {
                 this.saveSession('update', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
             }
 
@@ -394,6 +411,13 @@ class StudyMentor {
                 this.stopFocusSession(); // This clears session too
                 // Show a final "Back to work" nudge
                 this.showWelcomeGreeting();
+            }
+        }, 1000);
+
+        // Immediate sync after 1s
+        setTimeout(() => {
+            if (this.breakSession.isActive) {
+                this.saveSession('update', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
             }
         }, 1000);
     }
