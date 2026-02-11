@@ -583,7 +583,14 @@ const StudyTargetTracker = {
             const baseIntensity = 15;
             // Clamped to 35 max intensity
             const intensity = Math.min(35, baseIntensity + studyBoost * 4);
-            const pulseInterval = Math.max(50, 100 - studyBoost * 8);
+            // Count active subjects (studied > 0 seconds)
+            const activeSubjects = this.subjects.filter(s => s.seconds > 0).length;
+            const beatCount = Math.max(1, activeSubjects);
+
+            // Calculate interval to show exactly 'beatCount' beats in the window
+            // 150 frames / 1 beat = 150 frames/beat (Slow)
+            // 150 frames / 10 beats = 15 frames/beat (Fast)
+            const pulseInterval = Math.max(15, 150 / beatCount);
 
             frameCount++;
             let y = canvas.height / 2;
@@ -592,16 +599,22 @@ const StudyTargetTracker = {
             // Exotic Pulse Logic - Scaled for 80px Height (Canvas Center = 40px)
             // Max safe amplitude = ~35px
             let activeSpike = false;
-            if (phase > 10 && phase < 15) {
-                y -= intensity * 0.2; // P wave (was 0.4)
-            } else if (phase >= 15 && phase < 18) {
-                y += intensity * 0.9; // QRS Deep Spike (was 1.8) -> Max: ~31.5px down
+
+            // Dynamic Phase Logic based on interval
+            // P-Wave: 20-30% of interval
+            // QRS: 30-50% of interval
+            // T-Wave: 60-80% of interval
+
+            if (phase > (pulseInterval * 0.2) && phase < (pulseInterval * 0.3)) {
+                y -= intensity * 0.2; // P wave
+            } else if (phase >= (pulseInterval * 0.3) && phase < (pulseInterval * 0.35)) {
+                y += intensity * 0.9; // QRS Deep Spike
                 activeSpike = true;
-            } else if (phase >= 18 && phase < 22) {
-                y -= intensity * 1.1; // QRS High Spike (was 2.2) -> Max: ~38.5px up
+            } else if (phase >= (pulseInterval * 0.35) && phase < (pulseInterval * 0.45)) {
+                y -= intensity * 1.1; // QRS High Spike
                 activeSpike = true;
-            } else if (phase >= 22 && phase < 26) {
-                y += intensity * 0.3; // Recovery (was 0.6)
+            } else if (phase >= (pulseInterval * 0.6) && phase < (pulseInterval * 0.8)) {
+                y += intensity * 0.3; // Recovery
             } else {
                 y += (Math.random() - 0.5) * 3; // Nervous baseline
             }
