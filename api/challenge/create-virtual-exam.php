@@ -102,16 +102,23 @@ try {
         'instructions' => $instructions
     ];
 
-    // Decode options for frontend
-    foreach ($questions as &$q) {
-        $q['options'] = json_decode($q['options'], true);
+    // --- NEW: Fetch the actual questions we just inserted to get the new IDs ---
+    $fetch_synced_q = $conn->prepare("SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation FROM questions WHERE exam_id = ? AND is_deleted = 0");
+    $fetch_synced_q->bind_param("i", $new_exam_id);
+    $fetch_synced_q->execute();
+    $synced_result = $fetch_synced_q->get_result();
+    $synced_questions = [];
+    while ($row = $synced_result->fetch_assoc()) {
+        $row['options'] = json_decode($row['options'], true);
+        $synced_questions[] = $row;
     }
+    $fetch_synced_q->close();
 
     echo json_encode([
         'success' => true, 
         'data' => [
             'details' => $exam_details,
-            'questions' => $questions
+            'questions' => $synced_questions
         ]
     ]);
 

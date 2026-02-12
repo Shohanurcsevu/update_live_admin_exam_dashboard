@@ -1,6 +1,6 @@
 function initializeOfflineExamEngine() {
     const params = new URLSearchParams(window.location.search);
-    const examId = params.get('exam_id');
+    let examId = params.get('exam_id');
 
     // Robust UUID Fallback
     const generateUUID = () => {
@@ -364,6 +364,9 @@ function initializeOfflineExamEngine() {
                         if (result.success) {
                             questions = result.data.questions;
                             const remoteDetails = result.data.details;
+
+                            // Synchronize the local examId with the persistent record from the server
+                            examId = remoteDetails.id;
 
                             // Use the persistent ID and title from the server
                             const details = {
