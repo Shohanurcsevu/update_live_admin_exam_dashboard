@@ -62,15 +62,24 @@
                     </div>
                 </div>
                 
-                <div class="flex items-center gap-6">
+                <div class="flex items-center gap-4">
                     <div class="text-right">
                         <span class="block font-bold text-rose-600 text-xl">${ex.total_mistakes}</span>
                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Mistakes</span>
                     </div>
-                    <button onclick="startMasteryQuiz(${ex.exam_id})" 
-                        class="whitespace-nowrap bg-gray-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-600 transition-all shadow-sm hover:shadow-rose-100 transform active:scale-95">
-                        Master This Exam
-                    </button>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="startMasteryQuiz(${ex.exam_id})" 
+                            class="whitespace-nowrap bg-gray-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-600 transition-all shadow-sm hover:shadow-rose-100 transform active:scale-95">
+                            Master This Exam
+                        </button>
+                        
+                        <button onclick="deleteExamMistakes(${ex.exam_id}, '${ex.exam_title.replace(/'/g, "\\'")}')" 
+                            class="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            title="Clear all mistakes for this exam">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         `).join('');
@@ -94,6 +103,34 @@
 
         if (window.loadPage) {
             window.loadPage('take-offline-exam', url);
+        }
+    };
+
+    window.deleteExamMistakes = async function (examId, examTitle) {
+        if (!confirm(`Are you sure you want to clear all unresolved mistakes for "${examTitle}"? This cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('api/mistakes/delete-exam.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ exam_id: examId })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                // Refresh data
+                await init();
+
+                // Show a quick notification if possible (or just use basic alert for now)
+                console.log(result.message);
+            } else {
+                alert('Error: ' + (result.message || 'Failed to delete mistakes'));
+            }
+        } catch (err) {
+            console.error('Delete Error:', err);
+            alert('Failed to delete mistakes. Please check your connection.');
         }
     };
 
