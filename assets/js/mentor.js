@@ -155,8 +155,7 @@ class StudyMentor {
     }
 
     isFocusModeActive() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('page') === 'take-exam-interface' || this.focusSession.isActive || this.breakSession.isActive;
+        return this.focusSession.isActive;
     }
 
     isBreakModeActive() {
@@ -245,10 +244,21 @@ class StudyMentor {
         const badge = document.getElementById('mentor-badge');
         const teaser = document.getElementById('mentor-teaser');
 
+        // Check if we're on the exam-taking page
+        const params = new URLSearchParams(window.location.search);
+        const isExamPage = params.get('page') === 'exam-taking' || params.get('page') === 'take-exam-interface';
+
         if (teaser && teaserText) {
             const minutes = Math.floor(this.focusSession.timeRemaining / 60);
             const seconds = this.focusSession.timeRemaining % 60;
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            // Hide UI on exam page, but keep timer running
+            if (isExamPage) {
+                teaser.classList.add('hidden');
+                badge?.classList.add('hidden');
+                return; // Exit early, timer continues in background
+            }
 
             teaser.classList.remove('hidden');
             badge?.classList.remove('hidden');
@@ -498,10 +508,21 @@ class StudyMentor {
         const teaser = document.getElementById('mentor-teaser');
         const badge = document.getElementById('mentor-badge');
 
+        // Check if we're on the exam-taking page
+        const params = new URLSearchParams(window.location.search);
+        const isExamPage = params.get('page') === 'exam-taking' || params.get('page') === 'take-exam-interface';
+
         if (teaser && teaserText) {
             const minutes = Math.floor(this.breakSession.timeRemaining / 60);
             const seconds = this.breakSession.timeRemaining % 60;
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            // Hide UI on exam page, but keep timer running
+            if (isExamPage) {
+                teaser.classList.add('hidden');
+                badge?.classList.add('hidden');
+                return; // Exit early, timer continues in background
+            }
 
             teaser.classList.remove('hidden');
             badge?.classList.remove('hidden');
