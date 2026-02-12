@@ -353,18 +353,37 @@ function initializeOfflineExamEngine() {
                         if (window.loadPage) window.loadPage('dashboard');
                         return;
                     }
-                } else if (mode === 'daily_15' && navigator.onLine) {
+                } else if ((mode === 'daily_15' || mode === 'daily_10') && navigator.onLine) {
                     try {
-                        const response = await fetch('api/take-exam/random-questions.php');
+                        const response = await fetch('api/challenge/create-virtual-exam.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ limit: count, mode: mode })
+                        });
                         const result = await response.json();
-                        if (result.success && result.data.length > 0) {
-                            questions = result.data;
-                            console.log("Offline Engine: Loaded live questions from Database");
+                        if (result.success) {
+                            questions = result.data.questions;
+                            const remoteDetails = result.data.details;
+
+                            // Use the persistent ID and title from the server
+                            const details = {
+                                id: remoteDetails.id,
+                                exam_title: remoteDetails.exam_title,
+                                duration: remoteDetails.duration,
+                                total_marks: remoteDetails.total_marks,
+                                pass_mark: remoteDetails.pass_mark,
+                                instructions: remoteDetails.instructions
+                            };
+
+                            startTime = new Date().toISOString();
+                            renderExam(details, questions);
+                            console.log("Offline Engine: Created persistent virtual exam ID:", details.id);
+                            return;
                         } else {
-                            throw new Error(result.message || "Failed to fetch from API");
+                            throw new Error(result.message || "Failed to create virtual exam");
                         }
                     } catch (apiError) {
-                        console.warn("API Fetch Failed, falling back to local IDB:", apiError);
+                        console.warn("Virtual Exam Creation Failed, falling back to local IDB:", apiError);
                         questions = await idbManager.getBalancedRandomQuestions(count);
                     }
                 } else {

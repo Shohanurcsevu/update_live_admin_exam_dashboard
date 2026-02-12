@@ -1,0 +1,124 @@
+<?php
+header("Content-Type: application/json; charset=UTF-8");
+require_once '../subject/db_connect.php';
+
+$data = json_decode(file_get_contents("php://input"), true);
+$limit = isset($data['limit']) ? intval($data['limit']) : 15;
+$mode = isset($data['mode']) ? $data['mode'] : 'daily_15';
+
+$questions = [];
+$used_ids = [];
+
+// 1. Get all subjects that have questions
+$subject_sql = "SELECT DISTINCT subject_id FROM questions WHERE is_deleted = 0";
+$subject_result = $conn->query($subject_sql);
+$subject_ids = [];
+while ($row = $subject_result->fetch_assoc()) {
+    $subject_ids[] = $row['subject_id'];
+}
+
+if (empty($subject_ids)) {
+    echo json_encode(['success' => false, 'message' => 'No questions found in database.']);
+    exit;
+}
+
+shuffle($subject_ids);
+
+// 2. Pick at least one question from each subject (up to $limit)
+foreach ($subject_ids as $s_id) {
+    if (count($questions) >= $limit) break;
+
+    $q_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation 
+              FROM questions 
+              WHERE subject_id = ? AND is_deleted = 0 
+              ORDER BY RAND() LIMIT 1";
+    $stmt = $conn->prepare($q_sql);
+    $stmt->bind_param("i", $s_id);
+    $stmt->execute();
+    $q_result = $stmt->get_result();
+    if ($row = $q_result->fetch_assoc()) {
+        $questions[] = $row;
+        $used_ids[] = $row['id'];
+    }
+    $stmt->close();
+}
+
+// 3. If we still need more questions, pick randomly from all questions
+$remaining = $limit - count($questions);
+if ($remaining > 0) {
+    $placeholders = count($used_ids) > 0 ? "AND id NOT IN (" . implode(',', $used_ids) . ")" : "";
+    $rand_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation 
+                 FROM questions 
+                 WHERE is_deleted = 0 $placeholders 
+                 ORDER BY RAND() LIMIT $remaining";
+    
+    $result = $conn->query($rand_sql);
+    while ($row = $result->fetch_assoc()) {
+        $questions[] = $row;
+    }
+}
+
+shuffle($questions);
+
+// 4. Create a persistent Exam entry
+$conn->begin_transaction();
+try {
+    $dateTitle = date("M d");
+    $examTitle = ($mode === 'daily_15' ? "Daily 15 Challenge" : "Daily 10 Challenge") . " - $dateTitle";
+    
+    $stmt = $conn->prepare("INSERT INTO exams (exam_title, duration, instructions, total_marks, pass_mark, negative_mark_value) 
+                            VALUES (?, ?, ?, ?, ?, 0.5)");
+    
+    $instructions = "Focus and practice across all subjects. MISSION: MASTER EVERYTHING.";
+    $passMark = ceil($limit * 0.4);
+    
+    $stmt->bind_param("sisdd", $examTitle, $limit, $instructions, $limit, $passMark);
+    $stmt->execute();
+    $new_exam_id = $conn->insert_id;
+    $stmt->close();
+
+    // 5. Insert question snapshots linked to this exam
+    $insert_q_stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation) 
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+
+    foreach ($questions as $q) {
+        $insert_q_stmt->bind_param("iiiissss", 
+            $q['subject_id'], $q['lesson_id'], $q['topic_id'], $new_exam_id, 
+            $q['question'], $q['options'], $q['answer'], $q['explanation']
+        );
+        $insert_q_stmt->execute();
+    }
+    $insert_q_stmt->close();
+
+    $conn->commit();
+
+    // Fetch details for the response
+    $exam_details = [
+        'id' => $new_exam_id,
+        'exam_title' => $examTitle,
+        'duration' => $limit,
+        'total_marks' => $limit,
+        'pass_mark' => $passMark,
+        'instructions' => $instructions
+    ];
+
+    // Decode options for frontend
+    foreach ($questions as &$q) {
+        $q['options'] = json_decode($q['options'], true);
+    }
+
+    echo json_encode([
+        'success' => true, 
+        'data' => [
+            'details' => $exam_details,
+            'questions' => $questions
+        ]
+    ]);
+
+} catch (Exception $e) {
+    $conn->rollback();
+    echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+}
+
+$conn->close();
+?>
