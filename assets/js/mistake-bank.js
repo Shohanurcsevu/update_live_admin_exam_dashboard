@@ -43,18 +43,18 @@
         }
 
         listContainer.innerHTML = exams.map(ex => `
-            <div class="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                <div class="flex gap-4 items-start">
-                    <div class="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 flex-shrink-0">
-                        <span class="material-symbols-outlined">library_books</span>
+            <div class="p-4 md:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 hover:bg-gray-50/50 transition-colors">
+                <div class="flex gap-4 items-start flex-1 min-w-0">
+                    <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 flex-shrink-0">
+                        <span class="material-symbols-outlined text-xl md:text-2xl">library_books</span>
                     </div>
-                    <div>
-                        <h3 class="font-bold text-gray-900 mb-0.5">${ex.exam_title}</h3>
-                        <div class="flex items-center gap-3 text-xs text-gray-500">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-bold text-gray-900 mb-1 truncate text-sm md:text-base" title="${ex.exam_title}">${ex.exam_title}</h3>
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                             <span class="flex items-center gap-1">
                                 <span class="material-symbols-outlined text-sm">subject</span> ${ex.subject_name}
                             </span>
-                            <span>•</span>
+                            <span class="hidden sm:inline text-gray-300">•</span>
                             <span class="flex items-center gap-1">
                                 <span class="material-symbols-outlined text-sm">schedule</span> ${new Date(ex.last_activity).toLocaleDateString()}
                             </span>
@@ -62,22 +62,22 @@
                     </div>
                 </div>
                 
-                <div class="flex items-center gap-4">
-                    <div class="text-right">
-                        <span class="block font-bold text-rose-600 text-xl">${ex.total_mistakes}</span>
+                <div class="flex items-center justify-between lg:justify-end gap-4 md:gap-6 pt-3 lg:pt-0 border-t lg:border-t-0 border-gray-100 mt-2 lg:mt-0">
+                    <div class="lg:text-right flex lg:block items-baseline gap-1 lg:gap-0">
+                        <span class="block font-bold text-rose-600 text-lg md:text-xl leading-none">${ex.total_mistakes}</span>
                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Mistakes</span>
                     </div>
                     
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 flex-1 sm:flex-none justify-end">
                         <button onclick="startMasteryQuiz(${ex.exam_id})" 
-                            class="whitespace-nowrap bg-gray-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-rose-600 transition-all shadow-sm hover:shadow-rose-100 transform active:scale-95">
-                            Master This Exam
+                            class="flex-1 sm:flex-none whitespace-nowrap bg-gray-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm hover:bg-rose-600 transition-all shadow-sm hover:shadow-rose-100 transform active:scale-95">
+                            Master Now
                         </button>
                         
                         <button onclick="deleteExamMistakes(${ex.exam_id}, '${ex.exam_title.replace(/'/g, "\\'")}')" 
-                            class="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            class="p-2 md:p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                             title="Clear all mistakes for this exam">
-                            <span class="material-symbols-outlined">delete</span>
+                            <span class="material-symbols-outlined text-xl md:text-2xl">delete</span>
                         </button>
                     </div>
                 </div>
