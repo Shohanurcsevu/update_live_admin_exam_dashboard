@@ -71,6 +71,8 @@ function initializePerformanceReviewPage() {
         container.innerHTML = '';
         const userAnswers = (typeof performance.selected_answers === 'string') ? JSON.parse(performance.selected_answers) : (performance.selected_answers || {});
 
+        const breadcrumb = `${exam.subject_name || 'N/A'} - ${exam.lesson_name || 'N/A'} - ${exam.topic_name || 'N/A'} - ${exam.exam_title || 'N/A'}`.replace(/ - N\/A/g, '');
+
         questions.forEach((q, index) => {
             const userAnswer = userAnswers[q.id] || null;
             const isCorrect = userAnswer === q.answer;
@@ -92,9 +94,12 @@ function initializePerformanceReviewPage() {
                 explanationHTML = `<div class="mt-4 pt-3 border-t border-gray-200"><p class="text-sm font-semibold text-gray-700">Explanation:</p><p class="text-sm text-gray-600">${q.explanation}</p></div>`;
             }
 
-            // --- MODIFIED: Added data-status attribute to the card ---
+            // --- MODIFIED: Added item breadcrumb and data-status attribute ---
             let questionCardHTML = `
                 <div class="border rounded-lg p-4 bg-gray-50 question-card" data-status="${status}">
+                    <div class="mb-2">
+                        <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">${breadcrumb}</span>
+                    </div>
                     <div class="flex justify-between items-start mb-4">
                         <p class="text-gray-800 font-semibold pr-4">${toBengali(index + 1)}. ${q.question}</p>
                         <div class="flex-shrink-0">${statusBadgeHTML}</div>
