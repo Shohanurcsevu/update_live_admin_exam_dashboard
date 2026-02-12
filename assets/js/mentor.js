@@ -27,6 +27,7 @@ class StudyMentor {
         this.countdownRefreshInterval = null; // For Boss Challenge countdown updates
         this.reportRefreshInterval = null; // For real-time study report updates
         this.expandedMissionSubjects = new Set(); // Track expanded mission subject cards
+        this.expandedRevisionSubjects = new Set(); // Track expanded revision subject cards
         this.init();
     }
 
@@ -1399,6 +1400,9 @@ class StudyMentor {
         const missionContainer = document.getElementById('mission-subjects-container');
         const savedScrollTop = missionContainer ? missionContainer.scrollTop : 0;
 
+        const revisionContainer = document.getElementById('yesterday-revision-container');
+        const savedRevisionScrollTop = revisionContainer ? revisionContainer.scrollTop : 0;
+
         let recommendationsHTML = '';
 
         // --- NEW: Daily Study Report ---
@@ -1831,7 +1835,7 @@ class StudyMentor {
                         </div>
                     </div>
 
-                    <div class="space-y-3">
+                    <div id="yesterday-revision-container" class="space-y-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
                         ${yesterdayExams.map((subject, subjectIndex) => {
                 const totalSubjectExams = subject.exams.length;
                 const reviewedSubjectExams = subject.exams.filter(e => e.taken_today).length;
@@ -2116,11 +2120,30 @@ class StudyMentor {
             }
         });
 
+        // Restore expanded state for revision subject cards
+        this.expandedRevisionSubjects.forEach(index => {
+            const examsDiv = document.getElementById(`revision-exams-${index}`);
+            const arrow = document.getElementById(`revision-arrow-${index}`);
+
+            if (examsDiv && arrow) {
+                examsDiv.classList.remove('hidden');
+                arrow.style.transform = 'rotate(180deg)';
+            }
+        });
+
         // Restore scroll position for mission subjects container
         if (savedScrollTop > 0) {
             const restoredContainer = document.getElementById('mission-subjects-container');
             if (restoredContainer) {
                 restoredContainer.scrollTop = savedScrollTop;
+            }
+        }
+
+        // Restore scroll position for revision panel
+        if (savedRevisionScrollTop > 0) {
+            const restoredRevisionContainer = document.getElementById('yesterday-revision-container');
+            if (restoredRevisionContainer) {
+                restoredRevisionContainer.scrollTop = savedRevisionScrollTop;
             }
         }
     }
@@ -2194,6 +2217,13 @@ class StudyMentor {
         if (examsDiv && arrow) {
             examsDiv.classList.toggle('hidden');
             arrow.style.transform = examsDiv.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+
+            // Track expanded state
+            if (examsDiv.classList.contains('hidden')) {
+                this.expandedRevisionSubjects.delete(index);
+            } else {
+                this.expandedRevisionSubjects.add(index);
+            }
         }
     }
 
