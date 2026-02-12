@@ -440,10 +440,10 @@ class StudyMentor {
         const finalSubjectName = subjectName || this.focusSession.subject;
 
         const activities = [
-            { text: "Drink a full glass of water and stretch your back. I'll wait for you.", emoji: "💧" },
-            { text: "Close your eyes for 2 minutes. Your brain needs to digest what you just learned.", emoji: "🧘‍♂️" },
-            { text: "Look at something 20 feet away for 20 seconds. Save your eyes!", emoji: "👀" },
-            { text: "Take 5 deep breaths. Inhale the dream, exhale the stress.", emoji: "🌬️" }
+            { text: "Drink a <strong>full glass of water</strong> and stretch your back. I'll wait for you.", emoji: "💧" },
+            { text: "Close your eyes for <strong>2 minutes</strong>. Your brain needs to digest what you just learned.", emoji: "🧘‍♂️" },
+            { text: "Look at something <strong>20 feet away</strong> for 20 seconds. Save your eyes!", emoji: "👀" },
+            { text: "Take <strong>5 deep breaths</strong>. Inhale the dream, exhale the stress.", emoji: "🌬️" }
         ];
 
         this.breakSession.isActive = true;
@@ -1123,16 +1123,28 @@ class StudyMentor {
     }
 
     detectFatigue(sessions) {
-        if (!sessions || sessions.length < 3) return null;
+        if (!sessions || sessions.length < 2) return null;
 
-        // Check if last 3 sessions are the same
-        const lastThree = sessions.slice(0, 3);
-        const subject = lastThree[0];
+        // Count consecutive sessions of the same subject
+        let consecutiveCount = 1;
+        const firstSubject = typeof sessions[0] === 'object' ? sessions[0].subject_name : sessions[0];
 
-        if (lastThree.every(s => s === subject)) {
+        for (let i = 1; i < sessions.length; i++) {
+            const currentSubject = typeof sessions[i] === 'object' ? sessions[i].subject_name : sessions[i];
+            if (currentSubject === firstSubject) {
+                consecutiveCount++;
+            } else {
+                break;
+            }
+        }
+
+        // Trigger fatigue if 3 or more sessions (75+ mins)
+        if (consecutiveCount >= 3) {
+            const totalMinutes = consecutiveCount * 25; // Default Pomodoro length
+
             // Find a different subject to suggest
-            const otherSubjects = (this.mentorData.subjects || []).filter(s => s.name !== subject);
-            const roadmapSubjects = (this.mentorData.morning_roadmap || []).filter(r => r.subject !== subject);
+            const otherSubjects = (this.mentorData.subjects || []).filter(s => s.name !== firstSubject);
+            const roadmapSubjects = (this.mentorData.morning_roadmap || []).filter(r => r.subject !== firstSubject);
 
             let suggestion = "a different topic";
             if (roadmapSubjects.length > 0) {
@@ -1142,7 +1154,7 @@ class StudyMentor {
             }
 
             return {
-                message: `Sohan, you've done 75 mins of ${subject}. Your brain is melting! Switch to <strong>${suggestion}</strong> for one session to stay sharp!`,
+                message: `Sohan, you've done <strong>${totalMinutes} mins</strong> of ${firstSubject}. Your brain is melting! Switch to <strong>${suggestion}</strong> for one session to stay sharp!`,
                 action: `Switch to ${suggestion}`
             };
         }
@@ -1332,7 +1344,7 @@ class StudyMentor {
 
                 // Set teaser text, respecting special innerHTML for boss
                 if (nudgeTheme !== 'boss') {
-                    teaserText.textContent = isStatusMessage ? randomMsg : `${randomMsg} ${timeRemaining}`;
+                    teaserText.innerHTML = isStatusMessage ? randomMsg : `${randomMsg} ${timeRemaining}`;
                 }
 
                 teaser.classList.remove('hidden');
@@ -2095,7 +2107,7 @@ class StudyMentor {
         if (nudge && !this.isOpen) {
             badge?.classList.remove('hidden');
             teaser?.classList.remove('hidden');
-            if (teaserText) teaserText.innerText = nudge.message;
+            if (teaserText) teaserText.innerHTML = nudge.message;
 
             // Auto-hide teaser after 8 seconds
             setTimeout(() => {
