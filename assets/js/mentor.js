@@ -2209,6 +2209,9 @@ class StudyMentor {
     }
 
     startExam(examId) {
+        // Close mentor panel before navigating to exam
+        this.closePanel();
+
         // Navigate to take exam interface with the exam ID
         window.loadPage('take-exam-interface', `exam_id=${examId}`);
     }
