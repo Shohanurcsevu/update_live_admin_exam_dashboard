@@ -26,6 +26,7 @@ class StudyMentor {
         };
         this.countdownRefreshInterval = null; // For Boss Challenge countdown updates
         this.reportRefreshInterval = null; // For real-time study report updates
+        this.expandedMissionSubjects = new Set(); // Track expanded mission subject cards
         this.init();
     }
 
@@ -1394,6 +1395,10 @@ class StudyMentor {
             </div>
         `;
 
+        // Save scroll position before re-rendering
+        const missionContainer = document.getElementById('mission-subjects-container');
+        const savedScrollTop = missionContainer ? missionContainer.scrollTop : 0;
+
         let recommendationsHTML = '';
 
         // --- NEW: Daily Study Report ---
@@ -1621,134 +1626,124 @@ class StudyMentor {
             const isBossPressure = currentHour >= 16 && missionProgress < 50;
 
             recommendationsHTML += `
-                <div class="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 p-4 rounded-2xl mb-4 shadow-2xl relative overflow-hidden group ${isBossPressure ? 'boss-pressure-card' : ''}">
-                    <!-- Tech Decor -->
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/20 transition-all"></div>
-                    
-                    <div class="relative z-10">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center gap-2">
-                                <span class="text-xl">${isBossPressure ? '💀' : '⚔️'}</span>
-                                <div>
-                                    <p class="text-[10px] font-black ${isBossPressure ? 'pressure-glitch-text' : 'text-indigo-400'} uppercase tracking-widest leading-none">Mission Dashboard</p>
-                                    <p class="text-[9px] text-gray-400 mt-0.5">Daily Coverage: ${completedMissionSubjects}/${totalMissionSubjects} Subjects</p>
-                                </div>
-                            </div>
-                            <div class="text-right flex flex-col items-end">
-                                <div class="flex items-center gap-1.5">
-                                    ${this.mentorData.mission_streak > 0 ? `
-                                        <div class="relative group/flame">
-                                            <span class="material-symbols-outlined text-lg ${this.mentorData.mission_streak >= 8 ? 'text-purple-500 animate-pulse' : this.mentorData.mission_streak >= 3 ? 'text-orange-500' : 'text-blue-400'} drop-shadow-[0_0_8px_rgba(var(--streak-color),0.8)]" 
-                                                  style="--streak-color: ${this.mentorData.mission_streak >= 8 ? '168,85,247' : this.mentorData.mission_streak >= 3 ? '249,115,22' : '96,165,250'}">
-                                                local_fire_department
-                                            </span>
-                                            <div class="absolute bottom-full right-0 mb-2 hidden group-hover/flame:block bg-gray-900 text-white text-[8px] py-1 px-2 rounded whitespace-nowrap z-50">
-                                                ${this.mentorData.mission_streak} Day Streak! ${this.mentorData.mission_streak >= 8 ? '🔥 UNSTOPPABLE' : this.mentorData.mission_streak >= 3 ? '⚡ HEATING UP' : '🧊 COLD START'}
-                                            </div>
-                                        </div>
-                                    ` : ''}
-                                    <span class="text-[10px] font-black ${missionProgress === 100 ? 'text-green-400' : 'text-indigo-300'}">${missionProgress}%</span>
-                                </div>
-                                <div class="h-1 w-12 bg-white/10 rounded-full mt-1 overflow-hidden">
-                                    <div class="h-full ${missionProgress === 100 ? 'bg-green-400' : (isBossPressure ? 'bg-red-500' : 'bg-indigo-500')} transition-all duration-1000" style="width: ${missionProgress}%"></div>
-                                </div>
+                <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 p-4 rounded-2xl mb-4 shadow-sm">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">⚔️</span>
+                            <div>
+                                <p class="text-xs font-bold text-indigo-900 uppercase tracking-wide">Mission Dashboard</p>
+                                <p class="text-xs text-gray-600 mt-0.5">Daily Coverage: ${completedMissionSubjects}/${totalMissionSubjects} Subjects</p>
                             </div>
                         </div>
+                        <div class="text-right flex flex-col items-end">
+                            <div class="flex items-center gap-2">
+                                ${this.mentorData.mission_streak > 0 ? `
+                                    <div class="relative group/flame">
+                                        <span class="material-symbols-outlined text-lg ${this.mentorData.mission_streak >= 8 ? 'text-purple-600' : this.mentorData.mission_streak >= 3 ? 'text-orange-600' : 'text-blue-600'}">
+                                            local_fire_department
+                                        </span>
+                                        <div class="absolute bottom-full right-0 mb-2 hidden group-hover/flame:block bg-gray-900 text-white text-xs py-1 px-2 rounded whitespace-nowrap z-50">
+                                            ${this.mentorData.mission_streak} Day Streak!
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                <span class="text-sm font-bold ${missionProgress === 100 ? 'text-green-600' : 'text-indigo-700'}">${missionProgress}%</span>
+                            </div>
+                            <div class="h-1.5 w-16 bg-indigo-200 rounded-full mt-1 overflow-hidden">
+                                <div class="h-full ${missionProgress === 100 ? 'bg-green-500' : 'bg-indigo-600'} transition-all duration-500" style="width: ${missionProgress}%"></div>
+                            </div>
+                        </div>
+                    </div>
 
                         ${missionProgress === 100 ? this.handleMissionSuccess() : ''}
 
-                        <div class="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                        <div id="mission-subjects-container" class="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
                             ${missionRoadmap.map((item, index) => {
-                const statusClass = item.status === 'success' ? 'border-green-500/30 bg-green-500/10' :
-                    item.status === 'pending_take' ? 'border-yellow-500/30 bg-yellow-500/5' :
-                        'border-white/10 bg-white/5';
+                const statusClass = item.status === 'success' ? 'border-green-200 bg-green-50' :
+                    item.status === 'pending_take' ? 'border-yellow-200 bg-yellow-50' :
+                        'border-indigo-200 bg-white';
 
                 return `
                                     <div class="mb-2 last:mb-0">
-                                        <div class="flex items-start justify-between p-2.5 rounded-xl border ${statusClass} transition-all cursor-pointer hover:bg-white/5" onclick="studyMentor.toggleMissionSubject(${index})">
-                                            <div class="flex items-start gap-3 flex-1 min-w-0 pr-2">
-                                                <div class="flex flex-col">
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="text-xs font-bold text-gray-200 break-words">${item.name}</span>
-                                                        <span class="text-gray-500 text-[10px] transition-transform" id="mission-arrow-${index}">▼</span>
-                                                    </div>
-                                                    <div class="flex flex-col gap-1 mt-1">
-                                                        <div class="flex flex-col gap-1.5">
-                                                            <div class="flex items-center gap-3">
-                                                                <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isCreated ? 'text-green-400' : 'text-gray-500'}">
-                                                                    <span class="material-symbols-outlined text-[10px]">${item.isCreated ? 'check_circle' : 'circle'}</span> Created
-                                                                </span>
-                                                                <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${item.isTaken ? 'text-blue-400' : 'text-gray-500'}">
-                                                                    <span class="material-symbols-outlined text-[10px]">${item.isTaken ? 'check_circle' : 'circle'}</span> Taken
-                                                                </span>
-                                                            </div>
-                                                            ${item.totalCount > 0 ? `
-                                                                <div class="flex flex-col gap-1 mb-1">
-                                                                    <div class="flex justify-between items-center text-[7px] font-black uppercase tracking-tighter text-gray-400">
-                                                                        <span>Progress</span>
-                                                                        <span>${item.completedCount}/${item.totalCount} Completed</span>
-                                                                    </div>
-                                                                    <div class="h-1 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                                                        <div class="h-full ${item.isTaken ? 'bg-green-400' : 'bg-indigo-500'} transition-all duration-700" style="width: ${(item.completedCount / item.totalCount) * 100}%"></div>
-                                                                    </div>
-                                                                </div>
-                                                            ` : ''}
-                                                            <div class="flex items-center gap-2 text-[7px] font-black uppercase tracking-tighter text-indigo-300">
-                                                                <span class="flex items-center gap-0.5">
-                                                                    <span class="material-symbols-outlined text-[10px]">timer</span>
-                                                                    ${item.focus_sessions} Sessions
-                                                                </span>
-                                                                <span class="text-white/20">•</span>
-                                                                <span class="flex items-center gap-0.5">
-                                                                    <span class="material-symbols-outlined text-[10px]">self_care</span>
-                                                                    ${item.break_sessions} Breaks
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <div class="flex items-center gap-2 mt-0.5">
-                                                            <span class="material-symbols-outlined text-[14px] ${item.mastery === 'gold' ? 'text-yellow-400' : item.mastery === 'silver' ? 'text-slate-300' : 'text-orange-600'} drop-shadow-[0_0_5px_rgba(var(--badge-glow),0.5)]" 
-                                                                  style="--badge-glow: ${item.mastery === 'gold' ? '250,204,21' : item.mastery === 'silver' ? '203,213,225' : '234,88,12'}"
-                                                                  title="${item.mastery.toUpperCase()} Mastery (${Math.round(item.accuracy)}%)">
-                                                                military_tech
-                                                            </span>
-                                                            <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${item.id}', '${item.name}')" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-indigo-400 hover:text-indigo-300 transition-colors" title="Start Focus Session">
-                                                                <span class="material-symbols-outlined text-[12px]">timer</span> Start Focus
-                                                            </button>
-                                                        </div>
-                                                        ${item.target_topic ? `
-                                                            <div class="flex">
-                                                                <span class="flex items-center gap-1 text-[7px] font-black uppercase tracking-tighter ${item.target_type === 'progression' ? 'text-blue-300' : 'text-yellow-400'} px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
-                                                                    🎯 ${item.target_type === 'progression' ? 'New Coverage' : 'Revision Focus'}: ${item.target_topic}
-                                                                </span>
-                                                            </div>
-                                                        ` : ''}
-                                                        <div class="flex items-center gap-3 mt-1.5 pt-1.5 border-t border-white/5">
-            ${item.status === 'pending_create' ? `
-                                                                <button onclick="event.stopPropagation(); window.location.href='https://bcspreli.free.nf/?page=exam'" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-indigo-400 hover:text-indigo-300 transition-colors">
-                                                                    <span class="material-symbols-outlined text-[12px]">add_circle</span> Create: ${item.target_topic ? item.target_topic.split(' ')[0] : 'Exam'}
-                                                                </button>
-                                                            ` : item.status === 'pending_take' ? `
-                                                                <button onclick="event.stopPropagation(); window.loadPage('take-exam-list')" class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-yellow-500 hover:text-yellow-400 transition-colors animate-pulse-subtle">
-                                                                    <span class="material-symbols-outlined text-[12px]">play_circle</span> Take Now
-                                                                </button>
-                                                            ` : `
-                                                                <span class="flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter text-green-400">
-                                                                    <span class="material-symbols-outlined text-[12px]">check_circle</span> Mission Completed
-                                                                </span>
-                                                            `}
-                                                        </div>
-                                                    </div>
+                                        <div class="p-3 rounded-xl border ${statusClass} transition-all hover:shadow-sm">
+                                            
+                                            <!-- ROW 1: HEADER ROW (Subject Name + Arrow + Mastery + Action Button) -->
+                                            <div class="flex justify-between items-center cursor-pointer" onclick="studyMentor.toggleMissionSubject(${index})">
+                                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                                    <span class="text-sm font-bold text-gray-800 break-words">${item.name}</span>
+                                                    <span class="text-gray-400 text-xs transition-transform" id="mission-arrow-${index}">▼</span>
+                                                </div>
+                                                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                                                    <span class="material-symbols-outlined text-base ${item.mastery === 'gold' ? 'text-yellow-600' : item.mastery === 'silver' ? 'text-slate-400' : 'text-orange-600'}" 
+                                                          title="${item.mastery.toUpperCase()} Mastery (${Math.round(item.accuracy)}%)">
+                                                        military_tech
+                                                    </span>
+                                                    ${item.status === 'pending_create' ? `
+                                                        <button onclick="event.stopPropagation(); window.location.href='https://bcspreli.free.nf/?page=exam'" class="px-2 py-1 text-xs font-bold uppercase tracking-tight text-indigo-700 hover:text-indigo-800 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors">
+                                                            Create
+                                                        </button>
+                                                    ` : item.status === 'pending_take' ? `
+                                                        <button onclick="event.stopPropagation(); window.loadPage('take-exam-list')" class="px-2 py-1 text-xs font-bold uppercase tracking-tight text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors">
+                                                            Take Now
+                                                        </button>
+                                                    ` : `
+                                                        <span class="px-2 py-1 text-xs font-bold uppercase tracking-tight text-green-700 bg-green-100 rounded-lg">
+                                                            Completed
+                                                        </span>
+                                                    `}
                                                 </div>
                                             </div>
 
-                <div class="flex items-start pt-1" onclick="event.stopPropagation()">
-                    <span class="material-symbols-outlined text-gray-500 text-sm opacity-50">more_vert</span>
-                </div>
+                                            <!-- ROW 2: STATUS STRIP (Created • Taken • Sessions • Breaks) -->
+                                            <div class="flex flex-wrap items-center gap-4 mt-2 text-xs text-gray-600">
+                                                <span class="flex items-center gap-1 ${item.isCreated ? 'text-green-600' : 'text-gray-400'}">
+                                                    <span class="material-symbols-outlined text-sm">${item.isCreated ? 'check_circle' : 'circle'}</span>
+                                                    Created
+                                                </span>
+                                                <span class="flex items-center gap-1 ${item.isTaken ? 'text-blue-600' : 'text-gray-400'}">
+                                                    <span class="material-symbols-outlined text-sm">${item.isTaken ? 'check_circle' : 'circle'}</span>
+                                                    Taken
+                                                </span>
+                                                <span class="flex items-center gap-1 text-indigo-600">
+                                                    <span class="material-symbols-outlined text-sm">timer</span>
+                                                    ${item.focus_sessions} Sessions
+                                                </span>
+                                                <span class="flex items-center gap-1 text-indigo-600">
+                                                    <span class="material-symbols-outlined text-sm">self_care</span>
+                                                    ${item.break_sessions} Breaks
+                                                </span>
+                                            </div>
+
+                                            <!-- ROW 3: PROGRESS BAR (If exists) -->
+                                            ${item.totalCount > 0 ? `
+                                                <div class="mt-2">
+                                                    <div class="flex justify-between items-center text-xs text-gray-600 mb-1">
+                                                        <span>Progress</span>
+                                                        <span>${item.completedCount}/${item.totalCount}</span>
+                                                    </div>
+                                                    <div class="h-1.5 w-full bg-indigo-100 rounded-full overflow-hidden">
+                                                        <div class="h-full ${item.isTaken ? 'bg-green-500' : 'bg-indigo-500'} transition-all duration-500" style="width: ${(item.completedCount / item.totalCount) * 100}%"></div>
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+
+                                            <!-- ROW 4: TARGET + FOCUS AREA -->
+                                            <div class="flex justify-between items-center mt-2 gap-2">
+                                                ${item.target_topic ? `
+                                                    <span class="flex items-center gap-1 text-xs font-bold ${item.target_type === 'progression' ? 'text-blue-700' : 'text-amber-700'} px-2 py-1 rounded-lg ${item.target_type === 'progression' ? 'bg-blue-50 border border-blue-200' : 'bg-amber-50 border border-amber-200'}">
+                                                        🎯 ${item.target_type === 'progression' ? 'New Coverage' : 'Revision'}
+                                                    </span>
+                                                ` : '<div></div>'}
+                                                <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${item.id}', '${item.name}')" class="px-3 py-1.5 text-xs font-bold uppercase tracking-tight text-indigo-700 hover:text-indigo-800 bg-indigo-100 hover:bg-indigo-200 rounded-full transition-colors flex items-center gap-1" title="Start Focus Session">
+                                                    <span class="material-symbols-outlined text-sm">timer</span>
+                                                    Start Focus
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <!--Collapsible Exams List-->
-            <div id="mission-exams-${index}" class="hidden mt-1 ml-4 space-y-1.5 border-l-2 border-white/5 pl-3 py-1">
-                ${item.today_exams.length > 0 ? item.today_exams.map(exam => `
+                                        <div id="mission-exams-${index}" class="hidden mt-2 ml-4 space-y-1.5 border-l-2 border-white/5 pl-3 py-1">
+                                            ${item.today_exams.length > 0 ? item.today_exams.map(exam => `
                                                 <div class="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/5">
                                                     <div class="flex-1 min-w-0">
                                                         <p class="text-[10px] font-bold text-gray-300 truncate">${exam.title}</p>
@@ -1772,18 +1767,18 @@ class StudyMentor {
                                             `).join('') : `
                                                 <p class="text-[8px] text-gray-500 italic">No exams created for this subject yet.</p>
                                             `}
-            </div>
+                                        </div>
                                     </div>
                 `;
             }).join('')}
                         </div>
                         
                         ${missionProgress === 100 ? `
-                            <div class="mt-3 p-2 bg-green-500/20 border border-green-500/30 rounded-xl text-center">
-                                <p class="text-[9px] font-bold text-green-400">🔥 DOMINATION! You have conquered all subjects today!</p>
+                            <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl text-center">
+                                <p class="text-xs font-bold text-green-700">🔥 Amazing! You have conquered all subjects today!</p>
                             </div>
                         ` : `
-                            <p class="mt-3 text-[9px] text-gray-500 italic text-center">"Sohan, the goal is simple: 1 Exam per Subject. Keep going!"</p>
+                            <p class="mt-3 text-xs text-gray-500 italic text-center">"Sohan, the goal is simple: 1 Exam per Subject. Keep going!"</p>
                         `}
                     </div>
                 </div>
@@ -2099,6 +2094,25 @@ class StudyMentor {
                 teaser?.classList.add('hidden');
             }
         }
+
+        // Restore expanded state for mission subject cards after re-render
+        this.expandedMissionSubjects.forEach(index => {
+            const examsDiv = document.getElementById(`mission-exams-${index}`);
+            const arrow = document.getElementById(`mission-arrow-${index}`);
+
+            if (examsDiv && arrow) {
+                examsDiv.classList.remove('hidden');
+                arrow.style.transform = 'rotate(180deg)';
+            }
+        });
+
+        // Restore scroll position for mission subjects container
+        if (savedScrollTop > 0) {
+            const restoredContainer = document.getElementById('mission-subjects-container');
+            if (restoredContainer) {
+                restoredContainer.scrollTop = savedScrollTop;
+            }
+        }
     }
 
     toggleEditTargets() {
@@ -2180,6 +2194,13 @@ class StudyMentor {
         if (examsDiv && arrow) {
             examsDiv.classList.toggle('hidden');
             arrow.style.transform = examsDiv.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+
+            // Track expanded state
+            if (examsDiv.classList.contains('hidden')) {
+                this.expandedMissionSubjects.delete(index);
+            } else {
+                this.expandedMissionSubjects.add(index);
+            }
         }
     }
 
