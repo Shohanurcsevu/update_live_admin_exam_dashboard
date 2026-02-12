@@ -1731,7 +1731,7 @@ class StudyMentor {
                                             <div class="flex justify-between items-center mt-2 gap-2">
                                                 ${item.target_topic ? `
                                                     <span class="flex items-center gap-1 text-xs font-bold ${item.target_type === 'progression' ? 'text-blue-700' : 'text-amber-700'} px-2 py-1 rounded-lg ${item.target_type === 'progression' ? 'bg-blue-50 border border-blue-200' : 'bg-amber-50 border border-amber-200'}">
-                                                        🎯 ${item.target_type === 'progression' ? 'New Coverage' : 'Revision'}
+                                                        🎯 ${item.target_type === 'progression' ? 'New Coverage' : 'Revision'}: ${item.target_topic}
                                                     </span>
                                                 ` : '<div></div>'}
                                                 <button onclick="event.stopPropagation(); studyMentor.startFocusSession('${item.id}', '${item.name}')" class="px-3 py-1.5 text-xs font-bold uppercase tracking-tight text-indigo-700 hover:text-indigo-800 bg-indigo-100 hover:bg-indigo-200 rounded-full transition-colors flex items-center gap-1" title="Start Focus Session">
@@ -1742,30 +1742,40 @@ class StudyMentor {
                                         </div>
 
                                         <!--Collapsible Exams List-->
-                                        <div id="mission-exams-${index}" class="hidden mt-2 ml-4 space-y-1.5 border-l-2 border-white/5 pl-3 py-1">
+                                        <div id="mission-exams-${index}" class="hidden mt-3 ml-4 space-y-2 border-l-2 border-indigo-100 pl-4 py-1">
                                             ${item.today_exams.length > 0 ? item.today_exams.map(exam => `
-                                                <div class="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/5">
-                                                    <div class="flex-1 min-w-0">
-                                                        <p class="text-[10px] font-bold text-gray-300 truncate">${exam.title}</p>
-                                                        <p class="text-[8px] text-gray-500 mt-0.5">${exam.total_marks} Marks | ${exam.is_completed ? (exam.completion_type === 'manual' ? '✅ Manual' : '✅ Online') : '⏳ Pending'}</p>
-                                                    </div>
-                                                    <div class="flex items-center gap-2">
+                                                <div class="flex flex-col gap-2 bg-gray-50 p-3 rounded-xl border border-gray-200 hover:border-indigo-200 transition-colors">
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <div class="flex-1 min-w-0">
+                                                            <p class="text-sm font-bold text-gray-800 leading-tight">${exam.title}</p>
+                                                            <p class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                                                                <span class="material-symbols-outlined text-sm">analytics</span>
+                                                                ${exam.total_marks} Marks | ${exam.is_completed ? (exam.completion_type === 'manual' ? '✅ Manual' : '✅ Online') : '⏳ Pending'}
+                                                            </p>
+                                                        </div>
                                                         ${exam.completion_type !== 'online' ? `
-                                                            <label class="flex items-center gap-1 ${exam.is_completed ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}" 
-                                                                   title="${exam.is_completed ? 'Completed (Manual)' : 'Mark as completed manually (offline)'}">
-                                                                <input type="checkbox" id="manual-check-${exam.id}" 
-                                                                    ${exam.is_completed ? 'checked disabled' : ''} 
-                                                                    onchange="studyMentor.toggleExamCompletion(${exam.id}, this.checked)"
-                                                                    class="form-checkbox h-3 w-3 text-indigo-500 rounded border-gray-600 bg-gray-700 focus:ring-indigo-500 focus:ring-offset-gray-900">
-                                                            </label>
+                                                            <div class="flex items-center" onclick="event.stopPropagation()">
+                                                                <label class="flex items-center gap-1.5 ${exam.is_completed ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}" 
+                                                                       title="${exam.is_completed ? 'Completed (Manual)' : 'Mark as completed offline'}">
+                                                                    <input type="checkbox" id="manual-check-${exam.id}" 
+                                                                        ${exam.is_completed ? 'checked disabled' : ''} 
+                                                                        onchange="studyMentor.toggleExamCompletion(${exam.id}, this.checked)"
+                                                                        class="form-checkbox h-4 w-4 text-indigo-600 rounded border-gray-300 bg-white focus:ring-indigo-500">
+                                                                </label>
+                                                            </div>
                                                         ` : ''}
-                                                        <button onclick="studyMentor.startExam(${exam.id})" class="text-[8px] font-bold text-indigo-400 hover:text-indigo-300">
-                                                            ${exam.is_completed ? 'Retake' : 'Start'} →
+                                                    </div>
+                                                    
+                                                    <div class="pt-2 border-t border-gray-100 flex justify-end">
+                                                        <button onclick="studyMentor.startExam(${exam.id})" 
+                                                                class="px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-indigo-700 hover:text-white bg-indigo-50 hover:bg-indigo-600 border border-indigo-100 hover:border-indigo-600 rounded-full transition-all flex items-center gap-1.5">
+                                                            <span class="material-symbols-outlined text-sm">${exam.is_completed ? 'refresh' : 'play_circle'}</span>
+                                                            ${exam.is_completed ? 'Retake Exam' : 'Start Exam'}
                                                         </button>
                                                     </div>
                                                 </div>
                                             `).join('') : `
-                                                <p class="text-[8px] text-gray-500 italic">No exams created for this subject yet.</p>
+                                                <p class="text-xs text-gray-400 italic py-2">No exams created for this subject yet.</p>
                                             `}
                                         </div>
                                     </div>
