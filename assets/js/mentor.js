@@ -827,6 +827,41 @@ class StudyMentor {
                     50% { transform: scale(1.05); opacity: 1; }
                 }
 
+                /* BOOK FLIP ANIMATION (Focus) */
+                .book-container {
+                    width: 32px;
+                    height: 22px;
+                    position: relative;
+                    perspective: 200px;
+                }
+                .book-icon {
+                    width: 100%;
+                    height: 100%;
+                    background: #10b981;
+                    border-radius: 3px;
+                    position: relative;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                }
+                .book-page {
+                    position: absolute;
+                    top: 3px;
+                    right: 3px;
+                    width: 13px;
+                    height: 16px;
+                    background: #f8fafc;
+                    transform-origin: left center;
+                    animation: page-turn 3s infinite ease-in-out;
+                    border-radius: 0 2px 2px 0;
+                    box-shadow: -1px 0 2px rgba(0,0,0,0.05);
+                }
+                .book-page:nth-child(2) { animation-delay: 1s; }
+                .book-page:nth-child(3) { animation-delay: 2s; }
+
+                @keyframes page-turn {
+                    0% { transform: rotateY(0deg); opacity: 1; }
+                    50%, 100% { transform: rotateY(-180deg); opacity: 0; }
+                }
+
                 .core-noise {
                     position: absolute;
                     inset: 0;
@@ -1273,8 +1308,14 @@ class StudyMentor {
             // Timer is hidden during Focus
             indicator.innerHTML = `
                 <div class="flex items-center gap-2">
-                    <div class="meltdown-core stable w-4 h-4"></div>
-                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">Focusing</span>
+                    <div class="book-container">
+                        <div class="book-icon">
+                            <div class="book-page"></div>
+                            <div class="book-page"></div>
+                            <div class="book-page"></div>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">Deep Work Active</span>
                 </div>
             `;
         } else if (this.isBreakModeActive()) {
