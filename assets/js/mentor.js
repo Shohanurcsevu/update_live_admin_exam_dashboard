@@ -29,7 +29,14 @@ class StudyMentor {
         this.expandedMissionSubjects = new Set(); // Track expanded mission subject cards
         this.expandedRevisionSubjects = new Set(); // Track expanded revision subject cards
         this.inactiveNudgeIntervalId = null; // Track the inactive nudge interval
-        this.inactivitySeconds = parseInt(localStorage.getItem('study_mentor_inactivity') || 0); // Persistence
+
+        // Server-Sync State
+        this.serverInactivityData = {
+            idleBaseline: 0,
+            syncTime: 0,
+            serverOffset: 0 // ServerTime - ClientTime
+        };
+
         this.init();
     }
 
@@ -187,9 +194,9 @@ class StudyMentor {
         this.focusSession.timeRemaining = 25 * 60;
         this.focusSession.totalDuration = 25 * 60;
 
-        // Reset inactivity timer when focus starts
-        this.inactivitySeconds = 0;
-        localStorage.removeItem('study_mentor_inactivity');
+        // Reset inactivity logically (will be verified by server on next sync)
+        this.serverInactivityData.lastPomodoroEnd = Math.floor(Date.now() / 1000) + this.serverInactivityData.serverOffset;
+        this.serverInactivityData.totalBreakSeconds = 0;
 
         // DB Call to Start
         await this.saveSession('start', {
@@ -1099,36 +1106,64 @@ class StudyMentor {
         }
     }
 
+    async fetchDailyStudyTime() {
+        try {
+            const response = await fetch('api/analytics/daily-study-time.php');
+            const result = await response.json();
+            if (result.success) {
+                const now = Math.floor(Date.now() / 1000);
+                this.serverInactivityData = {
+                    idleBaseline: parseInt(result.calc_idle_seconds || 0),
+                    syncTime: parseInt(result.server_time),
+                    serverOffset: parseInt(result.server_time) - now
+                };
+                this.updateStatusIndicator();
+            }
+        } catch (error) {
+            console.error("Mentor Sync Error:", error);
+        }
+    }
+
     startInactiveNudge() {
         if (this.inactiveNudgeIntervalId) return;
+
+        // Initial sync
+        this.fetchDailyStudyTime();
+
+        // Periodic sync every 2 minutes for cross-device consistency
+        setInterval(() => this.fetchDailyStudyTime(), 120000);
 
         let lastNotificationTime = Date.now();
 
         this.inactiveNudgeIntervalId = setInterval(() => {
-            const isInactive = !this.isFocusModeActive() && !this.isBreakModeActive();
+            if (!this.isFocusModeActive()) {
+                const now = Math.floor(Date.now() / 1000);
+                const currentServerTime = now + this.serverInactivityData.serverOffset;
 
-            if (isInactive) {
-                this.inactivitySeconds++;
+                let displaySeconds = this.serverInactivityData.idleBaseline;
 
-                // Sync to localStorage every 5 seconds or when it hits a minute
-                if (this.inactivitySeconds % 5 === 0) {
-                    localStorage.setItem('study_mentor_inactivity', this.inactivitySeconds);
+                // Only increment display if NOT in break
+                if (!this.isBreakModeActive()) {
+                    const elapsedSinceSync = currentServerTime - this.serverInactivityData.syncTime;
+                    displaySeconds += Math.max(0, elapsedSinceSync);
                 }
 
-                // Update UI every second if inactive
-                this.updateStatusIndicator();
+                // Update UI every second
+                this.updateStatusIndicator(displaySeconds);
 
-                // Browser Notification every 60 seconds of inactivity
-                const now = Date.now();
-                if (now - lastNotificationTime >= 60000) {
-                    this.sendNotification(
-                        "AI Mentor: Inactivity Alert",
-                        "Sohan, both timers are inactive. Time to get back to work and start a Pomodoro session!"
-                    );
-                    lastNotificationTime = now;
+                // Browser Notification every 60 seconds of inactivity (only if not in any session)
+                if (!this.isBreakModeActive()) {
+                    const nowMs = Date.now();
+                    if (nowMs - lastNotificationTime >= 60000) {
+                        this.sendNotification(
+                            "AI Mentor: Inactivity Alert",
+                            "Sohan, both timers are inactive. Time to get back to work and start a Pomodoro session!"
+                        );
+                        lastNotificationTime = nowMs;
+                    }
                 }
             }
-        }, 1000); // 1-second precision for the timer
+        }, 1000);
     }
 
     formatInactivityTime(seconds) {
@@ -1146,11 +1181,21 @@ class StudyMentor {
         }
     }
 
-    updateStatusIndicator() {
+    updateStatusIndicator(computedSeconds = null) {
         const indicator = document.getElementById('global-header-status-indicator');
         if (!indicator) return;
 
-        const inactiveTimeDisplay = this.formatInactivityTime(this.inactivitySeconds);
+        let seconds = computedSeconds;
+        if (seconds === null) {
+            const now = Math.floor(Date.now() / 1000);
+            const currentServerTime = now + this.serverInactivityData.serverOffset;
+            seconds = this.serverInactivityData.idleBaseline;
+            if (!this.isBreakModeActive()) {
+                seconds += Math.max(0, currentServerTime - this.serverInactivityData.syncTime);
+            }
+        }
+
+        const inactiveTimeDisplay = this.formatInactivityTime(seconds);
 
         if (this.isFocusModeActive()) {
             // Timer is hidden during Focus

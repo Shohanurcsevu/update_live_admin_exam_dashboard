@@ -140,6 +140,49 @@ try {
         $improvement = 100;
     }
     
+    // Get last pomodoro session end and total break time since then
+    $last_pomodoro_sql = "
+        SELECT UNIX_TIMESTAMP(MAX(timestamp)) as last_end
+        FROM activity_log
+        WHERE activity_type = 'pomodoro_session'
+    ";
+    $last_pomodoro_result = $conn->query($last_pomodoro_sql);
+    $last_pomodoro_end = 0;
+    if ($last_row = $last_pomodoro_result->fetch_assoc()) {
+        $last_pomodoro_end = intval($last_row['last_end'] ?? 0);
+    }
+
+    $break_seconds = 0;
+    if ($last_pomodoro_end > 0) {
+        $break_sql = "
+            SELECT SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.duration')) AS DECIMAL) * 60) as total_break_seconds
+            FROM activity_log
+            WHERE activity_type = 'pomodoro_break'
+            AND UNIX_TIMESTAMP(timestamp) > $last_pomodoro_end
+        ";
+        $break_result = $conn->query($break_sql);
+        if ($break_row = $break_result->fetch_assoc()) {
+            $break_seconds = intval($break_row['total_break_seconds'] ?? 0);
+        }
+
+        // Also subtract current active break if exists
+        $active_break_sql = "
+            SELECT 
+                (duration_minutes * 60 - remaining_seconds) + (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_heartbeat)) as active_duration
+            FROM study_sessions
+            WHERE session_type = 'break' AND status = 'active'
+            AND UNIX_TIMESTAMP(last_heartbeat) > $last_pomodoro_end
+            LIMIT 1
+        ";
+        $active_break_res = $conn->query($active_break_sql);
+        if ($active_row = $active_break_res->fetch_assoc()) {
+            $break_seconds += intval($active_row['active_duration']);
+        }
+    }
+
+    $now = time();
+    $calc_idle_seconds = ($last_pomodoro_end > 0) ? max(0, $now - $last_pomodoro_end - $break_seconds) : 0;
+
     echo json_encode([
         'success' => true,
         'total_today_seconds' => $total_today_seconds,
@@ -148,7 +191,9 @@ try {
         'yesterday_formatted' => format_seconds($yesterday_seconds),
         'improvement_percent' => round($improvement, 1),
         'improvement_type' => $improvement_type,
-        'subjects' => $subjects
+        'subjects' => $subjects,
+        'calc_idle_seconds' => $calc_idle_seconds,
+        'server_time' => $now
     ]);
     
 } catch (Throwable $e) {
