@@ -51,7 +51,7 @@ function list_exams($conn) {
     // Date filtering for Timely Model Exam Creator
     // Note: Using updated_at since created_at column doesn't exist
     if (!empty($_GET['from']) && !empty($_GET['to'])) {
-        $where_clauses[] = "DATE(e.updated_at) BETWEEN ? AND ?";
+        $where_clauses[] = "DATE(e.created_at) BETWEEN ? AND ?";
         $params[] = $_GET['from'];
         $params[] = $_GET['to'];
         $types .= 'ss';
