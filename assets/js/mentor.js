@@ -29,6 +29,7 @@ class StudyMentor {
         this.expandedMissionSubjects = new Set(); // Track expanded mission subject cards
         this.expandedRevisionSubjects = new Set(); // Track expanded revision subject cards
         this.inactiveNudgeIntervalId = null; // Track the inactive nudge interval
+        this.inactivitySeconds = parseInt(localStorage.getItem('study_mentor_inactivity') || 0); // Persistence
         this.init();
     }
 
@@ -185,6 +186,10 @@ class StudyMentor {
         this.focusSession.subjectId = subjectId;
         this.focusSession.timeRemaining = 25 * 60;
         this.focusSession.totalDuration = 25 * 60;
+
+        // Reset inactivity timer when focus starts
+        this.inactivitySeconds = 0;
+        localStorage.removeItem('study_mentor_inactivity');
 
         // DB Call to Start
         await this.saveSession('start', {
@@ -774,38 +779,58 @@ class StudyMentor {
                 }
 
                 .ambulance-alert {
-                    width: 48px;
-                    height: 8px;
-                    border-radius: 4px;
-                    position: relative;
-                    overflow: hidden;
-                    opacity: 0.8;
                     display: flex;
-                }
-                .ambulance-red, .ambulance-blue {
-                    flex: 1;
-                    height: 100%;
-                    transition: opacity 0.1s;
-                }
-                .ambulance-red { background: #ef4444; }
-                .ambulance-blue { background: #3b82f6; }
-
-                @keyframes ambulance-flash {
-                    0%, 37.5% { background: #ef4444; box-shadow: 0 0 15px #ef4444; } /* Red Flash (300ms) */
-                    37.5%, 75% { background: #3b82f6; box-shadow: 0 0 15px #3b82f6; } /* Blue Flash (300ms) */
-                    75%, 100% { background: transparent; box-shadow: none; } /* Pause (200ms) */
-                }
-                
-                .ambulance-active {
-                    animation: ambulance-flash 0.8s infinite;
+                    align-items: center;
+                    justify-content: center;
                 }
 
-                .light-sweep-effect {
+                .meltdown-core {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    position: relative;
+                    background: radial-gradient(circle, #fff 0%, #fbbf24 40%, #dc2626 70%, transparent 100%);
+                    box-shadow: 0 0 20px rgba(220, 38, 38, 0.6);
+                    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+
+                /* UNSTABLE STATE (Idle) */
+                .meltdown-core.unstable {
+                    animation: core-overheat 1s infinite alternate ease-in-out, core-jitter 0.15s infinite;
+                    box-shadow: 0 0 35px rgba(239, 68, 68, 0.8);
+                }
+
+                @keyframes core-overheat {
+                    0% { transform: scale(0.9); filter: brightness(1.2) contrast(1.2); }
+                    100% { transform: scale(1.15); filter: brightness(1.8) contrast(1.5); }
+                }
+
+                @keyframes core-jitter {
+                    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+                    25% { transform: translate(-1px, 1px) rotate(-1deg); }
+                    50% { transform: translate(1px, -1px) rotate(1deg); }
+                    75% { transform: translate(-1px, -1px) rotate(-0.5deg); }
+                }
+
+                /* STABLE STATE (Active) */
+                .meltdown-core.stable {
+                    background: radial-gradient(circle, #ccfbf1 0%, #2dd4bf 40%, #0d9488 70%, transparent 100%);
+                    box-shadow: 0 0 25px rgba(20, 184, 166, 0.5);
+                    animation: core-breathe 3s infinite ease-in-out;
+                }
+
+                @keyframes core-breathe {
+                    0%, 100% { transform: scale(0.95); opacity: 0.9; }
+                    50% { transform: scale(1.05); opacity: 1; }
+                }
+
+                .core-noise {
                     position: absolute;
-                    top: 0; left: -100%;
-                    width: 50%; height: 100%;
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-                    animation: light-sweep 2s infinite linear;
+                    inset: 0;
+                    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+                    opacity: 0.2;
+                    mix-blend-mode: overlay;
+                    border-radius: 50%;
                 }
 
                 @keyframes light-sweep {
@@ -1077,39 +1102,96 @@ class StudyMentor {
     startInactiveNudge() {
         if (this.inactiveNudgeIntervalId) return;
 
+        let lastNotificationTime = Date.now();
+
         this.inactiveNudgeIntervalId = setInterval(() => {
-            // Only trigger if both focus and break sessions are inactive
-            if (!this.isFocusModeActive() && !this.isBreakModeActive()) {
-                this.sendNotification(
-                    "AI Mentor: Inactivity Alert",
-                    "Sohan, both timers are inactive. Time to get back to work and start a Pomodoro session!"
-                );
+            const isInactive = !this.isFocusModeActive() && !this.isBreakModeActive();
+
+            if (isInactive) {
+                this.inactivitySeconds++;
+
+                // Sync to localStorage every 5 seconds or when it hits a minute
+                if (this.inactivitySeconds % 5 === 0) {
+                    localStorage.setItem('study_mentor_inactivity', this.inactivitySeconds);
+                }
+
+                // Update UI every second if inactive
+                this.updateStatusIndicator();
+
+                // Browser Notification every 60 seconds of inactivity
+                const now = Date.now();
+                if (now - lastNotificationTime >= 60000) {
+                    this.sendNotification(
+                        "AI Mentor: Inactivity Alert",
+                        "Sohan, both timers are inactive. Time to get back to work and start a Pomodoro session!"
+                    );
+                    lastNotificationTime = now;
+                }
             }
-        }, 60000); // 60 seconds
+        }, 1000); // 1-second precision for the timer
+    }
+
+    formatInactivityTime(seconds) {
+        if (seconds < 60) return `${seconds.toString().padStart(2, '0')}s`;
+
+        const pad = (num) => num.toString().padStart(2, '0');
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+
+        if (h > 0) {
+            return `${pad(h)}::${pad(m)}::${pad(s)}`;
+        } else {
+            return `${pad(m)}::${pad(s)}`;
+        }
     }
 
     updateStatusIndicator() {
         const indicator = document.getElementById('global-header-status-indicator');
         if (!indicator) return;
 
+        const inactiveTimeDisplay = this.formatInactivityTime(this.inactivitySeconds);
+
         if (this.isFocusModeActive()) {
+            // Timer is hidden during Focus
             indicator.innerHTML = `
-                <div class="grind-mode">
-                    <span class="grind-icon text-2xl">🔥</span>
-                    <span class="grind-text text-[10px] font-black text-amber-500">LOCKED IN. DON'T BREAK THE FLOW.</span>
+                <div class="flex flex-col items-center">
+                    <div class="meltdown-core stable">
+                        <div class="core-noise"></div>
+                    </div>
+                    <span class="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-tighter">Core Stabilized</span>
                 </div>
             `;
         } else if (this.isBreakModeActive()) {
+            // Timer is visible but paused during Break
             indicator.innerHTML = `
-                <div class="grind-mode text-cyan-500">
-                    <span class="grind-icon text-2xl">🧘‍♂️</span>
-                    <span class="grind-text text-[10px] font-black">RECHARGE IN PROGRESS</span>
+                <div class="flex items-center gap-4">
+                    <div class="flex flex-col items-center">
+                        <div class="meltdown-core stable" style="background: radial-gradient(circle, #e0f2fe 0%, #38bdf8 40%, #0369a1 70%, transparent 100%); box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);">
+                            <div class="core-noise"></div>
+                        </div>
+                        <span class="text-[10px] font-black text-sky-600 mt-1 uppercase tracking-tighter">Recharge Mode</span>
+                    </div>
+                    <div class="flex flex-col items-start border-l border-sky-100 pl-3">
+                        <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest">Idle Time</span>
+                        <span class="text-[11px] font-black text-sky-800 opacity-60">${inactiveTimeDisplay} (Paused)</span>
+                    </div>
                 </div>
             `;
         } else {
+            // Timer is visible and running during Idle
             indicator.innerHTML = `
-                <div class="ambulance-alert ambulance-active mt-2">
-                    <div class="light-sweep-effect"></div>
+                <div class="flex items-center gap-4">
+                    <div class="flex flex-col items-center ambulance-alert">
+                        <div class="meltdown-core unstable">
+                            <div class="core-noise"></div>
+                        </div>
+                        <span class="text-[9px] font-black text-rose-600 mt-1 uppercase animate-pulse">Meltdown Mode</span>
+                    </div>
+                    <div class="flex flex-col items-start border-l border-rose-100 pl-3">
+                        <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Idle</span>
+                        <span class="text-[12px] font-black text-rose-700">${inactiveTimeDisplay}</span>
+                    </div>
                 </div>
             `;
         }
