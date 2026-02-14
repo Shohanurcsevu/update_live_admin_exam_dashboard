@@ -1151,6 +1151,11 @@ class StudyMentor {
                 // Update UI every second
                 this.updateStatusIndicator(displaySeconds);
 
+                // Play heart monitor beep every 1 seconds during idle
+                if (!this.isBreakModeActive() && displaySeconds > 0 && displaySeconds % 1 === 0) {
+                    this.playHeartbeat();
+                }
+
                 // Browser Notification every 60 seconds of inactivity (only if not in any session)
                 if (!this.isBreakModeActive()) {
                     const nowMs = Date.now();
@@ -1178,6 +1183,59 @@ class StudyMentor {
             return `${pad(h)}::${pad(m)}::${pad(s)}`;
         } else {
             return `${pad(m)}::${pad(s)}`;
+        }
+    }
+
+    playHeartbeat() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+
+            // Shared context to bypass autoplay restrictions after first click
+            if (!this.audioCtx) {
+                this.audioCtx = new AudioContext();
+
+                // Resume on first click to bypass browser block
+                window.addEventListener('click', () => {
+                    if (this.audioCtx.state === 'suspended') {
+                        this.audioCtx.resume();
+                    }
+                }, { once: true });
+            }
+
+            if (this.audioCtx.state === 'suspended') return;
+
+            const playPulse = (delay, freq, vol) => {
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+
+                // Square wave for much more "piercing" and audible sound
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime + delay);
+
+                gain.gain.setValueAtTime(0, this.audioCtx.currentTime + delay);
+                gain.gain.linearRampToValueAtTime(vol, this.audioCtx.currentTime + delay + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + delay + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+
+                osc.start(this.audioCtx.currentTime + delay);
+                osc.stop(this.audioCtx.currentTime + delay + 0.2);
+            };
+
+            // High-pitched "Medical Alert" Beep (Much more audible)
+            // Pulse 1: High freq
+            playPulse(0, 2500, 0.2);
+            // Pulse 2: Slightly offset for "Double Beep" effect
+            setTimeout(() => {
+                if (this.audioCtx && this.audioCtx.state !== 'closed') {
+                    playPulse(0, 2200, 0.15);
+                }
+            }, 100);
+
+        } catch (e) {
+            console.warn("Heartbeat Audio Error:", e);
         }
     }
 
