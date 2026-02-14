@@ -794,31 +794,25 @@ class StudyMentor {
                 }
 
                 .meltdown-core {
-                    width: 32px;
-                    height: 32px;
+                    width: 24px;
+                    height: 24px;
                     border-radius: 50%;
                     position: relative;
-                    background: radial-gradient(circle, #fff 0%, #fbbf24 40%, #dc2626 70%, transparent 100%);
-                    box-shadow: 0 0 20px rgba(220, 38, 38, 0.6);
-                    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                    background: radial-gradient(circle, #fff 0%, #f43f5e 60%, #9f1239 100%);
+                    box-shadow: 0 0 15px rgba(225, 29, 72, 0.4);
+                    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
                 }
 
-                /* UNSTABLE STATE (Idle) */
+                /* WARNING STATE (Idle) */
                 .meltdown-core.unstable {
-                    animation: core-overheat 1s infinite alternate ease-in-out, core-jitter 0.15s infinite;
-                    box-shadow: 0 0 35px rgba(239, 68, 68, 0.8);
+                    animation: warning-pulse 1s infinite cubic-bezier(0.4, 0, 0.6, 1);
+                    box-shadow: 0 0 25px rgba(225, 29, 72, 0.6);
                 }
 
-                @keyframes core-overheat {
-                    0% { transform: scale(0.9); filter: brightness(1.2) contrast(1.2); }
-                    100% { transform: scale(1.15); filter: brightness(1.8) contrast(1.5); }
-                }
-
-                @keyframes core-jitter {
-                    0%, 100% { transform: translate(0, 0) rotate(0deg); }
-                    25% { transform: translate(-1px, 1px) rotate(-1deg); }
-                    50% { transform: translate(1px, -1px) rotate(1deg); }
-                    75% { transform: translate(-1px, -1px) rotate(-0.5deg); }
+                @keyframes warning-pulse {
+                    0% { transform: scale(1); opacity: 1; filter: brightness(1); }
+                    50% { transform: scale(1.4); opacity: 0.3; filter: brightness(1.5); }
+                    100% { transform: scale(1); opacity: 1; filter: brightness(1); }
                 }
 
                 /* STABLE STATE (Active) */
@@ -1278,27 +1272,20 @@ class StudyMentor {
         if (this.isFocusModeActive()) {
             // Timer is hidden during Focus
             indicator.innerHTML = `
-                <div class="flex flex-col items-center">
-                    <div class="meltdown-core stable">
-                        <div class="core-noise"></div>
-                    </div>
-                    <span class="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-tighter">Core Stabilized</span>
+                <div class="flex items-center gap-2">
+                    <div class="meltdown-core stable w-4 h-4"></div>
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">Focusing</span>
                 </div>
             `;
         } else if (this.isBreakModeActive()) {
             // Timer is visible but paused during Break
             indicator.innerHTML = `
                 <div class="flex items-center gap-3">
-                    <div class="flex flex-col items-center">
-                        <div class="meltdown-core stable" style="background: radial-gradient(circle, #e0f2fe 0%, #38bdf8 40%, #0369a1 70%, transparent 100%); box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);">
-                            <div class="core-noise"></div>
-                        </div>
-                        <span class="text-[10px] font-black text-sky-600 mt-1 uppercase tracking-tighter">Recharge Mode</span>
-                    </div>
+                    <div class="meltdown-core stable" style="background: radial-gradient(circle, #e0f2fe 0%, #0ea5e9 100%); box-shadow: 0 0 15px rgba(14, 165, 233, 0.4);"></div>
                     <div class="flex flex-col items-start border-l border-sky-100 pl-3">
                         <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest">Idle Time</span>
                         <div class="flex items-center gap-2">
-                            <span class="text-[11px] font-black text-sky-800 opacity-60">${inactiveTimeDisplay} (Paused)</span>
+                            <span class="text-[11px] font-black text-sky-800 opacity-60">${inactiveTimeDisplay}</span>
                              <button id="toggle-mentor-sound" class="text-gray-400 hover:text-sky-600 transition-colors">
                                 <span class="material-symbols-outlined text-sm">${soundIcon}</span>
                             </button>
@@ -1310,12 +1297,7 @@ class StudyMentor {
             // Timer is visible and running during Idle
             indicator.innerHTML = `
                 <div class="flex items-center gap-3">
-                    <div class="flex flex-col items-center ambulance-alert">
-                        <div class="meltdown-core unstable">
-                            <div class="core-noise"></div>
-                        </div>
-                        <span class="text-[9px] font-black text-rose-600 mt-1 uppercase animate-pulse">Meltdown Mode</span>
-                    </div>
+                    <div class="meltdown-core unstable"></div>
                     <div class="flex flex-col items-start border-l border-rose-100 pl-3">
                         <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Idle</span>
                         <div class="flex items-center gap-2">
