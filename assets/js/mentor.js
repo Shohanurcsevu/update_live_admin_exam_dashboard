@@ -28,6 +28,7 @@ class StudyMentor {
         this.reportRefreshInterval = null; // For real-time study report updates
         this.expandedMissionSubjects = new Set(); // Track expanded mission subject cards
         this.expandedRevisionSubjects = new Set(); // Track expanded revision subject cards
+        this.inactiveNudgeIntervalId = null; // Track the inactive nudge interval
         this.init();
     }
 
@@ -48,6 +49,7 @@ class StudyMentor {
         }
 
         this.startTimeBasedNudges();
+        this.startInactiveNudge(); // Start monitoring timer activity
         this.injectPressureCSS();
 
         // Save session on page unload/refresh
@@ -976,6 +978,20 @@ class StudyMentor {
                 }
             });
         }
+    }
+
+    startInactiveNudge() {
+        if (this.inactiveNudgeIntervalId) return;
+
+        this.inactiveNudgeIntervalId = setInterval(() => {
+            // Only trigger if both focus and break sessions are inactive
+            if (!this.isFocusModeActive() && !this.isBreakModeActive()) {
+                this.sendNotification(
+                    "AI Mentor: Inactivity Alert",
+                    "Sohan, both timers are inactive. Time to get back to work and start a Pomodoro session!"
+                );
+            }
+        }, 60000); // 60 seconds
     }
 
     async fetchMentorData() {
