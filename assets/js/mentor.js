@@ -37,6 +37,8 @@ class StudyMentor {
             serverOffset: 0 // ServerTime - ClientTime
         };
 
+        this.isSoundEnabled = localStorage.getItem('study_mentor_sound_enabled') !== 'false';
+
         this.init();
     }
 
@@ -1011,7 +1013,24 @@ class StudyMentor {
             if (this.isOpen && widget && !widget.contains(e.target)) {
                 this.closePanel();
             }
+
+            // Sound Toggle
+            const soundToggle = e.target.closest('#toggle-mentor-sound');
+            if (soundToggle) {
+                this.toggleSound();
+            }
         });
+    }
+
+    toggleSound() {
+        this.isSoundEnabled = !this.isSoundEnabled;
+        localStorage.setItem('study_mentor_sound_enabled', this.isSoundEnabled);
+        this.updateStatusIndicator();
+
+        // Resume AudioContext if we just enabled sound and it's suspended
+        if (this.isSoundEnabled && this.audioCtx && this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
     }
 
     async acceptChallenge() {
@@ -1152,7 +1171,7 @@ class StudyMentor {
                 this.updateStatusIndicator(displaySeconds);
 
                 // Play heart monitor beep every 1 seconds during idle
-                if (!this.isBreakModeActive() && displaySeconds > 0 && displaySeconds % 1 === 0) {
+                if (this.isSoundEnabled && !this.isBreakModeActive() && displaySeconds > 0 && displaySeconds % 1 === 0) {
                     this.playHeartbeat();
                 }
 
@@ -1254,6 +1273,7 @@ class StudyMentor {
         }
 
         const inactiveTimeDisplay = this.formatInactivityTime(seconds);
+        const soundIcon = this.isSoundEnabled ? 'volume_up' : 'volume_off';
 
         if (this.isFocusModeActive()) {
             // Timer is hidden during Focus
@@ -1268,7 +1288,7 @@ class StudyMentor {
         } else if (this.isBreakModeActive()) {
             // Timer is visible but paused during Break
             indicator.innerHTML = `
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3">
                     <div class="flex flex-col items-center">
                         <div class="meltdown-core stable" style="background: radial-gradient(circle, #e0f2fe 0%, #38bdf8 40%, #0369a1 70%, transparent 100%); box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);">
                             <div class="core-noise"></div>
@@ -1277,14 +1297,19 @@ class StudyMentor {
                     </div>
                     <div class="flex flex-col items-start border-l border-sky-100 pl-3">
                         <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest">Idle Time</span>
-                        <span class="text-[11px] font-black text-sky-800 opacity-60">${inactiveTimeDisplay} (Paused)</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[11px] font-black text-sky-800 opacity-60">${inactiveTimeDisplay} (Paused)</span>
+                             <button id="toggle-mentor-sound" class="text-gray-400 hover:text-sky-600 transition-colors">
+                                <span class="material-symbols-outlined text-sm">${soundIcon}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
         } else {
             // Timer is visible and running during Idle
             indicator.innerHTML = `
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3">
                     <div class="flex flex-col items-center ambulance-alert">
                         <div class="meltdown-core unstable">
                             <div class="core-noise"></div>
@@ -1293,7 +1318,12 @@ class StudyMentor {
                     </div>
                     <div class="flex flex-col items-start border-l border-rose-100 pl-3">
                         <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Idle</span>
-                        <span class="text-[12px] font-black text-rose-700">${inactiveTimeDisplay}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[12px] font-black text-rose-700">${inactiveTimeDisplay}</span>
+                            <button id="toggle-mentor-sound" class="text-rose-300 hover:text-rose-600 transition-colors">
+                                <span class="material-symbols-outlined text-sm">${soundIcon}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
