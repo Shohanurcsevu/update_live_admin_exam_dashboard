@@ -32,7 +32,7 @@ $yesterday_exams_sql = "
     FROM exams e
     JOIN subjects s ON e.subject_id = s.id
     LEFT JOIN performance p ON e.id = p.exam_id
-    WHERE e.updated_at BETWEEN '$yesterday_start' AND '$yesterday_end'
+    WHERE e.created_at BETWEEN '$yesterday_start' AND '$yesterday_end'
         AND e.is_deleted = 0
         AND s.is_deleted = 0
     GROUP BY e.id, e.exam_title, e.total_marks, s.id, s.subject_name

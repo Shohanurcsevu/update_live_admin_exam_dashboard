@@ -78,7 +78,7 @@ if ($result) {
             FROM exams e
             LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
             WHERE e.subject_id = $subject_id 
-                AND e.updated_at BETWEEN '$today_start' AND '$today_end'
+                AND e.created_at BETWEEN '$today_start' AND '$today_end'
                 AND e.is_deleted = 0
             GROUP BY e.id, e.exam_title, e.total_marks
         ";
@@ -233,7 +233,7 @@ $daily_exams_sql = "
         COUNT(DISTINCT e.id) as created_count,
         COUNT(DISTINCT p.id) as taken_count
     FROM subjects s
-    LEFT JOIN exams e ON s.id = e.subject_id AND e.updated_at BETWEEN '$today_start' AND '$today_end' AND e.is_deleted = 0
+    LEFT JOIN exams e ON s.id = e.subject_id AND e.created_at BETWEEN '$today_start' AND '$today_end' AND e.is_deleted = 0
     LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
     WHERE s.is_deleted = 0
     GROUP BY s.id, s.subject_name
@@ -408,7 +408,7 @@ $uncompleted_sql = "
     FROM exams e
     JOIN subjects s ON e.subject_id = s.id
     LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
-    WHERE e.updated_at BETWEEN '$today_start' AND '$today_end' 
+    WHERE e.created_at BETWEEN '$today_start' AND '$today_end' 
     AND e.is_deleted = 0
     AND p.id IS NULL
 ";
