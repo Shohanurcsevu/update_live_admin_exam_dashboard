@@ -50,6 +50,7 @@ class StudyMentor {
 
         this.startTimeBasedNudges();
         this.startInactiveNudge(); // Start monitoring timer activity
+        this.updateStatusIndicator(); // Initial indicator state
         this.injectPressureCSS();
 
         // Save session on page unload/refresh
@@ -195,6 +196,7 @@ class StudyMentor {
 
         this.startFocusTimer();
         this.updateFocusUI();
+        this.updateStatusIndicator();
         this.closePanel();
     }
 
@@ -203,11 +205,13 @@ class StudyMentor {
         this.focusSession.intervalId = null;
         this.saveSession('pause', { remaining_seconds: this.focusSession.timeRemaining });
         this.updateFocusUI(true); // Show paused state
+        this.updateStatusIndicator();
     }
 
     resumeFocusSession() {
         this.saveSession('resume');
         this.startFocusTimer(true);
+        this.updateStatusIndicator();
     }
 
     startFocusTimer(resuming = false) {
@@ -373,6 +377,8 @@ class StudyMentor {
             remaining_seconds: 0
         });
 
+        this.updateStatusIndicator();
+
         // Backend log is handled by complete.php now, so we can remove the manual fetch here
         // But we DO need to fetch fresh data to update the UI
         setTimeout(() => this.fetchMentorData(), 1000);
@@ -430,6 +436,7 @@ class StudyMentor {
         clearInterval(this.breakSession.intervalId);
         this.focusSession.isActive = false;
         this.breakSession.isActive = false;
+        this.updateStatusIndicator();
         const teaser = document.getElementById('mentor-teaser');
         if (teaser) teaser.classList.add('hidden');
     }
@@ -463,6 +470,7 @@ class StudyMentor {
         });
 
         this.startBreakTimer();
+        this.updateStatusIndicator();
     }
 
     startBreakTimer(resuming = false) {
@@ -500,11 +508,13 @@ class StudyMentor {
         this.breakSession.intervalId = null;
         this.saveSession('pause', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
         this.updateBreakUI(true); // Show paused state
+        this.updateStatusIndicator();
     }
 
     resumeBreakSession() {
         this.saveSession('resume', { type: 'break' });
         this.startBreakTimer(true);
+        this.updateStatusIndicator();
     }
 
     updateBreakUI() {
@@ -746,6 +756,90 @@ class StudyMentor {
                     text-align: center;
                     width: 64px;
                     line-height: 1.1;
+                }
+
+                /* Header Status Indicator Styles */
+                #header-status-indicator {
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 120px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    pointer-events: none;
+                    z-index: 5;
+                }
+
+                .ambulance-alert {
+                    width: 48px;
+                    height: 8px;
+                    border-radius: 4px;
+                    position: relative;
+                    overflow: hidden;
+                    opacity: 0.8;
+                    display: flex;
+                }
+                .ambulance-red, .ambulance-blue {
+                    flex: 1;
+                    height: 100%;
+                    transition: opacity 0.1s;
+                }
+                .ambulance-red { background: #ef4444; }
+                .ambulance-blue { background: #3b82f6; }
+
+                @keyframes ambulance-flash {
+                    0%, 37.5% { background: #ef4444; box-shadow: 0 0 15px #ef4444; } /* Red Flash (300ms) */
+                    37.5%, 75% { background: #3b82f6; box-shadow: 0 0 15px #3b82f6; } /* Blue Flash (300ms) */
+                    75%, 100% { background: transparent; box-shadow: none; } /* Pause (200ms) */
+                }
+                
+                .ambulance-active {
+                    animation: ambulance-flash 0.8s infinite;
+                }
+
+                .light-sweep-effect {
+                    position: absolute;
+                    top: 0; left: -100%;
+                    width: 50%; height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                    animation: light-sweep 2s infinite linear;
+                }
+
+                @keyframes light-sweep {
+                    to { left: 200%; }
+                }
+
+                .grind-mode {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    animation: fade-in 0.5s ease-out;
+                }
+                .grind-icon {
+                    font-size: 14px;
+                    animation: grind-pulse 2s infinite ease-in-out;
+                    color: #fbbf24;
+                }
+                .grind-text {
+                    font-size: 8px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    color: #fcd34d;
+                    margin-top: 2px;
+                }
+
+                @keyframes grind-pulse {
+                    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 5px #fbbf24); }
+                    50% { transform: scale(1.1); filter: drop-shadow(0 0 12px #f59e0b); }
+                }
+
+                @keyframes fade-in {
+                    from { opacity: 0; transform: translateY(-5px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
             </style>
 
@@ -992,6 +1086,33 @@ class StudyMentor {
                 );
             }
         }, 60000); // 60 seconds
+    }
+
+    updateStatusIndicator() {
+        const indicator = document.getElementById('global-header-status-indicator');
+        if (!indicator) return;
+
+        if (this.isFocusModeActive()) {
+            indicator.innerHTML = `
+                <div class="grind-mode">
+                    <span class="grind-icon text-2xl">🔥</span>
+                    <span class="grind-text text-[10px] font-black text-amber-500">LOCKED IN. DON'T BREAK THE FLOW.</span>
+                </div>
+            `;
+        } else if (this.isBreakModeActive()) {
+            indicator.innerHTML = `
+                <div class="grind-mode text-cyan-500">
+                    <span class="grind-icon text-2xl">🧘‍♂️</span>
+                    <span class="grind-text text-[10px] font-black">RECHARGE IN PROGRESS</span>
+                </div>
+            `;
+        } else {
+            indicator.innerHTML = `
+                <div class="ambulance-alert ambulance-active mt-2">
+                    <div class="light-sweep-effect"></div>
+                </div>
+            `;
+        }
     }
 
     async fetchMentorData() {
