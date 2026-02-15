@@ -27,7 +27,7 @@ if ($subjects_result) {
                 COUNT(q.id) as total_questions
             FROM lessons l
             LEFT JOIN questions q ON l.id = q.lesson_id AND q.is_deleted = 0
-            LEFT JOIN exams e ON q.exam_id = e.id AND e.is_deleted = 0
+            LEFT JOIN exams e ON q.exam_id = e.id AND e.is_deleted = 0 AND e.topic_id IS NOT NULL
             WHERE l.subject_id = ?
             GROUP BY l.id
             ORDER BY l.lesson_name ASC

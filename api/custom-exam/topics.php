@@ -14,7 +14,7 @@ $stmt = $conn->prepare("
     FROM topics t
     JOIN questions q ON t.id = q.topic_id
     JOIN exams e ON q.exam_id = e.id
-    WHERE t.lesson_id = ? AND q.is_deleted = 0 AND e.is_deleted = 0
+    WHERE t.lesson_id = ? AND q.is_deleted = 0 AND e.is_deleted = 0 AND e.topic_id IS NOT NULL
     GROUP BY t.id, t.topic_name
     HAVING total_questions > 0
     ORDER BY t.topic_name ASC
