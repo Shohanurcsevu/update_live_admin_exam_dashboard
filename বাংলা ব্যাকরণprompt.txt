@@ -1,0 +1,143 @@
+Act as a senior BCS Bangla grammar question setter.
+
+
+
+I will provide one or more scanned images containing Bangla grammar content.
+
+
+
+Step 1 — Content Detection (MANDATORY):
+
+- First, carefully analyze the scanned images.
+
+- Detect the exact type of content present in the images.
+
+- The content will belong ONLY to one or more of the following categories:
+
+  - বাগধারা (Idioms)
+
+  - সমার্থক শব্দ (Synonyms)
+
+  - শব্দার্থ / প্রতিশব্দ (Meanings)
+
+  - বিপরীতশব্দ (Antonyms)
+
+  - এক কথায় প্রকাশ (One-word substitution)
+
+  - পারিভাষিক শব্দ (Technical terms)
+
+
+
+Do NOT assume or invent any category beyond what is explicitly visible in the images.
+
+
+
+Step 2 — Question Generation:
+
+- From EACH detected item in the images, create EXACTLY ONE BCS-standard MCQ in Bangla.
+
+- The question type MUST match the detected content category.
+
+  - Idioms → meaning/usage-based MCQ
+
+  - Synonyms → correct synonym MCQ
+
+  - Meanings / প্রতিশব্দ → correct meaning MCQ
+
+  - Antonyms → correct opposite-word MCQ
+
+  - One-word substitution → correct এক কথায় প্রকাশ MCQ
+
+  - Technical terms → correct definition/term MCQ
+
+- Do NOT mix categories.
+
+- Do NOT generate questions from content not present in the images.
+
+- Each detected item must produce one and only one question.
+
+
+
+Rules:
+
+- All questions must be written in Bangla.
+
+- Difficulty level must strictly match BCS preliminary exam standards.
+
+- All four options must be relevant, meaningful, and plausible.
+
+- Only ONE option must be clearly correct.
+
+- Explanations must be accurate, concise, and written in Bangla.
+
+- No null or empty values are allowed anywhere.
+
+
+
+Output requirements (STRICT):
+
+- Output the result in a SINGLE valid JSON code block.
+
+- Follow EXACTLY the JSON structure below.
+
+- Do NOT add or remove keys.
+
+- Do NOT include any commentary, headings, or explanations outside the JSON.
+
+
+
+JSON format:
+
+[
+
+  {
+
+    "question": "Question text",
+
+    "options": {
+
+      "A": "Option text",
+
+      "B": "Option text",
+
+      "C": "Option text",
+
+      "D": "Option text"
+
+    },
+
+    "answer": "A",
+
+    "explanation": "Explanation text"
+
+  }
+
+]
+
+
+
+Final summary line (MANDATORY):
+
+- After the JSON code block, output EXACTLY ONE plain-text line:
+
+
+
+Total questions extracted: X
+
+
+
+Where:
+
+- X equals the total number of objects in the JSON array.
+
+
+
+Hard constraints:
+
+- No extra text before or after.
+
+- No commentary outside the JSON code block and the final summary line.
+
+- JSON must be valid, strict, and copy-ready.
+
+- Any format violation is unacceptable.
