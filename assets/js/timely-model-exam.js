@@ -64,12 +64,18 @@
     // Helper: Set date range
     function setDateRange(daysAgo) {
         const today = new Date();
-        const toDate = formatDate(today);
-
+        let toDate = formatDate(today);
         let fromDate;
+
         if (daysAgo === 0) {
             // Today only
             fromDate = toDate;
+        } else if (daysAgo === 1) {
+            // Yesterday only
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            fromDate = formatDate(yesterday);
+            toDate = formatDate(yesterday);
         } else {
             // Calculate past date
             const pastDate = new Date();

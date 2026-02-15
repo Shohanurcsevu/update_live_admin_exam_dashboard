@@ -16,7 +16,7 @@ $query = "
         COUNT(DISTINCT m.question_id) as total_mistakes,
         MAX(m.last_missed_at) as last_activity
     FROM mistake_bank m
-    LEFT JOIN exams e ON m.exam_id = e.id
+    JOIN exams e ON m.exam_id = e.id
     LEFT JOIN subjects s ON m.subject_id = s.id
     WHERE m.resolved = 0 
       AND (e.is_deleted IS NULL OR e.is_deleted = 0)
