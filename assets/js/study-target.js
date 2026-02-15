@@ -42,8 +42,7 @@ const StudyTargetTracker = {
 
     async fetchAIInsights() {
         try {
-            const response = await fetch('api/analytics/get-ai-insights.php');
-            const result = await response.json();
+            const result = await CacheManager.fetchWithCache('api/analytics/get-ai-insights.php', 60);
 
             if (result.success && result.data) {
                 const container = document.getElementById('ai-insights-container');
@@ -67,10 +66,9 @@ const StudyTargetTracker = {
 
     async fetchAllSubjects() {
         try {
-            const response = await fetch('api/exam/subjects.php');
-            const result = await response.json();
-            if (result.success) {
-                this.allSubjects = result.data || [];
+            const result = await CacheManager.fetchWithCache('api/exam/subjects.php', 60);
+            if (result) {
+                this.allSubjects = result || [];
             }
         } catch (error) {
             console.error("Error fetching all subjects:", error);
@@ -79,9 +77,8 @@ const StudyTargetTracker = {
 
     async fetchData() {
         try {
-            const response = await fetch('api/analytics/daily-study-time.php');
-            const result = await response.json();
-            if (result.success) {
+            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 1);
+            if (result) {
                 this.studiedSeconds = result.total_today_seconds || 0;
                 const dailyData = result.subjects || [];
 
@@ -122,9 +119,8 @@ const StudyTargetTracker = {
 
         // Otherwise, fetch from our new first-activity API
         try {
-            const response = await fetch('api/analytics/get-first-activity.php');
-            const result = await response.json();
-            if (result.success && result.timestamp) {
+            const result = await CacheManager.fetchWithCache('api/analytics/get-first-activity.php', 30);
+            if (result && result.timestamp) {
                 // Correct for MySQL timestamp format
                 this.firstStartTime = new Date(result.timestamp.replace(/-/g, '/'));
                 localStorage.setItem('study_first_start_today', this.firstStartTime.getTime());
@@ -265,10 +261,9 @@ const StudyTargetTracker = {
 
     async fetchYesterdayProgress() {
         try {
-            const response = await fetch('api/analytics/get-yesterday-progress.php');
-            const result = await response.json();
-            if (result.success) {
-                this.yesterdaySeconds = result.data.yesterday_total_seconds;
+            const result = await CacheManager.fetchWithCache('api/analytics/get-yesterday-progress.php', 60);
+            if (result) {
+                this.yesterdaySeconds = result.yesterday_total_seconds;
             }
         } catch (e) {
             console.error("Ghost Runner Error:", e);
@@ -277,10 +272,9 @@ const StudyTargetTracker = {
 
     async fetchSubjectEfficiency() {
         try {
-            const response = await fetch('api/analytics/get-subject-efficiency.php');
-            const result = await response.json();
-            if (result.success) {
-                this.efficiency = result.data;
+            const result = await CacheManager.fetchWithCache('api/analytics/get-subject-efficiency.php', 15);
+            if (result) {
+                this.efficiency = result;
                 this.renderSubjectCards(); // Re-render to show indicators
             }
         } catch (e) {
@@ -293,9 +287,8 @@ const StudyTargetTracker = {
     async fetchEstimatedFinish(pace = null) {
         const multiplier = pace || this.currentPaceMultiplier || 1.0;
         try {
-            const response = await fetch(`api/analytics/get-estimated-finish.php?pace=${multiplier}`);
-            const result = await response.json();
-            if (result.success) {
+            const result = await CacheManager.fetchWithCache(`api/analytics/get-estimated-finish.php?pace=${multiplier}`, 2);
+            if (result) {
                 this.estimatedFinishLabel = result.formatted_time;
                 this.renderPredictedFinish();
             }

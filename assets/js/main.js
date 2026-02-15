@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         initializeLastSeenId().then(() => {
-            setInterval(checkForNewNotifications, 15000);
+            setInterval(checkForNewNotifications, 60000); // Increased from 15s to 60s
         });
     }
 
