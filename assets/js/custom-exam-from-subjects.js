@@ -63,18 +63,18 @@ function initializeCustomExamFromSubjectsPage() {
     async function fetchAndDisplayHierarchy() {
         if (!tableBody) return;
         tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-8">Loading hierarchy...</td></tr>`;
-        
+
         // --- Using the TEST DATA ---
         const testData = {
-          "success": true,
-          "data": [
-            { "subject_id": "10", "subject_name": "কম্পিউটার ও তথ্য প্রযুক্তি - ১৫", "lessons": [ { "lesson_id": 7, "lesson_name": "Test ANopther", "py_bcs_ques": 1, "total_questions": "3" }, { "lesson_id": 4, "lesson_name": "আইটি ", "py_bcs_ques": 6, "total_questions": "15" } ] },
-            { "subject_id": "8", "subject_name": "বাংলা ব্যাকরণ - ১৫", "lessons": [ { "lesson_id": 5, "lesson_name": "বাগধারা ", "py_bcs_ques": 45, "total_questions": "4" } ] },
-            { "subject_id": "7", "subject_name": "বাংলা সাহিত্য - ২০", "lessons": [ { "lesson_id": 3, "lesson_name": " চর্যাপদ ", "py_bcs_ques": 45, "total_questions": "4" } ] },
-            { "subject_id": "9", "subject_name": "সাধারণ বিজ্ঞান - ১৫", "lessons": [ { "lesson_id": 6, "lesson_name": "তাপবিদ্যা ", "py_bcs_ques": 6, "total_questions": "4" } ] }
-          ]
+            "success": true,
+            "data": [
+                { "subject_id": "10", "subject_name": "কম্পিউটার ও তথ্য প্রযুক্তি - ১৫", "lessons": [{ "lesson_id": 7, "lesson_name": "Test ANopther", "py_bcs_ques": 1, "total_questions": "3" }, { "lesson_id": 4, "lesson_name": "আইটি ", "py_bcs_ques": 6, "total_questions": "15" }] },
+                { "subject_id": "8", "subject_name": "বাংলা ব্যাকরণ - ১৫", "lessons": [{ "lesson_id": 5, "lesson_name": "বাগধারা ", "py_bcs_ques": 45, "total_questions": "4" }] },
+                { "subject_id": "7", "subject_name": "বাংলা সাহিত্য - ২০", "lessons": [{ "lesson_id": 3, "lesson_name": " চর্যাপদ ", "py_bcs_ques": 45, "total_questions": "4" }] },
+                { "subject_id": "9", "subject_name": "সাধারণ বিজ্ঞান - ১৫", "lessons": [{ "lesson_id": 6, "lesson_name": "তাপবিদ্যা ", "py_bcs_ques": 6, "total_questions": "4" }] }
+            ]
         };
-        
+
         // Call the render function with the test data
         renderTable(testData);
 
@@ -92,9 +92,14 @@ function initializeCustomExamFromSubjectsPage() {
         */
     }
 
+    function getSelectedPriorities() {
+        const checkboxes = document.querySelectorAll('input[name="priority_level"]:checked');
+        return Array.from(checkboxes).map(cb => parseInt(cb.value));
+    }
+
     async function handleFormSubmit(e) {
         e.preventDefault();
-        
+
         const source_lessons = [];
         document.querySelectorAll('#source-hierarchy-table-body tr[data-lesson-id]').forEach(row => {
             const countInput = row.querySelector('.question-count-input');
@@ -102,7 +107,7 @@ function initializeCustomExamFromSubjectsPage() {
                 const count = parseInt(countInput.value, 10);
                 if (!isNaN(count) && count > 0) {
                     source_lessons.push({
-                        lesson_id: row.dataset.lessonId,
+                        lesson_id: parseInt(row.dataset.lessonId),
                         question_count: count
                     });
                 }
@@ -113,31 +118,36 @@ function initializeCustomExamFromSubjectsPage() {
             showToast('Please select questions from at least one lesson.', 'error');
             return;
         }
-        
+
         const new_exam_details = {
             exam_title: document.getElementById('exam-title').value,
-            duration: document.getElementById('duration').value,
-            total_marks: document.getElementById('total-marks').value,
-            pass_mark: document.getElementById('pass-mark').value,
+            duration: parseInt(document.getElementById('duration').value),
+            total_marks: parseFloat(document.getElementById('total-marks').value),
+            pass_mark: parseFloat(document.getElementById('pass-mark').value),
             instructions: 'প্রতিটি প্রশ্নের ৪ (চার) টি উত্তরের মধ্যে ১ (এক) টি সঠিক উত্তর রয়েছে। প্রতিটি শুদ্ধ উত্তরের জন্য প্রার্থী ১ (এক) নম্বর পাবেন। প্রতিটি ভুল উত্তরের জন্য ০.৫ ( শূন্য দশমিক পাঁচ ) নম্বর কাটা যাবে।'
         };
 
         for (const key of ['exam_title', 'duration', 'total_marks', 'pass_mark']) {
-             if (!new_exam_details[key]) {
+            if (!new_exam_details[key] && new_exam_details[key] !== 0) {
                 showToast(`${key.replace(/_/g, ' ')} is required.`, 'error');
                 return;
             }
         }
-        
+
         const submitButton = customExamForm.querySelector('button[type="submit"]');
         submitButton.disabled = true;
         submitButton.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">autorenew</span>Creating...`;
 
         try {
+            const payload = {
+                new_exam_details,
+                source_lessons,
+                priority_levels: getSelectedPriorities()
+            };
             const response = await fetch(CREATE_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ new_exam_details, source_lessons })
+                body: JSON.stringify(payload)
             });
             const result = await response.json();
             if (result.success) {
@@ -147,13 +157,13 @@ function initializeCustomExamFromSubjectsPage() {
             } else {
                 showToast(result.message || 'An unknown error occurred.', 'error');
             }
-        } catch (error) { showToast('A network error occurred.', 'error'); } 
+        } catch (error) { showToast('A network error occurred.', 'error'); }
         finally {
             submitButton.disabled = false;
             submitButton.innerHTML = `<span class="material-symbols-outlined mr-2">science</span>Create Subject-Level Model Test`;
         }
     }
-    
+
     customExamForm.addEventListener('submit', handleFormSubmit);
     fetchAndDisplayHierarchy();
 }

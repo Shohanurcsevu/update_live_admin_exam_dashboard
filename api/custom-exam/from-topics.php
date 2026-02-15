@@ -78,6 +78,16 @@ try {
                 }
             }
 
+            // Priority levels filter
+            if (!empty($data['priority_levels'])) {
+                $priority_placeholders = implode(',', array_fill(0, count($data['priority_levels']), '?'));
+                $fetch_sql .= " AND priority IN ($priority_placeholders)";
+                foreach ($data['priority_levels'] as $p) {
+                    $fetch_params[] = intval($p);
+                    $fetch_types .= 'i';
+                }
+            }
+
             $fetch_sql .= " ORDER BY priority DESC, RAND() LIMIT ?";
             $fetch_params[] = $question_count;
             $fetch_types .= 'i';

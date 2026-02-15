@@ -42,6 +42,7 @@ function initializeCustomExamBuilderPage() {
         if (!topicId || topicId === '0') {
             sourceExamsSection.classList.add('hidden');
             customExamFormSection.classList.add('hidden');
+            document.getElementById('priority-filters-section')?.classList.add('hidden');
             return;
         }
 
@@ -66,16 +67,23 @@ function initializeCustomExamBuilderPage() {
                     sourceExamsTableBody.innerHTML += row;
                 });
                 customExamFormSection.classList.remove('hidden');
+                document.getElementById('priority-filters-section')?.classList.remove('hidden');
             } else {
                 sourceExamsTableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4">No source exams found for this topic.</td></tr>`;
                 customExamFormSection.classList.add('hidden');
+                document.getElementById('priority-filters-section')?.classList.add('hidden');
             }
         } catch (error) { showToast('Failed to load source exams.', 'error'); }
     }
-    
+
+    function getSelectedPriorities() {
+        const checkboxes = document.querySelectorAll('input[name="priority_level"]:checked');
+        return Array.from(checkboxes).map(cb => parseInt(cb.value));
+    }
+
     async function handleFormSubmit(e) {
         e.preventDefault();
-        
+
         const sourceExams = [];
         document.querySelectorAll('#source-exams-table-body tr[data-exam-id]').forEach(row => {
             const countInput = row.querySelector('.question-count-input');
@@ -83,7 +91,7 @@ function initializeCustomExamBuilderPage() {
                 const count = parseInt(countInput.value, 10);
                 if (!isNaN(count) && count > 0) {
                     sourceExams.push({
-                        exam_id: row.dataset.examId,
+                        exam_id: parseInt(row.dataset.examId),
                         question_count: count
                     });
                 }
@@ -95,55 +103,58 @@ function initializeCustomExamBuilderPage() {
             return;
         }
 
+        const custom_exam_form_el = document.getElementById('custom-exam-form');
         const new_exam_details = {
-            subject_id: document.getElementById('subject-filter').value,
-            lesson_id: document.getElementById('lesson-filter').value,
-            topic_id: document.getElementById('topic-filter').value,
+            subject_id: parseInt(document.getElementById('subject-filter').value),
+            lesson_id: parseInt(document.getElementById('lesson-filter').value),
+            topic_id: parseInt(document.getElementById('topic-filter').value),
             exam_title: document.getElementById('exam-title').value,
-            duration: document.getElementById('duration').value,
-            total_marks: document.getElementById('total-marks').value,
-            pass_mark: document.getElementById('pass-mark').value,
+            duration: parseInt(document.getElementById('duration').value),
+            total_marks: parseFloat(document.getElementById('total-marks').value),
+            pass_mark: parseFloat(document.getElementById('pass-mark').value),
             instructions: 'প্রতিটি প্রশ্নের ৪ (চার) টি উত্তরের মধ্যে ১ (এক) টি সঠিক উত্তর রয়েছে। প্রতিটি শুদ্ধ উত্তরের জন্য প্রার্থী ১ (এক) নম্বর পাবেন। প্রতিটি ভুল উত্তরের জন্য ০.৫ ( শূন্য দশমিক পাঁচ ) নম্বর কাটা যাবে।'
         };
 
-        // --- FIX: The validation loop was checking the wrong variable. It should check 'new_exam_details'. ---
         for (const key in new_exam_details) {
-            if (!new_exam_details[key] || new_exam_details[key] === '0') {
+            if (!new_exam_details[key] && new_exam_details[key] !== 0) {
                 const fieldName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                showToast(`${fieldName} is required. Please check your selections and inputs.`, 'error');
+                showToast(`${fieldName} is required.`, 'error');
                 return;
             }
         }
-        
-        const customExamForm = document.getElementById('custom-exam-form');
-        const submitButton = customExamForm.querySelector('button[type="submit"]');
+
+        const submitButton = custom_exam_form_el.querySelector('button[type="submit"]');
         submitButton.disabled = true;
         submitButton.innerHTML = `<span class="material-symbols-outlined mr-2 animate-spin">autorenew</span>Creating...`;
 
         try {
+            const payload = {
+                new_exam_details,
+                source_exams: sourceExams,
+                priority_levels: getSelectedPriorities()
+            };
             const response = await fetch(CREATE_CUSTOM_EXAM_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ new_exam_details, source_exams: sourceExams })
-
+                body: JSON.stringify(payload)
             });
             const result = await response.json();
             if (result.success) {
                 showToast(result.message, 'success');
-                customExamForm.reset();
+                custom_exam_form_el.reset();
                 fetchAndDisplaySourceExams(document.getElementById('topic-filter'), document.getElementById('source-exams-section'), document.getElementById('custom-exam-form-section'));
             } else {
                 showToast(result.message || 'An unknown error occurred.', 'error');
             }
-        } catch (error) { 
-            showToast('A network error occurred. Please check the console.', 'error'); 
+        } catch (error) {
+            showToast('A network error occurred. Please check the console.', 'error');
             console.error("Fetch Error:", error);
         } finally {
             submitButton.disabled = false;
             submitButton.innerHTML = `<span class="material-symbols-outlined mr-2">construction</span>Create Custom Exam`;
         }
     }
-    
+
     function setupEventListeners() {
         const subjectFilter = document.getElementById('subject-filter');
         const lessonFilter = document.getElementById('lesson-filter');
@@ -167,12 +178,12 @@ function initializeCustomExamBuilderPage() {
             sourceExamsSection.classList.add('hidden'); customExamFormSection.classList.add('hidden');
         });
         topicFilter.addEventListener('change', () => fetchAndDisplaySourceExams(topicFilter, sourceExamsSection, customExamFormSection));
-        
+
         customExamForm.addEventListener('submit', handleFormSubmit);
     }
 
     const subjectFilter = document.getElementById('subject-filter');
-    if(subjectFilter) {
+    if (subjectFilter) {
         populateDropdown(SUBJECT_API_URL, subjectFilter, 'Select Subject');
         setupEventListeners();
     } else {

@@ -393,6 +393,11 @@
                 question_count: exam.selectedCount
             }));
 
+            function getSelectedPriorities() {
+                const checkboxes = document.querySelectorAll('input[name="priority_level"]:checked');
+                return Array.from(checkboxes).map(cb => parseInt(cb.value));
+            }
+
             const payload = {
                 new_exam_details: {
                     subject_id: null,
@@ -404,7 +409,8 @@
                     total_marks: parseFloat(examMarksInput.value),
                     pass_mark: Math.floor(parseFloat(examMarksInput.value) * 0.4)
                 },
-                source_exams: sourceExams
+                source_exams: sourceExams,
+                priority_levels: getSelectedPriorities()
             };
 
             const response = await fetch(API_CREATE_EXAM, {

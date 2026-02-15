@@ -410,6 +410,11 @@
         // Get the first selected topic to determine subject_id and lesson_id
         const firstTopic = Array.from(state.selectedTopics.values())[0];
 
+        function getSelectedPriorities() {
+            const checkboxes = document.querySelectorAll('input[name="priority_level"]:checked');
+            return Array.from(checkboxes).map(cb => parseInt(cb.value));
+        }
+
         // Prepare payload for API
         const payload = {
             new_exam_details: {
@@ -424,7 +429,8 @@
             source_topics: Array.from(state.selectedTopics.entries()).map(([topicId, data]) => ({
                 topic_id: parseInt(topicId),
                 question_count: data.questionCount
-            }))
+            })),
+            priority_levels: getSelectedPriorities()
         };
 
         elements.generateExamBtn.disabled = true;
