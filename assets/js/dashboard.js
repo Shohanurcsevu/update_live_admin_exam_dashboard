@@ -61,16 +61,13 @@ function initializeDashboardPage() {
 
     async function fetchAndDisplayMetrics() {
         try {
-            const response = await fetch(METRICS_API_URL);
-            const result = await response.json();
-            if (result.success) {
-                const metrics = result.data;
-                animateCount(document.getElementById('total-subjects'), metrics.subjects);
-                animateCount(document.getElementById('total-lessons'), metrics.lessons);
-                animateCount(document.getElementById('total-topics'), metrics.topics);
-                animateCount(document.getElementById('total-exams'), metrics.exams);
-                animateCount(document.getElementById('total-questions'), metrics.questions);
-            }
+            const result = await CacheManager.fetchWithCache(METRICS_API_URL, 5);
+            const metrics = result;
+            animateCount(document.getElementById('total-subjects'), metrics.subjects);
+            animateCount(document.getElementById('total-lessons'), metrics.lessons);
+            animateCount(document.getElementById('total-topics'), metrics.topics);
+            animateCount(document.getElementById('total-exams'), metrics.exams);
+            animateCount(document.getElementById('total-questions'), metrics.questions);
 
             // Mistake Bank Stats
             fetchMistakeStats();
@@ -93,11 +90,10 @@ function initializeDashboardPage() {
         if (!insightsContainer) return;
 
         try {
-            const response = await fetch('api/performance/mastery-trends.php');
-            const result = await response.json();
-            if (!result.success || !result.data) return;
+            const result = await CacheManager.fetchWithCache('api/performance/mastery-trends.php', 30);
+            if (!result) return;
 
-            const { subjects, insights } = result.data;
+            const { subjects, insights } = result;
             const ctx = document.getElementById('mastery-radar-chart');
 
             // Name mapping for chart labels
@@ -209,11 +205,10 @@ function initializeDashboardPage() {
         if (!trackerList) return;
 
         try {
-            const response = await fetch('api/mistakes/discipline-stats.php');
-            const result = await response.json();
+            const result = await CacheManager.fetchWithCache('api/mistakes/discipline-stats.php', 15);
 
-            if (result.success && result.data) {
-                trackerList.innerHTML = result.data.map(subject => {
+            if (result) {
+                trackerList.innerHTML = result.map(subject => {
                     const isNeglected = subject.status === 'Neglected';
                     const isConsistent = subject.status === 'Consistent';
                     const icon = isConsistent ? 'verified' : (isNeglected ? 'error' : 'schedule');
@@ -255,11 +250,10 @@ function initializeDashboardPage() {
         if (!heatmapGrid) return;
 
         try {
-            const response = await fetch('api/mistakes/subject-stats.php');
-            const result = await response.json();
+            const result = await CacheManager.fetchWithCache('api/mistakes/subject-stats.php', 10);
 
-            if (result.success && result.data) {
-                heatmapGrid.innerHTML = result.data.map(subject => {
+            if (result) {
+                heatmapGrid.innerHTML = result.map(subject => {
                     let bgColor = 'bg-white';
                     let borderColor = 'border-gray-100';
                     let textColor = 'text-gray-900';
@@ -314,10 +308,9 @@ function initializeDashboardPage() {
         if (!badgeGrid) return;
 
         try {
-            const response = await fetch('api/performance/badges.php');
-            const result = await response.json();
+            const result = await CacheManager.fetchWithCache('api/performance/badges.php', 30);
 
-            if (result.success && result.badges) {
+            if (result && result.badges) {
                 badgeGrid.innerHTML = result.badges.map(badge => {
                     const earnedClass = badge.earned ? `bg-${badge.color}-50 border-${badge.color}-200 text-${badge.color}-700` : 'bg-gray-50 border-gray-100 text-gray-400 grayscale opacity-60';
                     const iconEarnedClass = badge.earned ? `text-${badge.color}-600` : 'text-gray-300';
@@ -356,22 +349,20 @@ function initializeDashboardPage() {
 
     async function fetchMistakeStats() {
         try {
-            const response = await fetch('api/mistakes/stats.php');
-            const result = await response.json();
-            if (result.success) {
-                const countEl = document.getElementById('mistake-count');
-                if (countEl) animateCount(countEl, result.count);
+            const result = await CacheManager.fetchWithCache('api/mistakes/stats.php', 5);
+            const count = result.count;
+            const countEl = document.getElementById('mistake-count');
+            if (countEl) animateCount(countEl, count);
 
-                const masteryBtn = document.getElementById('mastery-quiz-btn');
-                if (masteryBtn) {
-                    masteryBtn.disabled = (result.count === 0);
-                    if (result.count === 0) {
-                        masteryBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                        masteryBtn.title = "No mistakes found yet! Complete some exams first.";
-                    } else {
-                        masteryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                        masteryBtn.title = "";
-                    }
+            const masteryBtn = document.getElementById('mastery-quiz-btn');
+            if (masteryBtn) {
+                masteryBtn.disabled = (count === 0);
+                if (count === 0) {
+                    masteryBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    masteryBtn.title = "No mistakes found yet! Complete some exams first.";
+                } else {
+                    masteryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    masteryBtn.title = "";
                 }
             }
         } catch (error) { console.error("Error fetching mistake stats:", error); }
@@ -379,10 +370,9 @@ function initializeDashboardPage() {
 
     async function fetchStudyTimeStats() {
         try {
-            const response = await fetch('api/analytics/daily-study-time.php');
-            const result = await response.json();
+            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 2);
 
-            if (result.success) {
+            if (result) {
                 const totalEl = document.getElementById('study-today-total');
                 const improvementBadge = document.getElementById('study-improvement-badge');
                 const subjectsContainer = document.getElementById('study-subjects-container');
@@ -444,10 +434,9 @@ function initializeDashboardPage() {
         selector.innerHTML = `<option value="0">${placeholder}</option>`;
         if (isDependent) selector.disabled = true;
         try {
-            const response = await fetch(url);
-            const result = await response.json();
-            if (result.success && result.data.length > 0) {
-                result.data.forEach(item => {
+            const result = await CacheManager.fetchWithCache(url, 60);
+            if (result && result.length > 0) {
+                result.forEach(item => {
                     selector.innerHTML += `<option value="${item.id}">${item.subject_name || item.lesson_name || item.topic_name}</option>`;
                 });
                 if (isDependent) selector.disabled = false;

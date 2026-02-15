@@ -57,11 +57,10 @@ function initializeExamPage() {
 
     async function populateSubjects(selector) {
         try {
-            const response = await fetch(SUBJECT_API_URL);
-            const result = await response.json();
-            if (result.success) {
+            const result = await CacheManager.fetchWithCache(SUBJECT_API_URL, 60);
+            if (result) {
                 selector.innerHTML = selector === subjectFilter ? '<option value="0">All Subjects</option>' : '<option value="">Select Subject</option>';
-                result.data.forEach(subject => {
+                result.forEach(subject => {
                     selector.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
                 });
             }
@@ -76,11 +75,10 @@ function initializeExamPage() {
             return;
         }
         try {
-            const response = await fetch(`${LESSON_API_URL}?subject_id=${subjectId}`);
-            const result = await response.json();
-            if (result.success) {
+            const result = await CacheManager.fetchWithCache(`${LESSON_API_URL}?subject_id=${subjectId}`, 60);
+            if (result) {
                 selector.innerHTML = selector === lessonFilter ? '<option value="0">All Lessons</option>' : '<option value="">Select Lesson</option>';
-                result.data.forEach(lesson => {
+                result.forEach(lesson => {
                     selector.innerHTML += `<option value="${lesson.id}">${lesson.lesson_name}</option>`;
                 });
                 selector.disabled = false;
@@ -97,11 +95,10 @@ function initializeExamPage() {
             return;
         }
         try {
-            const response = await fetch(`${TOPIC_API_URL}?lesson_id=${lessonId}`);
-            const result = await response.json();
-            if (result.success) {
+            const result = await CacheManager.fetchWithCache(`${TOPIC_API_URL}?lesson_id=${lessonId}`, 60);
+            if (result) {
                 selector.innerHTML = selector === topicFilter ? '<option value="0">All Topics</option>' : '<option value="">Select Topic</option>';
-                result.data.forEach(topic => {
+                result.forEach(topic => {
                     selector.innerHTML += `<option value="${topic.id}">${topic.topic_name}</option>`;
                 });
                 selector.disabled = false;
@@ -128,13 +125,12 @@ function initializeExamPage() {
         if (query) url += `&${query}`;
 
         try {
-            const response = await fetch(url);
-            const result = await response.json();
+            const result = await CacheManager.fetchWithCache(url, 2);
 
             if (!append) tableBody.innerHTML = '';
 
-            if (result.success && result.data.length > 0) {
-                result.data.forEach(exam => {
+            if (result && result.length > 0) {
+                result.forEach(exam => {
                     const row = `
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
                             <td class="py-3 px-6 text-left font-medium">${exam.exam_title}</td>

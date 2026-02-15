@@ -50,7 +50,6 @@
     let hierarchyData = {};
     let selectedExams = {}; // { examId: { examTitle, maxQuestions, selectedCount } }
     let currentStep = 1;
-    const cache = new Map();
     let currentDateFilter = { from: '', to: '' };
 
     // Helper: Format date to YYYY-MM-DD
@@ -114,15 +113,8 @@
 
     // Helper: Fetch data with caching (cache key includes date filter)
     async function fetchData(url, skipCache = false) {
-        const cacheKey = url + JSON.stringify(currentDateFilter);
-        if (!skipCache && cache.has(cacheKey)) return cache.get(cacheKey);
-
-        const response = await fetch(url);
-        const result = await response.json();
-        if (!result.success) throw new Error(result.message || 'Failed to fetch data');
-
-        cache.set(cacheKey, result.data);
-        return result.data;
+        // Use central CacheManager with a 10-minute TTL
+        return await CacheManager.fetchWithCache(url, 10, skipCache);
     }
 
     // Build hierarchy tree - SIMPLIFIED: Load exams directly
