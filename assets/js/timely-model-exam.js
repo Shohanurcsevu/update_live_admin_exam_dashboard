@@ -157,16 +157,8 @@
             console.log('Fetching all exams from:', url);
             console.log('Date range:', currentDateFilter.from, 'to', currentDateFilter.to);
 
-            const response = await fetch(url);
-            const result = await response.json();
-
-            console.log('API Response:', result);
-
-            if (!result.success) {
-                throw new Error(result.message || 'Failed to fetch exams');
-            }
-
-            const exams = result.data;
+            // Use fetchData helper to enable caching and reduce server hits
+            const exams = await fetchData(url);
 
             console.log('📊 Total exams received:', exams.length);
 
