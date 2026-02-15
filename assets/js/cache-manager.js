@@ -65,8 +65,31 @@ window.CacheManager = (function () {
         }
     }
 
+    /**
+     * Clear all cache entries containing a specific keyword (group-based invalidation)
+     * @param {string} keyword e.g. 'analytics', 'dashboard', 'exam'
+     */
+    function clearGroup(keyword) {
+        console.log(`%c[CacheManager] Clearing group: ${keyword}`, 'color: #ef4444; font-weight: bold;');
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith(CACHE_PREFIX)) {
+                // Since we use btoa for keys, we need to check if the decodable URL contains the keyword
+                try {
+                    const encodedUrl = key.replace(CACHE_PREFIX, '');
+                    const url = atob(encodedUrl);
+                    if (url.includes(keyword)) {
+                        localStorage.removeItem(key);
+                    }
+                } catch (e) {
+                    // Fallback: If it's not valid btoa or other issue, just skip it
+                }
+            }
+        });
+    }
+
     return {
         fetchWithCache,
-        clearCache
+        clearCache,
+        clearGroup
     };
 })();
