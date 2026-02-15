@@ -243,8 +243,8 @@ class StudyMentor {
                 this.sendNotification("AI Mentor: Focus Check", `5 minutes left! Finish strong, Sohan. You're crushing ${this.focusSession.subject}!`);
             }
 
-            // Sync to DB every 5 seconds
-            if (this.focusSession.timeRemaining % 5 === 0) {
+            // Sync to DB every 30 seconds (Increased from 5s)
+            if (this.focusSession.timeRemaining % 30 === 0) {
                 this.saveSession('update', { remaining_seconds: this.focusSession.timeRemaining, type: 'focus' });
             }
 
@@ -496,8 +496,8 @@ class StudyMentor {
             this.breakSession.timeRemaining--;
             this.updateBreakUI();
 
-            // Sync to DB every 5 seconds
-            if (this.breakSession.timeRemaining % 5 === 0) {
+            // Sync to DB every 30 seconds (Increased from 5s)
+            if (this.breakSession.timeRemaining % 30 === 0) {
                 this.saveSession('update', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
             }
 
@@ -1091,11 +1091,10 @@ class StudyMentor {
             // Always fetch fresh data when opening to reflect recent study sessions
             this.fetchMentorData();
 
-            // Refresh the study report every 10 seconds while open
-            if (this.reportRefreshInterval) clearInterval(this.reportRefreshInterval);
+            // Refresh the study report every 60 seconds while open (Increased from 10s)
             this.reportRefreshInterval = setInterval(() => {
                 if (this.isOpen) this.renderRecommendations();
-            }, 10000);
+            }, 60000);
         }
     }
 
@@ -1178,8 +1177,8 @@ class StudyMentor {
         // Initial sync
         this.fetchDailyStudyTime();
 
-        // Periodic sync every 2 minutes for cross-device consistency
-        setInterval(() => this.fetchDailyStudyTime(), 120000);
+        // Periodic sync every 10 minutes for cross-device consistency (Increased from 2m)
+        setInterval(() => this.fetchDailyStudyTime(), 600000);
 
         let lastNotificationTime = Date.now();
 
@@ -1355,21 +1354,17 @@ class StudyMentor {
 
     async fetchMentorData() {
         try {
-            const [trendsResponse, decksResponse, yesterdayResponse] = await Promise.all([
-                fetch('api/performance/mastery-trends.php'),
-                fetch('api/flashcards/decks.php'),
-                fetch('api/revision/get-yesterday-exams.php')
+            const [trendsResult, decksResult, yesterdayResult] = await Promise.all([
+                CacheManager.fetchWithCache('api/performance/mastery-trends.php', 30),
+                CacheManager.fetchWithCache('api/flashcards/decks.php', 60),
+                CacheManager.fetchWithCache('api/revision/get-yesterday-exams.php', 60)
             ]);
 
-            const trendsResult = await trendsResponse.json();
-            const decksResult = await decksResponse.json();
-            const yesterdayResult = await yesterdayResponse.json();
-
-            if (trendsResult.success && trendsResult.data) {
-                this.mentorData = trendsResult.data;
-                this.mentorData.flashcard_decks = decksResult.success ? decksResult.decks : [];
-                this.mentorData.total_cards_due = decksResult.success ? decksResult.total_cards_due : 0;
-                this.mentorData.yesterday_exams = yesterdayResult.success ? yesterdayResult.data.yesterday_exams : [];
+            if (trendsResult) {
+                this.mentorData = trendsResult;
+                this.mentorData.flashcard_decks = decksResult ? decksResult.decks : [];
+                this.mentorData.total_cards_due = decksResult ? decksResult.total_cards_due : 0;
+                this.mentorData.yesterday_exams = yesterdayResult ? yesterdayResult.yesterday_exams : [];
                 this.mentorData.activity_status = null; // Will be fetched separately
 
                 // Fetch activity status separately (optional - won't break if it fails)
@@ -1384,9 +1379,8 @@ class StudyMentor {
 
     async fetchActivityStatus() {
         try {
-            const response = await fetch('api/activity-status.php');
-            const result = await response.json();
-            if (result.success && this.mentorData) {
+            const result = await CacheManager.fetchWithCache('api/activity-status.php', 5);
+            if (result && this.mentorData) {
                 this.mentorData.activity_status = result;
                 // Re-render to show nudge if inactive
                 this.renderRecommendations();
