@@ -13,7 +13,8 @@ $stmt = $conn->prepare("
     SELECT t.id, t.topic_name, COUNT(q.id) as total_questions 
     FROM topics t
     JOIN questions q ON t.id = q.topic_id
-    WHERE t.lesson_id = ? AND q.is_deleted = 0
+    JOIN exams e ON q.exam_id = e.id
+    WHERE t.lesson_id = ? AND q.is_deleted = 0 AND e.is_deleted = 0
     GROUP BY t.id, t.topic_name
     HAVING total_questions > 0
     ORDER BY t.topic_name ASC

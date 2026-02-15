@@ -58,7 +58,7 @@ try {
         error_log("Processing source lesson ID: {$source_lesson_id}, attempting to fetch {$question_count} questions.");
 
         if ($question_count > 0) {
-            $fetch_sql = "SELECT id, subject_id, topic_id, question, options, answer, explanation FROM questions WHERE lesson_id = ?";
+            $fetch_sql = "SELECT id, subject_id, topic_id, question, options, answer, explanation FROM questions WHERE lesson_id = ? AND is_deleted = 0";
             $fetch_params = [$source_lesson_id];
             $fetch_types = "i";
 

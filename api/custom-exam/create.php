@@ -66,7 +66,7 @@ try {
 
         if ($question_count > 0) {
             $fetch_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation
-                          FROM questions WHERE exam_id = ?";
+                          FROM questions WHERE exam_id = ? AND is_deleted = 0";
             $fetch_params = [$source_exam_id];
             $fetch_types = "i";
 
