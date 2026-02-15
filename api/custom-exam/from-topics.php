@@ -78,7 +78,7 @@ try {
                 }
             }
 
-            $fetch_sql .= " ORDER BY RAND() LIMIT ?";
+            $fetch_sql .= " ORDER BY priority DESC, RAND() LIMIT ?";
             $fetch_params[] = $question_count;
             $fetch_types .= 'i';
 

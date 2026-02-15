@@ -58,7 +58,7 @@ try {
         error_log("Processing source lesson ID: {$source_lesson_id}, attempting to fetch {$question_count} questions.");
 
         if ($question_count > 0) {
-            $fetch_q_stmt = $conn->prepare("SELECT subject_id, topic_id, question, options, answer, explanation FROM questions WHERE lesson_id = ? ORDER BY RAND() LIMIT ?");
+            $fetch_q_stmt = $conn->prepare("SELECT subject_id, topic_id, question, options, answer, explanation FROM questions WHERE lesson_id = ? ORDER BY priority DESC, RAND() LIMIT ?");
             $fetch_q_stmt->bind_param("ii", $source_lesson_id, $question_count);
             $fetch_q_stmt->execute();
             $questions_result = $fetch_q_stmt->get_result();

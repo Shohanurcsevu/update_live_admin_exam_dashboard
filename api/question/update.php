@@ -13,6 +13,7 @@ $question_text = $data['question'];
 $options_json = json_encode($data['options']);
 $answer = $data['answer'];
 $explanation = $data['explanation'];
+$priority = isset($data['priority']) ? max(0, intval($data['priority'])) : 0;
 
 // Function to get single column value by table and id
 function get_name_by_id($conn, $table, $id, $column) {
@@ -29,8 +30,8 @@ function get_name_by_id($conn, $table, $id, $column) {
     return $name;
 }
 
-// Fetch exam_id for this question
-$stmt_exam = $conn->prepare("SELECT exam_id FROM questions WHERE id = ?");
+// Fetch exam_id and current priority for this question
+$stmt_exam = $conn->prepare("SELECT exam_id, priority FROM questions WHERE id = ?");
 $stmt_exam->bind_param("i", $id);
 $stmt_exam->execute();
 $result_exam = $stmt_exam->get_result();
@@ -40,6 +41,7 @@ if ($result_exam->num_rows === 0) {
 }
 $row_exam = $result_exam->fetch_assoc();
 $exam_id = $row_exam['exam_id'];
+$old_priority = intval($row_exam['priority']);
 $stmt_exam->close();
 
 // Fetch exam details
@@ -58,8 +60,8 @@ $exam_title = $exam['exam_title'];
 $subject_name = get_name_by_id($conn, 'subjects', $exam['subject_id'], 'subject_name');
 $lesson_name = get_name_by_id($conn, 'lessons', $exam['lesson_id'], 'lesson_name');
 
-$stmt_update = $conn->prepare("UPDATE questions SET question = ?, options = ?, answer = ?, explanation = ? WHERE id = ?");
-$stmt_update->bind_param("ssssi", $question_text, $options_json, $answer, $explanation, $id);
+$stmt_update = $conn->prepare("UPDATE questions SET question = ?, options = ?, answer = ?, explanation = ?, priority = ? WHERE id = ?");
+$stmt_update->bind_param("ssssii", $question_text, $options_json, $answer, $explanation, $priority, $id);
 
 function log_activity($conn, $type, $message) {
     $stmt_log = $conn->prepare("INSERT INTO activity_log (activity_type, activity_message) VALUES (?, ?)");
@@ -71,6 +73,9 @@ function log_activity($conn, $type, $message) {
 if ($stmt_update->execute()) {
     // Log with exam, subject, lesson info
     $msg = "Question ID {$id} was updated in Exam '{$exam_title}' (Subject: '{$subject_name}', Lesson: '{$lesson_name}'). New question: '" . substr($question_text, 0, 50) . (strlen($question_text) > 50 ? "..." : "") . "'";
+    if ($priority !== $old_priority) {
+        $msg .= " Priority changed: {$old_priority} → {$priority}.";
+    }
     log_activity($conn, 'Question Updated', $msg);
 
     echo json_encode(['success' => true, 'message' => 'Question updated successfully.']);

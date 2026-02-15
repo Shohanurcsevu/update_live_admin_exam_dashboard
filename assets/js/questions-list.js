@@ -13,7 +13,7 @@ function initializeQuestionsListPage() {
     const deleteModal = document.getElementById('delete-question-confirm-modal');
     const editForm = document.getElementById('edit-question-form');
     const toastContainer = document.getElementById('toast-container');
-    
+
     let questionIdToDelete = null;
 
     if (!examId) {
@@ -22,7 +22,7 @@ function initializeQuestionsListPage() {
     }
 
     pageTitle.textContent = `Questions for: ${examTitle || 'Exam'}`;
-    
+
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
         let bgColor, icon;
@@ -43,11 +43,21 @@ function initializeQuestionsListPage() {
             const result = await response.json();
             questionsContainer.innerHTML = '';
             if (result.success && result.data.length > 0) {
+                currentQuestions = result.data;
                 result.data.forEach((q, index) => {
+                    const priorityInt = parseInt(q.priority) || 0;
+                    let priorityBadge = '';
+                    if (priorityInt >= 3) {
+                        priorityBadge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">🔴 High</span>';
+                    } else if (priorityInt === 2) {
+                        priorityBadge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">🟡 Medium</span>';
+                    } else if (priorityInt === 1) {
+                        priorityBadge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">🔵 Low</span>';
+                    }
                     const questionCard = `
                         <div class="border rounded-lg p-4 bg-gray-50">
                             <div class="flex justify-between items-start">
-                                <p class="text-gray-800 font-semibold">${index + 1}. ${q.question}</p>
+                                <p class="text-gray-800 font-semibold">${index + 1}. ${q.question}${priorityBadge}</p>
                                 <div class="flex-shrink-0 ml-4">
                                     <button class="edit-btn p-1 text-green-600 hover:text-green-800" data-id="${q.id}"><span class="material-symbols-outlined">edit</span></button>
                                     <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${q.id}"><span class="material-symbols-outlined">delete</span></button>
@@ -88,6 +98,7 @@ function initializeQuestionsListPage() {
             },
             answer: formData.get('answer'),
             explanation: formData.get('explanation'),
+            priority: parseInt(formData.get('priority')) || 0,
         };
 
         try {
@@ -100,7 +111,7 @@ function initializeQuestionsListPage() {
             } else { showToast(result.message, 'error'); }
         } catch (error) { showToast('Network error.', 'error'); }
     }
-    
+
     async function handleDeleteConfirm() {
         if (!questionIdToDelete) return;
         try {
@@ -110,19 +121,19 @@ function initializeQuestionsListPage() {
         } catch (error) { showToast('Network error.', 'error'); }
         finally { closeModal(deleteModal); fetchAndDisplayQuestions(); }
     }
-    
+
     function handleContainerClick(e) {
         const editBtn = e.target.closest('.edit-btn');
         const deleteBtn = e.target.closest('.delete-btn');
-        
-        if(editBtn) {
+
+        if (editBtn) {
             const id = editBtn.dataset.id;
             // Find the full question data from the already fetched list to pre-fill the modal
             const questionData = Array.from(questionsContainer.children)
                 .map((_, index) => currentQuestions[index])
                 .find(q => q.id == id);
-            
-            if(questionData) {
+
+            if (questionData) {
                 document.getElementById('edit-question-id').value = questionData.id;
                 document.getElementById('edit-question-text').value = questionData.question;
                 document.getElementById('edit-option-a').value = questionData.options.A;
@@ -131,16 +142,17 @@ function initializeQuestionsListPage() {
                 document.getElementById('edit-option-d').value = questionData.options.D;
                 document.getElementById('edit-answer').value = questionData.answer;
                 document.getElementById('edit-explanation').value = questionData.explanation;
+                document.getElementById('edit-priority').value = questionData.priority || 0;
                 openModal(editModal);
             }
         }
 
-        if(deleteBtn) {
+        if (deleteBtn) {
             questionIdToDelete = deleteBtn.dataset.id;
             openModal(deleteModal);
         }
     }
-    
+
     let currentQuestions = [];
     async function initialLoad() {
         try {
@@ -150,7 +162,7 @@ function initializeQuestionsListPage() {
                 currentQuestions = result.data;
                 fetchAndDisplayQuestions();
             } else {
-                 questionsContainer.innerHTML = `<p class="text-center text-red-500 py-8">${result.message}</p>`;
+                questionsContainer.innerHTML = `<p class="text-center text-red-500 py-8">${result.message}</p>`;
             }
         } catch (error) {
             showToast('Failed to load initial question data.', 'error');

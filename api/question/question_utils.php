@@ -37,7 +37,7 @@ if (!function_exists('insert_questions')) {
         $topic_name = $get_name('topics', $topic_id, 'topic_name');
 
         // Prepare statement for inserting questions
-        $stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         foreach ($questions as $index => $q) {
             if (empty($q['question']) || empty($q['options']) || !is_array($q['options']) || empty($q['answer'])) {
@@ -47,8 +47,9 @@ if (!function_exists('insert_questions')) {
 
             $options_json = json_encode($q['options']);
             $explanation = isset($q['explanation']) ? $q['explanation'] : '';
+            $priority = isset($q['priority']) ? max(0, intval($q['priority'])) : 0;
 
-            $stmt->bind_param("iiiissss", $subject_id, $lesson_id, $topic_id, $exam_id, $q['question'], $options_json, $q['answer'], $explanation);
+            $stmt->bind_param("iiiissssi", $subject_id, $lesson_id, $topic_id, $exam_id, $q['question'], $options_json, $q['answer'], $explanation, $priority);
 
             if (!$stmt->execute()) {
                 $stmt->close();
