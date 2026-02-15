@@ -215,6 +215,8 @@ function initializeExamPage() {
                 closeModal(examModal);
                 fetchAndDisplayExams(false);
                 showToast(result.message, data.id ? 'update' : 'success');
+                // Cache Invalidation
+                CacheManager.clearGroup('dashboard');
             } else { showToast(result.message, 'error'); }
         } catch (error) { showToast('A network error occurred.', 'error'); }
     }
@@ -226,7 +228,12 @@ function initializeExamPage() {
             const result = await response.json();
             showToast(result.message, result.success ? 'error' : 'error');
         } catch (error) { showToast('Network error.', 'error'); }
-        finally { closeModal(deleteModal); fetchAndDisplayExams(false); }
+        finally {
+            closeModal(deleteModal);
+            fetchAndDisplayExams(false);
+            // Cache Invalidation
+            CacheManager.clearGroup('dashboard');
+        }
     }
 
     async function handleTableClick(e) {

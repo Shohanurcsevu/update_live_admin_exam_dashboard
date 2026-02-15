@@ -320,6 +320,13 @@ function initializeOfflineExamEngine() {
                 submitExamBtn.disabled = false;
                 submitExamBtn.innerHTML = `<span class="material-symbols-outlined mr-2">check_circle</span>Submit Exam`;
             }
+
+            // --- Cache Invalidation ---
+            if (typeof CacheManager !== 'undefined') {
+                CacheManager.clearGroup('analytics');
+                CacheManager.clearGroup('dashboard');
+                CacheManager.clearGroup('mentor');
+            }
         }
     }
 

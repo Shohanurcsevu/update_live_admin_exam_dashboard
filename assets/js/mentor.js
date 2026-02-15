@@ -128,12 +128,21 @@ class StudyMentor {
         if (action === 'complete') endpoint = 'api/pomodoro/complete.php';
 
         try {
-            await fetch(endpoint, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
                 keepalive: true
             });
+            const result = await response.json();
+
+            // --- Cache Invalidation on completion ---
+            if (action === 'complete' && result.success) {
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('analytics');
+                    CacheManager.clearGroup('dashboard');
+                }
+            }
         } catch (e) {
             console.error('Failed to save session state:', e);
         }
@@ -1110,7 +1119,14 @@ class StudyMentor {
             });
             const result = await response.json();
 
+            // --- Cache Invalidation ---
             if (result.success) {
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('analytics');
+                    CacheManager.clearGroup('dashboard');
+                }
+                // Refresh data to update progress bars and mission status
+                await this.fetchMentorData();
                 // Refresh data to update progress bars and mission status
                 await this.fetchMentorData();
             } else {

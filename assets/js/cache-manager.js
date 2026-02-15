@@ -7,15 +7,21 @@ window.CacheManager = (function () {
 
     const CACHE_PREFIX = 'rethink_cache_';
 
+    // Helper for UTF-8 safe base64 encoding (e.g. for Bengali characters in URLs)
+    const safeBtoa = (str) => btoa(unescape(encodeURIComponent(str)));
+    const safeAtob = (str) => decodeURIComponent(escape(atob(str)));
+
     /**
      * Fetch with cache support
      * @param {string} url The API URL to fetch
      * @param {number} ttlMinutes Time to live in minutes
      * @param {boolean} forceRefresh If true, bypasses cache and fetches fresh data
+     * @param {boolean} skipRevalidate Internal flag to prevent infinite loops during background refresh
      * @returns {Promise<any>} The response data
      */
-    async function fetchWithCache(url, ttlMinutes = 5, forceRefresh = false) {
-        const cacheKey = CACHE_PREFIX + btoa(url);
+    async function fetchWithCache(url, ttlMinutes = 5, forceRefresh = false, skipRevalidate = false) {
+        const cacheKey = CACHE_PREFIX + safeBtoa(url);
+        let cachedData = null;
 
         if (!forceRefresh) {
             const cached = localStorage.getItem(cacheKey);
@@ -24,28 +30,71 @@ window.CacheManager = (function () {
                     const { data, expiry } = JSON.parse(cached);
                     if (Date.now() < expiry) {
                         console.log(`%c[CacheManager] Hit for ${url}`, 'color: #10b981; font-weight: bold;');
+
+                        // --- SWR Pattern: Trigger background fetch to ensure freshness ---
+                        if (!skipRevalidate) {
+                            revalidateInBackground(url, ttlMinutes, data);
+                        }
+
                         return data;
                     }
                     console.log(`%c[CacheManager] Expired for ${url}`, 'color: #f59e0b; font-weight: bold;');
+                    cachedData = data; // Keep stale data just in case fetch fails
                 } catch (e) {
                     console.error('[CacheManager] Parse error', e);
                 }
             }
         }
 
-        console.log(`%c[CacheManager] Fetching ${url}`, 'color: #3b82f6; font-weight: bold;');
-        const response = await fetch(url);
-        const result = await response.json();
+        try {
+            console.log(`%c[CacheManager] Fetching ${url}`, 'color: #3b82f6; font-weight: bold;');
+            const response = await fetch(url);
+            const result = await response.json();
 
-        if (result.success) {
-            const cacheData = {
-                data: result.data || result, // Handle both {success, data} and raw data patterns
-                expiry: Date.now() + (ttlMinutes * 60 * 1000)
-            };
-            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-            return cacheData.data;
-        } else {
-            throw new Error(result.message || 'API request failed');
+            if (result.success || result.data || Array.isArray(result)) {
+                const data = result.data || result;
+                const cacheData = {
+                    data: data,
+                    expiry: Date.now() + (ttlMinutes * 60 * 1000)
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                return data;
+            } else {
+                throw new Error(result.message || 'API request failed');
+            }
+        } catch (error) {
+            if (cachedData) {
+                console.warn(`%c[CacheManager] Fetch failed for ${url}, returning stale data`, 'color: #ef4444;');
+                return cachedData;
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * SWR: Fetches in background and notifies UI if data changed
+     */
+    async function revalidateInBackground(url, ttlMinutes, currentData) {
+        try {
+            const response = await fetch(url);
+            const result = await response.json();
+            const newData = result.data || result;
+
+            if (JSON.stringify(newData) !== JSON.stringify(currentData)) {
+                console.log(`%c[CacheManager] SWR: Data updated for ${url}`, 'color: #8b5cf6; font-weight: bold;');
+                const cacheData = {
+                    data: newData,
+                    expiry: Date.now() + (ttlMinutes * 60 * 1000)
+                };
+                localStorage.setItem(CACHE_PREFIX + btoa(url), JSON.stringify(cacheData));
+
+                // Notify UI that data has changed
+                document.dispatchEvent(new CustomEvent('cache-revalidated', {
+                    detail: { url, data: newData }
+                }));
+            }
+        } catch (e) {
+            // Background revalidation failed - ignore silently to not disturb user
         }
     }
 
@@ -55,7 +104,7 @@ window.CacheManager = (function () {
      */
     function clearCache(url = null) {
         if (url) {
-            localStorage.removeItem(CACHE_PREFIX + btoa(url));
+            localStorage.removeItem(CACHE_PREFIX + safeBtoa(url));
         } else {
             Object.keys(localStorage).forEach(key => {
                 if (key.startsWith(CACHE_PREFIX)) {
@@ -76,7 +125,7 @@ window.CacheManager = (function () {
                 // Since we use btoa for keys, we need to check if the decodable URL contains the keyword
                 try {
                     const encodedUrl = key.replace(CACHE_PREFIX, '');
-                    const url = atob(encodedUrl);
+                    const url = safeAtob(encodedUrl);
                     if (url.includes(keyword)) {
                         localStorage.removeItem(key);
                     }

@@ -59,9 +59,9 @@ function initializeDashboardPage() {
         requestAnimationFrame(animation);
     }
 
-    async function fetchAndDisplayMetrics() {
+    async function fetchAndDisplayMetrics(skipRevalidate = false) {
         try {
-            const result = await CacheManager.fetchWithCache(METRICS_API_URL, 5);
+            const result = await CacheManager.fetchWithCache(METRICS_API_URL, 15, false, skipRevalidate);
             const metrics = result;
             animateCount(document.getElementById('total-subjects'), metrics.subjects);
             animateCount(document.getElementById('total-lessons'), metrics.lessons);
@@ -85,12 +85,12 @@ function initializeDashboardPage() {
     }
 
     let masteryChart = null;
-    async function fetchAndRenderMasteryTrends() {
+    async function fetchAndRenderMasteryTrends(skipRevalidate = false) {
         const insightsContainer = document.getElementById('mastery-insights-container');
         if (!insightsContainer) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/performance/mastery-trends.php', 30);
+            const result = await CacheManager.fetchWithCache('api/performance/mastery-trends.php', 30, false, skipRevalidate);
             if (!result) return;
 
             const { subjects, insights } = result;
@@ -200,12 +200,12 @@ function initializeDashboardPage() {
         }
     }
 
-    async function fetchAndRenderDisciplineTracker() {
+    async function fetchAndRenderDisciplineTracker(skipRevalidate = false) {
         const trackerList = document.getElementById('discipline-tracker-list');
         if (!trackerList) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/mistakes/discipline-stats.php', 15);
+            const result = await CacheManager.fetchWithCache('api/mistakes/discipline-stats.php', 15, false, skipRevalidate);
 
             if (result) {
                 trackerList.innerHTML = result.map(subject => {
@@ -245,12 +245,12 @@ function initializeDashboardPage() {
         }
     }
 
-    async function fetchAndRenderHeatmap() {
+    async function fetchAndRenderHeatmap(skipRevalidate = false) {
         const heatmapGrid = document.getElementById('subject-heatmap-grid');
         if (!heatmapGrid) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/mistakes/subject-stats.php', 10);
+            const result = await CacheManager.fetchWithCache('api/mistakes/subject-stats.php', 10, false, skipRevalidate);
 
             if (result) {
                 heatmapGrid.innerHTML = result.map(subject => {
@@ -299,7 +299,7 @@ function initializeDashboardPage() {
     }
 
 
-    async function fetchAndRenderBadges() {
+    async function fetchAndRenderBadges(skipRevalidate = false) {
         const badgeGrid = document.getElementById('badge-grid');
         const badgeCountPill = document.getElementById('badge-count-pill');
         const summaryBadgeText = document.getElementById('earned-badge-text');
@@ -308,7 +308,7 @@ function initializeDashboardPage() {
         if (!badgeGrid) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/performance/badges.php', 30);
+            const result = await CacheManager.fetchWithCache('api/performance/badges.php', 30, false, skipRevalidate);
 
             if (result && result.badges) {
                 badgeGrid.innerHTML = result.badges.map(badge => {
@@ -347,9 +347,9 @@ function initializeDashboardPage() {
         }
     }
 
-    async function fetchMistakeStats() {
+    async function fetchMistakeStats(skipRevalidate = false) {
         try {
-            const result = await CacheManager.fetchWithCache('api/mistakes/stats.php', 5);
+            const result = await CacheManager.fetchWithCache('api/mistakes/stats.php', 10, false, skipRevalidate);
             const count = result.count;
             const countEl = document.getElementById('mistake-count');
             if (countEl) animateCount(countEl, count);
@@ -368,9 +368,9 @@ function initializeDashboardPage() {
         } catch (error) { console.error("Error fetching mistake stats:", error); }
     }
 
-    async function fetchStudyTimeStats() {
+    async function fetchStudyTimeStats(skipRevalidate = false) {
         try {
-            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 2);
+            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 10, false, skipRevalidate);
 
             if (result) {
                 const totalEl = document.getElementById('study-today-total');
@@ -434,7 +434,7 @@ function initializeDashboardPage() {
         selector.innerHTML = `<option value="0">${placeholder}</option>`;
         if (isDependent) selector.disabled = true;
         try {
-            const result = await CacheManager.fetchWithCache(url, 60);
+            const result = await CacheManager.fetchWithCache(url, 60, false, false);
             if (result && result.length > 0) {
                 result.forEach(item => {
                     selector.innerHTML += `<option value="${item.id}">${item.subject_name || item.lesson_name || item.topic_name}</option>`;
@@ -458,7 +458,7 @@ function initializeDashboardPage() {
     let currentOffset = 0;
     const PAGE_SIZE = 6;
 
-    async function fetchAndDisplayExams(isLoadMore = false) {
+    async function fetchAndDisplayExams(isLoadMore = false, skipRevalidate = false) {
         // Ensure isLoadMore is strictly boolean
         const loadingMore = isLoadMore === true;
         const container = document.getElementById('load-more-container');
@@ -510,11 +510,11 @@ function initializeDashboardPage() {
                 btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Loading...';
             }
 
-            const response = await fetch(url);
-            const result = await response.json();
+            // --- Cache integration for Exam List ---
+            const result = await CacheManager.fetchWithCache(url, 15, false, skipRevalidate);
 
-            if (result.success) {
-                displayExams(result.data, loadingMore);
+            if (result) {
+                displayExams(result, loadingMore);
 
                 // Update Cache (only for the initial/main list to keep it fast)
                 if (typeof idbManager !== 'undefined' && currentOffset === 0) {
@@ -639,10 +639,12 @@ function initializeDashboardPage() {
             jsonEl.disabled = true;
             icon.textContent = "hourglass_empty";
 
-            fetch(`https://bcspreli.free.nf/api/take-exam/start.php?exam_id=${examId}`)
-                .then(res => res.text())
+            // Use CacheManager to prevent rapid double-hits
+            CacheManager.fetchWithCache(`https://bcspreli.free.nf/api/take-exam/start.php?exam_id=${examId}`, 1)
                 .then(data => {
-                    return navigator.clipboard.writeText(data);
+                    // CacheManager returns parsed data
+                    const text = typeof data === 'string' ? data : JSON.stringify(data);
+                    return navigator.clipboard.writeText(text);
                 })
                 .then(() => {
                     icon.textContent = "check";
@@ -699,6 +701,7 @@ function initializeDashboardPage() {
         } catch (error) { showToast('A network error occurred.', 'error'); }
         finally {
             closeDeleteModal();
+            CacheManager.clearGroup('dashboard'); // Cache invalidation
         }
     };
 
@@ -716,12 +719,12 @@ function initializeDashboardPage() {
         generatePdfBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Fetching Data...';
 
         try {
-            const response = await fetch(`https://bcspreli.free.nf/api/take-exam/start.php?exam_id=${examId}`);
-            const result = await response.json();
+            // Use CacheManager for short-term caching of the print data
+            const result = await CacheManager.fetchWithCache(`https://bcspreli.free.nf/api/take-exam/start.php?exam_id=${examId}`, 1);
 
-            if (!result.success || !result.data) throw new Error('Failed to fetch exam data');
+            if (!result) throw new Error('Failed to fetch exam data');
 
-            PrintEngine.generatePDF(result.data);
+            PrintEngine.generatePDF(result);
             showToast('PDF generation triggered successfully!');
             PrintEngine.closeModal();
 
@@ -912,8 +915,34 @@ function initializeDashboardPage() {
         document.addEventListener('pageBeforeChange', cleanup);
     }
 
+    // --- SWR Support: Listen for revalidation events ---
+    function setupSWRListeners() {
+        document.addEventListener('cache-revalidated', (e) => {
+            const { url } = e.detail;
+            console.log(`%c[Dashboard] Refreshing UI for revalidated URL: ${url}`, 'color: #8b5cf6;');
+
+            if (url.includes(METRICS_API_URL)) fetchAndDisplayMetrics(true);
+            if (url.includes('api/mistakes/stats.php')) fetchMistakeStats(true);
+            if (url.includes('api/analytics/daily-study-time.php')) fetchStudyTimeStats(true);
+            if (url.includes('api/dashboard-exams.php')) fetchAndDisplayExams(false, true);
+            if (url.includes('mastery-trends.php')) fetchAndRenderMasteryTrends(true);
+            if (url.includes('discipline-stats.php')) fetchAndRenderDisciplineTracker(true);
+            if (url.includes('subject-stats.php')) fetchAndRenderHeatmap(true);
+            if (url.includes('badges.php')) fetchAndRenderBadges(true);
+        });
+
+        // Visibility-based Revalidation
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                console.log('%c[Dashboard] Tab focused - revalidating key metrics', 'color: #0d9488;');
+                fetchAndDisplayMetrics(); // This will trigger SWR checks for all metrics
+            }
+        });
+    }
+
     function initializePage() {
         startCountdownTimers();
+        setupSWRListeners();
         fetchAndDisplayMetrics();
         populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
         fetchAndDisplayExams();
