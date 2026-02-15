@@ -64,32 +64,35 @@ function initializeCustomExamFromSubjectsPage() {
         if (!tableBody) return;
         tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-8">Loading hierarchy...</td></tr>`;
 
-        // --- Using the TEST DATA ---
-        const testData = {
-            "success": true,
-            "data": [
-                { "subject_id": "10", "subject_name": "কম্পিউটার ও তথ্য প্রযুক্তি - ১৫", "lessons": [{ "lesson_id": 7, "lesson_name": "Test ANopther", "py_bcs_ques": 1, "total_questions": "3" }, { "lesson_id": 4, "lesson_name": "আইটি ", "py_bcs_ques": 6, "total_questions": "15" }] },
-                { "subject_id": "8", "subject_name": "বাংলা ব্যাকরণ - ১৫", "lessons": [{ "lesson_id": 5, "lesson_name": "বাগধারা ", "py_bcs_ques": 45, "total_questions": "4" }] },
-                { "subject_id": "7", "subject_name": "বাংলা সাহিত্য - ২০", "lessons": [{ "lesson_id": 3, "lesson_name": " চর্যাপদ ", "py_bcs_ques": 45, "total_questions": "4" }] },
-                { "subject_id": "9", "subject_name": "সাধারণ বিজ্ঞান - ১৫", "lessons": [{ "lesson_id": 6, "lesson_name": "তাপবিদ্যা ", "py_bcs_ques": 6, "total_questions": "4" }] }
-            ]
-        };
-
-        // Call the render function with the test data
-        renderTable(testData);
-
-        // NOTE: To switch back to live data, comment out the two lines above (`renderTable(testData);`)
-        // and uncomment the `try...catch` block below.
-        /*
         try {
-            const response = await fetch(HIERARCHY_API_URL);
-            const result = await response.json();
-            renderTable(result);
+            let result;
+            if (typeof CacheManager !== 'undefined') {
+                result = await CacheManager.fetchWithCache(HIERARCHY_API_URL, 60);
+            } else {
+                const response = await fetch(HIERARCHY_API_URL);
+                const data = await response.json();
+                result = data.success ? data.data : null;
+            }
+
+            if (result) {
+                renderTable({ success: true, data: result });
+            } else {
+                throw new Error("Failed to load hierarchy data.");
+            }
         } catch (error) {
-            showToast('Failed to load subject hierarchy.', 'error');
-            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-red-500">Error loading data.</td></tr>`;
+            console.warn('Live fetch failed, using test data fallback.', error);
+            // --- Fallback TEST DATA ---
+            const testData = {
+                "success": true,
+                "data": [
+                    { "subject_id": "10", "subject_name": "কম্পিউটার ও তথ্য প্রযুক্তি - ১৫", "lessons": [{ "lesson_id": 7, "lesson_name": "Test ANopther", "py_bcs_ques": 1, "total_questions": "3" }, { "lesson_id": 4, "lesson_name": "আইটি ", "py_bcs_ques": 6, "total_questions": "15" }] },
+                    { "subject_id": "8", "subject_name": "বাংলা ব্যাকরণ - ১৫", "lessons": [{ "lesson_id": 5, "lesson_name": "বাগধারা ", "py_bcs_ques": 45, "total_questions": "4" }] },
+                    { "subject_id": "7", "subject_name": "বাংলা সাহিত্য - ২০", "lessons": [{ "lesson_id": 3, "lesson_name": " চর্যাপদ ", "py_bcs_ques": 45, "total_questions": "4" }] },
+                    { "subject_id": "9", "subject_name": "সাধারণ বিজ্ঞান - ১৫", "lessons": [{ "lesson_id": 6, "lesson_name": "তাপবিদ্যা ", "py_bcs_ques": 6, "total_questions": "4" }] }
+                ]
+            };
+            renderTable(testData);
         }
-        */
     }
 
     function getSelectedPriorities() {
@@ -152,6 +155,14 @@ function initializeCustomExamFromSubjectsPage() {
             const result = await response.json();
             if (result.success) {
                 showToast(result.message, 'success');
+
+                // --- Cache Invalidation ---
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                    CacheManager.clearGroup('exam');
+                    CacheManager.clearGroup('custom-exam');
+                }
+
                 customExamForm.reset();
                 document.querySelectorAll('.question-count-input').forEach(input => input.value = '');
             } else {

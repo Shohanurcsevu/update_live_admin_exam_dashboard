@@ -40,11 +40,18 @@ function initializePage() {
 
     const populateSubjects = async () => {
         try {
-            const response = await fetch(SUBJECT_API_URL);
-            const result = await response.json();
-            if (result.success) {
+            let result;
+            if (typeof CacheManager !== 'undefined') {
+                result = await CacheManager.fetchWithCache(SUBJECT_API_URL, 60);
+            } else {
+                const response = await fetch(SUBJECT_API_URL);
+                const data = await response.json();
+                result = data.success ? data.data : null;
+            }
+
+            if (result) {
                 subjectFilter.innerHTML = '<option value="0">Select Subject</option>';
-                result.data.forEach(subject => {
+                result.forEach(subject => {
                     subjectFilter.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
                 });
             } else {
@@ -65,11 +72,19 @@ function initializePage() {
         sourceLessonsTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4">Loading lessons...</td></tr>`;
 
         try {
-            const response = await fetch(`${LESSON_API_URL}?subject_id=${subjectId}`);
-            const result = await response.json();
+            let result;
+            const url = `${LESSON_API_URL}?subject_id=${subjectId}`;
+            if (typeof CacheManager !== 'undefined') {
+                result = await CacheManager.fetchWithCache(url, 30);
+            } else {
+                const response = await fetch(url);
+                const data = await response.json();
+                result = data.success ? data.data : null;
+            }
+
             sourceLessonsTableBody.innerHTML = '';
-            if (result.success && result.data.length > 0) {
-                result.data.forEach(lesson => {
+            if (result && result.length > 0) {
+                result.forEach(lesson => {
                     const row = `
                         <tr class="border-b" data-lesson-id="${lesson.id}">
                             <td class="py-3 px-6 text-left font-medium">${lesson.lesson_name}</td>
@@ -150,6 +165,14 @@ function initializePage() {
             const result = await response.json();
             if (result.success) {
                 showToast(result.message, 'success');
+
+                // --- Cache Invalidation ---
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                    CacheManager.clearGroup('exam');
+                    CacheManager.clearGroup('custom-exam');
+                }
+
                 e.target.reset();
                 document.querySelectorAll('.question-count-input').forEach(input => input.value = '');
             } else {

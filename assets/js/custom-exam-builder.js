@@ -26,6 +26,17 @@ function initializeCustomExamBuilderPage() {
         selector.innerHTML = `<option value="0">${placeholder}</option>`;
         if (isDependent) selector.disabled = true;
         try {
+            if (typeof CacheManager !== 'undefined') {
+                const result = await CacheManager.fetchWithCache(url, 60);
+                if (result && result.length > 0) {
+                    result.forEach(item => {
+                        selector.innerHTML += `<option value="${item.id}">${item.subject_name || item.lesson_name || item.topic_name}</option>`;
+                    });
+                    if (isDependent) selector.disabled = false;
+                }
+                return;
+            }
+
             const response = await fetch(url);
             const result = await response.json();
             if (result.success && result.data.length > 0) {
@@ -51,11 +62,18 @@ function initializeCustomExamBuilderPage() {
         sourceExamsTableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4">Loading source exams...</td></tr>`;
 
         try {
-            const response = await fetch(`${EXAM_LIST_API_URL}?action=list&topic_id=${topicId}`);
-            const result = await response.json();
+            let result;
+            if (typeof CacheManager !== 'undefined') {
+                result = await CacheManager.fetchWithCache(`${EXAM_LIST_API_URL}?action=list&topic_id=${topicId}`, 15);
+            } else {
+                const response = await fetch(`${EXAM_LIST_API_URL}?action=list&topic_id=${topicId}`);
+                const data = await response.json();
+                result = data.success ? data.data : null;
+            }
+
             sourceExamsTableBody.innerHTML = '';
-            if (result.success && result.data.length > 0) {
-                result.data.forEach(exam => {
+            if (result && result.length > 0) {
+                result.forEach(exam => {
                     const row = `
                         <tr class="border-b border-gray-200" data-exam-id="${exam.id}">
                             <td class="py-3 px-6 text-left font-medium">${exam.exam_title}</td>
@@ -141,6 +159,14 @@ function initializeCustomExamBuilderPage() {
             const result = await response.json();
             if (result.success) {
                 showToast(result.message, 'success');
+
+                // --- Cache Invalidation ---
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                    CacheManager.clearGroup('exam');
+                    CacheManager.clearGroup('custom-exam');
+                }
+
                 custom_exam_form_el.reset();
                 fetchAndDisplaySourceExams(document.getElementById('topic-filter'), document.getElementById('source-exams-section'), document.getElementById('custom-exam-form-section'));
             } else {

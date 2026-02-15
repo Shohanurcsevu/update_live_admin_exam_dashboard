@@ -10,11 +10,20 @@ function initializeCustomExamsPage() {
         tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Loading custom exams...</td></tr>`;
 
         try {
-            const response = await fetch(API_URL);
-            const result = await response.json();
+            let result;
+            if (typeof CacheManager !== 'undefined') {
+                result = await CacheManager.fetchWithCache(API_URL, 5);
+            } else {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                result = data.success ? data.data : null;
+            }
+
             tableBody.innerHTML = '';
-            if (result.success && result.data.length > 0) {
-                result.data.forEach(exam => {
+            const exams = Array.isArray(result) ? result : (result && result.data ? result.data : []);
+
+            if (exams.length > 0) {
+                exams.forEach(exam => {
                     const basedOn = `${exam.subject_name || 'N/A'} > ${exam.lesson_name || 'N/A'}`;
                     const row = `
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
@@ -36,7 +45,7 @@ function initializeCustomExamsPage() {
             tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Failed to load custom exams.</td></tr>`;
         }
     }
-    
+
     if (tableBody) {
         tableBody.addEventListener('click', (e) => {
             if (e.target.classList.contains('take-exam-btn')) {

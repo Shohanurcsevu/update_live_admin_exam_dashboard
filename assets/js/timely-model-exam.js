@@ -467,6 +467,13 @@
 
             if (result.success) {
                 showToast('Exam created successfully!');
+
+                // --- Cache Invalidation ---
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                    CacheManager.clearGroup('custom-exam');
+                }
+
                 setTimeout(() => {
                     if (window.loadPage) window.loadPage('custom-exams');
                 }, 1500);

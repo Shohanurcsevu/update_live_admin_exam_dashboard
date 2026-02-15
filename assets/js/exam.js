@@ -110,7 +110,7 @@ function initializeExamPage() {
     let currentOffset = 0;
     const itemsPerPage = 10;
 
-    async function fetchAndDisplayExams(append = false) {
+    async function fetchAndDisplayExams(append = false, forceRefresh = false) {
         if (!append) {
             currentOffset = 0;
             tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading...</td></tr>';
@@ -125,7 +125,7 @@ function initializeExamPage() {
         if (query) url += `&${query}`;
 
         try {
-            const result = await CacheManager.fetchWithCache(url, 2);
+            const result = await CacheManager.fetchWithCache(url, 2, forceRefresh);
 
             if (!append) tableBody.innerHTML = '';
 
@@ -213,10 +213,14 @@ function initializeExamPage() {
             const result = await response.json();
             if (result.success) {
                 closeModal(examModal);
-                fetchAndDisplayExams(false);
-                showToast(result.message, data.id ? 'update' : 'success');
                 // Cache Invalidation
-                CacheManager.clearGroup('dashboard');
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                    CacheManager.clearGroup('exam');
+                    CacheManager.clearGroup('custom-exam');
+                }
+                fetchAndDisplayExams(false, true); // Force refresh
+                showToast(result.message, data.id ? 'update' : 'success');
             } else { showToast(result.message, 'error'); }
         } catch (error) { showToast('A network error occurred.', 'error'); }
     }
@@ -230,9 +234,13 @@ function initializeExamPage() {
         } catch (error) { showToast('Network error.', 'error'); }
         finally {
             closeModal(deleteModal);
-            fetchAndDisplayExams(false);
             // Cache Invalidation
-            CacheManager.clearGroup('dashboard');
+            if (typeof CacheManager !== 'undefined') {
+                CacheManager.clearGroup('dashboard');
+                CacheManager.clearGroup('exam');
+                CacheManager.clearGroup('custom-exam');
+            }
+            fetchAndDisplayExams(false, true); // Force refresh
         }
     }
 

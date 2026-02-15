@@ -26,7 +26,7 @@ if ($subjects_result) {
                 l.py_bcs_ques, 
                 COUNT(q.id) as total_questions
             FROM lessons l
-            LEFT JOIN questions q ON l.id = q.lesson_id
+            LEFT JOIN questions q ON l.id = q.lesson_id AND q.is_deleted = 0
             WHERE l.subject_id = ?
             GROUP BY l.id
             ORDER BY l.lesson_name ASC

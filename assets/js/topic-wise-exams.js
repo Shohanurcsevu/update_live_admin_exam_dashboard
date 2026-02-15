@@ -8,7 +8,7 @@
         subjects: [],
         selectedTopics: new Map(), // Map<topicId, {subjectId, lessonId, topicName, questionCount, maxQuestions}>
         examDetails: {},
-        cache: new Map()
+        // Using global CacheManager instead of local state.cache
     };
 
     // DOM Elements
@@ -71,15 +71,15 @@
         }, 3000);
     }
 
-    // Fetch data with caching
+    // Fetch data with caching (Topic structure is cached for 60m)
     async function fetchData(url) {
-        if (state.cache.has(url)) return state.cache.get(url);
+        if (typeof CacheManager !== 'undefined') {
+            return await CacheManager.fetchWithCache(url, 60);
+        }
 
         const response = await fetch(url);
         const result = await response.json();
         if (!result.success) throw new Error(result.message || 'Failed to fetch data');
-
-        state.cache.set(url, result.data);
         return result.data;
     }
 
@@ -449,6 +449,15 @@
 
             if (result.success) {
                 showToast('Exam created successfully!', 'success');
+
+                // --- Cache Invalidation ---
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                    CacheManager.clearGroup('exam');
+                    CacheManager.clearGroup('custom-exam');
+                    CacheManager.clearGroup('analytics');
+                }
+
                 setTimeout(() => {
                     window.loadPage('custom-exams');
                 }, 1500);
