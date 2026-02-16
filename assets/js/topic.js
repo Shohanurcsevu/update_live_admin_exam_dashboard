@@ -14,7 +14,7 @@ function initializeTopicPage() {
     const modalSubjectSelector = document.getElementById('modal-subject-selector');
     const modalLessonSelector = document.getElementById('modal-lesson-selector');
     const toastContainer = document.getElementById('toast-container');
-    
+
     let topicIdToDelete = null;
 
     function showToast(message, type = 'success') {
@@ -127,12 +127,17 @@ function initializeTopicPage() {
         const formData = new FormData(topicForm);
         const data = Object.fromEntries(formData.entries());
         const url = data.id ? `${TOPIC_API_URL}?action=update` : `${TOPIC_API_URL}?action=create`;
-        
+
         try {
             const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             const result = await response.json();
             if (result.success) {
                 closeModal(topicModal);
+                // Cache Invalidation
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('topic');
+                    CacheManager.clearGroup('exam');
+                }
                 fetchAndDisplayTopics();
                 showToast(result.message, data.id ? 'update' : 'success');
             } else { showToast(result.message, 'error'); }
@@ -146,13 +151,21 @@ function initializeTopicPage() {
             const result = await response.json();
             showToast(result.message, result.success ? 'error' : 'error');
         } catch (error) { showToast('Network error.', 'error'); }
-        finally { closeModal(deleteModal); fetchAndDisplayTopics(); }
+        finally {
+            closeModal(deleteModal);
+            // Cache Invalidation
+            if (typeof CacheManager !== 'undefined') {
+                CacheManager.clearGroup('topic');
+                CacheManager.clearGroup('exam');
+            }
+            fetchAndDisplayTopics();
+        }
     }
 
     async function handleTableClick(e) {
         const editBtn = e.target.closest('.edit-btn');
         const deleteBtn = e.target.closest('.delete-btn');
-        
+
         if (editBtn) {
             const id = editBtn.dataset.id;
             try {
@@ -172,7 +185,7 @@ function initializeTopicPage() {
                 }
             } catch (error) { showToast('Failed to fetch topic details.', 'error'); }
         }
-        
+
         if (deleteBtn) {
             topicIdToDelete = deleteBtn.dataset.id;
             openModal(deleteModal);
