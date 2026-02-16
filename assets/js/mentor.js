@@ -7,6 +7,7 @@ class StudyMentor {
         this.mentorData = null;
         this.isInitialGreeting = false;
         this.isMotivationalNudgeActive = false;
+        this.isContinuationPromptActive = false;
         this.lastMessageIndex = -1;
         this.focusSession = {
             isActive: false,
@@ -23,6 +24,12 @@ class StudyMentor {
             subjectId: null,
             intervalId: null,
             currentActivity: null
+        };
+        this.sessionChain = {
+            isActive: false,
+            subjectId: null,
+            subjectName: null,
+            completedSessions: 0
         };
         this.countdownRefreshInterval = null; // For Boss Challenge countdown updates
         this.reportRefreshInterval = null; // For real-time study report updates
@@ -208,8 +215,19 @@ class StudyMentor {
         this.focusSession.isActive = true;
         this.focusSession.subject = subjectName;
         this.focusSession.subjectId = subjectId;
+        this.isContinuationPromptActive = false; // Starting new session clears prompt state
         this.focusSession.timeRemaining = 25 * 60;
         this.focusSession.totalDuration = 25 * 60;
+
+        // Initialize or continue session chain
+        if (!this.sessionChain.isActive || this.sessionChain.subjectId !== subjectId) {
+            this.sessionChain = {
+                isActive: true,
+                subjectId: subjectId,
+                subjectName: subjectName,
+                completedSessions: 0
+            };
+        }
 
         // Reset inactivity logically (will be verified by server on next sync)
         this.serverInactivityData.lastPomodoroEnd = Math.floor(Date.now() / 1000) + this.serverInactivityData.serverOffset;
@@ -304,7 +322,7 @@ class StudyMentor {
             teaserText.innerHTML = `
                 <div class="flex flex-col items-center">
                     <span class="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">
-                        ${isPaused ? '⏸️ PAUSED' : `Focusing: ${this.focusSession.subject}`}
+                        ${isPaused ? '⏸️ PAUSED' : `Focusing: ${this.focusSession.subject} (Session ${this.sessionChain.completedSessions + 1})`}
                     </span>
                     <span class="text-3xl font-black ${isPaused ? 'opacity-50' : ''}">${timeStr}</span>
                     <div class="flex gap-2 mt-2">
@@ -338,7 +356,7 @@ class StudyMentor {
     }
 
     showCustomNudge({ title, message, icon = '🎯', theme = 'boss' }) {
-        if (this.isFocusModeActive() || this.isBreakModeActive()) return;
+        if (this.isFocusModeActive() || this.isBreakModeActive() || this.isContinuationPromptActive) return;
         if (!this.isOnDashboard()) return; // Only show nudges on dashboard
 
         const teaser = document.getElementById('mentor-teaser');
@@ -384,7 +402,7 @@ class StudyMentor {
 
             // Auto-hide after 10 seconds
             setTimeout(() => {
-                if (this.isFocusModeActive() || this.isBreakModeActive()) return;
+                if (this.isFocusModeActive() || this.isBreakModeActive() || this.isContinuationPromptActive) return;
                 teaser.classList.add('hidden');
                 teaser.classList.remove('animate-float');
                 teaserBorder.classList.remove('boss-heartbeat');
@@ -404,41 +422,159 @@ class StudyMentor {
         });
 
         this.updateStatusIndicator();
-
-        // Backend log is handled by complete.php now, so we can remove the manual fetch here
-        // But we DO need to fetch fresh data to update the UI
         setTimeout(() => this.fetchMentorData(), 1000);
-
-        // Celebrate!
-        if (typeof confetti !== 'undefined') {
-            confetti({
-                particleCount: 150,
-                spread: 70,
-                origin: { y: 0.6 }
-            });
-        }
 
         // Notification
         this.sendNotification("AI Mentor: Session Complete", `Victory! 25 minutes of ${completedSubject} completed.`);
 
-        // Only show victory UI on dashboard
-        if (this.isOnDashboard()) {
-            const teaserText = document.getElementById('teaser-text');
-            if (teaserText) {
-                teaserText.innerHTML = `
-                    <div class="text-center">
-                        <p class="text-xs font-black uppercase text-yellow-400 mb-1">VICTORY!</p>
-                        <p class="text-sm font-bold">Sohan, you dominated ${this.focusSession.subject}! 25 minutes of pure focus.</p>
-                        <p class="text-[10px] mt-2 opacity-80">TIME FOR REST!</p>
-                    </div>
-                `;
-            }
-        }
+        // Increment session counter
+        this.sessionChain.completedSessions++;
 
-        // Wait 5 seconds for victory celebration, then start break
-        setTimeout(() => {
-            this.startBreakSession(this.focusSession.subjectId, this.focusSession.subject);
-        }, 5000);
+        // Only show UI on dashboard
+        if (this.isOnDashboard()) {
+            // Celebrate!
+            if (typeof confetti !== 'undefined') {
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            // Show continuation prompt
+            this.showContinuationPrompt();
+        } else {
+            // On other pages, auto-continue to break
+            setTimeout(() => {
+                this.startBreakSession(this.focusSession.subjectId, this.focusSession.subject);
+            }, 2000);
+        }
+    }
+
+    showContinuationPrompt() {
+        this.isContinuationPromptActive = true;
+        const subject = this.focusSession.subject;
+        const sessionCount = this.sessionChain.completedSessions;
+
+        const teaserText = document.getElementById('teaser-text');
+        if (teaserText) {
+            teaserText.innerHTML = `
+                <div class="text-center p-1">
+                    <p class="text-[10px] font-black uppercase text-yellow-400 mb-1">SESSION ${sessionCount} COMPLETE!</p>
+                    <p class="text-sm font-bold mb-3 leading-tight">Continue studying ${subject}?</p>
+                    <div class="flex gap-2 justify-center">
+                        <button onclick="studyMentor.showBreakChoicePrompt()" 
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 shadow-lg shadow-emerald-900/20">
+                            Yes, Continue
+                        </button>
+                        <button onclick="studyMentor.endSessionChain()" 
+                            class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 border border-white/20">
+                            Stop
+                        </button>
+                    </div>
+                </div>
+            `;
+            const teaser = document.getElementById('mentor-teaser');
+            const badge = document.getElementById('mentor-badge');
+            if (teaser) teaser.classList.remove('hidden');
+            if (badge) badge.classList.remove('hidden');
+        }
+    }
+
+    showBreakChoicePrompt() {
+        this.isContinuationPromptActive = true;
+        const subject = this.sessionChain.subjectName || this.focusSession.subject;
+        const teaserText = document.getElementById('teaser-text');
+        if (teaserText) {
+            teaserText.innerHTML = `
+                <div class="text-center p-1">
+                    <p class="text-[10px] font-black uppercase text-cyan-400 mb-1">CHOOSE FLOW</p>
+                    <p class="text-sm font-bold mb-3 leading-tight">Start next session for ${subject}?</p>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex gap-2 justify-center">
+                            <button onclick="studyMentor.startFocusSession('${this.sessionChain.subjectId}', '${subject}')" 
+                                class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex-1 transition-all active:scale-95 shadow-lg shadow-emerald-900/20">
+                                Start Now
+                            </button>
+                            <button onclick="studyMentor.continueSession()" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex-1 transition-all active:scale-95 shadow-lg shadow-blue-900/20">
+                                After Break
+                            </button>
+                        </div>
+                        <button onclick="studyMentor.endSessionChain()" 
+                            class="text-gray-400 hover:text-white text-[10px] font-bold py-1 transition-colors">
+                            Stop Studying
+                        </button>
+                    </div>
+                </div>
+            `;
+            const teaser = document.getElementById('mentor-teaser');
+            const badge = document.getElementById('mentor-badge');
+            if (teaser) teaser.classList.remove('hidden');
+            if (badge) badge.classList.remove('hidden');
+        }
+    }
+
+    continueSession() {
+        this.isContinuationPromptActive = false;
+        this.sessionChain.isActive = true;
+        // Start break, which will lead to next focus session choice after break ends
+        this.startBreakSession(this.focusSession.subjectId, this.focusSession.subject);
+    }
+
+    endSessionChain() {
+        this.isContinuationPromptActive = false;
+        const subject = this.sessionChain.subjectName || this.focusSession.subject;
+        const count = this.sessionChain.completedSessions;
+
+        // Show summary
+        this.showCustomNudge({
+            title: "STUDY SESSION COMPLETE",
+            message: `Great work! You completed ${count} session(s) of ${subject}.`,
+            icon: "🎯",
+            theme: "champion"
+        });
+
+        // Reset chain
+        this.sessionChain = {
+            isActive: false,
+            subjectId: null,
+            subjectName: null,
+            completedSessions: 0
+        };
+
+        // Refresh mentor data to show updated stats
+        setTimeout(() => this.fetchMentorData(), 1000);
+    }
+
+    showResumePrompt() {
+        this.isContinuationPromptActive = true;
+        const subject = this.sessionChain.subjectName;
+        const nextSession = this.sessionChain.completedSessions + 1;
+
+        const teaserText = document.getElementById('teaser-text');
+        if (teaserText) {
+            teaserText.innerHTML = `
+                <div class="text-center p-1">
+                    <p class="text-[10px] font-black uppercase text-green-400 mb-1">BREAK COMPLETE!</p>
+                    <p class="text-sm font-bold mb-3 leading-tight">Ready for session ${nextSession} of ${subject}?</p>
+                    <div class="flex gap-2 justify-center">
+                        <button onclick="studyMentor.startFocusSession('${this.sessionChain.subjectId}', '${subject}')" 
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 shadow-lg shadow-emerald-900/20">
+                            Start Session
+                        </button>
+                        <button onclick="studyMentor.endSessionChain()" 
+                            class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95 border border-white/20">
+                            Stop
+                        </button>
+                    </div>
+                </div>
+            `;
+            const teaser = document.getElementById('mentor-teaser');
+            const badge = document.getElementById('mentor-badge');
+            if (teaser) teaser.classList.remove('hidden');
+            if (badge) badge.classList.remove('hidden');
+        }
     }
 
     stopFocusSession() {
@@ -518,9 +654,22 @@ class StudyMentor {
 
             if (this.breakSession.timeRemaining <= 0) {
                 this.sendNotification("AI Mentor: Break Over", "Time to get back to work! Let's go.");
-                this.stopFocusSession(); // This clears session too
-                // Show a final "Back to work" nudge
-                this.showWelcomeGreeting();
+
+                if (this.sessionChain.isActive) {
+                    this.stopFocusSession(); // Clear break session state
+                    if (this.isOnDashboard()) {
+                        this.showResumePrompt();
+                    } else {
+                        // Auto-resume on other pages
+                        setTimeout(() => {
+                            this.startFocusSession(this.sessionChain.subjectId, this.sessionChain.subjectName);
+                        }, 2000);
+                    }
+                } else {
+                    this.stopFocusSession(); // This clears session too
+                    // Show a final "Back to work" nudge
+                    this.showWelcomeGreeting();
+                }
             }
         }, 1000);
 
@@ -544,6 +693,20 @@ class StudyMentor {
         this.saveSession('resume', { type: 'break' });
         this.startBreakTimer(true);
         this.updateStatusIndicator();
+    }
+
+    skipBreak() {
+        if (this.sessionChain.isActive) {
+            this.stopFocusSession(); // Clear break session state
+            if (this.isOnDashboard()) {
+                this.showResumePrompt();
+            } else {
+                this.startFocusSession(this.sessionChain.subjectId, this.sessionChain.subjectName);
+            }
+        } else {
+            this.stopFocusSession();
+            this.showWelcomeGreeting();
+        }
     }
 
     updateBreakUI() {
@@ -573,7 +736,7 @@ class StudyMentor {
             teaserText.innerHTML = `
                 <div class="flex flex-col items-center">
                     <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-1">
-                        ${isPaused ? '⏸️ PAUSED' : 'Health Coach: Break Time'}
+                        ${isPaused ? '⏸️ PAUSED' : `Break Time (Session ${this.sessionChain.completedSessions} Complete)`}
                     </span>
                     <span class="text-xs font-bold leading-tight mb-2 ${isPaused ? 'opacity-50' : ''}">
                         ${this.breakSession.currentActivity.text}
@@ -584,7 +747,7 @@ class StudyMentor {
                     ? `<button onclick="studyMentor.resumeBreakSession()" class="text-[8px] font-bold text-white bg-emerald-600 px-2 py-1 rounded uppercase tracking-tighter">Resume</button>`
                     : `<button onclick="studyMentor.pauseBreakSession()" class="text-[8px] font-bold text-white bg-amber-600 px-2 py-1 rounded uppercase tracking-tighter">Pause</button>`
                 }
-                        <button onclick="studyMentor.stopFocusSession()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Skip Break</button>
+                        <button onclick="studyMentor.skipBreak()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Skip Break</button>
                     </div>
                 </div>
             `;
@@ -604,7 +767,7 @@ class StudyMentor {
     }
 
     showWelcomeGreeting() {
-        if (this.isFocusModeActive() || this.isBreakModeActive()) return;
+        if (this.isFocusModeActive() || this.isBreakModeActive() || this.isContinuationPromptActive) return;
         if (!this.isOnDashboard()) return; // Only show greeting on dashboard
 
         // --- NEW: Yesterday Failure Check ---
@@ -2490,7 +2653,7 @@ class StudyMentor {
         const teaserText = document.getElementById('teaser-text');
 
         // Don't overwrite higher priority greetings or active motivational nudges
-        if (this.isInitialGreeting || this.isMotivationalNudgeActive) return;
+        if (this.isInitialGreeting || this.isMotivationalNudgeActive || this.isContinuationPromptActive) return;
 
         if (nudge && !this.isOpen) {
             badge?.classList.remove('hidden');
@@ -2503,7 +2666,7 @@ class StudyMentor {
                 teaser?.classList.add('hidden');
             }, 8000);
         } else {
-            if (!this.isFocusModeActive() && !this.isBreakModeActive()) {
+            if (!this.isFocusModeActive() && !this.isBreakModeActive() && !this.isContinuationPromptActive) {
                 badge?.classList.add('hidden');
                 teaser?.classList.add('hidden');
             }
