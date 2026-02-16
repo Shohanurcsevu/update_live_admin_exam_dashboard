@@ -38,11 +38,30 @@ if (!empty($_GET['topic_id'])) {
     $types .= 'i';
 }
 
+// --- Pagination Logic ---
+$limit = isset($_GET['limit']) ? intval($_GET['limit']) : 20;
+$page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+$offset = ($page - 1) * $limit;
+
 if (!empty($where_clauses)) {
-    $sql .= " WHERE " . implode(' AND ', $where_clauses);
+    $where_sql = " WHERE " . implode(' AND ', $where_clauses);
+    $sql .= $where_sql;
 }
 
-$sql .= " ORDER BY e.id DESC";
+// Get Total Count for Pagination
+$count_sql = "SELECT COUNT(*) as total FROM exams e " . (isset($where_sql) ? $where_sql : "");
+$count_stmt = $conn->prepare($count_sql);
+if (!empty($params)) {
+    $count_stmt->bind_param($types, ...$params);
+}
+$count_stmt->execute();
+$total_count = $count_stmt->get_result()->fetch_assoc()['total'];
+$count_stmt->close();
+
+$sql .= " ORDER BY e.id DESC LIMIT ? OFFSET ?";
+$params[] = $limit;
+$params[] = $offset;
+$types .= 'ii';
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) {
@@ -55,7 +74,16 @@ while ($row = $result->fetch_assoc()) {
     $exams[] = $row;
 }
 
-echo json_encode(['success' => true, 'data' => $exams]);
+echo json_encode([
+    'success' => true, 
+    'data' => $exams,
+    'pagination' => [
+        'total' => $total_count,
+        'limit' => $limit,
+        'page' => $page,
+        'has_more' => ($offset + count($exams)) < $total_count
+    ]
+]);
 $stmt->close();
 $conn->close();
 ?>

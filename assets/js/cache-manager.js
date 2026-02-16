@@ -19,7 +19,7 @@ window.CacheManager = (function () {
      * @param {boolean} skipRevalidate Internal flag to prevent infinite loops during background refresh
      * @returns {Promise<any>} The response data
      */
-    async function fetchWithCache(url, ttlMinutes = 5, forceRefresh = false, skipRevalidate = false) {
+    async function fetchWithCache(url, ttlMinutes = 5, forceRefresh = false, skipRevalidate = false, returnFullResponse = false) {
         const cacheKey = CACHE_PREFIX + safeBtoa(url);
         let cachedData = null;
 
@@ -27,21 +27,34 @@ window.CacheManager = (function () {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
                 try {
-                    const { data, expiry } = JSON.parse(cached);
+                    const parsedCache = JSON.parse(cached);
+                    const { data, expiry } = parsedCache;
+
                     if (Date.now() < expiry) {
                         console.log(`%c[CacheManager] Hit for ${url}`, 'color: #10b981; font-weight: bold;');
 
                         // --- SWR Pattern: Trigger background fetch to ensure freshness ---
                         if (!skipRevalidate) {
-                            revalidateInBackground(url, ttlMinutes, data);
+                            revalidateInBackground(url, ttlMinutes, data, returnFullResponse);
                         }
 
-                        return data;
+                        // Use returnFullResponse flag to determine what to return
+                        if (returnFullResponse) {
+                            if (parsedCache.fullResponse) {
+                                return parsedCache.fullResponse;
+                            }
+                            // If full response requested but not in cache, treat as miss
+                            console.log(`%c[CacheManager] Full response missing for ${url}, refreshing`, 'color: #f59e0b;');
+                        } else {
+                            return data;
+                        }
                     }
                     console.log(`%c[CacheManager] Expired for ${url}`, 'color: #f59e0b; font-weight: bold;');
-                    cachedData = data; // Keep stale data just in case fetch fails
+                    cachedData = returnFullResponse && parsedCache.fullResponse ? parsedCache.fullResponse : data; // Keep stale data just in case fetch fails
                 } catch (e) {
                     console.error('[CacheManager] Parse error', e);
+                    // clear corrupt cache
+                    localStorage.removeItem(cacheKey);
                 }
             }
         }
@@ -51,14 +64,20 @@ window.CacheManager = (function () {
             const response = await fetch(url);
             const result = await response.json();
 
+            // We cache regardless of success if we got a valid JSON response
+            // But we usually only want to cache SUCCESSFUL data responses.
+            // For now, let's stick to the existing logic which checks for success.
             if (result.success || result.data || Array.isArray(result)) {
                 const data = result.data || result;
+
                 const cacheData = {
                     data: data,
+                    fullResponse: result, // Store the full response
                     expiry: Date.now() + (ttlMinutes * 60 * 1000)
                 };
                 localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-                return data;
+
+                return returnFullResponse ? result : data;
             } else {
                 throw new Error(result.message || 'API request failed');
             }

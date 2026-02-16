@@ -79,6 +79,12 @@ function initializeTakeExamInterface() {
         questionsArea.innerHTML = fullHTML;
 
         isExamInProgress = true;
+
+        // Hide Mentor Icon
+        if (window.studyMentor) window.studyMentor.closePanel();
+        const mentorWidget = document.getElementById('study-mentor-widget');
+        if (mentorWidget) mentorWidget.classList.add('hidden');
+
         setupExitPrevention();
         startTimer(details.duration * 60);
         updateNavigator();
@@ -97,7 +103,7 @@ function initializeTakeExamInterface() {
                     const qId = entry.target.id.replace('question-', '');
                     const qIndex = examData.questions.findIndex(q => q.id == qId);
                     if (qIndex !== -1) {
-                        progressText.innerHTML = `Question ${qIndex + 1} of ${examData.questions.length} <span class="material-symbols-outlined text-sm ml-1">expand_less</span>`;
+                        progressText.innerHTML = `Q ${qIndex + 1} / ${examData.questions.length}`;
                     }
                 }
             });
@@ -128,6 +134,11 @@ function initializeTakeExamInterface() {
                 if (confirmed) {
                     await submitExam(true);
                     isExamInProgress = false;
+
+                    // Show Mentor Icon
+                    const mentorWidget = document.getElementById('study-mentor-widget');
+                    if (mentorWidget) mentorWidget.classList.remove('hidden');
+
                     window.loadPage = originalLoadPage;
                     return originalLoadPage(page, params);
                 }
@@ -158,10 +169,16 @@ function initializeTakeExamInterface() {
     function startTimer(duration) {
         let timer = duration;
         const timerEl = document.getElementById('timer');
+        const timerMobileEl = document.getElementById('timer-mobile');
+
         timerInterval = setInterval(() => {
             const minutes = Math.floor(timer / 60);
             const seconds = timer % 60;
-            if (timerEl) timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            if (timerEl) timerEl.textContent = timeStr;
+            if (timerMobileEl) timerMobileEl.textContent = timeStr;
+
             if (--timer < 0) {
                 clearInterval(timerInterval);
                 submitExam();
@@ -221,15 +238,34 @@ function initializeTakeExamInterface() {
             if (flaggedQuestions.has(q.id)) bgColor = 'bg-yellow-500 border-yellow-600 text-white';
 
             const btn = document.createElement('button');
-            btn.className = `w-full aspect-square flex items-center justify-center rounded-xl border-2 text-sm font-bold transition-all hover:scale-105 active:scale-95 ${bgColor}`;
+            btn.className = `w-full aspect-square flex items-center justify-center rounded-lg md:rounded-xl border-2 text-[10px] md:text-sm font-black transition-all hover:scale-105 active:scale-95 ${bgColor}`;
             btn.title = `Question ${idx + 1}`;
             btn.innerText = idx + 1;
             btn.addEventListener('click', () => {
-                console.log('Navigator click for question ID:', q.id);
                 scrollToQuestion(q.id);
+                // Auto-close on mobile
+                if (window.innerWidth < 768) {
+                    toggleNavigator(false);
+                }
             });
             navContainer.appendChild(btn);
         });
+    }
+
+    function toggleNavigator(show) {
+        const navSidebar = document.getElementById('navigator-sidebar');
+        const navOverlay = document.getElementById('nav-overlay');
+        if (!navSidebar) return;
+
+        if (show) {
+            navSidebar.classList.remove('-translate-y-full');
+            navSidebar.classList.add('translate-y-0');
+            if (navOverlay) navOverlay.classList.remove('hidden');
+        } else {
+            navSidebar.classList.add('-translate-y-full');
+            navSidebar.classList.remove('translate-y-0');
+            if (navOverlay) navOverlay.classList.add('hidden');
+        }
     }
 
     function scrollToQuestion(id) {
@@ -240,8 +276,7 @@ function initializeTakeExamInterface() {
 
         const navSidebar = document.getElementById('navigator-sidebar');
         if (navSidebar && window.innerWidth < 768) {
-            navSidebar.classList.add('translate-y-full');
-            navSidebar.classList.remove('translate-y-0');
+            toggleNavigator(false);
         }
 
         const delay = window.innerWidth < 768 ? 200 : 0;
@@ -331,7 +366,7 @@ function initializeTakeExamInterface() {
             }
         });
         const score = right * 1;
-        const timerEl = document.getElementById('timer');
+        const timerEl = document.getElementById('timer') || document.getElementById('timer-mobile');
         const timeLeft = timerEl ? timerEl.textContent.split(':') : ['0', '0'];
         const timeLeftSeconds = (parseInt(timeLeft[0]) || 0) * 60 + (parseInt(timeLeft[1]) || 0);
 
@@ -368,6 +403,11 @@ function initializeTakeExamInterface() {
         }
 
         const performance = calculatePerformance();
+
+        // Restore Mentor Icon
+        const mentorWidget = document.getElementById('study-mentor-widget');
+        if (mentorWidget) mentorWidget.classList.remove('hidden');
+
         try {
             const response = await fetch(`${API_URL}submit.php`, {
                 method: 'POST',
@@ -378,6 +418,11 @@ function initializeTakeExamInterface() {
             if (result.success && result.data && result.data.attempt_id) {
                 closeResultModalBtn.dataset.attemptId = result.data.attempt_id;
                 displayExamResult(result.data);
+
+                // Clear dashboard cache to ensure updated stats
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                }
 
                 // --- NEW: Record activity for Streak ---
                 if (typeof streakManager !== 'undefined') {
@@ -468,29 +513,19 @@ function initializeTakeExamInterface() {
     }
     if (submitExamBtn) submitExamBtn.addEventListener('click', submitExam);
     if (submitExamBtnMobile) submitExamBtnMobile.addEventListener('click', submitExam);
-
     const mobileNavTrigger = document.getElementById('mobile-nav-trigger');
     const closeNavBtn = document.getElementById('close-nav-btn');
     const navOverlay = document.getElementById('nav-overlay');
     const navSidebar = document.getElementById('navigator-sidebar');
 
-    if (mobileNavTrigger && navSidebar) {
-        mobileNavTrigger.addEventListener('click', () => {
-            navSidebar.classList.remove('translate-y-full');
-            navSidebar.classList.add('translate-y-0');
-        });
+    if (mobileNavTrigger) {
+        mobileNavTrigger.addEventListener('click', () => toggleNavigator(true));
     }
-    if (closeNavBtn && navSidebar) {
-        closeNavBtn.addEventListener('click', () => {
-            navSidebar.classList.add('translate-y-full');
-            navSidebar.classList.remove('translate-y-0');
-        });
+    if (closeNavBtn) {
+        closeNavBtn.addEventListener('click', () => toggleNavigator(false));
     }
-    if (navOverlay && navSidebar) {
-        navOverlay.addEventListener('click', () => {
-            navSidebar.classList.add('translate-y-full');
-            navSidebar.classList.remove('translate-y-0');
-        });
+    if (navOverlay) {
+        navOverlay.addEventListener('click', () => toggleNavigator(false));
     }
 
     async function loadExam() {

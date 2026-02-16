@@ -511,10 +511,11 @@ function initializeDashboardPage() {
             }
 
             // --- Cache integration for Exam List ---
-            const result = await CacheManager.fetchWithCache(url, 15, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache(url, 15, false, skipRevalidate, true);
 
             if (result) {
-                displayExams(result, loadingMore);
+                // Pass result.data because we now get the full response
+                displayExams(result.data, loadingMore);
 
                 // Update Cache (only for the initial/main list to keep it fast)
                 if (typeof idbManager !== 'undefined' && currentOffset === 0) {
@@ -640,7 +641,7 @@ function initializeDashboardPage() {
             icon.textContent = "hourglass_empty";
 
             // Use CacheManager to prevent rapid double-hits
-            CacheManager.fetchWithCache(`https://bcspreli.free.nf/api/take-exam/start.php?exam_id=${examId}`, 1)
+            CacheManager.fetchWithCache(`api/take-exam/start.php?exam_id=${examId}`, 1)
                 .then(data => {
                     // CacheManager returns parsed data
                     const text = typeof data === 'string' ? data : JSON.stringify(data);
@@ -720,7 +721,7 @@ function initializeDashboardPage() {
 
         try {
             // Use CacheManager for short-term caching of the print data
-            const result = await CacheManager.fetchWithCache(`https://bcspreli.free.nf/api/take-exam/start.php?exam_id=${examId}`, 1);
+            const result = await CacheManager.fetchWithCache(`api/take-exam/start.php?exam_id=${examId}`, 1);
 
             if (!result) throw new Error('Failed to fetch exam data');
 

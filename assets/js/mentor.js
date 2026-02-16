@@ -2080,7 +2080,7 @@ class StudyMentor {
                                                         military_tech
                                                     </span>
                                                     ${item.status === 'pending_create' ? `
-                                                        <button onclick="event.stopPropagation(); window.location.href='https://bcspreli.free.nf/?page=exam'" class="px-2 py-1 text-xs font-bold uppercase tracking-tight text-indigo-700 hover:text-indigo-800 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors">
+                                                        <button onclick="event.stopPropagation(); window.loadPage('exam')" class="px-2 py-1 text-xs font-bold uppercase tracking-tight text-indigo-700 hover:text-indigo-800 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors">
                                                             Create
                                                         </button>
                                                     ` : item.status === 'pending_take' ? `
@@ -2341,7 +2341,7 @@ class StudyMentor {
                                         <p class="text-sm font-medium text-gray-800 mt-1">
                                             Sohan, no exam has been created for <strong>${subj.name}</strong> yet today. Let's start!
                                         </p>
-                                        <button onclick="window.location.href='https://bcspreli.free.nf/?page=exam'" class="mt-3 text-xs font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                                        <button onclick="window.loadPage('exam')" class="mt-3 text-xs font-bold text-blue-600 flex items-center gap-1 hover:underline">
                                             Create Exam <span class="material-symbols-outlined text-xs">add_circle</span>
                                         </button>
                                     </div>

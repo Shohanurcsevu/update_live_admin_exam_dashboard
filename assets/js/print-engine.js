@@ -263,4 +263,5 @@ const PrintEngine = {
 };
 
 // Initialize on load
+window.PrintEngine = PrintEngine;
 PrintEngine.init();

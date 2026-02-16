@@ -5,13 +5,32 @@
         <p class="text-gray-500">Filter and select an exam to begin.</p>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 border rounded-lg bg-gray-50">
-        <div><label for="subject-filter" class="block text-sm font-medium text-gray-700">Subject</label><select id="subject-filter" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"></select></div>
-        <div><label for="lesson-filter" class="block text-sm font-medium text-gray-700">Lesson</label><select id="lesson-filter" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm" disabled></select></div>
-        <div><label for="topic-filter" class="block text-sm font-medium text-gray-700">Topic</label><select id="topic-filter" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm" disabled></select></div>
+        <div><label for="subject-filter" class="block text-sm font-medium text-gray-700">Subject</label><select
+                id="subject-filter"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"></select></div>
+        <div><label for="lesson-filter" class="block text-sm font-medium text-gray-700">Lesson</label><select
+                id="lesson-filter"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"
+                disabled></select></div>
+        <div><label for="topic-filter" class="block text-sm font-medium text-gray-700">Topic</label><select
+                id="topic-filter"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"
+                disabled></select></div>
     </div>
-    <div class="overflow-x-auto">
+
+    <!-- Pagination Status (Top) -->
+    <div
+        class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+        <div id="pagination-status" class="text-sm font-medium text-indigo-900">
+            Showing <span id="current-count" class="font-bold">0</span> of <span id="total-count"
+                class="font-bold">0</span> exams
+        </div>
+    </div>
+
+    <!-- Desktop Table View -->
+    <div class="hidden md:block overflow-x-auto">
         <table class="min-w-full bg-white">
-            <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+            <thead class="bg-indigo-600 text-white uppercase text-xs leading-normal">
                 <tr>
                     <th class="py-3 px-6 text-left">Exam Title</th>
                     <th class="py-3 px-6 text-left">Topic</th>
@@ -22,5 +41,39 @@
             </thead>
             <tbody id="exams-table-body" class="text-gray-600 text-sm font-light"></tbody>
         </table>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div id="exams-card-view" class="md:hidden space-y-4">
+        <!-- Cards will be injected here -->
+    </div>
+
+    <!-- Pagination Controls (Bottom) -->
+    <div class="mt-8 flex justify-center pb-6">
+        <button id="load-more-btn"
+            class="hidden flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-full font-bold shadow-lg transition-all active:scale-95 hover:shadow-indigo-200">
+            <span class="material-symbols-outlined text-xl">expand_more</span>
+            Load More Exams
+        </button>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-exam-confirm-modal"
+    class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
+        <div class="flex flex-col items-center text-center">
+            <div class="bg-red-100 p-3 rounded-full"><span
+                    class="material-symbols-outlined text-4xl text-red-600">warning</span></div>
+            <h3 class="text-xl font-semibold mt-4 text-gray-800">Delete Exam</h3>
+            <p class="text-gray-600 mt-2">Are you sure you want to permanently delete this exam? This action cannot be
+                undone.</p>
+        </div>
+        <div class="flex justify-center mt-6 space-x-4">
+            <button type="button" id="cancel-exam-delete-btn"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg">Cancel</button>
+            <button type="button" id="confirm-exam-delete-btn"
+                class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Delete</button>
+        </div>
     </div>
 </div>

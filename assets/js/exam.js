@@ -10,7 +10,11 @@ function initializeExamPage() {
     const deleteModal = document.getElementById('delete-exam-confirm-modal');
     const examForm = document.getElementById('exam-form');
     const tableBody = document.getElementById('exams-table-body');
+    const cardView = document.getElementById('exams-card-view');
     const toastContainer = document.getElementById('toast-container');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const currentCountEl = document.getElementById('current-count');
+    const totalCountEl = document.getElementById('total-count');
 
     // Filters
     const subjectFilter = document.getElementById('subject-filter');
@@ -28,6 +32,11 @@ function initializeExamPage() {
     let examIdToDelete = null;
     let importedQuestions = [];
     const defaultInstructions = 'প্রতিটি প্রশ্নের ৪ (চার) টি উত্তরের মধ্যে ১ (এক) টি সঠিক উত্তর রয়েছে। প্রতিটি শুদ্ধ উত্তরের জন্য প্রার্থী ১ (এক) নম্বর পাবেন। প্রতিটি ভুল উত্তরের জন্য ০.৫ ( শূন্য দশমিক পাঁচ ) নম্বর কাটা যাবে।';
+
+    let currentOffset = 0;
+    const itemsPerPage = 20;
+    let isFetching = false;
+    let initialExamMetrics = null; // Store initial values for additive updates
 
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
@@ -49,9 +58,18 @@ function initializeExamPage() {
             const totalMarksInput = document.getElementById('total-marks');
             const passMarkInput = document.getElementById('pass-mark');
 
-            if (durationInput) durationInput.value = count;
-            if (totalMarksInput) totalMarksInput.value = count;
-            if (passMarkInput) passMarkInput.value = (count * 0.99).toFixed(2);
+            let newDuration = count;
+            let newTotalMarks = count;
+
+            // If editing an existing exam, add to the initial values
+            if (initialExamMetrics) {
+                newDuration = initialExamMetrics.duration + count;
+                newTotalMarks = initialExamMetrics.totalMarks + count;
+            }
+
+            if (durationInput) durationInput.value = newDuration;
+            if (totalMarksInput) totalMarksInput.value = newTotalMarks;
+            if (passMarkInput) passMarkInput.value = (newTotalMarks * 0.99).toFixed(2);
         }
     }
 
@@ -107,13 +125,15 @@ function initializeExamPage() {
         } catch (error) { showToast('Failed to load topics.', 'error'); }
     }
 
-    let currentOffset = 0;
-    const itemsPerPage = 10;
-
     async function fetchAndDisplayExams(append = false, forceRefresh = false) {
+        if (isFetching) return;
+        isFetching = true;
+
         if (!append) {
             currentOffset = 0;
-            tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-8"><span class="material-symbols-outlined animate-spin text-4xl text-blue-500">sync</span><p class="mt-2 text-gray-500 font-medium tracking-tight">Loading exams...</p></td></tr>';
+            cardView.innerHTML = '<div class="flex flex-col items-center justify-center py-12 text-blue-500"><span class="material-symbols-outlined animate-spin text-5xl">sync</span><p class="mt-4 text-gray-600 font-medium">Loading exams...</p></div>';
+            document.getElementById('load-more-container').classList.add('hidden');
         }
 
         let url = `${EXAM_API_URL}?action=list&limit=${itemsPerPage}&offset=${currentOffset}`;
@@ -125,46 +145,118 @@ function initializeExamPage() {
         if (query) url += `&${query}`;
 
         try {
-            const result = await CacheManager.fetchWithCache(url, 2, forceRefresh);
+            const result = await CacheManager.fetchWithCache(url, 2, forceRefresh, false, true);
 
-            if (!append) tableBody.innerHTML = '';
+            if (!append) {
+                tableBody.innerHTML = '';
+                cardView.innerHTML = '';
+            }
 
-            if (result && result.length > 0) {
-                result.forEach(exam => {
+            if (result && result.success && result.data.length > 0) {
+                result.data.forEach(exam => {
+                    // Desktop Table Row
                     const row = `
-                        <tr class="border-b border-gray-200 hover:bg-gray-100">
-                            <td class="py-3 px-6 text-left font-medium">${exam.exam_title}</td>
-                            <td class="py-3 px-6 text-left">${exam.topic_name || 'N/A'}</td>
-                            <td class="py-3 px-6 text-left">${exam.lesson_name || 'N/A'}</td>
-                            <td class="py-3 px-6 text-left">${exam.subject_name || 'N/A'}</td>
-                            <td class="py-3 px-6 text-center">${exam.duration} min</td>
-                            <td class="py-3 px-6 text-center">${exam.total_marks}</td>
-                            <td class="py-3 px-6 text-center">
-                                <div class="flex item-center justify-center">
-                                    <button class="edit-btn w-8 h-8 rounded-full bg-green-200 text-green-700" data-id="${exam.id}"><span class="material-symbols-outlined text-lg">edit</span></button>
-                                    <button class="delete-btn w-8 h-8 rounded-full bg-red-200 text-red-700 ml-2" data-id="${exam.id}"><span class="material-symbols-outlined text-lg">delete</span></button>
+                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                            <td class="py-4 px-6 text-left">
+                                <span class="font-bold text-gray-900 block truncate max-w-xs" title="${exam.exam_title}">${exam.exam_title}</span>
+                            </td>
+                            <td class="py-4 px-6 text-left">
+                                <div class="flex flex-col text-[11px] leading-tight text-gray-500">
+                                    <span class="font-bold text-blue-600 uppercase tracking-tighter">${exam.subject_name || 'N/A'}</span>
+                                    <span class="truncate max-w-[150px]">${exam.lesson_name || 'N/A'}</span>
+                                    <span class="italic text-gray-400 truncate max-w-[150px]">${exam.topic_name || 'N/A'}</span>
+                                </div>
+                            </td>
+                            <td class="py-4 px-6 text-center">
+                                <span class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-black tracking-tight">${exam.duration}m</span>
+                            </td>
+                            <td class="py-4 px-6 text-center">
+                                <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-black tracking-tight">${exam.total_marks}</span>
+                            </td>
+                            <td class="py-4 px-6 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button class="edit-btn p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" title="Edit Exam">
+                                        <span class="material-symbols-outlined text-lg">edit</span>
+                                    </button>
+                                    <button class="manage-questions-btn p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" data-title="${exam.exam_title}" title="Manage Questions">
+                                        <span class="material-symbols-outlined text-lg">quiz</span>
+                                    </button>
+                                    <button class="delete-btn p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" title="Delete Exam">
+                                        <span class="material-symbols-outlined text-lg">delete</span>
+                                    </button>
                                 </div>
                             </td>
                         </tr>`;
                     tableBody.innerHTML += row;
+
+                    // Mobile Card
+                    const card = `
+                        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3 relative overflow-hidden group">
+                           <div class="absolute top-0 right-0 w-16 h-16 bg-blue-50/50 rounded-bl-[60px] flex items-start justify-end p-2 z-0">
+                                <span class="material-symbols-outlined text-blue-200/50 text-4xl">assignment</span>
+                           </div>
+                           <div class="relative z-10">
+                                <h3 class="font-black text-gray-900 leading-tight pr-8">${exam.exam_title}</h3>
+                                <div class="mt-2 flex flex-col gap-0.5 text-[11px] font-medium text-gray-500">
+                                    <span class="text-blue-600 font-black uppercase tracking-widest">${exam.subject_name || 'N/A'}</span>
+                                    <span class="text-gray-400 italic">${exam.lesson_name || 'N/A'} / ${exam.topic_name || 'N/A'}</span>
+                                </div>
+                                <div class="flex items-center gap-3 mt-3">
+                                    <span class="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1 leading-none">
+                                        <span class="material-symbols-outlined text-sm">schedule</span>
+                                        ${exam.duration}m
+                                    </span>
+                                    <span class="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1 leading-none">
+                                        <span class="material-symbols-outlined text-sm">military_tech</span>
+                                        ${exam.total_marks}M
+                                    </span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-50">
+                                    <button class="edit-btn w-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all" data-id="${exam.id}">
+                                        <span class="material-symbols-outlined text-lg">edit</span>
+                                        Edit
+                                    </button>
+                                    <button class="manage-questions-btn w-full bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white text-[11px] font-black uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}">
+                                        <span class="material-symbols-outlined text-lg">quiz</span>
+                                        Questions
+                                    </button>
+                                    <button class="delete-btn w-full bg-red-50 text-red-600 hover:bg-red-600 hover:text-white text-[11px] font-black uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all" data-id="${exam.id}">
+                                        <span class="material-symbols-outlined text-lg">delete</span>
+                                        Delete
+                                    </button>
+                                </div>
+                           </div>
+                        </div>`;
+                    cardView.innerHTML += card;
                 });
+
+                // Update Pagination Info
+                const totalLoaded = (currentOffset + result.data.length);
+                currentCountEl.textContent = totalLoaded;
+                totalCountEl.textContent = result.pagination.total;
 
                 // Show/hide Load More button
                 const loadMoreContainer = document.getElementById('load-more-container');
-                if (result.pagination && result.pagination.hasMore) {
+                if (result.pagination.hasMore) {
                     loadMoreContainer.classList.remove('hidden');
                 } else {
                     loadMoreContainer.classList.add('hidden');
                 }
             } else {
                 if (!append) {
-                    tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">No exams found.</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-12 text-gray-400 font-medium">No exams found.</td></tr>`;
+                    cardView.innerHTML = `<div class="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl py-12 px-6 text-center text-gray-400 font-medium">No exams found for selection.</div>`;
+                    currentCountEl.textContent = 0;
+                    totalCountEl.textContent = 0;
                     document.getElementById('load-more-container').classList.add('hidden');
                 }
             }
         } catch (error) {
+            console.error('Fetch error:', error);
             showToast('Failed to load exams.', 'error');
-            if (!append) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">Error loading exams.</td></tr>`;
+            if (!append) tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 font-bold">Error loading exams.</td></tr>`;
+        } finally {
+            isFetching = false;
         }
     }
 
@@ -244,9 +336,10 @@ function initializeExamPage() {
         }
     }
 
-    async function handleTableClick(e) {
+    async function handleListClick(e) {
         const editBtn = e.target.closest('.edit-btn');
         const deleteBtn = e.target.closest('.delete-btn');
+        const manageQuestionsBtn = e.target.closest('.manage-questions-btn');
 
         if (editBtn) {
             const id = editBtn.dataset.id;
@@ -265,6 +358,13 @@ function initializeExamPage() {
                     document.getElementById('instructions').value = exam.instructions;
                     document.getElementById('total-marks').value = exam.total_marks;
                     document.getElementById('pass-mark').value = exam.pass_mark;
+
+                    // Set initial metrics for additive updates
+                    initialExamMetrics = {
+                        duration: parseInt(exam.duration) || 0,
+                        totalMarks: parseInt(exam.total_marks) || 0
+                    };
+
                     openModal(examModal);
                 }
             } catch (error) { showToast('Failed to fetch exam details.', 'error'); }
@@ -273,6 +373,19 @@ function initializeExamPage() {
         if (deleteBtn) {
             examIdToDelete = deleteBtn.dataset.id;
             openModal(deleteModal);
+        }
+
+        if (manageQuestionsBtn) {
+            const id = manageQuestionsBtn.dataset.id;
+            const title = manageQuestionsBtn.dataset.title;
+            // Use the global loadPage function if available (SPA navigation), otherwise allow standard link behavior or manual redirect
+            if (window.loadPage) {
+                window.loadPage('questions-list', `?exam_id=${id}&exam_title=${encodeURIComponent(title)}`);
+            } else {
+                // Fallback for non-SPA context or if loadPage isn't globally available yet
+                const url = `?page=questions-list&exam_id=${id}&exam_title=${encodeURIComponent(title)}`;
+                window.location.href = url;
+            }
         }
     }
 
@@ -285,6 +398,9 @@ function initializeExamPage() {
         document.getElementById('duration').value = 10;
         document.getElementById('total-marks').value = 10;
         document.getElementById('pass-mark').value = 10;
+
+        initialExamMetrics = null; // Reset for new exam
+
         modalLessonSelector.innerHTML = '<option value="">Select Subject First</option>';
         modalLessonSelector.disabled = true;
         modalTopicSelector.innerHTML = '<option value="">Select Lesson First</option>';
@@ -293,8 +409,9 @@ function initializeExamPage() {
     });
 
     examForm.addEventListener('submit', handleFormSubmit);
-    tableBody.addEventListener('click', handleTableClick);
-    document.getElementById('load-more-btn').addEventListener('click', loadMoreExams);
+    tableBody.addEventListener('click', handleListClick);
+    cardView.addEventListener('click', handleListClick);
+    loadMoreBtn.addEventListener('click', loadMoreExams);
 
     // Filter listeners
     subjectFilter.addEventListener('change', () => {

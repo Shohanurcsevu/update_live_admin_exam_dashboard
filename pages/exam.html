@@ -12,6 +12,25 @@
         </button>
     </div>
 
+    <!-- Stats Bar -->
+    <div class="flex items-center justify-between mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+        <div class="flex items-center gap-2">
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span class="material-symbols-outlined text-blue-600">assignment</span>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase tracking-wider font-bold text-blue-500 leading-none">Total Exams</p>
+                <h3 class="text-xl font-black text-blue-900 leading-tight">
+                    <span id="current-count">0</span> / <span id="total-count">0</span>
+                </h3>
+            </div>
+        </div>
+        <div class="hidden sm:flex items-center gap-2 text-sm text-blue-700 font-medium">
+            <span class="material-symbols-outlined">info</span>
+            Manage your exam bank here
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div><label for="subject-filter" class="block text-sm font-medium text-gray-700">Filter by
                 Subject</label><select id="subject-filter"
@@ -26,27 +45,31 @@
                 disabled></select></div>
     </div>
 
-    <div class="overflow-x-auto">
+    <!-- Desktop View: Table -->
+    <div class="hidden md:block overflow-x-auto border border-gray-100 rounded-xl mt-6">
         <table class="min-w-full bg-white">
-            <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-[11px] font-black tracking-widest border-b">
                 <tr>
-                    <th class="py-3 px-6 text-left">Exam Title</th>
-                    <th class="py-3 px-6 text-left">Topic</th>
-                    <th class="py-3 px-6 text-left">Lesson</th>
-                    <th class="py-3 px-6 text-left">Subject</th>
-                    <th class="py-3 px-6 text-center">Duration</th>
-                    <th class="py-3 px-6 text-center">Marks</th>
-                    <th class="py-3 px-6 text-center">Actions</th>
+                    <th class="py-4 px-6 text-left">Exam Title</th>
+                    <th class="py-4 px-6 text-left">Hierarchy</th>
+                    <th class="py-4 px-6 text-center">Duration</th>
+                    <th class="py-4 px-6 text-center">Marks</th>
+                    <th class="py-4 px-6 text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody id="exams-table-body" class="text-gray-600 text-sm font-light"></tbody>
+            <tbody id="exams-table-body" class="text-gray-600 text-sm font-medium divide-y divide-gray-50"></tbody>
         </table>
+    </div>
+
+    <!-- Mobile View: Cards -->
+    <div id="exams-card-view" class="md:hidden grid grid-cols-1 gap-4 mt-6">
+        <!-- Cards will be injected here -->
     </div>
 
     <!-- Load More Button -->
     <div id="load-more-container" class="mt-8 flex justify-center hidden px-4 sm:px-0">
         <button id="load-more-btn"
-            class="w-full sm:w-auto bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold py-2.5 px-8 rounded-lg flex items-center justify-center shadow-sm transition duration-150">
+            class="w-full sm:w-auto bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-bold py-3 px-10 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all">
             <span class="material-symbols-outlined mr-2">expand_more</span>
             Load More Exams
         </button>
@@ -55,7 +78,7 @@
 
 <!-- Add/Edit Exam Modal -->
 <div id="exam-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-40 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <div class="flex justify-between items-center p-4 border-b">
             <h3 id="exam-modal-title" class="text-xl font-semibold">Add New Exam</h3>
             <button id="close-exam-modal-btn" class="text-gray-500 hover:text-gray-800"><span
@@ -144,7 +167,7 @@
 <!-- Delete Confirmation Modal -->
 <div id="delete-exam-confirm-modal"
     class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
+    <div class="bg-white rounded-lg shadow-xl w-full max-sm mx-4 p-6">
         <div class="flex flex-col items-center text-center">
             <div class="bg-red-100 p-3 rounded-full"><span
                     class="material-symbols-outlined text-4xl text-red-600">warning</span></div>
