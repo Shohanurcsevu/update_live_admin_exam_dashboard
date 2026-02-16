@@ -13,6 +13,7 @@ function initializeTopicPage() {
     const lessonFilter = document.getElementById('lesson-filter');
     const modalSubjectSelector = document.getElementById('modal-subject-selector');
     const modalLessonSelector = document.getElementById('modal-lesson-selector');
+    const clearFiltersBtn = document.getElementById('clear-filters-btn');
     const toastContainer = document.getElementById('toast-container');
 
     let topicIdToDelete = null;
@@ -140,6 +141,12 @@ function initializeTopicPage() {
                 }
                 fetchAndDisplayTopics();
                 showToast(result.message, data.id ? 'update' : 'success');
+
+                // Auto-fill: Save last used values for creation
+                if (!data.id) {
+                    localStorage.setItem('last_topic_subject_id', data.subject_id);
+                    localStorage.setItem('last_topic_lesson_id', data.lesson_id);
+                }
             } else { showToast(result.message, 'error'); }
         } catch (error) { showToast('A network error occurred.', 'error'); }
     }
@@ -199,8 +206,30 @@ function initializeTopicPage() {
         modalLessonSelector.innerHTML = '<option value="">Select Subject First</option>';
         modalLessonSelector.disabled = true;
         document.getElementById('topic-id').value = '';
+
+        // Auto-fill filters from localStorage
+        const lastSubjectId = localStorage.getItem('last_topic_subject_id');
+        const lastLessonId = localStorage.getItem('last_topic_lesson_id');
+
+        if (lastSubjectId) {
+            modalSubjectSelector.value = lastSubjectId;
+            populateLessons(lastSubjectId, modalLessonSelector, lastLessonId);
+        }
+
         openModal(topicModal);
     });
+
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            modalSubjectSelector.value = "";
+            modalLessonSelector.innerHTML = '<option value="">Select Subject First</option>';
+            modalLessonSelector.disabled = true;
+
+            // Clear localStorage values
+            localStorage.removeItem('last_topic_subject_id');
+            localStorage.removeItem('last_topic_lesson_id');
+        });
+    }
 
     topicForm.addEventListener('submit', handleFormSubmit);
     tableBody.addEventListener('click', handleTableClick);

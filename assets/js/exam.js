@@ -20,6 +20,7 @@ function initializeExamPage() {
     const subjectFilter = document.getElementById('subject-filter');
     const lessonFilter = document.getElementById('lesson-filter');
     const topicFilter = document.getElementById('topic-filter');
+    const clearFiltersBtn = document.getElementById('clear-filters-btn');
 
     // Modal Selectors
     const modalSubjectSelector = document.getElementById('modal-subject-selector');
@@ -310,6 +311,13 @@ function initializeExamPage() {
                 }
                 fetchAndDisplayExams(false, true); // Force refresh
                 showToast(result.message, data.id ? 'update' : 'success');
+
+                // Auto-fill: Save last used values for creation
+                if (!data.id) {
+                    localStorage.setItem('last_exam_subject_id', data.subject_id);
+                    localStorage.setItem('last_exam_lesson_id', data.lesson_id);
+                    localStorage.setItem('last_exam_topic_id', data.topic_id);
+                }
             } else { showToast(result.message, 'error'); }
         } catch (error) { showToast('A network error occurred.', 'error'); }
     }
@@ -398,12 +406,40 @@ function initializeExamPage() {
 
         initialExamMetrics = null; // Reset for new exam
 
-        modalLessonSelector.innerHTML = '<option value="">Select Subject First</option>';
-        modalLessonSelector.disabled = true;
         modalTopicSelector.innerHTML = '<option value="">Select Lesson First</option>';
         modalTopicSelector.disabled = true;
+
+        // Auto-fill filters from localStorage
+        const lastSubjectId = localStorage.getItem('last_exam_subject_id');
+        const lastLessonId = localStorage.getItem('last_exam_lesson_id');
+        const lastTopicId = localStorage.getItem('last_exam_topic_id');
+
+        if (lastSubjectId) {
+            modalSubjectSelector.value = lastSubjectId;
+            populateLessons(lastSubjectId, modalLessonSelector, lastLessonId).then(() => {
+                if (lastLessonId) {
+                    populateTopics(lastLessonId, modalTopicSelector, lastTopicId);
+                }
+            });
+        }
+
         openModal(examModal);
     });
+
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            modalSubjectSelector.value = "";
+            modalLessonSelector.innerHTML = '<option value="">Select Subject First</option>';
+            modalLessonSelector.disabled = true;
+            modalTopicSelector.innerHTML = '<option value="">Select Lesson First</option>';
+            modalTopicSelector.disabled = true;
+
+            // Clear localStorage values
+            localStorage.removeItem('last_exam_subject_id');
+            localStorage.removeItem('last_exam_lesson_id');
+            localStorage.removeItem('last_exam_topic_id');
+        });
+    }
 
     examForm.addEventListener('submit', handleFormSubmit);
     tableBody.addEventListener('click', handleListClick);
