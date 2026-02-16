@@ -158,7 +158,7 @@ function initializeExamPage() {
                     const row = `
                         <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                             <td class="py-4 px-6 text-left">
-                                <span class="font-bold text-gray-900 block truncate max-w-xs" title="${exam.exam_title}">${exam.exam_title}</span>
+                                <span class="font-bold text-gray-900 block" title="${exam.exam_title}">${exam.exam_title}</span>
                             </td>
                             <td class="py-4 px-6 text-left">
                                 <div class="flex flex-col text-[11px] leading-tight text-gray-500">
