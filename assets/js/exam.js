@@ -212,17 +212,14 @@ function initializeExamPage() {
                                     </span>
                                 </div>
                                 <div class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-50">
-                                    <button class="edit-btn w-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all" data-id="${exam.id}">
-                                        <span class="material-symbols-outlined text-lg">edit</span>
-                                        Edit
+                                    <button class="edit-btn w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl flex items-center justify-center shadow-md active:scale-95 transition-all" data-id="${exam.id}" title="Edit">
+                                        <span class="material-symbols-outlined text-xl">edit</span>
                                     </button>
-                                    <button class="manage-questions-btn w-full bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white text-[11px] font-black uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}">
-                                        <span class="material-symbols-outlined text-lg">quiz</span>
-                                        Questions
+                                    <button class="manage-questions-btn w-full bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white py-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}" title="Manage Questions">
+                                        <span class="material-symbols-outlined text-xl">quiz</span>
                                     </button>
-                                    <button class="delete-btn w-full bg-red-50 text-red-600 hover:bg-red-600 hover:text-white text-[11px] font-black uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all" data-id="${exam.id}">
-                                        <span class="material-symbols-outlined text-lg">delete</span>
-                                        Delete
+                                    <button class="delete-btn w-full bg-red-50 text-red-600 hover:bg-red-600 hover:text-white py-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all" data-id="${exam.id}" title="Delete">
+                                        <span class="material-symbols-outlined text-xl">delete</span>
                                     </button>
                                 </div>
                            </div>
