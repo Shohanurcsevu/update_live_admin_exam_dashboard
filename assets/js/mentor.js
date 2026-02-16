@@ -186,6 +186,12 @@ class StudyMentor {
         return this.breakSession.isActive;
     }
 
+    isOnDashboard() {
+        const params = new URLSearchParams(window.location.search);
+        const currentPage = params.get('page') || 'dashboard';
+        return currentPage === 'dashboard';
+    }
+
     async startFocusSession(subjectId, subjectName) {
         // If there's an active session (even if different subject), stop it first
         if (this.focusSession.isActive || this.breakSession.isActive) {
@@ -275,17 +281,13 @@ class StudyMentor {
         const badge = document.getElementById('mentor-badge');
         const teaser = document.getElementById('mentor-teaser');
 
-        // Check if we're on the exam-taking page
-        const params = new URLSearchParams(window.location.search);
-        const isExamPage = params.get('page') === 'exam-taking' || params.get('page') === 'take-exam-interface';
-
         if (teaser && teaserText) {
             const minutes = Math.floor(this.focusSession.timeRemaining / 60);
             const seconds = this.focusSession.timeRemaining % 60;
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-            // Hide UI on exam page, but keep timer running
-            if (isExamPage) {
+            // Hide UI if not on dashboard, but keep timer running
+            if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
                 badge?.classList.add('hidden');
                 return; // Exit early, timer continues in background
@@ -337,6 +339,7 @@ class StudyMentor {
 
     showCustomNudge({ title, message, icon = '🎯', theme = 'boss' }) {
         if (this.isFocusModeActive() || this.isBreakModeActive()) return;
+        if (!this.isOnDashboard()) return; // Only show nudges on dashboard
 
         const teaser = document.getElementById('mentor-teaser');
         const teaserBorder = document.getElementById('teaser-border');
@@ -418,15 +421,18 @@ class StudyMentor {
         // Notification
         this.sendNotification("AI Mentor: Session Complete", `Victory! 25 minutes of ${completedSubject} completed.`);
 
-        const teaserText = document.getElementById('teaser-text');
-        if (teaserText) {
-            teaserText.innerHTML = `
-                <div class="text-center">
-                    <p class="text-xs font-black uppercase text-yellow-400 mb-1">VICTORY!</p>
-                    <p class="text-sm font-bold">Sohan, you dominated ${this.focusSession.subject}! 25 minutes of pure focus.</p>
-                    <p class="text-[10px] mt-2 opacity-80">TIME FOR REST!</p>
-                </div>
-            `;
+        // Only show victory UI on dashboard
+        if (this.isOnDashboard()) {
+            const teaserText = document.getElementById('teaser-text');
+            if (teaserText) {
+                teaserText.innerHTML = `
+                    <div class="text-center">
+                        <p class="text-xs font-black uppercase text-yellow-400 mb-1">VICTORY!</p>
+                        <p class="text-sm font-bold">Sohan, you dominated ${this.focusSession.subject}! 25 minutes of pure focus.</p>
+                        <p class="text-[10px] mt-2 opacity-80">TIME FOR REST!</p>
+                    </div>
+                `;
+            }
         }
 
         // Wait 5 seconds for victory celebration, then start break
@@ -545,17 +551,13 @@ class StudyMentor {
         const teaser = document.getElementById('mentor-teaser');
         const badge = document.getElementById('mentor-badge');
 
-        // Check if we're on the exam-taking page
-        const params = new URLSearchParams(window.location.search);
-        const isExamPage = params.get('page') === 'exam-taking' || params.get('page') === 'take-exam-interface';
-
         if (teaser && teaserText) {
             const minutes = Math.floor(this.breakSession.timeRemaining / 60);
             const seconds = this.breakSession.timeRemaining % 60;
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-            // Hide UI on exam page, but keep timer running
-            if (isExamPage) {
+            // Hide UI if not on dashboard, but keep timer running
+            if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
                 badge?.classList.add('hidden');
                 return; // Exit early, timer continues in background
@@ -603,6 +605,7 @@ class StudyMentor {
 
     showWelcomeGreeting() {
         if (this.isFocusModeActive() || this.isBreakModeActive()) return;
+        if (!this.isOnDashboard()) return; // Only show greeting on dashboard
 
         // --- NEW: Yesterday Failure Check ---
         if (this.mentorData?.boss_challenge?.status?.failed_yesterday) {
