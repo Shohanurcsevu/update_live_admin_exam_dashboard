@@ -29,7 +29,7 @@ try {
         $stmt->execute();
     }
 
-    echo json_encode(['success' => true]);
+    echo json_encode(['success' => true, 'affected_rows' => $conn->affected_rows]);
 
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);

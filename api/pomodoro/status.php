@@ -1,12 +1,15 @@
 <?php
 header('Content-Type: application/json');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
 require_once '../subject/db_connect.php';
 
 date_default_timezone_set('Asia/Dhaka');
 
 try {
     // Check for active or paused session
-    $sql = "SELECT id, subject_id, subject_name, remaining_seconds, status, duration_minutes, last_heartbeat, session_type FROM study_sessions WHERE status IN ('active', 'paused') ORDER BY id DESC LIMIT 1";
+    $sql = "SELECT id, subject_id, subject_name, remaining_seconds, status, duration_minutes, last_heartbeat, UNIX_TIMESTAMP(last_heartbeat) as last_heartbeat_timestamp, session_type FROM study_sessions WHERE status IN ('active', 'paused') ORDER BY id DESC LIMIT 1";
     $result = $conn->query($sql);
 
     if ($row = $result->fetch_assoc()) {

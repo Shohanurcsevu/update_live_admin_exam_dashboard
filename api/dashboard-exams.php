@@ -29,6 +29,7 @@ if (!empty($_GET['topic_id'])) {
     $types .= 'i';
 }
 
+$where_clauses[] = "e.is_revision = 0";
 $where_clauses[] = "e.is_deleted = 0";
 $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
 

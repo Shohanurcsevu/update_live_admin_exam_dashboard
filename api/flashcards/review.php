@@ -20,12 +20,9 @@ try {
             f.times_reviewed,
             f.times_correct,
             q.id as question_id,
-            q.question_text,
-            q.option_a,
-            q.option_b,
-            q.option_c,
-            q.option_d,
-            q.correct_answer,
+            q.question as question_text,
+            q.options,
+            q.answer as correct_answer,
             q.explanation,
             t.topic_name,
             s.subject_name
@@ -60,6 +57,7 @@ try {
     
     $cards = [];
     while ($row = $result->fetch_assoc()) {
+        $options_data = json_decode($row['options'], true);
         $cards[] = [
             'card_id' => intval($row['card_id']),
             'box_level' => intval($row['box_level']),
@@ -69,10 +67,10 @@ try {
                 'id' => intval($row['question_id']),
                 'text' => $row['question_text'],
                 'options' => [
-                    'A' => $row['option_a'],
-                    'B' => $row['option_b'],
-                    'C' => $row['option_c'],
-                    'D' => $row['option_d']
+                    'A' => $options_data['A'] ?? $options_data[0] ?? '',
+                    'B' => $options_data['B'] ?? $options_data[1] ?? '',
+                    'C' => $options_data['C'] ?? $options_data[2] ?? '',
+                    'D' => $options_data['D'] ?? $options_data[3] ?? ''
                 ],
                 'correct_answer' => $row['correct_answer'],
                 'explanation' => $row['explanation'],

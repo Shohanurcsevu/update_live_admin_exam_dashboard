@@ -80,6 +80,7 @@ if ($result) {
             WHERE e.subject_id = $subject_id 
                 AND e.created_at BETWEEN '$today_start' AND '$today_end'
                 AND e.is_deleted = 0
+                AND e.is_revision = 0
             GROUP BY e.id, e.exam_title, e.total_marks
         ";
         
@@ -195,7 +196,7 @@ foreach ($subjects as $subject) {
             COUNT(e.id) as exam_count,
             AVG((p.score_with_negative / e.total_marks) * 100) as topic_accuracy
         FROM topics t
-        LEFT JOIN exams e ON t.id = e.topic_id AND e.is_deleted = 0
+        LEFT JOIN exams e ON t.id = e.topic_id AND e.is_deleted = 0 AND e.is_revision = 0
         LEFT JOIN performance p ON e.id = p.exam_id
         WHERE t.subject_id = ?
         GROUP BY t.id, t.topic_name
@@ -233,7 +234,7 @@ $daily_exams_sql = "
         COUNT(DISTINCT e.id) as created_count,
         COUNT(DISTINCT p.id) as taken_count
     FROM subjects s
-    LEFT JOIN exams e ON s.id = e.subject_id AND e.created_at BETWEEN '$today_start' AND '$today_end' AND e.is_deleted = 0
+    LEFT JOIN exams e ON s.id = e.subject_id AND e.created_at BETWEEN '$today_start' AND '$today_end' AND e.is_deleted = 0 AND e.is_revision = 0
     LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
     WHERE s.is_deleted = 0
     GROUP BY s.id, s.subject_name
@@ -358,6 +359,7 @@ $online_sql = "
     JOIN exams e ON p.exam_id = e.id 
     WHERE p.attempt_time BETWEEN '$today_start' AND '$today_end' 
     AND e.is_deleted = 0
+    AND e.is_revision = 0
 ";
 
 // 2. Manual: Get distinct exam IDs from activity_log joined with exams (is_deleted=0)
@@ -368,6 +370,7 @@ $manual_sql = "
     WHERE al.activity_type = 'manual_exam_completion' 
     AND al.timestamp BETWEEN '$today_start' AND '$today_end'
     AND e.is_deleted = 0
+    AND e.is_revision = 0
 ";
 
 // Execute both and merge IDs to avoid double counting
@@ -410,6 +413,7 @@ $uncompleted_sql = "
     LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
     WHERE e.created_at BETWEEN '$today_start' AND '$today_end' 
     AND e.is_deleted = 0
+    AND e.is_revision = 0
     AND p.id IS NULL
 ";
 
@@ -434,6 +438,7 @@ $roadmap_sql = "
     JOIN subjects s ON e.subject_id = s.id
     WHERE DATE(p.attempt_time) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY)
     AND s.is_deleted = 0
+    AND e.is_revision = 0
     GROUP BY s.id, s.subject_name
     ORDER BY avg_accuracy ASC
     LIMIT 3

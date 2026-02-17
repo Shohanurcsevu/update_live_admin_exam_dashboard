@@ -15,7 +15,8 @@ class StudyMentor {
             totalDuration: 25 * 60, // Track original duration
             subject: null,
             subjectId: null,
-            intervalId: null
+            intervalId: null,
+            endTime: null // NEW: Target completion timestamp
         };
         this.breakSession = {
             isActive: false,
@@ -23,13 +24,16 @@ class StudyMentor {
             subject: null,
             subjectId: null,
             intervalId: null,
-            currentActivity: null
+            currentActivity: null,
+            endTime: null // NEW: Target completion timestamp
         };
         this.sessionChain = {
             isActive: false,
             subjectId: null,
             subjectName: null,
-            completedSessions: 0
+            completedSessions: 0,
+            awaitingContinuationChoice: false,
+            awaitingResumeConfirmation: false
         };
         this.countdownRefreshInterval = null; // For Boss Challenge countdown updates
         this.reportRefreshInterval = null; // For real-time study report updates
@@ -51,17 +55,26 @@ class StudyMentor {
 
     async init() {
         window.studyMentor = this; // Expose for onclick handlers
-        // Request notification permission
-        if ("Notification" in window && Notification.permission !== "granted") {
-            Notification.requestPermission();
-        }
         this.createWidget();
         this.attachEventListeners();
+        await this.fetchDailyStudyTime(); // Sync server time offset first
         await this.fetchMentorData();
         await this.restoreSession();
 
-        // Only show greeting if no session was restored
-        if (!this.focusSession.isActive && !this.breakSession.isActive) {
+        // Check for queued prompts after restoration
+        if (this.isOnDashboard()) {
+            if (this.sessionChain.awaitingContinuationChoice) {
+                this.sessionChain.awaitingContinuationChoice = false;
+                this.showContinuationPrompt();
+            } else if (this.sessionChain.awaitingResumeConfirmation) {
+                this.sessionChain.awaitingResumeConfirmation = false;
+                this.showResumePrompt();
+            } else if (!this.focusSession.isActive && !this.breakSession.isActive) {
+                // Only show greeting if no session was restored and no queued prompts
+                this.showWelcomeGreeting();
+            }
+        } else if (!this.focusSession.isActive && !this.breakSession.isActive) {
+            // Show greeting on non-dashboard pages if no session
             this.showWelcomeGreeting();
         }
 
@@ -69,6 +82,43 @@ class StudyMentor {
         this.startInactiveNudge(); // Start monitoring timer activity
         this.updateStatusIndicator(); // Initial indicator state
         this.injectPressureCSS();
+
+        // Listen for page navigation to check queued prompts
+        window.addEventListener('popstate', () => this.checkQueuedPrompts());
+        window.addEventListener('hashchange', () => this.checkQueuedPrompts());
+
+        // Handle visibility changes for background throttling and cross-device sync
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                this.restoreSession(); // Re-sync from server when tab becomes visible
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            this.restoreSession(); // Re-sync when window/tab gets focus (e.g. mobile wake)
+        });
+
+        // NEW: Periodic sync poll (every 2s) to catch actions from other devices without focus
+        setInterval(() => {
+            if (!document.hidden) {
+                this.restoreSession();
+            }
+        }, 2000);
+
+        // Also check on any URL parameter change (for SPA navigation)
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+        const self = this;
+
+        history.pushState = function () {
+            originalPushState.apply(this, arguments);
+            setTimeout(() => self.checkQueuedPrompts(), 100);
+        };
+
+        history.replaceState = function () {
+            originalReplaceState.apply(this, arguments);
+            setTimeout(() => self.checkQueuedPrompts(), 100);
+        };
 
         // Save session on page unload/refresh
         window.addEventListener('beforeunload', () => {
@@ -82,43 +132,78 @@ class StudyMentor {
 
     async restoreSession() {
         try {
-            const response = await fetch('api/pomodoro/status.php');
+            const response = await fetch(`api/pomodoro/status.php?t=${Date.now()}`);
             const result = await response.json();
+
+            // Handle No Active Session (e.g. stopped on another device)
+            if (result.success && !result.session) {
+                if (this.focusSession.isActive || this.breakSession.isActive) {
+                    this.stopFocusSession(); // Local cleanup
+                }
+                return;
+            }
 
             if (result.success && result.session) {
                 const session = result.session;
                 const type = session.session_type || 'focus';
 
+                // --- NEW: Catch-up logic for cross-device consistency ---
+                let driftAdjustedRemaining = session.remaining_seconds;
+                if (session.status === 'active' && session.last_heartbeat_timestamp) {
+                    const now = Math.floor(Date.now() / 1000) + this.serverInactivityData.serverOffset;
+                    const lastHb = parseInt(session.last_heartbeat_timestamp);
+                    const elapsedSinceHb = Math.max(0, now - lastHb);
+                    driftAdjustedRemaining = Math.max(0, session.remaining_seconds - elapsedSinceHb);
+                }
+
                 if (type === 'focus') {
+                    // If session changed completely or was stopped locally but active on server
                     this.focusSession.subject = session.subject_name;
                     this.focusSession.subjectId = session.subject_id;
-                    this.focusSession.timeRemaining = session.remaining_seconds;
+                    this.focusSession.timeRemaining = driftAdjustedRemaining;
                     this.focusSession.totalDuration = (session.duration_minutes || 25) * 60;
 
-                    if (session.status === 'active') {
+                    if (session.status === 'active' && driftAdjustedRemaining > 0) {
                         this.focusSession.isActive = true;
                         this.startFocusTimer(true);
                     } else if (session.status === 'paused') {
                         this.focusSession.isActive = true;
+                        if (this.focusSession.intervalId) clearInterval(this.focusSession.intervalId);
+                        this.focusSession.intervalId = null;
                         this.updateFocusUI(true);
                     }
                 } else if (type === 'break') {
                     this.breakSession.isActive = true;
                     this.breakSession.subject = session.subject_name;
                     this.breakSession.subjectId = session.subject_id;
-                    this.breakSession.timeRemaining = session.remaining_seconds;
+                    this.breakSession.timeRemaining = driftAdjustedRemaining;
                     this.breakSession.currentActivity = { text: "Resuming your break...", emoji: "☕" };
 
                     if (session.status === 'paused') {
+                        if (this.breakSession.intervalId) clearInterval(this.breakSession.intervalId);
+                        this.breakSession.intervalId = null;
                         this.updateBreakUI(true);
-                    } else {
+                    } else if (driftAdjustedRemaining > 0) {
                         this.startBreakTimer(true);
                     }
                 }
-                console.log('Restored session:', session);
+                console.log('Restored session:', session, 'Adjusted Remaining:', driftAdjustedRemaining);
             }
         } catch (e) {
             console.error('Failed to restore session:', e);
+        }
+    }
+
+    checkQueuedPrompts() {
+        // Check for queued prompts and trigger them if on dashboard
+        if (!this.isOnDashboard()) return;
+
+        if (this.sessionChain.awaitingContinuationChoice) {
+            this.sessionChain.awaitingContinuationChoice = false;
+            this.showContinuationPrompt();
+        } else if (this.sessionChain.awaitingResumeConfirmation) {
+            this.sessionChain.awaitingResumeConfirmation = false;
+            this.showResumePrompt();
         }
     }
 
@@ -142,6 +227,12 @@ class StudyMentor {
                 keepalive: true
             });
             const result = await response.json();
+
+            // If an update was sent but nothing was changed on server (session terminated elsewhere)
+            if (action === 'update' && result.success && result.affected_rows === 0) {
+                console.log('Update had no effect, session might have ended elsewhere. Syncing...');
+                this.restoreSession();
+            }
 
             // --- Cache Invalidation on completion ---
             if (action === 'complete' && result.success) {
@@ -264,20 +355,31 @@ class StudyMentor {
     startFocusTimer(resuming = false) {
         if (this.focusSession.intervalId) clearInterval(this.focusSession.intervalId);
 
+        // Set the end timestamp
+        this.focusSession.endTime = Date.now() + (this.focusSession.timeRemaining * 1000);
+
         // Initial UI update
         this.updateFocusUI();
 
         this.focusSession.intervalId = setInterval(() => {
-            this.focusSession.timeRemaining--;
+            // Calculate time remaining based on end timestamp
+            const now = Date.now();
+            const diff = Math.ceil((this.focusSession.endTime - now) / 1000);
+
+            // Sync current state
+            const previousTime = this.focusSession.timeRemaining;
+            this.focusSession.timeRemaining = Math.max(0, diff);
+
             this.updateFocusUI();
 
-            // 5-Minute Warning
-            if (this.focusSession.timeRemaining === 300) { // 300 seconds = 5 minutes
+            // 5-Minute Warning (Improved reliability)
+            if (this.focusSession.timeRemaining <= 300 && previousTime > 300) {
                 this.sendNotification("AI Mentor: Focus Check", `5 minutes left! Finish strong, Sohan. You're crushing ${this.focusSession.subject}!`);
+                console.log('Triggered 5-minute notification');
             }
 
-            // Sync to DB every 30 seconds (Increased from 5s)
-            if (this.focusSession.timeRemaining % 30 === 0) {
+            // Sync to DB every 30 seconds
+            if (this.focusSession.timeRemaining % 30 === 0 && previousTime !== this.focusSession.timeRemaining) {
                 this.saveSession('update', { remaining_seconds: this.focusSession.timeRemaining, type: 'focus' });
             }
 
@@ -300,11 +402,15 @@ class StudyMentor {
         const teaser = document.getElementById('mentor-teaser');
 
         if (teaser && teaserText) {
+            // Guard: Don't overwrite active continuation prompts
+            if (this.isContinuationPromptActive) return;
+
             const minutes = Math.floor(this.focusSession.timeRemaining / 60);
             const seconds = this.focusSession.timeRemaining % 60;
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
             // Hide UI if not on dashboard, but keep timer running
+            this.updateStatusIndicator();
             if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
                 badge?.classList.add('hidden');
@@ -444,10 +550,9 @@ class StudyMentor {
             // Show continuation prompt
             this.showContinuationPrompt();
         } else {
-            // On other pages, auto-continue to break
-            setTimeout(() => {
-                this.startBreakSession(this.focusSession.subjectId, this.focusSession.subject);
-            }, 2000);
+            // Queue prompt for dashboard return - DON'T auto-start break
+            this.sessionChain.awaitingContinuationChoice = true;
+            // Session stays in "completed" state until user returns to dashboard
         }
     }
 
@@ -641,14 +746,24 @@ class StudyMentor {
     startBreakTimer(resuming = false) {
         if (this.breakSession.intervalId) clearInterval(this.breakSession.intervalId);
 
+        // Set the end timestamp
+        this.breakSession.endTime = Date.now() + (this.breakSession.timeRemaining * 1000);
+
         this.updateBreakUI();
 
         this.breakSession.intervalId = setInterval(() => {
-            this.breakSession.timeRemaining--;
+            // Calculate time remaining based on end timestamp
+            const now = Date.now();
+            const diff = Math.ceil((this.breakSession.endTime - now) / 1000);
+
+            // Sync current state
+            const previousTime = this.breakSession.timeRemaining;
+            this.breakSession.timeRemaining = Math.max(0, diff);
+
             this.updateBreakUI();
 
-            // Sync to DB every 30 seconds (Increased from 5s)
-            if (this.breakSession.timeRemaining % 30 === 0) {
+            // Sync to DB every 30 seconds
+            if (this.breakSession.timeRemaining % 30 === 0 && previousTime !== this.breakSession.timeRemaining) {
                 this.saveSession('update', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
             }
 
@@ -660,6 +775,8 @@ class StudyMentor {
                     if (this.isOnDashboard()) {
                         this.showResumePrompt();
                     } else {
+                        // Queue prompt for dashboard return
+                        this.sessionChain.awaitingResumeConfirmation = true;
                         // Auto-resume on other pages
                         setTimeout(() => {
                             this.startFocusSession(this.sessionChain.subjectId, this.sessionChain.subjectName);
@@ -715,11 +832,15 @@ class StudyMentor {
         const badge = document.getElementById('mentor-badge');
 
         if (teaser && teaserText) {
+            // Guard: Don't overwrite active continuation prompts
+            if (this.isContinuationPromptActive) return;
+
             const minutes = Math.floor(this.breakSession.timeRemaining / 60);
             const seconds = this.breakSession.timeRemaining % 60;
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
             // Hide UI if not on dashboard, but keep timer running
+            this.updateStatusIndicator();
             if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
                 badge?.classList.add('hidden');
@@ -1188,7 +1309,6 @@ class StudyMentor {
                             <div class="flex items-start gap-3 bg-purple-50 p-3 rounded-xl">
                                 <span class="material-symbols-outlined text-purple-600 text-2xl">waving_hand</span>
                                 <div>
-                                    <p class="text-sm font-semibold text-gray-800">Hey there!</p>
                                     <p class="text-xs text-gray-600 mt-1">Let me analyze your performance...</p>
                                 </div>
                             </div>
@@ -1261,6 +1381,22 @@ class StudyMentor {
         if (this.isOpen) {
             this.closePanel();
         } else {
+            // Debugging and Requesting Notification Permission
+            if (!("Notification" in window)) {
+                console.warn('This browser does not support desktop notifications');
+            } else {
+                console.log('Notification Status:', Notification.permission);
+                if (!window.isSecureContext) {
+                    console.warn('Notifications require a Secure Context (HTTPS or localhost).');
+                }
+
+                if (Notification.permission === "default") {
+                    Notification.requestPermission().then(permission => {
+                        console.log('New Notification Permission:', permission);
+                    });
+                }
+            }
+
             panel?.classList.remove('hidden');
             this.isOpen = true;
             // Always fetch fresh data when opening to reflect recent study sessions
@@ -1359,8 +1495,8 @@ class StudyMentor {
         // Initial sync
         this.fetchDailyStudyTime();
 
-        // Periodic sync every 10 minutes for cross-device consistency (Increased from 2m)
-        setInterval(() => this.fetchDailyStudyTime(), 600000);
+        // Periodic sync every 1 minute for "instant" cross-device consistency (Reduced from 10m)
+        setInterval(() => this.fetchDailyStudyTime(), 60000);
 
         let lastNotificationTime = Date.now();
 
@@ -1485,6 +1621,26 @@ class StudyMentor {
         const inactiveTimeDisplay = this.formatInactivityTime(seconds);
         const soundIcon = this.isSoundEnabled ? 'volume_up' : 'volume_off';
 
+        // NEW: Compact Header Timer for non-dashboard pages
+        if (!this.isOnDashboard() && (this.isFocusModeActive() || this.isBreakModeActive())) {
+            const time = this.isFocusModeActive() ? this.focusSession.timeRemaining : this.breakSession.timeRemaining;
+            const mins = Math.floor(time / 60);
+            const secs = time % 60;
+            const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+            const type = this.isFocusModeActive() ? 'Focusing' : 'Break';
+            const icon = this.isFocusModeActive() ? 'timer' : 'self_care';
+            const color = this.isFocusModeActive() ? 'text-emerald-600' : 'text-sky-600';
+            const borderColor = this.isFocusModeActive() ? 'border-emerald-100' : 'border-sky-100';
+
+            indicator.innerHTML = `
+                <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border ${borderColor} shadow-sm">
+                    <span class="material-symbols-outlined text-sm ${color}">${icon}</span>
+                    <span class="text-[11px] font-bold ${color} tracking-tight">${type}: ${timeStr}</span>
+                </div>
+            `;
+            return;
+        }
+
         if (this.isFocusModeActive()) {
             // Timer is hidden during Focus
             indicator.innerHTML = `
@@ -1537,9 +1693,9 @@ class StudyMentor {
     async fetchMentorData() {
         try {
             const [trendsResult, decksResult, yesterdayResult] = await Promise.all([
-                CacheManager.fetchWithCache('api/performance/mastery-trends.php', 30),
-                CacheManager.fetchWithCache('api/flashcards/decks.php', 60),
-                CacheManager.fetchWithCache('api/revision/get-yesterday-exams.php', 60)
+                CacheManager.fetchWithCache('api/performance/mastery-trends.php', 0),
+                CacheManager.fetchWithCache('api/flashcards/decks.php', 0),
+                CacheManager.fetchWithCache('api/revision/get-yesterday-exams.php', 0)
             ]);
 
             if (trendsResult) {
@@ -1561,7 +1717,7 @@ class StudyMentor {
 
     async fetchActivityStatus() {
         try {
-            const result = await CacheManager.fetchWithCache('api/activity-status.php', 5);
+            const result = await CacheManager.fetchWithCache('api/activity-status.php', 0);
             if (result && this.mentorData) {
                 this.mentorData.activity_status = result;
                 // Re-render to show nudge if inactive

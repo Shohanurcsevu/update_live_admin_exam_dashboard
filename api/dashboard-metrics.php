@@ -19,7 +19,7 @@ $metrics = [
     'subjects' => get_count($conn, 'subjects'),
     'lessons' => get_count($conn, 'lessons'),
     'topics' => get_count($conn, 'topics'),
-    'exams' => get_count($conn, 'exams'),
+    'exams' => $conn->query("SELECT COUNT(*) as count FROM exams WHERE is_deleted = 0 AND is_revision = 0")->fetch_assoc()['count'],
     'questions' => get_count($conn, 'questions')
 ];
 

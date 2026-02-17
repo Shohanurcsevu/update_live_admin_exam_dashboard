@@ -106,7 +106,8 @@
             // Sort by ID descending
             filteredExams.sort((a, b) => b.id - a.id);
 
-            // Apply filters locally
+            // Apply filters locally (Hide revision exams)
+            filteredExams = filteredExams.filter(e => e.is_revision != 1);
             if (topicId) filteredExams = filteredExams.filter(e => e.topic_id == topicId);
 
             if (!cardsContainer) return;

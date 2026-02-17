@@ -1,5 +1,20 @@
 <!-- Toast Notification Container -->
-<div id="toast-container" class="fixed top-5 right-5 z-50"></div>
+<div id="toast-container"
+    class="fixed top-24 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center pointer-events-none"></div>
+
+<style>
+    @keyframes fade-in-down {
+        0% {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
 
 <!-- Main Content -->
 <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
@@ -154,7 +169,8 @@
                     </div>
                 </div>
             </div>
-            <div class="flex flex-wrap items-center justify-end gap-2 pt-4 border-t sticky bottom-0 bg-white py-4 px-6 -mx-6">
+            <div
+                class="flex flex-wrap items-center justify-end gap-2 pt-4 border-t sticky bottom-0 bg-white py-4 px-6 -mx-6">
                 <button type="button" id="clear-filters-btn"
                     class="bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold py-2 px-4 rounded-lg flex items-center mr-auto">
                     <span class="material-symbols-outlined mr-2">filter_alt_off</span>

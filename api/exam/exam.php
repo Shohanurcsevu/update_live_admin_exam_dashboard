@@ -58,6 +58,12 @@ function list_exams($conn) {
     }
 
 
+    if (isset($_GET['include_revision']) && $_GET['include_revision'] === 'true') {
+        // Do nothing, show both
+    } else {
+        $where_clauses[] = "e.is_revision = 0";
+    }
+
     // Filter out custom exams (those not linked to full hierarchy)
     $where_clauses[] = "e.subject_id IS NOT NULL";
     $where_clauses[] = "e.lesson_id IS NOT NULL";

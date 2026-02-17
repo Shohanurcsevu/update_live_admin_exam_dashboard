@@ -22,10 +22,16 @@ function get_table_changes($conn, $table, $last_sync) {
     if (!$last_sync) {
         // Initial sync: fetch all non-deleted records
         $sql = "SELECT * FROM $table WHERE is_deleted = 0";
+        if ($table === 'exams') {
+            $sql .= " AND is_revision = 0";
+        }
         $stmt = $conn->prepare($sql);
     } else {
         // Incremental sync: fetch changed or deleted records since last sync
         $sql = "SELECT * FROM $table WHERE updated_at > ?";
+        if ($table === 'exams') {
+            $sql .= " AND is_revision = 0";
+        }
         $stmt = $conn->prepare($sql);
         if ($stmt) {
             $stmt->bind_param("s", $last_sync);

@@ -19,11 +19,11 @@ $subject_id = isset($_GET['subject_id']) && $_GET['subject_id'] !== 'all' ? intv
 try {
     // 1. Fetch exams
     if ($subject_id) {
-        $exam_sql = "SELECT * FROM exams WHERE subject_id = ? AND is_deleted = 0";
+        $exam_sql = "SELECT * FROM exams WHERE subject_id = ? AND is_deleted = 0 AND is_revision = 0";
         $stmt = $conn->prepare($exam_sql);
         $stmt->bind_param("i", $subject_id);
     } else {
-        $exam_sql = "SELECT * FROM exams WHERE is_deleted = 0";
+        $exam_sql = "SELECT * FROM exams WHERE is_deleted = 0 AND is_revision = 0";
         $stmt = $conn->prepare($exam_sql);
     }
     

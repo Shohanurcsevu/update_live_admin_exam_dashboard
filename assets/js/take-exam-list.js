@@ -133,6 +133,16 @@ function initializeTakeExamListPage() {
 
             if (result.success && result.data.length > 0) {
                 result.data.forEach(exam => {
+                    // Prepare Status & Score Badges
+                    const isTaken = exam.attempt_count && exam.attempt_count > 0;
+                    const statusBadge = isTaken
+                        ? `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold uppercase">Taken</span>`
+                        : `<span class="bg-gray-100 text-gray-400 px-2 py-1 rounded text-[10px] font-bold uppercase">New</span>`;
+
+                    const scoreDisplay = exam.last_score !== null
+                        ? `<div class="text-xs font-bold text-indigo-600 mt-0.5">${parseFloat(exam.last_score).toFixed(1)} / ${exam.total_marks}</div>`
+                        : `<div class="text-xs text-gray-400 mt-0.5">--</div>`;
+
                     // Desktop Table Row
                     const row = `
                         <tr class="border-b border-gray-100 hover:bg-indigo-50/50 transition-colors">
@@ -143,6 +153,10 @@ function initializeTakeExamListPage() {
                             </td>
                             <td class="py-3 px-6 text-center">
                                 <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-bold">${exam.total_questions} Qs</span>
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                ${statusBadge}
+                                ${scoreDisplay}
                             </td>
                             <td class="py-3 px-6 text-center">
                                 <div class="flex items-center justify-center gap-2">
@@ -160,9 +174,10 @@ function initializeTakeExamListPage() {
 
                     // Mobile Card
                     const card = `
-                        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3 relative overflow-hidden">
+                            ${isTaken ? `<div class="absolute top-0 right-0 px-3 py-1 bg-green-500 text-white text-[9px] font-black uppercase tracking-tighter rounded-bl-xl shadow-sm">Taken (${exam.attempt_count})</div>` : ''}
                             <div>
-                                <h3 class="font-bold text-gray-900 leading-tight">${exam.exam_title}</h3>
+                                <h3 class="font-bold text-gray-900 leading-tight pr-12">${exam.exam_title}</h3>
                                 <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                     <span class="material-symbols-outlined text-xs">label</span>
                                     ${exam.topic_name || 'N/A'}
@@ -177,6 +192,11 @@ function initializeTakeExamListPage() {
                                     <span class="material-symbols-outlined text-xs">quiz</span>
                                     ${exam.total_questions}Q
                                 </span>
+                                ${isTaken ? `
+                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-xs">grade</span>
+                                    ${parseFloat(exam.last_percentage).toFixed(0)}%
+                                </span>` : ''}
                             </div>
                             <div class="grid grid-cols-3 gap-2 pt-2">
                                 <button class="take-exam-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center" data-id="${exam.id}">Take</button>

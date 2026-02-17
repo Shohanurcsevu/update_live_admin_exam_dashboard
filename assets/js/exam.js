@@ -43,14 +43,22 @@ function initializeExamPage() {
         const toast = document.createElement('div');
         let bgColor, icon;
         switch (type) {
-            case 'error': bgColor = 'bg-red-500'; icon = 'error'; break;
-            case 'update': bgColor = 'bg-yellow-500'; icon = 'notification_important'; break;
-            default: bgColor = 'bg-green-500'; icon = 'check_circle'; break;
+            case 'error': bgColor = 'bg-rose-600'; icon = 'error'; break;
+            case 'update': bgColor = 'bg-amber-500'; icon = 'notification_important'; break;
+            default: bgColor = 'bg-emerald-600'; icon = 'check_circle'; break;
         }
-        toast.className = `flex items-center text-white p-4 rounded-lg shadow-lg mb-2 ${bgColor}`;
-        toast.innerHTML = `<span class="material-symbols-outlined mr-3">${icon}</span> ${message}`;
+        // Centered styling for toasts
+        toast.className = `flex items-center text-white px-6 py-3 rounded-2xl shadow-2xl mb-3 transform transition-all duration-300 translate-y-[-20px] opacity-0 animate-[fade-in-down_0.3s_forwards] pointer-events-auto ${bgColor}`;
+        toast.innerHTML = `<span class="material-symbols-outlined mr-3 font-bold">${icon}</span> <span class="font-bold tracking-tight">${message}</span>`;
         toastContainer.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s ease'; setTimeout(() => toast.remove(), 500); }, 3000);
+
+        // Remove after 3 seconds
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-20px)';
+            toast.style.transition = 'all 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     function updateExamMetrics(count) {
@@ -290,10 +298,16 @@ function initializeExamPage() {
         const formData = new FormData(examForm);
         const data = Object.fromEntries(formData.entries());
 
-        // Enforce default instructions and include imported questions if any
-        data.instructions = defaultInstructions;
-        if (importedQuestions.length > 0) {
-            data.questions = importedQuestions;
+        // Validating JSON array if textarea has content
+        const jsonText = modalQuestionsJson?.value?.trim();
+        if (jsonText) {
+            const result = QuestionUtils.parseQuestionsJSON(jsonText);
+            if (!result.success) {
+                showToast(`JSON Error: ${result.message}`, 'error');
+                modalQuestionsJson.focus();
+                return; // Stop submission
+            }
+            data.questions = result.data;
         }
 
         const url = data.id ? `${EXAM_API_URL}?action=update` : `${EXAM_API_URL}?action=create`;

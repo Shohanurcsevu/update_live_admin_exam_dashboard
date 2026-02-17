@@ -34,6 +34,7 @@ $yesterday_exams_sql = "
     LEFT JOIN performance p ON e.id = p.exam_id
     WHERE e.created_at BETWEEN '$yesterday_start' AND '$yesterday_end'
         AND e.is_deleted = 0
+        AND e.is_revision = 0
         AND s.is_deleted = 0
     GROUP BY e.id, e.exam_title, e.total_marks, s.id, s.subject_name
     ORDER BY s.subject_name, e.exam_title

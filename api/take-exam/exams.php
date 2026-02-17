@@ -7,18 +7,35 @@ $sql = "SELECT
             e.id, 
             e.exam_title, 
             e.duration, 
+            e.total_marks,
             s.subject_name, 
             l.lesson_name, 
             t.topic_name,
-            (SELECT COUNT(*) FROM questions WHERE exam_id = e.id AND is_deleted = 0) as total_questions
+            (SELECT COUNT(*) FROM questions WHERE exam_id = e.id AND is_deleted = 0) as total_questions,
+            p.last_score,
+            (p.last_score / NULLIF(e.total_marks, 0)) * 100 as last_percentage,
+            p.total_attempts as attempt_count
         FROM exams e
         LEFT JOIN subjects s ON e.subject_id = s.id
         LEFT JOIN lessons l ON e.lesson_id = l.id
-        LEFT JOIN topics t ON e.topic_id = t.id";
+        LEFT JOIN topics t ON e.topic_id = t.id
+        LEFT JOIN (
+            SELECT 
+                exam_id, 
+                score_with_negative as last_score,
+                COUNT(*) as total_attempts
+            FROM performance
+            WHERE (exam_id, attempt_number) IN (
+                SELECT exam_id, MAX(attempt_number)
+                FROM performance
+                GROUP BY exam_id
+            )
+            GROUP BY exam_id
+        ) p ON e.id = p.exam_id";
 
 $params = [];
 $types = '';
-$where_clauses = ["e.is_deleted = 0"];
+$where_clauses = ["e.is_deleted = 0", "e.is_revision = 0"];
 
 // The UI filter logic remains the same and will work as expected.
 // If a filter is applied, it will correctly narrow down the results.

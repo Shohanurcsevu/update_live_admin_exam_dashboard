@@ -95,6 +95,46 @@ if ($stmt->execute()) {
     $update_subject->execute();
     $update_subject->close();
 
+    // --- NEW: Track Question-Level Performance ---
+    $q_stmt = $conn->prepare("SELECT id, answer FROM questions WHERE exam_id = ? AND is_deleted = 0");
+    $q_stmt->bind_param("i", $exam_id);
+    $q_stmt->execute();
+    $questions_result = $q_stmt->get_result();
+    
+    $insert_attempt_stmt = $conn->prepare("INSERT INTO question_attempts (question_id, exam_id, selected_answer, is_correct) VALUES (?, ?, ?, ?)");
+    
+    $selected_answers = $performance['selected_answers']; // question_id => option_key
+    
+    while ($q_row = $questions_result->fetch_assoc()) {
+        $qid = $q_row['id'];
+        $correct_answer = $q_row['answer'];
+        $selected = isset($selected_answers[$qid]) ? $selected_answers[$qid] : null;
+        $is_correct = null;
+        
+        if ($selected !== null) {
+            $is_correct = ($selected === $correct_answer) ? 1 : 0;
+        }
+        
+        $insert_attempt_stmt->bind_param("iisi", $qid, $exam_id, $selected, $is_correct);
+        $insert_attempt_stmt->execute();
+    }
+    $insert_attempt_stmt->close();
+    $q_stmt->close();
+
+    // --- NEW: Update Topic Revision Metadata ---
+    $exam_info_stmt = $conn->prepare("SELECT topic_id, is_revision FROM exams WHERE id = ?");
+    $exam_info_stmt->bind_param("i", $exam_id);
+    $exam_info_stmt->execute();
+    $exam_info = $exam_info_stmt->get_result()->fetch_assoc();
+
+    if ($exam_info && $exam_info['is_revision'] == 1 && $exam_info['topic_id']) {
+        $update_topic_stmt = $conn->prepare("UPDATE topics SET last_revised_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $update_topic_stmt->bind_param("i", $exam_info['topic_id']);
+        $update_topic_stmt->execute();
+        $update_topic_stmt->close();
+    }
+    $exam_info_stmt->close();
+
     echo json_encode([
         'success' => true, 
         'message' => 'Exam submitted successfully.',
