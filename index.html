@@ -46,123 +46,220 @@
         </main>
     </div>
 
-    <!-- PRINT OPTIONS MODAL (Global) -->
+    <!-- COMPACT SOFT GRADIENT PRINT STUDIO -->
     <div id="print-options-modal"
-        class="fixed inset-0 bg-gray-900/60 hidden items-center justify-center z-[150] p-3 sm:p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto overflow-hidden animate-fade-in">
-            <!-- Modal Header -->
-            <div class="bg-blue-600 p-4 sm:p-5 flex justify-between items-center text-white">
-                <h3 class="text-xl font-bold flex items-center gap-2">
-                    <span class="material-symbols-outlined">print_connect</span>
-                    Print Questions
-                </h3>
+        class="fixed inset-0 bg-slate-950/20 hidden items-center justify-center z-[300] backdrop-blur-md p-4">
+
+        <div
+            class="bg-white border border-slate-100 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] w-full max-w-md relative overflow-hidden animate-scale-up">
+
+            <!-- Header -->
+            <div class="p-6 pb-0 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                        <span class="material-symbols-outlined text-white text-xl">layers</span>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 tracking-tight">PDF Question Generator</h2>
+                    </div>
+                </div>
                 <button type="button" id="close-print-modal"
-                    class="hover:bg-blue-700 rounded-full p-2 transition-all active:scale-95" title="Close">
-                    <span class="material-symbols-outlined text-2xl">close</span>
+                    class="w-8 h-8 rounded-full border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all"
+                    title="Close">
+                    <span class="material-symbols-outlined text-sm">close</span>
                 </button>
             </div>
 
-            <div class="p-4 sm:p-6 max-h-[80vh] sm:max-h-[85vh] overflow-y-auto">
-                <!-- Exam ID Info -->
-                <div
-                    class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-5 flex items-center justify-between rounded-r-lg">
-                    <span class="text-blue-700 font-medium">Exam ID: <span id="modal-exam-id"
-                            class="font-bold"></span></span>
-                </div>
+            <!-- Scrollable Content Section -->
+            <div class="p-6 max-h-[80vh] overflow-y-auto custom-scrollbar space-y-6">
 
-                <!-- Presets Section -->
-                <div class="mb-6">
-                    <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Quick Presets</h4>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" onclick="window.applyExamPreset('BCS')"
-                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm">BCS
-                            Model Test</button>
-                        <button type="button" onclick="window.applyExamPreset('Primary')"
-                            class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm">Primary
-                            Teacher</button>
-                        <button type="button" onclick="window.applyExamPreset('Bank')"
-                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm">Bank
-                            Preliminary</button>
-                        <button type="button" onclick="window.applyExamPreset('Clear')"
-                            class="bg-gray-100 text-gray-600 hover:bg-gray-200 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95">Clear</button>
-                    </div>
-                </div>
-
-                <!-- Fields Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Exam Title</label>
-                        <input type="text" id="print-custom-title"
-                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            placeholder="Default: প্রিলিমিনারি টেস্ট">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Year</label>
-                        <input type="text" id="print-custom-year"
-                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            placeholder="Default: 2026">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Time</label>
-                        <input type="text" id="print-custom-time"
-                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            placeholder="Default from JSON">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Full Marks</label>
-                        <input type="text" id="print-custom-marks"
-                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            placeholder="Default from JSON">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Start Question Number</label>
-                        <input type="number" id="print-start-num"
-                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            placeholder="Default: 1" min="1">
-                    </div>
-                    <div class="flex items-center pt-2 sm:pt-6">
-                        <label class="flex items-center gap-3 cursor-pointer group">
-                            <div class="relative">
-                                <input type="checkbox" id="print-shuffle-options" checked class="peer sr-only">
-                                <div
-                                    class="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-blue-600 transition-colors">
-                                </div>
-                                <div
-                                    class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4">
-                                </div>
+                <!-- Presets at Top -->
+                <div>
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4 px-1">Studio
+                        Presets</span>
+                    <div class="grid grid-cols-4 gap-2">
+                        <!-- BCS Preset -->
+                        <div class="flex flex-col items-center group cursor-pointer"
+                            onclick="window.applyExamPreset('BCS')">
+                            <div
+                                class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-indigo-100 active:scale-95">
+                                <span class="material-symbols-outlined text-lg">auto_awesome_motion</span>
                             </div>
-                            <span class="text-sm font-bold text-gray-700">Shuffle Options (ক, খ, গ, ঘ)</span>
-                        </label>
+                            <span
+                                class="text-[8px] font-bold text-slate-500 mt-2 text-center uppercase tracking-widest">BCS</span>
+                        </div>
+
+                        <!-- Primary Preset -->
+                        <div class="flex flex-col items-center group cursor-pointer"
+                            onclick="window.applyExamPreset('Primary')">
+                            <div
+                                class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-emerald-100 active:scale-95">
+                                <span class="material-symbols-outlined text-lg">history_edu</span>
+                            </div>
+                            <span
+                                class="text-[8px] font-bold text-slate-500 mt-2 text-center uppercase tracking-widest">PRIMARY</span>
+                        </div>
+
+                        <!-- Bank Preset -->
+                        <div class="flex flex-col items-center group cursor-pointer"
+                            onclick="window.applyExamPreset('Bank')">
+                            <div
+                                class="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-purple-100 active:scale-95">
+                                <span class="material-symbols-outlined text-lg">account_balance</span>
+                            </div>
+                            <span
+                                class="text-[8px] font-bold text-slate-500 mt-2 text-center uppercase tracking-widest">BANK</span>
+                        </div>
+
+                        <!-- Clear -->
+                        <div class="flex flex-col items-center group cursor-pointer"
+                            onclick="window.applyExamPreset('Clear')">
+                            <div
+                                class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-rose-100 active:scale-95">
+                                <span class="material-symbols-outlined text-lg">restart_alt</span>
+                            </div>
+                            <span
+                                class="text-[8px] font-bold text-slate-500 mt-2 text-center uppercase tracking-widest">CLEAR</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Instructions -->
-                <div class="mb-8">
-                    <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Custom Instructions (One per
-                        line)</label>
-                    <textarea id="print-custom-instructions" rows="3"
-                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none"
-                        placeholder="Default instructions will be used if left blank"></textarea>
-                </div>
+                <!-- Parameters -->
+                <div class="space-y-3.5">
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="col-span-3">
+                            <label
+                                class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-1">Exam
+                                Title</label>
+                            <input type="text" id="print-custom-title"
+                                class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                placeholder="e.g. BCS Preliminary" value="প্রিলিমিনারি টেস্ট">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-1">Session</label>
+                            <input type="text" id="print-custom-year"
+                                class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                placeholder="2026" value="2026">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-1">Marks</label>
+                            <input type="text" id="print-custom-marks"
+                                class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                placeholder="Auto" value="From JSON">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-1">Duration</label>
+                            <input type="text" id="print-custom-time"
+                                class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                placeholder="Auto" value="From JSON">
+                        </div>
+                    </div>
 
-                <!-- Actions -->
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <button type="button" id="cancel-print-modal"
-                        class="flex-1 order-2 sm:order-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 rounded-xl transition-all active:scale-95">
-                        Cancel
-                    </button>
-                    <button type="button" id="generate-pdf-btn"
-                        class="flex-[2] order-1 sm:order-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 transition-all active:scale-95">
-                        <span class="material-symbols-outlined">picture_as_pdf</span>
-                        Generate Questions
-                    </button>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div
+                            class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <div class="flex-1">
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Question
+                                    Start From</p>
+                                <input type="number" id="print-start-num" value="1" min="1"
+                                    class="bg-transparent text-sm font-bold text-indigo-600 outline-none w-full text-left">
+                            </div>
+                        </div>
+
+                        <div
+                            class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <div>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Shuffle
+                                    options</p>
+                                <span class="text-[8px] font-bold text-slate-500 uppercase">ক-ঘ</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="print-shuffle-options" checked class="sr-only peer">
+                                <div
+                                    class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600">
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label
+                            class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-1">Special
+                            Instructions</label>
+                        <textarea id="print-custom-instructions" rows="2"
+                            class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-[11px] font-medium text-slate-600 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/5 transition-all resize-none custom-scrollbar"
+                            placeholder="Add metadata or notes..."></textarea>
+                    </div>
                 </div>
             </div>
+
+            <!-- Final Synthesis Action -->
+            <div class="pt-2">
+                <button type="button" id="generate-pdf-btn"
+                    class="w-full bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white rounded-2xl h-14 flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 hover:shadow-indigo-200 transition-all font-bold uppercase tracking-widest text-xs active:scale-[0.98]">
+                    Print
+                </button>
+            </div>
         </div>
+    </div>
     </div>
 
     <!-- PRINT ENGINE STYLES (Screen Hidden) -->
     <style>
+        /* Custom Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes scaleUp {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .animate-scale-up {
+            animation: scaleUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Premium Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f8fafc;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+
         #print-container {
             display: none;
         }
