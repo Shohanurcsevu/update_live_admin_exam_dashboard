@@ -2,6 +2,7 @@
     console.log("Mistake Bank: Script loaded and initializing...");
     const listContainer = document.getElementById('mistake-exams-list');
     const searchInput = document.getElementById('mistake-exam-search');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
     let allExams = [];
 
     async function init() {
@@ -12,7 +13,21 @@
 
             if (result.success) {
                 allExams = result.data;
-                renderExams(allExams);
+
+                // Restore search term from localStorage
+                const savedSearch = localStorage.getItem('filter_mistake_search');
+                if (savedSearch && searchInput) {
+                    searchInput.value = savedSearch;
+                    clearSearchBtn.classList.remove('hidden');
+                    const term = savedSearch.toLowerCase();
+                    const filtered = allExams.filter(ex =>
+                        ex.exam_title.toLowerCase().includes(term) ||
+                        ex.subject_name.toLowerCase().includes(term)
+                    );
+                    renderExams(filtered);
+                } else {
+                    renderExams(allExams);
+                }
                 updateCounters(allExams);
             }
         } catch (err) {
@@ -88,11 +103,28 @@
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
+            localStorage.setItem('filter_mistake_search', e.target.value);
+
+            if (e.target.value) {
+                clearSearchBtn.classList.remove('hidden');
+            } else {
+                clearSearchBtn.classList.add('hidden');
+            }
+
             const filtered = allExams.filter(ex =>
                 ex.exam_title.toLowerCase().includes(term) ||
                 ex.subject_name.toLowerCase().includes(term)
             );
             renderExams(filtered);
+        });
+    }
+
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            localStorage.removeItem('filter_mistake_search');
+            clearSearchBtn.classList.add('hidden');
+            renderExams(allExams);
         });
     }
 

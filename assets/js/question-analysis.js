@@ -10,6 +10,7 @@ function initializeQuestionAnalysis() {
     const lessonFilter = document.getElementById('filter-lesson');
     const topicFilter = document.getElementById('filter-topic');
     const questionListBody = document.getElementById('question-list-body');
+    const clearAnalysisFiltersBtn = document.getElementById('clear-analysis-filters');
     const loadingSpinner = document.getElementById('loading-spinner');
 
     // Stats Elements
@@ -31,6 +32,13 @@ function initializeQuestionAnalysis() {
                 result.forEach(subject => {
                     subjectFilter.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
                 });
+
+                // Restore from localStorage
+                const savedSubject = localStorage.getItem('filter_analysis_subject');
+                if (savedSubject) {
+                    subjectFilter.value = savedSubject;
+                    populateLessons(savedSubject);
+                }
             }
         } catch (error) { console.error('Failed to load subjects', error); }
     }
@@ -50,6 +58,13 @@ function initializeQuestionAnalysis() {
                     lessonFilter.innerHTML += `<option value="${lesson.id}">${lesson.lesson_name}</option>`;
                 });
                 lessonFilter.disabled = false;
+
+                // Restore from localStorage
+                const savedLesson = localStorage.getItem('filter_analysis_lesson');
+                if (savedLesson) {
+                    lessonFilter.value = savedLesson;
+                    populateTopics(savedLesson);
+                }
             }
         } catch (error) { console.error('Failed to load lessons', error); }
     }
@@ -67,6 +82,13 @@ function initializeQuestionAnalysis() {
                     topicFilter.innerHTML += `<option value="${topic.id}">${topic.topic_name}</option>`;
                 });
                 topicFilter.disabled = false;
+
+                // Restore from localStorage
+                const savedTopic = localStorage.getItem('filter_analysis_topic');
+                if (savedTopic) {
+                    topicFilter.value = savedTopic;
+                }
+                fetchAnalysis();
             }
         } catch (error) { console.error('Failed to load topics', error); }
     }
@@ -171,18 +193,42 @@ function initializeQuestionAnalysis() {
     // Event Listeners
     if (subjectFilter) {
         subjectFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_analysis_subject', subjectFilter.value);
+            localStorage.removeItem('filter_analysis_lesson');
+            localStorage.removeItem('filter_analysis_topic');
             populateLessons(subjectFilter.value);
             fetchAnalysis();
         });
     }
     if (lessonFilter) {
         lessonFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_analysis_lesson', lessonFilter.value);
+            localStorage.removeItem('filter_analysis_topic');
             populateTopics(lessonFilter.value);
             fetchAnalysis();
         });
     }
     if (topicFilter) {
-        topicFilter.addEventListener('change', fetchAnalysis);
+        topicFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_analysis_topic', topicFilter.value);
+            fetchAnalysis();
+        });
+    }
+
+    if (clearAnalysisFiltersBtn) {
+        clearAnalysisFiltersBtn.addEventListener('click', () => {
+            localStorage.removeItem('filter_analysis_subject');
+            localStorage.removeItem('filter_analysis_lesson');
+            localStorage.removeItem('filter_analysis_topic');
+
+            subjectFilter.value = '';
+            lessonFilter.innerHTML = '<option value="">All Lessons</option>';
+            lessonFilter.disabled = true;
+            topicFilter.innerHTML = '<option value="">All Topics</option>';
+            topicFilter.disabled = true;
+
+            fetchAnalysis();
+        });
     }
 
     if (btnWrongExam) btnWrongExam.addEventListener('click', () => handleCreateExam('wrong'));

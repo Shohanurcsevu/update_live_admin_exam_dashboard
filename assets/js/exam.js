@@ -20,6 +20,7 @@ function initializeExamPage() {
     const subjectFilter = document.getElementById('subject-filter');
     const lessonFilter = document.getElementById('lesson-filter');
     const topicFilter = document.getElementById('topic-filter');
+    const mainClearFiltersBtn = document.getElementById('main-clear-filters-btn');
     const clearFiltersBtn = document.getElementById('clear-filters-btn');
 
     // Modal Selectors
@@ -90,6 +91,15 @@ function initializeExamPage() {
                 result.forEach(subject => {
                     selector.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
                 });
+
+                // Restore main list filters
+                if (selector === subjectFilter) {
+                    const savedSubject = localStorage.getItem('filter_exam_subject');
+                    if (savedSubject && savedSubject !== '0') {
+                        subjectFilter.value = savedSubject;
+                        populateLessons(savedSubject, lessonFilter, localStorage.getItem('filter_exam_lesson'));
+                    }
+                }
             }
         } catch (error) { showToast('Failed to load subjects.', 'error'); }
     }
@@ -109,7 +119,12 @@ function initializeExamPage() {
                     selector.innerHTML += `<option value="${lesson.id}">${lesson.lesson_name}</option>`;
                 });
                 selector.disabled = false;
-                if (lessonToSelect) selector.value = lessonToSelect;
+                if (lessonToSelect) {
+                    selector.value = lessonToSelect;
+                    if (selector === lessonFilter) {
+                        populateTopics(lessonToSelect, topicFilter, localStorage.getItem('filter_exam_topic'));
+                    }
+                }
             }
         } catch (error) { showToast('Failed to load lessons.', 'error'); }
     }
@@ -129,7 +144,13 @@ function initializeExamPage() {
                     selector.innerHTML += `<option value="${topic.id}">${topic.topic_name}</option>`;
                 });
                 selector.disabled = false;
-                if (topicToSelect) selector.value = topicToSelect;
+                if (topicToSelect) {
+                    selector.value = topicToSelect;
+                }
+                // Refresh list only if this is the main filter and not modal
+                if (selector === topicFilter) {
+                    fetchAndDisplayExams(false);
+                }
             }
         } catch (error) { showToast('Failed to load topics.', 'error'); }
     }
@@ -462,14 +483,38 @@ function initializeExamPage() {
 
     // Filter listeners
     subjectFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_exam_subject', subjectFilter.value);
+        localStorage.removeItem('filter_exam_lesson');
+        localStorage.removeItem('filter_exam_topic');
         populateLessons(subjectFilter.value, lessonFilter);
         lessonFilter.dispatchEvent(new Event('change')); // Trigger lesson filter change
     });
     lessonFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_exam_lesson', lessonFilter.value);
+        localStorage.removeItem('filter_exam_topic');
         populateTopics(lessonFilter.value, topicFilter);
         topicFilter.dispatchEvent(new Event('change')); // Trigger topic filter change
     });
-    topicFilter.addEventListener('change', () => fetchAndDisplayExams(false));
+    topicFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_exam_topic', topicFilter.value);
+        fetchAndDisplayExams(false);
+    });
+
+    if (mainClearFiltersBtn) {
+        mainClearFiltersBtn.addEventListener('click', () => {
+            localStorage.removeItem('filter_exam_subject');
+            localStorage.removeItem('filter_exam_lesson');
+            localStorage.removeItem('filter_exam_topic');
+
+            subjectFilter.value = "0";
+            lessonFilter.innerHTML = '<option value="0">All Lessons</option>';
+            lessonFilter.disabled = true;
+            topicFilter.innerHTML = '<option value="0">All Topics</option>';
+            topicFilter.disabled = true;
+
+            fetchAndDisplayExams(false);
+        });
+    }
 
     // Modal dependent dropdown listeners
     modalSubjectSelector.addEventListener('change', () => populateLessons(modalSubjectSelector.value, modalLessonSelector));

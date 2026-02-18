@@ -40,6 +40,8 @@ class StudyMentor {
         this.expandedMissionSubjects = new Set(); // Track expanded mission subject cards
         this.expandedRevisionSubjects = new Set(); // Track expanded revision subject cards
         this.inactiveNudgeIntervalId = null; // Track the inactive nudge interval
+        this.lastProcessedSessionId = null; // Track session IDs to avoid redundant sync events
+        this.isRestoringSession = false; // Guard for parallel sync calls
 
         // Server-Sync State
         this.serverInactivityData = {
@@ -63,7 +65,7 @@ class StudyMentor {
 
         // Check for queued prompts after restoration
         if (this.isOnDashboard()) {
-            if (this.sessionChain.awaitingContinuationChoice) {
+            if (this.sessionChain.awaitingContinuationChoice || this.isContinuationPromptActive) {
                 this.sessionChain.awaitingContinuationChoice = false;
                 this.showContinuationPrompt();
             } else if (this.sessionChain.awaitingResumeConfirmation) {
@@ -73,8 +75,8 @@ class StudyMentor {
                 // Only show greeting if no session was restored and no queued prompts
                 this.showWelcomeGreeting();
             }
-        } else if (!this.focusSession.isActive && !this.breakSession.isActive) {
-            // Show greeting on non-dashboard pages if no session
+        } else if (!this.focusSession.isActive && !this.breakSession.isActive && !this.isContinuationPromptActive) {
+            // Show greeting on non-dashboard pages if no session and no prompt
             this.showWelcomeGreeting();
         }
 
@@ -98,12 +100,10 @@ class StudyMentor {
             this.restoreSession(); // Re-sync when window/tab gets focus (e.g. mobile wake)
         });
 
-        // NEW: Periodic sync poll (every 2s) to catch actions from other devices without focus
+        // NEW: Periodic sync poll (every 1s) to catch actions from other devices instantly
         setInterval(() => {
-            if (!document.hidden) {
-                this.restoreSession();
-            }
-        }, 2000);
+            this.restoreSession();
+        }, 1000);
 
         // Also check on any URL parameter change (for SPA navigation)
         const originalPushState = history.pushState;
@@ -131,23 +131,51 @@ class StudyMentor {
     }
 
     async restoreSession() {
+        if (this.isRestoringSession) return;
+        this.isRestoringSession = true;
         try {
             const response = await fetch(`api/pomodoro/status.php?t=${Date.now()}`);
             const result = await response.json();
 
-            // Handle No Active Session (e.g. stopped on another device)
+            // --- Server Time Sync ---
+            if (result.server_time) {
+                const now = Math.floor(Date.now() / 1000);
+                this.serverInactivityData.serverOffset = result.server_time - now;
+            }
+
+            // Handle No Active Session (e.g. stopped/dismissed on another device)
             if (result.success && !result.session) {
-                if (this.focusSession.isActive || this.breakSession.isActive) {
+                if (this.focusSession.isActive || this.breakSession.isActive || this.isContinuationPromptActive || this.sessionChain.awaitingContinuationChoice) {
                     this.stopFocusSession(); // Local cleanup
+                    this.isContinuationPromptActive = false;
+                    this.sessionChain.awaitingContinuationChoice = false;
+                    this.sessionChain.awaitingResumeConfirmation = false;
+                    const teaser = document.getElementById('mentor-teaser');
+                    if (teaser) teaser.classList.add('hidden');
                 }
                 return;
             }
 
             if (result.success && result.session) {
                 const session = result.session;
-                const type = session.session_type || 'focus';
 
-                // --- NEW: Catch-up logic for cross-device consistency ---
+                // Sync the completed session count from server to ensure all devices show same "Session X"
+                if (result.completed_today !== undefined) {
+                    this.sessionChain.completedSessions = result.completed_today;
+                }
+
+                // If a new active/paused session is found, clear any stale completion prompts
+                if (session.status === 'active' || session.status === 'paused') {
+                    if (this.isContinuationPromptActive) {
+                        this.isContinuationPromptActive = false;
+                        const teaser = document.getElementById('mentor-teaser');
+                        if (teaser && !this.isFocusModeActive() && !this.isBreakModeActive()) {
+                            teaser.classList.add('hidden');
+                        }
+                    }
+                }
+
+                // --- Catch-up logic for cross-device consistency ---
                 let driftAdjustedRemaining = session.remaining_seconds;
                 if (session.status === 'active' && session.last_heartbeat_timestamp) {
                     const now = Math.floor(Date.now() / 1000) + this.serverInactivityData.serverOffset;
@@ -156,20 +184,51 @@ class StudyMentor {
                     driftAdjustedRemaining = Math.max(0, session.remaining_seconds - elapsedSinceHb);
                 }
 
+                // If session is completed and we haven't processed it yet
+                if (session.status === 'completed' || session.status === 'finished') {
+                    if (session.id !== this.lastProcessedSessionId) {
+                        this.lastProcessedSessionId = session.id;
+
+                        if (session.session_type === 'break' && this.sessionChain.isActive) {
+                            if (this.isOnDashboard()) {
+                                this.showResumePrompt();
+                            } else {
+                                this.sessionChain.awaitingResumeConfirmation = true;
+                            }
+                        } else {
+                            this.completeFocusSession(true); // handles focus session completion
+                        }
+                    }
+                    return;
+                }
+
+                this.lastProcessedSessionId = session.id;
+
+                const type = session.session_type || 'focus';
+
                 if (type === 'focus') {
-                    // If session changed completely or was stopped locally but active on server
                     this.focusSession.subject = session.subject_name;
                     this.focusSession.subjectId = session.subject_id;
                     this.focusSession.timeRemaining = driftAdjustedRemaining;
                     this.focusSession.totalDuration = (session.duration_minutes || 25) * 60;
 
-                    if (session.status === 'active' && driftAdjustedRemaining > 0) {
-                        this.focusSession.isActive = true;
-                        this.startFocusTimer(true);
+                    if (session.status === 'active') {
+                        if (driftAdjustedRemaining > 0) {
+                            this.focusSession.isActive = true;
+                            // Update endTime for smooth local countdown
+                            this.focusSession.endTime = Date.now() + (driftAdjustedRemaining * 1000);
+                            if (!this.focusSession.intervalId) this.startFocusTimer(true);
+                        } else {
+                            // If active but time is 0, let the next timer tick or next poll handle completion
+                            this.focusSession.isActive = true;
+                            this.updateFocusUI();
+                        }
                     } else if (session.status === 'paused') {
                         this.focusSession.isActive = true;
-                        if (this.focusSession.intervalId) clearInterval(this.focusSession.intervalId);
-                        this.focusSession.intervalId = null;
+                        if (this.focusSession.intervalId) {
+                            clearInterval(this.focusSession.intervalId);
+                            this.focusSession.intervalId = null;
+                        }
                         this.updateFocusUI(true);
                     }
                 } else if (type === 'break') {
@@ -177,20 +236,28 @@ class StudyMentor {
                     this.breakSession.subject = session.subject_name;
                     this.breakSession.subjectId = session.subject_id;
                     this.breakSession.timeRemaining = driftAdjustedRemaining;
-                    this.breakSession.currentActivity = { text: "Resuming your break...", emoji: "☕" };
+                    if (!this.breakSession.currentActivity) {
+                        this.breakSession.currentActivity = { text: "Resuming your break...", emoji: "☕" };
+                    }
 
                     if (session.status === 'paused') {
-                        if (this.breakSession.intervalId) clearInterval(this.breakSession.intervalId);
-                        this.breakSession.intervalId = null;
+                        if (this.breakSession.intervalId) {
+                            clearInterval(this.breakSession.intervalId);
+                            this.breakSession.intervalId = null;
+                        }
                         this.updateBreakUI(true);
-                    } else if (driftAdjustedRemaining > 0) {
-                        this.startBreakTimer(true);
+                    } else if (session.status === 'active') {
+                        this.breakSession.isActive = true;
+                        this.breakSession.endTime = Date.now() + (driftAdjustedRemaining * 1000);
+                        if (!this.breakSession.intervalId) this.startBreakTimer(true);
                     }
                 }
-                console.log('Restored session:', session, 'Adjusted Remaining:', driftAdjustedRemaining);
+                this.updateStatusIndicator();
             }
         } catch (e) {
             console.error('Failed to restore session:', e);
+        } finally {
+            this.isRestoringSession = false;
         }
     }
 
@@ -228,6 +295,11 @@ class StudyMentor {
             });
             const result = await response.json();
 
+            // --- NEW: Track ID immediately to avoid redundant sync polls ---
+            if (result.success && result.session_id) {
+                this.lastProcessedSessionId = result.session_id;
+            }
+
             // If an update was sent but nothing was changed on server (session terminated elsewhere)
             if (action === 'update' && result.success && result.affected_rows === 0) {
                 console.log('Update had no effect, session might have ended elsewhere. Syncing...');
@@ -241,6 +313,8 @@ class StudyMentor {
                     CacheManager.clearGroup('dashboard');
                 }
             }
+            // --- Force local verification poll immediately after save ---
+            setTimeout(() => this.restoreSession(), 100);
         } catch (e) {
             console.error('Failed to save session state:', e);
         }
@@ -517,15 +591,17 @@ class StudyMentor {
         }
     }
 
-    completeFocusSession() {
+    completeFocusSession(isSynced = false) {
         clearInterval(this.focusSession.intervalId);
         const completedSubject = this.focusSession.subject || "General Focus";
         this.focusSession.isActive = false;
 
-        // DB Call to Complete
-        this.saveSession('complete', {
-            remaining_seconds: 0
-        });
+        // DB Call to Complete (Only if NOT a sync-based event)
+        if (!isSynced) {
+            this.saveSession('complete', {
+                remaining_seconds: 0
+            });
+        }
 
         this.updateStatusIndicator();
         setTimeout(() => this.fetchMentorData(), 1000);
@@ -629,6 +705,9 @@ class StudyMentor {
 
     endSessionChain() {
         this.isContinuationPromptActive = false;
+        const teaser = document.getElementById('mentor-teaser');
+        if (teaser) teaser.classList.add('hidden'); // Ensure prompt UI disappears immediately
+
         const subject = this.sessionChain.subjectName || this.focusSession.subject;
         const count = this.sessionChain.completedSessions;
 
@@ -647,6 +726,9 @@ class StudyMentor {
             subjectName: null,
             completedSessions: 0
         };
+
+        // Notify server that we've dismissed the prompt/chain to sync other devices
+        this.saveSession('complete', { status: 'finished', remaining_seconds: 0 });
 
         // Refresh mentor data to show updated stats
         setTimeout(() => this.fetchMentorData(), 1000);
@@ -683,29 +765,26 @@ class StudyMentor {
     }
 
     stopFocusSession() {
-        // If stopping a focus session manually, calculate and log elapsed time
+        // Signal "STOP" and Log Duration if active
         if (this.focusSession.isActive && !this.breakSession.isActive) {
             const elapsedSeconds = this.focusSession.totalDuration - this.focusSession.timeRemaining;
             const elapsedMinutes = Math.ceil(elapsedSeconds / 60);
 
-            if (elapsedMinutes > 0) {
-                this.saveSession('complete', {
-                    duration: elapsedMinutes,
-                    remaining_seconds: 0
-                });
-            } else {
-                // If stopped instantly, just clear it without logging study time
-                this.saveSession('complete', { remaining_seconds: 0 });
-            }
-        } else if (this.breakSession.isActive) {
-            // If stopping a break, just clear the server session
-            this.saveSession('complete', { remaining_seconds: 0 });
+            this.saveSession('complete', {
+                duration: elapsedMinutes > 0 ? elapsedMinutes : 0,
+                remaining_seconds: 0,
+                status: 'finished'
+            });
+        } else if (this.breakSession.isActive || this.isContinuationPromptActive) {
+            // Explicitly signal stop for breaks or pending prompts
+            this.saveSession('complete', { status: 'finished', remaining_seconds: 0 });
         }
 
         clearInterval(this.focusSession.intervalId);
         clearInterval(this.breakSession.intervalId);
         this.focusSession.isActive = false;
         this.breakSession.isActive = false;
+        this.isContinuationPromptActive = false;
         this.updateStatusIndicator();
         const teaser = document.getElementById('mentor-teaser');
         if (teaser) teaser.classList.add('hidden');
@@ -777,10 +856,6 @@ class StudyMentor {
                     } else {
                         // Queue prompt for dashboard return
                         this.sessionChain.awaitingResumeConfirmation = true;
-                        // Auto-resume on other pages
-                        setTimeout(() => {
-                            this.startFocusSession(this.sessionChain.subjectId, this.sessionChain.subjectName);
-                        }, 2000);
                     }
                 } else {
                     this.stopFocusSession(); // This clears session too
@@ -818,7 +893,7 @@ class StudyMentor {
             if (this.isOnDashboard()) {
                 this.showResumePrompt();
             } else {
-                this.startFocusSession(this.sessionChain.subjectId, this.sessionChain.subjectName);
+                this.sessionChain.awaitingResumeConfirmation = true;
             }
         } else {
             this.stopFocusSession();
@@ -1525,10 +1600,14 @@ class StudyMentor {
                 if (!this.isBreakModeActive()) {
                     const nowMs = Date.now();
                     if (nowMs - lastNotificationTime >= 60000) {
-                        this.sendNotification(
-                            "AI Mentor: Inactivity Alert",
-                            "Sohan, both timers are inactive. Time to get back to work and start a Pomodoro session!"
-                        );
+                        // Only notify if this specific tab is "active" or "focused" 
+                        // to avoid multiple devices chiming at once
+                        if (document.visibilityState === 'visible' || document.hasFocus()) {
+                            this.sendNotification(
+                                "AI Mentor: Inactivity Alert",
+                                "Sohan, both timers are inactive. Time to get back to work and start a Pomodoro session!"
+                            );
+                        }
                         lastNotificationTime = nowMs;
                     }
                 }
@@ -1952,7 +2031,7 @@ class StudyMentor {
 
         const showNudge = () => {
             const challengeStatus = this.mentorData?.boss_challenge?.status;
-            if (this.isOpen || this.isInitialGreeting || this.isFocusModeActive() || this.isBreakModeActive()) {
+            if (this.isOpen || this.isInitialGreeting || this.isFocusModeActive() || this.isBreakModeActive() || this.isContinuationPromptActive) {
                 return;
             }
 
@@ -2059,7 +2138,7 @@ class StudyMentor {
 
                 // Auto-hide after 15 seconds
                 setTimeout(() => {
-                    if (this.isFocusModeActive()) return;
+                    if (this.isFocusModeActive() || this.isBreakModeActive() || this.isContinuationPromptActive) return;
                     teaser.classList.add('hidden');
                     teaser.classList.remove('animate-float');
                     this.isMotivationalNudgeActive = false;

@@ -20,6 +20,7 @@
     const fromDateInput = document.getElementById('from-date');
     const toDateInput = document.getElementById('to-date');
     const applyFilterBtn = document.getElementById('apply-date-filter');
+    const resetDateFiltersBtn = document.getElementById('reset-date-filters');
     const presetButtons = document.querySelectorAll('.preset-btn');
 
     // Step containers
@@ -505,6 +506,8 @@
             btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
 
             // Auto-apply filter
+            localStorage.setItem('filter_timely_from', fromDateInput.value);
+            localStorage.setItem('filter_timely_to', toDateInput.value);
             reloadExamsWithDateFilter();
         });
     });
@@ -524,6 +527,8 @@
         }
 
         currentDateFilter = { from, to };
+        localStorage.setItem('filter_timely_from', from);
+        localStorage.setItem('filter_timely_to', to);
 
         // Reset preset button styles
         presetButtons.forEach(btn => {
@@ -533,6 +538,27 @@
 
         reloadExamsWithDateFilter();
     });
+
+    if (resetDateFiltersBtn) {
+        resetDateFiltersBtn.addEventListener('click', () => {
+            localStorage.removeItem('filter_timely_from');
+            localStorage.removeItem('filter_timely_to');
+
+            setDateRange(0); // Reset to today
+
+            // Set first preset button as active
+            if (presetButtons.length > 0) {
+                presetButtons.forEach(b => {
+                    b.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    b.classList.add('bg-gray-600', 'hover:bg-gray-700');
+                });
+                presetButtons[0].classList.remove('bg-gray-600', 'hover:bg-gray-700');
+                presetButtons[0].classList.add('bg-blue-600', 'hover:bg-blue-700');
+            }
+
+            reloadExamsWithDateFilter();
+        });
+    }
 
     // Step navigation event listeners
     nextToStep2Btn.addEventListener('click', () => showStep(2));
@@ -549,14 +575,29 @@
     backToStep2Btn.addEventListener('click', () => showStep(2));
     generateExamBtn.addEventListener('click', generateExam);
 
-    // Initialize - Set default to "Today"
-    const todayFilter = setDateRange(0);
-    currentDateFilter = todayFilter;
+    // Initialize - Restore from localStorage or set default to "Today"
+    const savedFromDate = localStorage.getItem('filter_timely_from');
+    const savedToDate = localStorage.getItem('filter_timely_to');
 
-    // Set first preset button as active
-    if (presetButtons.length > 0) {
-        presetButtons[0].classList.remove('bg-gray-600', 'hover:bg-gray-700');
-        presetButtons[0].classList.add('bg-blue-600', 'hover:bg-blue-700');
+    if (savedFromDate && savedToDate) {
+        fromDateInput.value = savedFromDate;
+        toDateInput.value = savedToDate;
+        currentDateFilter = { from: savedFromDate, to: savedToDate };
+
+        // Reset preset button styles as none might be specifically active from range
+        presetButtons.forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+        });
+    } else {
+        const todayFilter = setDateRange(0);
+        currentDateFilter = todayFilter;
+
+        // Set first preset button as active
+        if (presetButtons.length > 0) {
+            presetButtons[0].classList.remove('bg-gray-600', 'hover:bg-gray-700');
+            presetButtons[0].classList.add('bg-blue-600', 'hover:bg-blue-700');
+        }
     }
 
     buildHierarchy();

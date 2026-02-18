@@ -4,6 +4,7 @@ function initializeTakeExamListPage() {
     const subjectFilter = document.getElementById('subject-filter');
     const lessonFilter = document.getElementById('lesson-filter');
     const topicFilter = document.getElementById('topic-filter');
+    const clearFiltersBtn = document.getElementById('clear-filters-btn');
     const loadMoreBtn = document.getElementById('load-more-btn');
     const currentCountEl = document.getElementById('current-count');
     const totalCountEl = document.getElementById('total-count');
@@ -39,6 +40,13 @@ function initializeTakeExamListPage() {
                 result.data.forEach(subject => {
                     subjectFilter.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
                 });
+
+                // Restore from localStorage
+                const savedSubject = localStorage.getItem('filter_take_exam_subject');
+                if (savedSubject && savedSubject !== '0') {
+                    subjectFilter.value = savedSubject;
+                    populateLessons(savedSubject);
+                }
             }
         } catch (error) { showToast('Failed to load subjects.'); }
     }
@@ -66,6 +74,13 @@ function initializeTakeExamListPage() {
                     lessonFilter.innerHTML += `<option value="${lesson.id}">${lesson.lesson_name}</option>`;
                 });
                 lessonFilter.disabled = false;
+
+                // Restore from localStorage
+                const savedLesson = localStorage.getItem('filter_take_exam_lesson');
+                if (savedLesson && savedLesson !== '0') {
+                    lessonFilter.value = savedLesson;
+                    populateTopics(savedLesson);
+                }
             }
         } catch (error) { showToast('Failed to load lessons.'); }
         finally {
@@ -95,6 +110,12 @@ function initializeTakeExamListPage() {
                     topicFilter.innerHTML += `<option value="${topic.id}">${topic.topic_name}</option>`;
                 });
                 topicFilter.disabled = false;
+
+                // Restore from localStorage
+                const savedTopic = localStorage.getItem('filter_take_exam_topic');
+                if (savedTopic && savedTopic !== '0') {
+                    topicFilter.value = savedTopic;
+                }
             }
         } catch (error) { showToast('Failed to load topics.'); }
         finally {
@@ -235,9 +256,39 @@ function initializeTakeExamListPage() {
     }
 
     // --- Event Listeners ---
-    subjectFilter.addEventListener('change', () => populateLessons(subjectFilter.value));
-    lessonFilter.addEventListener('change', () => populateTopics(lessonFilter.value));
-    topicFilter.addEventListener('change', () => fetchAndDisplayExams(false));
+    subjectFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_take_exam_subject', subjectFilter.value);
+        localStorage.removeItem('filter_take_exam_lesson');
+        localStorage.removeItem('filter_take_exam_topic');
+        populateLessons(subjectFilter.value);
+    });
+
+    lessonFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_take_exam_lesson', lessonFilter.value);
+        localStorage.removeItem('filter_take_exam_topic');
+        populateTopics(lessonFilter.value);
+    });
+
+    topicFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_take_exam_topic', topicFilter.value);
+        fetchAndDisplayExams(false);
+    });
+
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            localStorage.removeItem('filter_take_exam_subject');
+            localStorage.removeItem('filter_take_exam_lesson');
+            localStorage.removeItem('filter_take_exam_topic');
+
+            subjectFilter.value = '0';
+            lessonFilter.innerHTML = '<option value="0">All Lessons</option>';
+            lessonFilter.disabled = true;
+            topicFilter.innerHTML = '<option value="0">All Topics</option>';
+            topicFilter.disabled = true;
+
+            fetchAndDisplayExams(false);
+        });
+    }
 
     loadMoreBtn.addEventListener('click', () => {
         currentPage++;

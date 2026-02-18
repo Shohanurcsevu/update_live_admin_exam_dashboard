@@ -8,11 +8,18 @@ require_once '../subject/db_connect.php';
 date_default_timezone_set('Asia/Dhaka');
 
 try {
-    // Check for active or paused session
-    $sql = "SELECT id, subject_id, subject_name, remaining_seconds, status, duration_minutes, last_heartbeat, UNIX_TIMESTAMP(last_heartbeat) as last_heartbeat_timestamp, session_type FROM study_sessions WHERE status IN ('active', 'paused') ORDER BY id DESC LIMIT 1";
+    // Fetch the single latest session regardless of status to avoid fallback to older completed sessions
+    $sql = "SELECT id, subject_id, subject_name, remaining_seconds, status, duration_minutes, last_heartbeat, UNIX_TIMESTAMP(last_heartbeat) as last_heartbeat_timestamp, session_type 
+            FROM study_sessions 
+            ORDER BY id DESC LIMIT 1";
     $result = $conn->query($sql);
 
     if ($row = $result->fetch_assoc()) {
+        // Valid if active/paused OR completed within the last hour
+        $isRecentlyCompleted = ($row['status'] === 'completed' && strtotime($row['last_heartbeat']) >= time() - 3600);
+        $isActiveOrPaused = in_array($row['status'], ['active', 'paused']);
+
+        if ($isActiveOrPaused || $isRecentlyCompleted) {
         // Logic to calculate offline elapsed time IF needed (not for paused)
         // For 'active' sessions, if user closed tab, time logically kept ticking? 
         // Or do we validly resume from last heartbeat? 
@@ -44,10 +51,27 @@ try {
             // NOTE: To prevent "active" session from seeming stalled, we'll return it as is.
         }
 
-        echo json_encode(['success' => true, 'session' => $row]);
-    } else {
-        echo json_encode(['success' => true, 'session' => null]);
+        // Fetch daily count for this subject to keep multiple devices in sync on session number
+        $completedToday = 0;
+        if ($row['subject_id']) {
+            $countSql = "SELECT COUNT(*) as total FROM study_sessions 
+                         WHERE subject_id = ? AND status = 'completed' 
+                         AND DATE(last_heartbeat) = CURDATE()";
+            $countStmt = $conn->prepare($countSql);
+            $countStmt->bind_param("i", $row['subject_id']);
+            $countStmt->execute();
+            $countRes = $countStmt->get_result();
+            if ($countRow = $countRes->fetch_assoc()) {
+                $completedToday = intval($countRow['total']);
+            }
+        }
+
+        echo json_encode(['success' => true, 'session' => $row, 'server_time' => time(), 'completed_today' => $completedToday]);
+        exit;
     }
+}
+
+echo json_encode(['success' => true, 'session' => null, 'server_time' => time()]);
 
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);

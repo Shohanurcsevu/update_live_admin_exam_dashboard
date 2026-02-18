@@ -46,18 +46,18 @@ function initializeQuestionsListPage() {
                 currentQuestions = result.data;
                 result.data.forEach((q, index) => {
                     const priorityInt = parseInt(q.priority) || 0;
-                    let priorityBadge = '';
-                    if (priorityInt >= 3) {
-                        priorityBadge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">🔴 High</span>';
-                    } else if (priorityInt === 2) {
-                        priorityBadge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">🟡 Medium</span>';
-                    } else if (priorityInt === 1) {
-                        priorityBadge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">🔵 Low</span>';
-                    }
                     const questionCard = `
-                        <div class="border rounded-lg p-4 bg-gray-50">
-                            <div class="flex justify-between items-start">
-                                <p class="text-gray-800 font-semibold">${index + 1}. ${q.question}${priorityBadge}</p>
+                        <div class="border rounded-lg p-4 bg-gray-50 flex flex-col">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex-grow">
+                                    <p class="text-gray-800 font-semibold">${index + 1}. ${q.question}</p>
+                                    <div class="mt-2 flex flex-wrap gap-2 priority-controls" data-question-id="${q.id}">
+                                        <button class="quick-priority-btn px-2 py-0.5 rounded border text-[10px] font-bold transition-all ${priorityInt === 0 ? 'bg-gray-200 border-gray-400 text-gray-800 shadow-sm' : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'}" data-priority="0">0</button>
+                                        <button class="quick-priority-btn px-2 py-0.5 rounded border text-[10px] font-bold transition-all ${priorityInt === 1 ? 'bg-blue-100 border-blue-400 text-blue-800 shadow-sm' : 'bg-white border-gray-200 text-gray-400 hover:border-blue-300'}" data-priority="1">P1</button>
+                                        <button class="quick-priority-btn px-2 py-0.5 rounded border text-[10px] font-bold transition-all ${priorityInt === 2 ? 'bg-yellow-100 border-yellow-400 text-yellow-800 shadow-sm' : 'bg-white border-gray-200 text-gray-400 hover:border-yellow-300'}" data-priority="2">P2</button>
+                                        <button class="quick-priority-btn px-2 py-0.5 rounded border text-[10px] font-bold transition-all ${priorityInt === 3 ? 'bg-red-100 border-red-400 text-red-800 shadow-sm' : 'bg-white border-gray-200 text-gray-400 hover:border-red-300'}" data-priority="3">P3</button>
+                                    </div>
+                                </div>
                                 <div class="flex-shrink-0 ml-4">
                                     <button class="edit-btn p-1 text-green-600 hover:text-green-800" data-id="${q.id}"><span class="material-symbols-outlined">edit</span></button>
                                     <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${q.id}"><span class="material-symbols-outlined">delete</span></button>
@@ -112,6 +112,32 @@ function initializeQuestionsListPage() {
         } catch (error) { showToast('Network error.', 'error'); }
     }
 
+    async function updateQuestionPriority(questionId, priority) {
+        try {
+            const response = await fetch(`api/question/set_priority.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: questionId, priority: priority })
+            });
+            const result = await response.json();
+            if (result.success) {
+                if (!result.no_change) {
+                    showToast(result.message, 'success');
+                    // Update the local data to keep it in sync without a full fetch
+                    const qIdx = currentQuestions.findIndex(q => q.id == questionId);
+                    if (qIdx !== -1) currentQuestions[qIdx].priority = priority;
+                }
+                return true;
+            } else {
+                showToast(result.message, 'error');
+                return false;
+            }
+        } catch (error) {
+            showToast('Failed to update priority.', 'error');
+            return false;
+        }
+    }
+
     async function handleDeleteConfirm() {
         if (!questionIdToDelete) return;
         try {
@@ -122,7 +148,7 @@ function initializeQuestionsListPage() {
         finally { closeModal(deleteModal); fetchAndDisplayQuestions(); }
     }
 
-    function handleContainerClick(e) {
+    async function handleContainerClick(e) {
         const editBtn = e.target.closest('.edit-btn');
         const deleteBtn = e.target.closest('.delete-btn');
 
@@ -142,8 +168,30 @@ function initializeQuestionsListPage() {
                 document.getElementById('edit-option-d').value = questionData.options.D;
                 document.getElementById('edit-answer').value = questionData.answer;
                 document.getElementById('edit-explanation').value = questionData.explanation;
-                document.getElementById('edit-priority').value = questionData.priority || 0;
+
+                // Set priority buttons in modal
+                const priorityValue = questionData.priority || 0;
+                document.getElementById('edit-priority').value = priorityValue;
+                updateModalPriorityButtons(priorityValue);
+
                 openModal(editModal);
+            }
+        }
+
+        const quickPriorityBtn = e.target.closest('.quick-priority-btn');
+        if (quickPriorityBtn) {
+            const container = quickPriorityBtn.closest('.priority-controls');
+            const questionId = container.dataset.questionId;
+            const newPriority = parseInt(quickPriorityBtn.dataset.priority);
+
+            const success = await updateQuestionPriority(questionId, newPriority);
+            if (success) {
+                // Update button UI immediately on the card
+                const buttons = container.querySelectorAll('.quick-priority-btn');
+                buttons.forEach(btn => {
+                    const btnPriority = parseInt(btn.dataset.priority);
+                    btn.className = getPriorityBtnClass(btnPriority, btnPriority === newPriority);
+                });
             }
         }
 
@@ -168,6 +216,46 @@ function initializeQuestionsListPage() {
             showToast('Failed to load initial question data.', 'error');
         }
     }
+
+    function getPriorityBtnClass(priority, isActive) {
+        const base = "quick-priority-btn px-2 py-0.5 rounded border text-[10px] font-bold transition-all ";
+        if (!isActive) return base + "bg-white border-gray-200 text-gray-400 hover:border-gray-300";
+
+        switch (priority) {
+            case 1: return base + "bg-blue-100 border-blue-400 text-blue-800 shadow-sm";
+            case 2: return base + "bg-yellow-100 border-yellow-400 text-yellow-800 shadow-sm";
+            case 3: return base + "bg-red-100 border-red-400 text-red-800 shadow-sm";
+            default: return base + "bg-gray-200 border-gray-400 text-gray-800 shadow-sm";
+        }
+    }
+
+    function updateModalPriorityButtons(activePriority) {
+        const buttons = document.querySelectorAll('#edit-priority-buttons .priority-btn');
+        buttons.forEach(btn => {
+            const p = parseInt(btn.dataset.priority);
+            if (p === activePriority) {
+                btn.classList.add('ring-2', 'ring-offset-1', 'border-current');
+                switch (p) {
+                    case 0: btn.classList.add('ring-gray-400'); break;
+                    case 1: btn.classList.add('ring-blue-400'); break;
+                    case 2: btn.classList.add('ring-yellow-400'); break;
+                    case 3: btn.classList.add('ring-red-400'); break;
+                }
+            } else {
+                btn.classList.remove('ring-2', 'ring-offset-1', 'ring-gray-400', 'ring-blue-400', 'ring-yellow-400', 'ring-red-400', 'border-current');
+            }
+        });
+    }
+
+    // Modal Priority Button Click Handler
+    document.getElementById('edit-priority-buttons').addEventListener('click', (e) => {
+        const btn = e.target.closest('.priority-btn');
+        if (btn) {
+            const priority = parseInt(btn.dataset.priority);
+            document.getElementById('edit-priority').value = priority;
+            updateModalPriorityButtons(priority);
+        }
+    });
 
     // Event listeners
     backBtn.addEventListener('click', () => window.history.back()); // Simple back navigation

@@ -11,9 +11,16 @@
 
     <!-- Date Filter Section -->
     <div class="bg-white p-6 rounded-lg shadow-md">
-        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <span class="material-symbols-outlined mr-2 text-blue-600">calendar_today</span>
-            Date Filter
+        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
+            <div class="flex items-center">
+                <span class="material-symbols-outlined mr-2 text-blue-600">calendar_today</span>
+                Date Filter
+            </div>
+            <button id="reset-date-filters"
+                class="flex items-center gap-2 text-amber-600 hover:text-amber-800 transition font-bold text-sm">
+                <span class="material-symbols-outlined text-lg">filter_alt_off</span>
+                Reset
+            </button>
         </h3>
 
         <div class="space-y-4">

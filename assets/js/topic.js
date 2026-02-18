@@ -13,6 +13,7 @@ function initializeTopicPage() {
     const lessonFilter = document.getElementById('lesson-filter');
     const modalSubjectSelector = document.getElementById('modal-subject-selector');
     const modalLessonSelector = document.getElementById('modal-lesson-selector');
+    const mainClearFiltersBtn = document.getElementById('main-clear-filters-btn');
     const clearFiltersBtn = document.getElementById('clear-filters-btn');
     const toastContainer = document.getElementById('toast-container');
 
@@ -41,6 +42,15 @@ function initializeTopicPage() {
                 result.data.forEach(subject => {
                     selector.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
                 });
+
+                // Restore main list filters
+                if (selector === subjectFilter) {
+                    const savedSubject = localStorage.getItem('filter_topic_subject');
+                    if (savedSubject && savedSubject !== '0') {
+                        subjectFilter.value = savedSubject;
+                        populateLessons(savedSubject, lessonFilter, localStorage.getItem('filter_topic_lesson'));
+                    }
+                }
             }
         } catch (error) { showToast('Failed to load subjects.', 'error'); }
     }
@@ -62,7 +72,14 @@ function initializeTopicPage() {
                     selector.innerHTML += `<option value="${lesson.id}">${lesson.lesson_name}</option>`;
                 });
                 selector.disabled = false;
-                if (lessonToSelect) selector.value = lessonToSelect;
+                if (lessonToSelect) {
+                    selector.value = lessonToSelect;
+                }
+
+                // Refresh list if this is the main filter
+                if (selector === lessonFilter) {
+                    fetchAndDisplayTopics();
+                }
             }
         } catch (error) { showToast('Failed to load lessons.', 'error'); }
     }
@@ -236,10 +253,28 @@ function initializeTopicPage() {
 
     // Filter listeners
     subjectFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_topic_subject', subjectFilter.value);
+        localStorage.removeItem('filter_topic_lesson');
         populateLessons(subjectFilter.value, lessonFilter);
         fetchAndDisplayTopics();
     });
-    lessonFilter.addEventListener('change', fetchAndDisplayTopics);
+    lessonFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_topic_lesson', lessonFilter.value);
+        fetchAndDisplayTopics();
+    });
+
+    if (mainClearFiltersBtn) {
+        mainClearFiltersBtn.addEventListener('click', () => {
+            localStorage.removeItem('filter_topic_subject');
+            localStorage.removeItem('filter_topic_lesson');
+
+            subjectFilter.value = "0";
+            lessonFilter.innerHTML = '<option value="0">All Lessons</option>';
+            lessonFilter.disabled = true;
+
+            fetchAndDisplayTopics();
+        });
+    }
 
     // Modal dependent dropdown listener
     modalSubjectSelector.addEventListener('change', () => populateLessons(modalSubjectSelector.value, modalLessonSelector));

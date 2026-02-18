@@ -1,8 +1,15 @@
 <div id="toast-container" class="fixed top-5 right-5 z-50"></div>
 <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
-    <div class="mb-4">
-        <h2 class="text-2xl font-bold text-gray-800">Take an Exam</h2>
-        <p class="text-gray-500">Filter and select an exam to begin.</p>
+    <div class="flex flex-col sm:flex-row justify-between items-start mb-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Take an Exam</h2>
+            <p class="text-gray-500">Filter and select an exam to begin.</p>
+        </div>
+        <button id="clear-filters-btn"
+            class="mt-4 sm:mt-0 flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition font-bold text-sm shadow-sm">
+            <span class="material-symbols-outlined text-lg">filter_alt_off</span>
+            Clear Filters
+        </button>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 border rounded-lg bg-gray-50">
         <div><label for="subject-filter" class="block text-sm font-medium text-gray-700">Subject</label><select

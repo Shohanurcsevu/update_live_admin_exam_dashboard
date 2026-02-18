@@ -10,9 +10,10 @@ function initializeLessonPage() {
     const lessonForm = document.getElementById('lesson-form');
     const lessonsTableBody = document.getElementById('lessons-table-body');
     const subjectFilter = document.getElementById('subject-filter');
+    const mainClearFiltersBtn = document.getElementById('main-clear-filters-btn');
     const subjectIdSelector = document.getElementById('subject-id-selector');
     const toastContainer = document.getElementById('toast-container');
-    
+
     let lessonIdToDelete = null;
 
     // --- Toast Function ---
@@ -43,6 +44,13 @@ function initializeLessonPage() {
                     subjectFilter.innerHTML += option;
                     subjectIdSelector.innerHTML += option;
                 });
+
+                // Restore from localStorage
+                const savedSubject = localStorage.getItem('filter_lesson_subject');
+                if (savedSubject && savedSubject !== '0') {
+                    subjectFilter.value = savedSubject;
+                }
+                fetchAndDisplayLessons(subjectFilter.value);
             }
         } catch (error) {
             showToast('Failed to load subjects.', 'error');
@@ -110,13 +118,13 @@ function initializeLessonPage() {
         document.getElementById('lesson-id').value = '';
         openModal(lessonModal);
     }
-    
+
     async function handleFormSubmit(e) {
         e.preventDefault();
         const formData = new FormData(lessonForm);
         const data = Object.fromEntries(formData.entries());
         const url = data.id ? `${LESSON_API_URL}?action=update` : `${LESSON_API_URL}?action=create`;
-        
+
         try {
             const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             const result = await response.json();
@@ -141,11 +149,11 @@ function initializeLessonPage() {
         } catch (error) { showToast('Network error.', 'error'); }
         finally { closeModal(deleteModal); fetchAndDisplayLessons(subjectFilter.value); }
     }
-    
+
     async function handleTableClick(e) {
         const editBtn = e.target.closest('.edit-btn');
         const deleteBtn = e.target.closest('.delete-btn');
-        
+
         if (editBtn) {
             const id = editBtn.dataset.id;
             try {
@@ -165,7 +173,7 @@ function initializeLessonPage() {
                 }
             } catch (error) { showToast('Failed to fetch lesson details.', 'error'); }
         }
-        
+
         if (deleteBtn) {
             lessonIdToDelete = deleteBtn.dataset.id;
             openModal(deleteModal);
@@ -176,8 +184,19 @@ function initializeLessonPage() {
     createLessonBtn.addEventListener('click', handleCreateClick);
     lessonForm.addEventListener('submit', handleFormSubmit);
     lessonsTableBody.addEventListener('click', handleTableClick);
-    subjectFilter.addEventListener('change', () => fetchAndDisplayLessons(subjectFilter.value));
-    
+    subjectFilter.addEventListener('change', () => {
+        localStorage.setItem('filter_lesson_subject', subjectFilter.value);
+        fetchAndDisplayLessons(subjectFilter.value);
+    });
+
+    if (mainClearFiltersBtn) {
+        mainClearFiltersBtn.addEventListener('click', () => {
+            localStorage.removeItem('filter_lesson_subject');
+            subjectFilter.value = '0';
+            fetchAndDisplayLessons(0);
+        });
+    }
+
     // Modal close buttons
     document.getElementById('close-lesson-modal-btn').addEventListener('click', () => closeModal(lessonModal));
     document.getElementById('cancel-lesson-modal-btn').addEventListener('click', () => closeModal(lessonModal));
@@ -186,7 +205,7 @@ function initializeLessonPage() {
 
     // --- Initial Load ---
     populateSubjectDropdowns();
-    fetchAndDisplayLessons();
+    // fetchAndDisplayLessons() is now called inside populateSubjectDropdowns after restoration
 }
 
 initializeLessonPage();

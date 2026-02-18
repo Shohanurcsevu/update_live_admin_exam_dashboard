@@ -17,8 +17,8 @@ if ($type === 'focus' && !$subject_id) {
 }
 
 try {
-    // 1. Abandon any existing active sessions
-    $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
+    // 1. Abandon any existing active or completed sessions that are awaiting decision
+    $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused', 'completed')");
 
     // 2. Create new session
     $stmt = $conn->prepare("INSERT INTO study_sessions (subject_id, subject_name, duration_minutes, remaining_seconds, status, start_time, last_heartbeat, session_type) VALUES (?, ?, ?, ?, 'active', NOW(), NOW(), ?)");

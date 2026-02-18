@@ -5,11 +5,18 @@
 <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-4 sm:space-y-0">
         <h2 class="text-2xl font-bold text-gray-800">Manage Topics</h2>
-        <button id="create-topic-btn"
-            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow">
-            <span class="material-symbols-outlined mr-2">add</span>
-            Create Topic
-        </button>
+        <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button id="main-clear-filters-btn"
+                class="flex items-center justify-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition font-bold text-sm shadow-sm">
+                <span class="material-symbols-outlined text-lg">filter_alt_off</span>
+                Clear Filters
+            </button>
+            <button id="create-topic-btn"
+                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow">
+                <span class="material-symbols-outlined mr-2">add</span>
+                Create Topic
+            </button>
+        </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
