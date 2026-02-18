@@ -48,102 +48,113 @@
 
     <!-- PRINT OPTIONS MODAL (Global) -->
     <div id="print-options-modal"
-        class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto overflow-hidden">
+        class="fixed inset-0 bg-gray-900/60 hidden items-center justify-center z-[150] p-3 sm:p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto overflow-hidden animate-fade-in">
             <!-- Modal Header -->
-            <div class="bg-blue-600 p-4 flex justify-between items-center text-white">
+            <div class="bg-blue-600 p-4 sm:p-5 flex justify-between items-center text-white">
                 <h3 class="text-xl font-bold flex items-center gap-2">
                     <span class="material-symbols-outlined">print_connect</span>
-                    Print Configuration
+                    Print Questions
                 </h3>
                 <button type="button" id="close-print-modal"
-                    class="hover:bg-blue-700 rounded-full p-1 transition-colors">
-                    <span class="material-symbols-outlined">close</span>
+                    class="hover:bg-blue-700 rounded-full p-2 transition-all active:scale-95" title="Close">
+                    <span class="material-symbols-outlined text-2xl">close</span>
                 </button>
             </div>
 
-            <div class="p-6 max-h-[85vh] overflow-y-auto">
+            <div class="p-4 sm:p-6 max-h-[80vh] sm:max-h-[85vh] overflow-y-auto">
                 <!-- Exam ID Info -->
-                <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-6 flex items-center justify-between">
-                    <span class="text-blue-700 font-medium">Selected Exam ID: <span id="modal-exam-id"
+                <div
+                    class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-5 flex items-center justify-between rounded-r-lg">
+                    <span class="text-blue-700 font-medium">Exam ID: <span id="modal-exam-id"
                             class="font-bold"></span></span>
                 </div>
 
                 <!-- Presets Section -->
                 <div class="mb-6">
-                    <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Quick Presets</h4>
+                    <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Quick Presets</h4>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" onclick="window.applyExamPreset('BCS')"
-                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">BCS
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm">BCS
                             Model Test</button>
                         <button type="button" onclick="window.applyExamPreset('Primary')"
-                            class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Primary
+                            class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm">Primary
                             Teacher</button>
                         <button type="button" onclick="window.applyExamPreset('Bank')"
-                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Bank
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm">Bank
                             Preliminary</button>
                         <button type="button" onclick="window.applyExamPreset('Clear')"
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">Clear
-                            All</button>
+                            class="bg-gray-100 text-gray-600 hover:bg-gray-200 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95">Clear</button>
                     </div>
                 </div>
 
                 <!-- Fields Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Exam Title</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Exam Title</label>
                         <input type="text" id="print-custom-title"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                             placeholder="Default: প্রিলিমিনারি টেস্ট">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Year</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Year</label>
                         <input type="text" id="print-custom-year"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                             placeholder="Default: 2026">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Time</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Time</label>
                         <input type="text" id="print-custom-time"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                             placeholder="Default from JSON">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Full Marks</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Full Marks</label>
                         <input type="text" id="print-custom-marks"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                             placeholder="Default from JSON">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Start Question Number</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Start Question Number</label>
                         <input type="number" id="print-start-num"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                             placeholder="Default: 1" min="1">
                     </div>
-                    <div class="flex items-center pt-6">
-                        <label class="flex items-center gap-2 cursor-pointer font-semibold text-gray-700">
-                            <input type="checkbox" id="print-shuffle-options" checked
-                                class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                            Shuffle Options (ক, খ, গ, ঘ)
+                    <div class="flex items-center pt-2 sm:pt-6">
+                        <label class="flex items-center gap-3 cursor-pointer group">
+                            <div class="relative">
+                                <input type="checkbox" id="print-shuffle-options" checked class="peer sr-only">
+                                <div
+                                    class="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-blue-600 transition-colors">
+                                </div>
+                                <div
+                                    class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4">
+                                </div>
+                            </div>
+                            <span class="text-sm font-bold text-gray-700">Shuffle Options (ক, খ, গ, ঘ)</span>
                         </label>
                     </div>
                 </div>
 
                 <!-- Instructions -->
-                <div class="mb-6">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Custom Instructions (One per
+                <div class="mb-8">
+                    <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Custom Instructions (One per
                         line)</label>
                     <textarea id="print-custom-instructions" rows="3"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none"
                         placeholder="Default instructions will be used if left blank"></textarea>
                 </div>
 
-                <!-- Progress / Actions -->
-                <div class="flex flex-col gap-4">
+                <!-- Actions -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" id="cancel-print-modal"
+                        class="flex-1 order-2 sm:order-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 rounded-xl transition-all active:scale-95">
+                        Cancel
+                    </button>
                     <button type="button" id="generate-pdf-btn"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95">
+                        class="flex-[2] order-1 sm:order-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 transition-all active:scale-95">
                         <span class="material-symbols-outlined">picture_as_pdf</span>
-                        Generate PDF Questions
+                        Generate Questions
                     </button>
                 </div>
             </div>

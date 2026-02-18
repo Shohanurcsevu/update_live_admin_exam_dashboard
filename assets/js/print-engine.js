@@ -14,10 +14,10 @@ const PrintEngine = {
     init() {
         const modal = document.getElementById('print-options-modal');
         const closeBtn = document.getElementById('close-print-modal');
+        const cancelBtn = document.getElementById('cancel-print-modal');
 
-        if (closeBtn) {
-            closeBtn.onclick = () => this.closeModal();
-        }
+        if (closeBtn) closeBtn.onclick = () => this.closeModal();
+        if (cancelBtn) cancelBtn.onclick = () => this.closeModal();
 
         const generateBtn = document.getElementById('generate-pdf-btn');
         if (generateBtn) {
