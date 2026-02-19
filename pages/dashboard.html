@@ -578,7 +578,7 @@
         </div>
 
         <!-- Filters -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 border rounded-lg bg-gray-50">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 border rounded-lg bg-gray-50 items-end">
             <div>
                 <label for="exam-subject-filter" class="block text-sm font-medium text-gray-700">Subject</label>
                 <select id="exam-subject-filter"
@@ -595,6 +595,13 @@
                 <select id="exam-topic-filter"
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"
                     disabled></select>
+            </div>
+            <div>
+                <button id="clear-dashboard-filters" 
+                    class="w-full bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-sm">filter_alt_off</span>
+                    Clear Filters
+                </button>
             </div>
         </div>
 

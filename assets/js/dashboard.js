@@ -8,24 +8,41 @@ function initializeDashboardPage() {
     const LESSON_API_URL = 'api/exam/lessons.php';
     const TOPIC_API_URL = 'api/exam/topics.php';
 
+    // Global Error Tracker for debugging
+    if (!window.dashboardErrorTracked) {
+        window.addEventListener('error', function (event) {
+            if (event.filename && event.filename.includes('dashboard.js')) {
+                console.error("[Dashboard Internal Error]", event.message, event.error);
+                if (typeof showToast === 'function') showToast(`Error: ${event.message}`, 'error');
+            }
+        });
+        window.dashboardErrorTracked = true;
+    }
+
     // --- DOM Elements ---
     const subjectFilter = document.getElementById('exam-subject-filter');
     const lessonFilter = document.getElementById('exam-lesson-filter');
     const topicFilter = document.getElementById('exam-topic-filter');
+    const clearFiltersBtn = document.getElementById('clear-dashboard-filters');
     const examCardsContainer = document.getElementById('exam-cards-container');
     const deleteModal = document.getElementById('delete-exam-confirm-modal');
     const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
     const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
     const toastContainer = document.getElementById('toast-container');
 
-    // Print Options Elements
-    const printOptionsModal = document.getElementById('print-options-modal');
-    const closePrintModalBtn = document.getElementById('close-print-modal');
+    console.log("[Dashboard] Elements check:", {
+        subjectFilter: !!subjectFilter,
+        lessonFilter: !!lessonFilter,
+        topicFilter: !!topicFilter,
+        clearFiltersBtn: !!clearFiltersBtn,
+        examCardsContainer: !!examCardsContainer
+    });
+
+    // Print Options: generatePdfBtn is used by processAndPrint() for loading state.
+    // The print modal itself (open/close) is managed by PrintEngine.
     const generatePdfBtn = document.getElementById('generate-pdf-btn');
-    const modalExamIdSpan = document.getElementById('modal-exam-id');
 
     let examIdToDelete = null;
-    let selectedExamIdForPrint = null;
 
     // --- Helper Functions ---
     const showToast = (message, type = 'success') => {
@@ -44,6 +61,7 @@ function initializeDashboardPage() {
 
     // --- Section 1: Summary Cards Logic ---
     function animateCount(element, targetValue) {
+        if (!element) return;
         const end = parseInt(targetValue, 10);
         if (isNaN(end)) { element.textContent = targetValue; return; }
         const duration = 1200;
@@ -78,10 +96,15 @@ function initializeDashboardPage() {
             fetchAndRenderMasteryTrends(); // NEW: Mastery Trends
 
             // Initialize Study Target Tracker (NEW)
-            if (window.StudyTargetTracker) {
+            if (window.StudyTargetTracker && typeof window.StudyTargetTracker.init === 'function') {
                 window.StudyTargetTracker.init();
+            } else {
+                console.warn("[Dashboard] StudyTargetTracker not found or init is not a function");
             }
-        } catch (error) { console.error("Error fetching metrics:", error); }
+        } catch (error) {
+            console.error("[Dashboard] Error fetching metrics:", error);
+            showToast('Failed to load some dashboard metrics.', 'error');
+        }
     }
 
     let masteryChart = null;
@@ -126,61 +149,68 @@ function initializeDashboardPage() {
 
             // 1. Radar Chart
             if (ctx && typeof Chart !== 'undefined') {
-                if (masteryChart) masteryChart.destroy();
+                if (masteryChart) {
+                    try { masteryChart.destroy(); } catch (e) { console.warn("Chart destroy failed", e); }
+                }
+
                 if (subjects.length === 0) {
                     ctx.parentElement.innerHTML = '<div class="text-center text-gray-400 py-20">Not enough data to calculate trends yet.</div>';
                 } else {
-                    masteryChart = new Chart(ctx, {
-                        type: 'radar',
-                        data: {
-                            labels: subjects.map(s => getShortName(s.name)),
-                            datasets: [
-                                {
-                                    label: 'This Week',
-                                    data: subjects.map(s => s.this_week || 0),
-                                    fill: true,
-                                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                                    borderColor: 'rgb(59, 130, 246)',
-                                    pointBackgroundColor: 'rgb(59, 130, 246)',
-                                    borderWidth: 2
-                                },
-                                {
-                                    label: 'Last Week',
-                                    data: subjects.map(s => s.last_week || 0),
-                                    fill: true,
-                                    backgroundColor: 'rgba(156, 163, 175, 0.1)',
-                                    borderColor: 'rgb(156, 163, 175)',
-                                    borderWidth: 1,
-                                    borderDash: [5, 5]
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                r: {
-                                    suggestedMin: 0,
-                                    suggestedMax: 100,
-                                    ticks: { display: false },
-                                    pointLabels: {
-                                        centerPointLabels: true, // Help keep labels centered
-                                        font: {
-                                            size: window.innerWidth < 640 ? 9 : 11,
-                                            weight: '600'
-                                        },
-                                        padding: 10
+                    try {
+                        masteryChart = new Chart(ctx, {
+                            type: 'radar',
+                            data: {
+                                labels: subjects.map(s => getShortName(s.name)),
+                                datasets: [
+                                    {
+                                        label: 'This Week',
+                                        data: subjects.map(s => s.this_week || 0),
+                                        fill: true,
+                                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                                        borderColor: 'rgb(59, 130, 246)',
+                                        pointBackgroundColor: 'rgb(59, 130, 246)',
+                                        borderWidth: 2
+                                    },
+                                    {
+                                        label: 'Last Week',
+                                        data: subjects.map(s => s.last_week || 0),
+                                        fill: true,
+                                        backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                                        borderColor: 'rgb(156, 163, 175)',
+                                        borderWidth: 1,
+                                        borderDash: [5, 5]
                                     }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    r: {
+                                        suggestedMin: 0,
+                                        suggestedMax: 100,
+                                        ticks: { display: false },
+                                        pointLabels: {
+                                            centerPointLabels: true, // Help keep labels centered
+                                            font: {
+                                                size: window.innerWidth < 640 ? 9 : 11,
+                                                weight: '600'
+                                            },
+                                            padding: 10
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    legend: { display: false }
+                                },
+                                layout: {
+                                    padding: 35 // Uniform symmetrical padding
                                 }
-                            },
-                            plugins: {
-                                legend: { display: false }
-                            },
-                            layout: {
-                                padding: 35 // Uniform symmetrical padding
                             }
-                        }
-                    });
+                        });
+                    } catch (err) {
+                        console.error("Chart creation failed:", err);
+                    }
                 }
             }
 
@@ -431,6 +461,11 @@ function initializeDashboardPage() {
 
     // --- Section 2: Exam Selection Logic ---
     async function populateDropdown(url, selector, placeholder, isDependent = false, valueToSelect = null) {
+        if (!selector) {
+            console.error(`[Dashboard] Selector for ${placeholder} not found!`);
+            return;
+        }
+        console.log(`[Dashboard] Populating ${placeholder} from ${url}`);
         selector.innerHTML = `<option value="0">${placeholder}</option>`;
         if (isDependent) selector.disabled = true;
         try {
@@ -439,50 +474,58 @@ function initializeDashboardPage() {
                 result.forEach(item => {
                     selector.innerHTML += `<option value="${item.id}">${item.subject_name || item.lesson_name || item.topic_name}</option>`;
                 });
+
+                // If a value was requested, select it
+                if (valueToSelect && valueToSelect !== '0') {
+                    selector.value = valueToSelect;
+                }
+
                 if (isDependent) selector.disabled = false;
 
-                if (valueToSelect) {
-                    selector.value = valueToSelect;
-                    // Trigger cascade if restoring
-                    if (selector === subjectFilter) {
-                        const savedLesson = localStorage.getItem('filter_dashboard_lesson');
-                        if (savedLesson && savedLesson !== '0') {
-                            await populateDropdown(`${LESSON_API_URL}?subject_id=${valueToSelect}`, lessonFilter, 'All Lessons', true, savedLesson);
-                        } else {
-                            await populateDropdown(`${LESSON_API_URL}?subject_id=${valueToSelect}`, lessonFilter, 'All Lessons', true);
-                            fetchAndDisplayExams(false);
-                        }
-                    } else if (selector === lessonFilter) {
-                        const savedTopic = localStorage.getItem('filter_dashboard_topic');
-                        if (savedTopic && savedTopic !== '0') {
-                            await populateDropdown(`${TOPIC_API_URL}?lesson_id=${valueToSelect}`, topicFilter, 'All Topics', true, savedTopic);
-                        } else {
-                            await populateDropdown(`${TOPIC_API_URL}?lesson_id=${valueToSelect}`, topicFilter, 'All Topics', true);
-                            fetchAndDisplayExams(false);
-                        }
-                    } else if (selector === topicFilter) {
-                        fetchAndDisplayExams(false);
-                    }
+                // Cascade: If we just populated a dropdown and it has a selected value, populate the NEXT one
+                if (selector === subjectFilter && selector.value !== '0') {
+                    const savedLesson = localStorage.getItem('filter_dashboard_lesson');
+                    await populateDropdown(`${LESSON_API_URL}?subject_id=${selector.value}`, lessonFilter, 'All Lessons', true, savedLesson);
+                } else if (selector === lessonFilter && selector.value !== '0') {
+                    const savedTopic = localStorage.getItem('filter_dashboard_topic');
+                    await populateDropdown(`${TOPIC_API_URL}?lesson_id=${selector.value}`, topicFilter, 'All Topics', true, savedTopic);
                 }
+            } else {
+                if (isDependent) selector.disabled = true;
             }
-        } catch (error) { console.error(`Dropdown Error for ${placeholder}:`, error); }
+        } catch (error) {
+            console.error(`Dropdown Error for ${placeholder}:`, error);
+            if (isDependent) selector.disabled = true;
+        }
     }
 
     function renderChart(canvasId, history) {
         const ctx = document.getElementById(canvasId);
         if (!ctx || !history || history.length === 0) return;
-        if (Chart.getChart(canvasId)) Chart.getChart(canvasId).destroy();
-        new Chart(ctx, {
-            type: 'line',
-            data: { labels: history.map(h => `Attempt ${h.attempt}`), datasets: [{ label: 'Score', data: history.map(h => h.score), borderColor: 'rgba(59, 130, 246, 0.5)', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, tension: 0.4 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => `Score: ${context.raw}` } } } }
-        });
+        if (typeof Chart === 'undefined') {
+            console.warn("[Dashboard] Chart.js not loaded yet for", canvasId);
+            return;
+        }
+        try {
+            if (Chart.getChart(canvasId)) Chart.getChart(canvasId).destroy();
+            new Chart(ctx, {
+                type: 'line',
+                data: { labels: history.map(h => `Attempt ${h.attempt}`), datasets: [{ label: 'Score', data: history.map(h => h.score), borderColor: 'rgba(59, 130, 246, 0.5)', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => `Score: ${context.raw}` } } } }
+            });
+        } catch (err) {
+            console.error("Error rendering chart:", err);
+        }
     }
 
     let currentOffset = 0;
     const PAGE_SIZE = 6;
 
     async function fetchAndDisplayExams(isLoadMore = false, skipRevalidate = false) {
+        if (!examCardsContainer) {
+            console.error("[Dashboard] examCardsContainer not found!");
+            return;
+        }
         // Ensure isLoadMore is strictly boolean
         const loadingMore = isLoadMore === true;
         const container = document.getElementById('load-more-container');
@@ -496,9 +539,9 @@ function initializeDashboardPage() {
 
         let url = `${EXAMS_API_URL}?limit=${PAGE_SIZE}&offset=${currentOffset}`;
         const params = new URLSearchParams();
-        if (subjectFilter.value > 0) params.append('subject_id', subjectFilter.value);
-        if (lessonFilter.value > 0) params.append('lesson_id', lessonFilter.value);
-        if (topicFilter.value > 0) params.append('topic_id', topicFilter.value);
+        if (subjectFilter && subjectFilter.value > 0) params.append('subject_id', subjectFilter.value);
+        if (lessonFilter && lessonFilter.value > 0) params.append('lesson_id', lessonFilter.value);
+        if (topicFilter && topicFilter.value > 0) params.append('topic_id', topicFilter.value);
 
         const filterStr = params.toString();
         if (filterStr) url += '&' + filterStr;
@@ -510,9 +553,9 @@ function initializeDashboardPage() {
                     const cachedExams = await idbManager.getAll('exams');
                     if (cachedExams && cachedExams.length > 0) {
                         let filteredExams = cachedExams;
-                        if (subjectFilter.value > 0) filteredExams = filteredExams.filter(e => e.subject_id == subjectFilter.value);
-                        if (lessonFilter.value > 0) filteredExams = filteredExams.filter(e => e.lesson_id == lessonFilter.value);
-                        if (topicFilter.value > 0) filteredExams = filteredExams.filter(e => e.topic_id == topicFilter.value);
+                        if (subjectFilter && subjectFilter.value > 0) filteredExams = filteredExams.filter(e => e.subject_id == subjectFilter.value);
+                        if (lessonFilter && lessonFilter.value > 0) filteredExams = filteredExams.filter(e => e.lesson_id == lessonFilter.value);
+                        if (topicFilter && topicFilter.value > 0) filteredExams = filteredExams.filter(e => e.topic_id == topicFilter.value);
 
                         if (filteredExams.length > 0) {
                             // Slice to PAGE_SIZE for initial cache display to keep it snappy
@@ -537,13 +580,18 @@ function initializeDashboardPage() {
             // --- Cache integration for Exam List ---
             const result = await CacheManager.fetchWithCache(url, 15, false, skipRevalidate, true);
 
-            if (result) {
-                // Pass result.data because we now get the full response
-                displayExams(result.data, loadingMore);
+            if (result && result.success) {
+                const exams = result.data || [];
+
+                if (exams.length > 0) {
+                    displayExams(exams, loadingMore);
+                } else if (!loadingMore) {
+                    examCardsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-8">No exams found for the selected filters.</p>`;
+                }
 
                 // Update Cache (only for the initial/main list to keep it fast)
-                if (typeof idbManager !== 'undefined' && currentOffset === 0) {
-                    const changes = { exams: result.data };
+                if (typeof idbManager !== 'undefined' && currentOffset === 0 && exams.length > 0) {
+                    const changes = { exams: exams };
                     await idbManager.performSyncTransaction(changes);
                 }
 
@@ -557,7 +605,7 @@ function initializeDashboardPage() {
                         if (container) container.classList.add('hidden');
                     }
                 }
-            } else if (result.success && result.data.length === 0 && !loadingMore) {
+            } else if (result && !loadingMore) {
                 examCardsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-8">No exams found for the selected filters.</p>`;
                 if (container) container.classList.add('hidden');
             }
@@ -575,6 +623,7 @@ function initializeDashboardPage() {
     }
 
     function displayExams(exams, append = false) {
+        if (!exams || !Array.isArray(exams)) return;
         if (!append) examCardsContainer.innerHTML = '';
 
         if (exams.length === 0 && !append) {
@@ -764,56 +813,104 @@ function initializeDashboardPage() {
 
     // --- Event Listeners & Initial Load ---
     function setupEventListeners() {
-        subjectFilter.addEventListener('change', () => {
-            localStorage.setItem('filter_dashboard_subject', subjectFilter.value);
-            localStorage.removeItem('filter_dashboard_lesson');
-            localStorage.removeItem('filter_dashboard_topic');
-            populateDropdown(`${LESSON_API_URL}?subject_id=${subjectFilter.value}`, lessonFilter, 'All Lessons', true);
-            topicFilter.innerHTML = '<option value="0">All Topics</option>';
-            topicFilter.disabled = true;
-            fetchAndDisplayExams(false);
-        });
+        if (subjectFilter) {
+            subjectFilter.addEventListener('change', async () => {
+                console.log("Subject filter changed:", subjectFilter.value);
+                localStorage.setItem('filter_dashboard_subject', subjectFilter.value);
+                localStorage.removeItem('filter_dashboard_lesson');
+                localStorage.removeItem('filter_dashboard_topic');
 
-        lessonFilter.addEventListener('change', () => {
-            localStorage.setItem('filter_dashboard_lesson', lessonFilter.value);
-            localStorage.removeItem('filter_dashboard_topic');
-            populateDropdown(`${TOPIC_API_URL}?lesson_id=${lessonFilter.value}`, topicFilter, 'All Topics', true);
-            fetchAndDisplayExams(false);
-        });
+                if (lessonFilter) {
+                    lessonFilter.innerHTML = '<option value="0">All Lessons</option>';
+                    lessonFilter.disabled = true;
+                }
+                if (topicFilter) {
+                    topicFilter.innerHTML = '<option value="0">All Topics</option>';
+                    topicFilter.disabled = true;
+                }
 
-        topicFilter.addEventListener('change', () => {
-            localStorage.setItem('filter_dashboard_topic', topicFilter.value);
-            fetchAndDisplayExams(false);
-        });
+                if (subjectFilter.value !== '0' && lessonFilter) {
+                    await populateDropdown(`${LESSON_API_URL}?subject_id=${subjectFilter.value}`, lessonFilter, 'All Lessons', true);
+                }
+                fetchAndDisplayExams(false);
+            });
+        }
 
-        examCardsContainer.addEventListener('click', (e) => {
-            const takeExamBtn = e.target.closest('.take-exam-btn');
-            const deleteExamBtn = e.target.closest('.delete-exam-btn');
-            const printOptionsBtn = e.target.closest('.print-options-btn');
+        if (lessonFilter) {
+            lessonFilter.addEventListener('change', async () => {
+                console.log("Lesson filter changed:", lessonFilter.value);
+                localStorage.setItem('filter_dashboard_lesson', lessonFilter.value);
+                localStorage.removeItem('filter_dashboard_topic');
 
-            if (takeExamBtn) {
-                const examId = takeExamBtn.dataset.id;
-                if (window.loadPage) window.loadPage('take-exam-interface', `?exam_id=${examId}`);
-            }
-            if (deleteExamBtn) {
-                const examId = deleteExamBtn.dataset.id;
-                openDeleteModal(examId);
-            }
-            if (printOptionsBtn) {
-                const examId = printOptionsBtn.dataset.id;
-                openPrintModal(examId);
-            }
-        });
+                if (topicFilter) {
+                    topicFilter.innerHTML = '<option value="0">All Topics</option>';
+                    topicFilter.disabled = true;
+                }
 
-        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
-        confirmDeleteBtn.addEventListener('click', handleDeleteConfirm);
+                if (lessonFilter.value !== '0' && topicFilter) {
+                    await populateDropdown(`${TOPIC_API_URL}?lesson_id=${lessonFilter.value}`, topicFilter, 'All Topics', true);
+                }
+                fetchAndDisplayExams(false);
+            });
+        }
 
-        // Print Options Listeners
-        if (closePrintModalBtn) closePrintModalBtn.addEventListener('click', closePrintModal);
+        if (topicFilter) {
+            topicFilter.addEventListener('change', () => {
+                console.log("Topic filter changed:", topicFilter.value);
+                localStorage.setItem('filter_dashboard_topic', topicFilter.value);
+                fetchAndDisplayExams(false);
+            });
+        }
 
-        // Close modal on outside click
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', () => {
+                console.log("Clearing filters...");
+                localStorage.removeItem('filter_dashboard_subject');
+                localStorage.removeItem('filter_dashboard_lesson');
+                localStorage.removeItem('filter_dashboard_topic');
+
+                if (subjectFilter) subjectFilter.value = '0';
+                if (lessonFilter) {
+                    lessonFilter.innerHTML = '<option value="0">All Lessons</option>';
+                    lessonFilter.disabled = true;
+                }
+                if (topicFilter) {
+                    topicFilter.innerHTML = '<option value="0">All Topics</option>';
+                    topicFilter.disabled = true;
+                }
+
+                fetchAndDisplayExams(false);
+            });
+        }
+
+        if (examCardsContainer) {
+            examCardsContainer.addEventListener('click', (e) => {
+                const takeExamBtn = e.target.closest('.take-exam-btn');
+                const deleteExamBtn = e.target.closest('.delete-exam-btn');
+                const printOptionsBtn = e.target.closest('.print-options-btn');
+
+                if (takeExamBtn) {
+                    const examId = takeExamBtn.dataset.id;
+                    if (window.loadPage) window.loadPage('take-exam-interface', `?exam_id=${examId}`);
+                }
+                if (deleteExamBtn) {
+                    const examId = deleteExamBtn.dataset.id;
+                    openDeleteModal(examId);
+                }
+                if (printOptionsBtn) {
+                    const examId = printOptionsBtn.dataset.id;
+                    openPrintModal(examId);
+                }
+            });
+        }
+
+        if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', closeDeleteModal);
+        if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', handleDeleteConfirm);
+
+        // Print Options Listeners — use PrintEngine.closeModal() since PrintEngine owns the modal
+        // Note: PrintEngine.init() already binds close-print-modal and outside-click handlers,
+        // so we only need to ensure the delete modal outside-click is handled here.
         window.addEventListener('click', (e) => {
-            if (e.target === printOptionsModal) closePrintModal();
             if (e.target === deleteModal) closeDeleteModal();
         });
     }
@@ -950,7 +1047,9 @@ function initializeDashboardPage() {
 
     // --- SWR Support: Listen for revalidation events ---
     function setupSWRListeners() {
-        document.addEventListener('cache-revalidated', (e) => {
+        if (window.dashboardSWRHandlersSet) return;
+
+        const revalidateHandler = (e) => {
             const { url } = e.detail;
             console.log(`%c[Dashboard] Refreshing UI for revalidated URL: ${url}`, 'color: #8b5cf6;');
 
@@ -962,18 +1061,31 @@ function initializeDashboardPage() {
             if (url.includes('discipline-stats.php')) fetchAndRenderDisciplineTracker(true);
             if (url.includes('subject-stats.php')) fetchAndRenderHeatmap(true);
             if (url.includes('badges.php')) fetchAndRenderBadges(true);
-        });
+        };
 
-        // Visibility-based Revalidation
-        document.addEventListener('visibilitychange', () => {
+        const visibilityHandler = () => {
             if (document.visibilityState === 'visible') {
                 console.log('%c[Dashboard] Tab focused - revalidating key metrics', 'color: #0d9488;');
                 fetchAndDisplayMetrics(); // This will trigger SWR checks for all metrics
             }
-        });
+        };
+
+        document.addEventListener('cache-revalidated', revalidateHandler);
+        document.addEventListener('visibilitychange', visibilityHandler);
+        window.dashboardSWRHandlersSet = true;
+
+        // Cleanup on navigation
+        const cleanupHandlers = () => {
+            document.removeEventListener('cache-revalidated', revalidateHandler);
+            document.removeEventListener('visibilitychange', visibilityHandler);
+            window.dashboardSWRHandlersSet = false;
+            document.removeEventListener('pageBeforeChange', cleanupHandlers);
+        };
+        document.addEventListener('pageBeforeChange', cleanupHandlers);
     }
 
     async function initializePage() {
+        console.log("[Dashboard] Initializing page...");
         startCountdownTimers();
         setupSWRListeners();
         fetchAndDisplayMetrics();
@@ -983,10 +1095,19 @@ function initializeDashboardPage() {
 
         // Restore filters from localStorage
         const savedSubject = localStorage.getItem('filter_dashboard_subject');
-        if (savedSubject && savedSubject !== '0') {
-            await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects', false, savedSubject);
-        } else {
-            await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
+
+        try {
+            if (savedSubject && savedSubject !== '0' && subjectFilter) {
+                console.log("[Dashboard] Restoring saved subject:", savedSubject);
+                await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects', false, savedSubject);
+            } else if (subjectFilter) {
+                console.log("[Dashboard] No saved subject, populating default");
+                await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
+            }
+        } catch (error) {
+            console.error("[Dashboard] Initial population failed:", error);
+        } finally {
+            console.log("[Dashboard] Initial fetch and display exams");
             fetchAndDisplayExams();
         }
     }

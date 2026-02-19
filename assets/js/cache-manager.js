@@ -75,7 +75,16 @@ window.CacheManager = (function () {
                     fullResponse: result, // Store the full response
                     expiry: Date.now() + (ttlMinutes * 60 * 1000)
                 };
-                localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                } catch (e) {
+                    if (e.name === 'QuotaExceededError') {
+                        console.warn('[CacheManager] LocalStorage full, clearing group "dashboard"');
+                        clearGroup('dashboard');
+                        try { localStorage.setItem(cacheKey, JSON.stringify(cacheData)); } catch (e2) { }
+                    }
+                }
 
                 return returnFullResponse ? result : data;
             } else {
@@ -93,7 +102,7 @@ window.CacheManager = (function () {
     /**
      * SWR: Fetches in background and notifies UI if data changed
      */
-    async function revalidateInBackground(url, ttlMinutes, currentData) {
+    async function revalidateInBackground(url, ttlMinutes, currentData, returnFullResponse = false) {
         try {
             const response = await fetch(url);
             const result = await response.json();
@@ -103,13 +112,21 @@ window.CacheManager = (function () {
                 console.log(`%c[CacheManager] SWR: Data updated for ${url}`, 'color: #8b5cf6; font-weight: bold;');
                 const cacheData = {
                     data: newData,
+                    fullResponse: result,
                     expiry: Date.now() + (ttlMinutes * 60 * 1000)
                 };
-                localStorage.setItem(CACHE_PREFIX + btoa(url), JSON.stringify(cacheData));
+                try {
+                    localStorage.setItem(CACHE_PREFIX + safeBtoa(url), JSON.stringify(cacheData));
+                } catch (e) {
+                    if (e.name === 'QuotaExceededError') {
+                        clearGroup('dashboard');
+                        try { localStorage.setItem(CACHE_PREFIX + safeBtoa(url), JSON.stringify(cacheData)); } catch (e2) { }
+                    }
+                }
 
                 // Notify UI that data has changed
                 document.dispatchEvent(new CustomEvent('cache-revalidated', {
-                    detail: { url, data: newData }
+                    detail: { url, data: newData, fullResponse: result }
                 }));
             }
         } catch (e) {

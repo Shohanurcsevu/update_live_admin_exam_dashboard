@@ -1,8 +1,8 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *'); // Consider restricting this in production for security
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 // FILE: api/exam/subjects.php
 // Used by Exam, Dashboard, and Check Performance pages.
 require_once '../subject/db_connect.php';
