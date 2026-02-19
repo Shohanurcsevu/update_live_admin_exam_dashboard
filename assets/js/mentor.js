@@ -146,7 +146,7 @@ class StudyMentor {
 
             // Handle No Active Session (e.g. stopped/dismissed on another device)
             if (result.success && !result.session) {
-                if (this.focusSession.isActive || this.breakSession.isActive || this.isContinuationPromptActive || this.sessionChain.awaitingContinuationChoice) {
+                if (this.focusSession.isActive || this.breakSession.isActive) {
                     this.stopFocusSession(); // Local cleanup
                     this.isContinuationPromptActive = false;
                     this.sessionChain.awaitingContinuationChoice = false;
@@ -241,6 +241,12 @@ class StudyMentor {
                     this.breakSession.timeRemaining = driftAdjustedRemaining;
                     if (!this.breakSession.currentActivity) {
                         this.breakSession.currentActivity = { text: "Resuming your break...", emoji: "☕" };
+                    }
+
+                    // Sync chain subject if not set
+                    if (this.sessionChain.isActive && !this.sessionChain.subjectName) {
+                        this.sessionChain.subjectName = session.subject_name;
+                        this.sessionChain.subjectId = session.subject_id;
                     }
 
                     if (session.status === 'paused') {
@@ -706,6 +712,9 @@ class StudyMentor {
     continueSession() {
         this.isContinuationPromptActive = false;
         this.sessionChain.isActive = true;
+        // Ensure subject propagates to chain
+        this.sessionChain.subjectId = this.focusSession.subjectId;
+        this.sessionChain.subjectName = this.focusSession.subject;
         // Start break, which will lead to next focus session choice after break ends
         this.startBreakSession(this.focusSession.subjectId, this.focusSession.subject);
     }
@@ -743,7 +752,7 @@ class StudyMentor {
 
     showResumePrompt() {
         this.isContinuationPromptActive = true;
-        const subject = this.sessionChain.subjectName;
+        const subject = this.sessionChain.subjectName || this.breakSession.subject || this.focusSession.subject || "your subject";
         const nextSession = this.sessionChain.completedSessions + 1;
 
         const teaserText = document.getElementById('teaser-text');
@@ -771,7 +780,7 @@ class StudyMentor {
         }
     }
 
-    stopFocusSession() {
+    stopFocusSession(keepTeaser = false) {
         // Signal "STOP" and Log Duration if active
         if (this.focusSession.isActive && !this.breakSession.isActive) {
             const elapsedSeconds = this.focusSession.totalDuration - this.focusSession.timeRemaining;
@@ -783,8 +792,10 @@ class StudyMentor {
                 status: 'finished'
             });
         } else if (this.breakSession.isActive || this.isContinuationPromptActive) {
-            // Explicitly signal stop for breaks or pending prompts
-            this.saveSession('complete', { status: 'finished', remaining_seconds: 0 });
+            // Explicitly signal stop for breaks or pending prompts (Manual Stop)
+            if (!keepTeaser) {
+                this.saveSession('complete', { status: 'finished', remaining_seconds: 0 });
+            }
         }
 
         clearInterval(this.focusSession.intervalId);
@@ -793,10 +804,13 @@ class StudyMentor {
         this.breakSession.intervalId = null;
         this.focusSession.isActive = false;
         this.breakSession.isActive = false;
-        this.isContinuationPromptActive = false;
-        this.updateStatusIndicator();
-        const teaser = document.getElementById('mentor-teaser');
-        if (teaser) teaser.classList.add('hidden');
+
+        if (!keepTeaser) {
+            this.isContinuationPromptActive = false;
+            this.updateStatusIndicator();
+            const teaser = document.getElementById('mentor-teaser');
+            if (teaser) teaser.classList.add('hidden');
+        }
     }
 
     startBreakSession(subjectId = null, subjectName = null) {
@@ -859,7 +873,11 @@ class StudyMentor {
                 this.sendNotification("AI Mentor: Break Over", "Time to get back to work! Let's go.");
 
                 if (this.sessionChain.isActive) {
-                    this.stopFocusSession(); // Clear break session state
+                    this.stopFocusSession(true); // Preserve UI for the resume prompt
+
+                    // Log natural completion
+                    this.saveSession('complete', { type: 'break', remaining_seconds: 0, status: 'completed' });
+
                     if (this.isOnDashboard()) {
                         this.showResumePrompt();
                     } else {
@@ -867,7 +885,8 @@ class StudyMentor {
                         this.sessionChain.awaitingResumeConfirmation = true;
                     }
                 } else {
-                    this.stopFocusSession(); // This clears session too
+                    this.stopFocusSession(true); // Clear timers but keep teaser if needed (unlikely here)
+                    this.saveSession('complete', { type: 'break', remaining_seconds: 0, status: 'completed' });
                     // Show a final "Back to work" nudge
                     this.showWelcomeGreeting();
                 }
