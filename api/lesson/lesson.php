@@ -42,6 +42,8 @@ function list_lessons($conn) {
             LEFT JOIN topics t ON l.id = t.lesson_id AND t.is_deleted = 0";
     
     $where_clauses = ["l.is_deleted = 0"];
+    $params = [];
+    $types = '';
     if ($subject_id > 0) {
         $where_clauses[] = "l.subject_id = ?";
         $params[] = $subject_id;
