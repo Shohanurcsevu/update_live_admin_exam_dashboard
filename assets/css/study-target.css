@@ -261,21 +261,88 @@
 .mission-stealth h2,
 .mission-stealth p,
 .mission-stealth span,
+.mission-stealth label,
 .mission-stealth div:not(.ecg-container):not(.orb-container) {
     color: #f8fafc !important;
 }
 
 .mission-stealth .text-gray-400,
 .mission-stealth .text-slate-400 {
-    color: #cbd5e1 !important;
+    color: #94a3b8 !important;
 }
 
+/* Override stat card light backgrounds to semi-transparent dark panels */
+.mission-stealth [class*="bg-orange-50"],
+.mission-stealth [class*="bg-emerald-50"],
+.mission-stealth [class*="bg-blue-50"],
+.mission-stealth [class*="bg-yellow-50"],
+.mission-stealth [class*="bg-indigo-50"],
+.mission-stealth [class*="bg-gray-100"],
 .mission-stealth .bg-white\/40,
+.mission-stealth .bg-white\/30,
 .mission-stealth .bg-slate-900\/5 {
-    background: rgba(30, 41, 59, 0.5) !important;
-    border-color: rgba(34, 211, 238, 0.2) !important;
+    background: rgba(30, 41, 59, 0.6) !important;
+    border-color: rgba(148, 163, 184, 0.2) !important;
 }
 
+/* Override dark stat value text colors to readable light tones */
+.mission-stealth .text-orange-900,
+.mission-stealth .text-yellow-900,
+.mission-stealth .text-slate-800 {
+    color: #f1f5f9 !important;
+}
+
+.mission-stealth .text-orange-400 {
+    color: #fb923c !important;
+}
+
+.mission-stealth .text-emerald-400,
+.mission-stealth .text-emerald-600 {
+    color: #34d399 !important;
+}
+
+.mission-stealth .text-blue-400,
+.mission-stealth .text-blue-600 {
+    color: #60a5fa !important;
+}
+
+.mission-stealth .text-yellow-600 {
+    color: #fbbf24 !important;
+}
+
+.mission-stealth .text-indigo-400,
+.mission-stealth .text-indigo-600 {
+    color: #818cf8 !important;
+}
+
+.mission-stealth .text-gray-800,
+.mission-stealth .text-gray-900 {
+    color: #e2e8f0 !important;
+}
+
+/* Buffer tracker overrides */
+.mission-stealth .text-yellow-700 {
+    color: #fcd34d !important;
+}
+
+.mission-stealth [class*="bg-yellow-100"],
+.mission-stealth [class*="bg-emerald-100"],
+.mission-stealth [class*="bg-rose-100"] {
+    background: rgba(30, 41, 59, 0.5) !important;
+}
+
+/* AI Insights readability */
+.mission-stealth .bg-white\/30 {
+    background: rgba(30, 41, 59, 0.5) !important;
+    border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+.mission-stealth .text-rose-600,
+.mission-stealth .text-rose-500 {
+    color: #fb7185 !important;
+}
+
+/* Progress bar area */
 .mission-stealth #target-percentage {
     color: #22d3ee !important;
     text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
@@ -283,6 +350,12 @@
 
 .mission-stealth #feasibility-status {
     color: #22d3ee !important;
+}
+
+/* Pace slider label */
+.mission-stealth .text-indigo-600#pace-multiplier-label,
+.mission-stealth #pace-multiplier-label {
+    color: #a5b4fc !important;
 }
 
 #mission-control-banner.active {
