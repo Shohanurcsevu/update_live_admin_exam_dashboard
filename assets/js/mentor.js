@@ -41,6 +41,7 @@ class StudyMentor {
         this.expandedRevisionSubjects = new Set(); // Track expanded revision subject cards
         this.inactiveNudgeIntervalId = null; // Track the inactive nudge interval
         this.lastProcessedSessionId = null; // Track session IDs to avoid redundant sync events
+        this.lastProcessedSessionStatus = null; // Track session status to detect active→completed transitions
         this.isRestoringSession = false; // Guard for parallel sync calls
 
         // Server-Sync State
@@ -186,8 +187,9 @@ class StudyMentor {
 
                 // If session is completed and we haven't processed it yet
                 if (session.status === 'completed' || session.status === 'finished') {
-                    if (session.id !== this.lastProcessedSessionId) {
+                    if (session.id !== this.lastProcessedSessionId || this.lastProcessedSessionStatus !== session.status) {
                         this.lastProcessedSessionId = session.id;
+                        this.lastProcessedSessionStatus = session.status;
 
                         if (session.session_type === 'break' && this.sessionChain.isActive) {
                             if (this.isOnDashboard()) {
@@ -203,6 +205,7 @@ class StudyMentor {
                 }
 
                 this.lastProcessedSessionId = session.id;
+                this.lastProcessedSessionStatus = session.status;
 
                 const type = session.session_type || 'focus';
 
@@ -593,8 +596,12 @@ class StudyMentor {
 
     completeFocusSession(isSynced = false) {
         clearInterval(this.focusSession.intervalId);
+        this.focusSession.intervalId = null; // CRITICAL: null out so restoreSession can start new timers
         const completedSubject = this.focusSession.subject || "General Focus";
         this.focusSession.isActive = false;
+
+        // Prevent restoreSession from re-processing this completion on the next poll
+        this.lastProcessedSessionStatus = 'completed';
 
         // DB Call to Complete (Only if NOT a sync-based event)
         if (!isSynced) {
@@ -782,6 +789,8 @@ class StudyMentor {
 
         clearInterval(this.focusSession.intervalId);
         clearInterval(this.breakSession.intervalId);
+        this.focusSession.intervalId = null;
+        this.breakSession.intervalId = null;
         this.focusSession.isActive = false;
         this.breakSession.isActive = false;
         this.isContinuationPromptActive = false;
