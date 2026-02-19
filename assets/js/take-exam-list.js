@@ -46,6 +46,8 @@ function initializeTakeExamListPage() {
                 if (savedSubject && savedSubject !== '0') {
                     subjectFilter.value = savedSubject;
                     populateLessons(savedSubject);
+                } else {
+                    fetchAndDisplayExams();
                 }
             }
         } catch (error) { showToast('Failed to load subjects.'); }
@@ -396,7 +398,6 @@ function initializeTakeExamListPage() {
 
     // --- Initial Load ---
     populateSubjects();
-    fetchAndDisplayExams();
 }
 initializeTakeExamListPage();
 

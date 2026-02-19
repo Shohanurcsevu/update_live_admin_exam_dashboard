@@ -54,7 +54,13 @@ try {
                     THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(al.activity_details, '$.duration')) AS DECIMAL) * 60 
                     ELSE 25 * 60 
                 END) as calculated_seconds,
-                COUNT(*) as sessions,
+                -- Only count full completions towards sessions count
+                SUM(CASE 
+                    WHEN al.activity_details IS NULL OR al.activity_details = '' THEN 1 -- Old logs
+                    WHEN al.activity_details LIKE '%\"status\":\"completed\"%' THEN 1
+                    WHEN al.activity_details NOT LIKE '%\"status\"%' THEN 1 -- Transition period logs
+                    ELSE 0 
+                END) as sessions,
                 0 as questions
             FROM activity_log al
             LEFT JOIN subjects s ON al.activity_message = s.subject_name

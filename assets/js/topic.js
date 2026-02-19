@@ -49,6 +49,8 @@ function initializeTopicPage() {
                     if (savedSubject && savedSubject !== '0') {
                         subjectFilter.value = savedSubject;
                         populateLessons(savedSubject, lessonFilter, localStorage.getItem('filter_topic_lesson'));
+                    } else {
+                        fetchAndDisplayTopics();
                     }
                 }
             }
@@ -288,7 +290,6 @@ function initializeTopicPage() {
     // Initial Load
     populateSubjects(subjectFilter);
     populateSubjects(modalSubjectSelector);
-    fetchAndDisplayTopics();
 }
 
 initializeTopicPage();

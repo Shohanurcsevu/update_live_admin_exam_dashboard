@@ -430,7 +430,7 @@ function initializeDashboardPage() {
     }
 
     // --- Section 2: Exam Selection Logic ---
-    async function populateDropdown(url, selector, placeholder, isDependent = false) {
+    async function populateDropdown(url, selector, placeholder, isDependent = false, valueToSelect = null) {
         selector.innerHTML = `<option value="0">${placeholder}</option>`;
         if (isDependent) selector.disabled = true;
         try {
@@ -440,6 +440,30 @@ function initializeDashboardPage() {
                     selector.innerHTML += `<option value="${item.id}">${item.subject_name || item.lesson_name || item.topic_name}</option>`;
                 });
                 if (isDependent) selector.disabled = false;
+
+                if (valueToSelect) {
+                    selector.value = valueToSelect;
+                    // Trigger cascade if restoring
+                    if (selector === subjectFilter) {
+                        const savedLesson = localStorage.getItem('filter_dashboard_lesson');
+                        if (savedLesson && savedLesson !== '0') {
+                            await populateDropdown(`${LESSON_API_URL}?subject_id=${valueToSelect}`, lessonFilter, 'All Lessons', true, savedLesson);
+                        } else {
+                            await populateDropdown(`${LESSON_API_URL}?subject_id=${valueToSelect}`, lessonFilter, 'All Lessons', true);
+                            fetchAndDisplayExams(false);
+                        }
+                    } else if (selector === lessonFilter) {
+                        const savedTopic = localStorage.getItem('filter_dashboard_topic');
+                        if (savedTopic && savedTopic !== '0') {
+                            await populateDropdown(`${TOPIC_API_URL}?lesson_id=${valueToSelect}`, topicFilter, 'All Topics', true, savedTopic);
+                        } else {
+                            await populateDropdown(`${TOPIC_API_URL}?lesson_id=${valueToSelect}`, topicFilter, 'All Topics', true);
+                            fetchAndDisplayExams(false);
+                        }
+                    } else if (selector === topicFilter) {
+                        fetchAndDisplayExams(false);
+                    }
+                }
             }
         } catch (error) { console.error(`Dropdown Error for ${placeholder}:`, error); }
     }
@@ -741,6 +765,9 @@ function initializeDashboardPage() {
     // --- Event Listeners & Initial Load ---
     function setupEventListeners() {
         subjectFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_dashboard_subject', subjectFilter.value);
+            localStorage.removeItem('filter_dashboard_lesson');
+            localStorage.removeItem('filter_dashboard_topic');
             populateDropdown(`${LESSON_API_URL}?subject_id=${subjectFilter.value}`, lessonFilter, 'All Lessons', true);
             topicFilter.innerHTML = '<option value="0">All Topics</option>';
             topicFilter.disabled = true;
@@ -748,11 +775,16 @@ function initializeDashboardPage() {
         });
 
         lessonFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_dashboard_lesson', lessonFilter.value);
+            localStorage.removeItem('filter_dashboard_topic');
             populateDropdown(`${TOPIC_API_URL}?lesson_id=${lessonFilter.value}`, topicFilter, 'All Topics', true);
             fetchAndDisplayExams(false);
         });
 
-        topicFilter.addEventListener('change', () => fetchAndDisplayExams(false));
+        topicFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_dashboard_topic', topicFilter.value);
+            fetchAndDisplayExams(false);
+        });
 
         examCardsContainer.addEventListener('click', (e) => {
             const takeExamBtn = e.target.closest('.take-exam-btn');
@@ -941,14 +973,22 @@ function initializeDashboardPage() {
         });
     }
 
-    function initializePage() {
+    async function initializePage() {
         startCountdownTimers();
         setupSWRListeners();
         fetchAndDisplayMetrics();
-        populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
-        fetchAndDisplayExams();
+
         setupEventListeners();
         setupActionHub();
+
+        // Restore filters from localStorage
+        const savedSubject = localStorage.getItem('filter_dashboard_subject');
+        if (savedSubject && savedSubject !== '0') {
+            await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects', false, savedSubject);
+        } else {
+            await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
+            fetchAndDisplayExams();
+        }
     }
     initializePage();
 }

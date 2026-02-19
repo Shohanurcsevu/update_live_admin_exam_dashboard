@@ -61,6 +61,16 @@ $result = $conn->query($trends_sql);
 $subjects = [];
 $insights = [];
 
+// 1. Fetch manual completions ONCE for all today's subjects (efficiency)
+$manual_exam_ids = [];
+$man_res = $conn->query("SELECT activity_message FROM activity_log WHERE activity_type = 'manual_exam_completion' AND timestamp BETWEEN '$today_start' AND '$today_end'");
+if ($man_res) {
+    while ($m_row = $man_res->fetch_assoc()) {
+        $m_data = json_decode($m_row['activity_message'], true);
+        if (isset($m_data['exam_id'])) $manual_exam_ids[] = (int)$m_data['exam_id'];
+    }
+}
+
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $this_week = $row['accuracy_this_week'] !== null ? round(floatval($row['accuracy_this_week']), 1) : null;
@@ -87,24 +97,11 @@ if ($result) {
         $today_exams_result = $conn->query($today_exams_sql);
         $today_exams = [];
         
-        // Fetch manual completions for this subject's exams today
-        $manual_ids = [];
-        $man_sql = "SELECT activity_message FROM activity_log WHERE activity_type = 'manual_exam_completion' AND timestamp BETWEEN '$today_start' AND '$today_end'";
-        $man_res = $conn->query($man_sql);
-        if ($man_res) {
-            while ($man_row = $man_res->fetch_assoc()) {
-                $data = json_decode($man_row['activity_message'], true);
-                if (isset($data['exam_id'])) {
-                    $manual_ids[] = intval($data['exam_id']);
-                }
-            }
-        }
-
         if ($today_exams_result) {
             while ($exam_row = $today_exams_result->fetch_assoc()) {
                 $exam_id = intval($exam_row['id']);
                 $is_online_completed = intval($exam_row['attempt_count']) > 0;
-                $is_manual_completed = in_array($exam_id, $manual_ids);
+                $is_manual_completed = in_array($exam_id, $manual_exam_ids);
 
                 $today_exams[] = [
                     'id' => $exam_id,
@@ -118,16 +115,15 @@ if ($result) {
             }
         }
         
-        // Fetch pomodoro sessions for this subject today
+        // Fetch pomodoro sessions for this subject today (Corrected to only count completed sessions)
         $focus_count = 0;
         $break_count = 0;
         
         $pom_sql = "
-            SELECT 
-                SUM(CASE WHEN activity_type = 'pomodoro_session' THEN 1 ELSE 0 END) as focus_cnt,
-                SUM(CASE WHEN activity_type = 'pomodoro_break' THEN 1 ELSE 0 END) as break_cnt
+            SELECT activity_type, activity_details
             FROM activity_log 
             WHERE TRIM(activity_message) = ? 
+            AND activity_type IN ('pomodoro_session', 'pomodoro_break')
             AND timestamp BETWEEN '$today_start' AND '$today_end'
         ";
         $pom_stmt = $conn->prepare($pom_sql);
@@ -135,9 +131,16 @@ if ($result) {
         $pom_stmt->bind_param("s", $subject_name_val);
         $pom_stmt->execute();
         $pom_res = $pom_stmt->get_result();
-        if ($p_row = $pom_res->fetch_assoc()) {
-            $focus_count = (int)$p_row['focus_cnt'];
-            $break_count = (int)$p_row['break_cnt'];
+        while ($p_row = $pom_res->fetch_assoc()) {
+            if ($p_row['activity_type'] === 'pomodoro_break') {
+                $break_count++;
+            } else {
+                // Focus: Check if completed (old logs might not have status, assume completed)
+                $det = json_decode($p_row['activity_details'], true);
+                if (!isset($det['status']) || $det['status'] === 'completed') {
+                    $focus_count++;
+                }
+            }
         }
 
         $subjects[] = [
@@ -350,9 +353,9 @@ $response['data']['daily_stats']['exams_taken'] = $exams_taken;
 $response['data']['daily_stats']['subjects_no_activity'] = $subjects_no_activity;
 
 // --- TOTAL EXAMS TAKEN TODAY (Online + Manual, Exclude Deleted) ---
-$total_taken_today = 0;
+$completed_exam_ids = [];
 
-// 1. Online: Get distinct exam IDs from performance table joined with exams (is_deleted=0)
+// 1. Online Completions
 $online_sql = "
     SELECT DISTINCT p.exam_id 
     FROM performance p 
@@ -361,36 +364,31 @@ $online_sql = "
     AND e.is_deleted = 0
     AND e.is_revision = 0
 ";
-
-// 2. Manual: Get distinct exam IDs from activity_log joined with exams (is_deleted=0)
-$manual_sql = "
-    SELECT DISTINCT e.id 
-    FROM activity_log al
-    JOIN exams e ON e.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.activity_message, '$.exam_id')) AS UNSIGNED)
-    WHERE al.activity_type = 'manual_exam_completion' 
-    AND al.timestamp BETWEEN '$today_start' AND '$today_end'
-    AND e.is_deleted = 0
-    AND e.is_revision = 0
-";
-
-// Execute both and merge IDs to avoid double counting
-$completed_exam_ids = [];
-
 $online_res = $conn->query($online_sql);
 if ($online_res) {
-    while ($row = $online_res->fetch_row()) {
-        $completed_exam_ids[] = intval($row[0]);
+    while ($row = $online_res->fetch_row()) $completed_exam_ids[] = intval($row[0]);
+}
+
+// 2. Manual Completions (Robust PHP-based decoding instead of SQL JSON_EXTRACT)
+$manual_logs_res = $conn->query("SELECT activity_message FROM activity_log WHERE activity_type = 'manual_exam_completion' AND timestamp BETWEEN '$today_start' AND '$today_end'");
+if ($manual_logs_res) {
+    // Collect manual IDs
+    $man_ids = [];
+    while ($row = $manual_logs_res->fetch_assoc()) {
+        $m_data = json_decode($row['activity_message'], true);
+        if (isset($m_data['exam_id'])) $man_ids[] = intval($m_data['exam_id']);
+    }
+    
+    // Validate manual IDs exist and aren't deleted/revision
+    if (!empty($man_ids)) {
+        $ids_csv = implode(',', $man_ids);
+        $valid_manual_res = $conn->query("SELECT id FROM exams WHERE id IN ($ids_csv) AND is_deleted = 0 AND is_revision = 0");
+        if ($valid_manual_res) {
+            while ($row = $valid_manual_res->fetch_row()) $completed_exam_ids[] = intval($row[0]);
+        }
     }
 }
 
-$manual_res = $conn->query($manual_sql);
-if ($manual_res) {
-    while ($row = $manual_res->fetch_row()) {
-        $completed_exam_ids[] = intval($row[0]);
-    }
-}
-
-// Unique IDs count
 $completed_exam_ids = array_unique($completed_exam_ids);
 $total_taken_today = count($completed_exam_ids);
 
@@ -456,19 +454,29 @@ if ($roadmap_result) {
 
 // --- POMODORO SESSIONS: Get counts for today ---
 $pomodoro_sql = "
-    SELECT TRIM(activity_message) as subject_name, COUNT(*) as session_count
+    SELECT activity_message as subject_name, activity_details
     FROM activity_log
     WHERE activity_type = 'pomodoro_session'
     AND timestamp BETWEEN '$today_start' AND '$today_end'
-    GROUP BY TRIM(activity_message)
 ";
 
 $pomodoro_result = $conn->query($pomodoro_sql);
 if ($pomodoro_result) {
+    $subject_counts = [];
     while ($row = $pomodoro_result->fetch_assoc()) {
+        $details = json_decode($row['activity_details'], true);
+        // Only count if status is completed (or missing for old logs)
+        if (!isset($details['status']) || $details['status'] === 'completed') {
+            $subj = trim($row['subject_name']);
+            if (!isset($subject_counts[$subj])) $subject_counts[$subj] = 0;
+            $subject_counts[$subj]++;
+        }
+    }
+    
+    foreach ($subject_counts as $subject => $count) {
         $response['data']['daily_stats']['pomodoro_sessions'][] = [
-            'subject' => $row['subject_name'],
-            'count' => intval($row['session_count'])
+            'subject' => $subject,
+            'count' => $count
         ];
     }
 }

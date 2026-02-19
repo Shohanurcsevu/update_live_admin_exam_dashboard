@@ -38,6 +38,8 @@ function initializeQuestionAnalysis() {
                 if (savedSubject) {
                     subjectFilter.value = savedSubject;
                     populateLessons(savedSubject);
+                } else {
+                    fetchAnalysis();
                 }
             }
         } catch (error) { console.error('Failed to load subjects', error); }
@@ -49,7 +51,10 @@ function initializeQuestionAnalysis() {
         topicFilter.innerHTML = '<option value="">All Topics</option>';
         topicFilter.disabled = true;
 
-        if (!subjectId) return;
+        if (!subjectId) {
+            fetchAnalysis();
+            return;
+        }
 
         try {
             const result = await CacheManager.fetchWithCache(`${LESSON_API_URL}?subject_id=${subjectId}`, 60);
@@ -64,6 +69,8 @@ function initializeQuestionAnalysis() {
                 if (savedLesson) {
                     lessonFilter.value = savedLesson;
                     populateTopics(savedLesson);
+                } else {
+                    fetchAnalysis();
                 }
             }
         } catch (error) { console.error('Failed to load lessons', error); }
@@ -73,7 +80,10 @@ function initializeQuestionAnalysis() {
         topicFilter.innerHTML = '<option value="">All Topics</option>';
         topicFilter.disabled = true;
 
-        if (!lessonId) return;
+        if (!lessonId) {
+            fetchAnalysis();
+            return;
+        }
 
         try {
             const result = await CacheManager.fetchWithCache(`${TOPIC_API_URL}?lesson_id=${lessonId}`, 60);
@@ -237,7 +247,6 @@ function initializeQuestionAnalysis() {
 
     // Initial Load
     populateSubjects();
-    fetchAnalysis();
 }
 
 initializeQuestionAnalysis();

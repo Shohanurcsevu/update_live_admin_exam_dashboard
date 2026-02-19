@@ -97,7 +97,15 @@ function initializeExamPage() {
                     const savedSubject = localStorage.getItem('filter_exam_subject');
                     if (savedSubject && savedSubject !== '0') {
                         subjectFilter.value = savedSubject;
-                        populateLessons(savedSubject, lessonFilter, localStorage.getItem('filter_exam_lesson'));
+                        const savedLesson = localStorage.getItem('filter_exam_lesson');
+                        if (savedLesson && savedLesson !== '0') {
+                            populateLessons(savedSubject, lessonFilter, savedLesson);
+                        } else {
+                            await populateLessons(savedSubject, lessonFilter);
+                            fetchAndDisplayExams(false);
+                        }
+                    } else {
+                        fetchAndDisplayExams(false);
                     }
                 }
             }
@@ -578,7 +586,6 @@ function initializeExamPage() {
     // --- Initial Load ---
     populateSubjects(subjectFilter);
     populateSubjects(modalSubjectSelector);
-    fetchAndDisplayExams(false);
 }
 
 initializeExamPage();

@@ -39,6 +39,7 @@ try {
             $details = json_encode([
                 'duration' => $durationToLog,
                 'subject_id' => $row['subject_id'],
+                'status' => $targetStatus,
                 'completed_at' => date('Y-m-d H:i:s')
             ]);
             
