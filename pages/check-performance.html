@@ -17,18 +17,18 @@
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"
                 disabled></select></div>
     </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full bg-white">
-            <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-                <tr>
-                    <th class="py-3 px-6 text-left">Exam Title</th>
-                    <th class="py-3 px-6 text-left">Attempt Date</th>
-                    <th class="py-3 px-6 text-center">Score</th>
-                    <th class="py-3 px-6 text-center">Total Marks</th>
-                    <th class="py-3 px-6 text-center">Action</th>
-                </tr>
-            </thead>
-            <tbody id="attempts-table-body" class="text-gray-600 text-sm font-light"></tbody>
-        </table>
+    <div id="attempts-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Attempts will be loaded here as cards -->
+    </div>
+
+    <div id="load-more-container" class="mt-8 flex justify-center hidden">
+        <button id="load-more-btn"
+            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all flex items-center gap-2">
+            <span class="material-symbols-outlined">expand_more</span> Load More
+        </button>
+    </div>
+
+    <div id="no-attempts-message" class="hidden text-center py-10">
+        <p class="text-gray-500">No attempts found for the selected filters.</p>
     </div>
 </div>

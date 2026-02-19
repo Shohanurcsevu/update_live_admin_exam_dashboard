@@ -103,7 +103,7 @@
         </div>
     </div>
 
-    <!-- Questions Table -->
+    <!-- Question Performance List Section -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="p-6 border-b border-gray-100 flex items-center justify-between">
             <h3 class="font-bold text-gray-800">Question Performance List</h3>
@@ -111,22 +111,93 @@
                 <span class="material-symbols-outlined animate-spin text-blue-600">sync</span>
             </div>
         </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                    <tr>
-                        <th class="px-6 py-4 font-semibold">Question</th>
-                        <th class="px-6 py-4 font-semibold text-center">Attempts</th>
-                        <th class="px-6 py-4 font-semibold text-center text-green-600">Correct</th>
-                        <th class="px-6 py-4 font-semibold text-center text-red-600">Wrong</th>
-                        <th class="px-6 py-4 font-semibold text-center text-gray-400">Skipped</th>
-                        <th class="px-6 py-4 font-semibold text-right">Accuracy</th>
-                    </tr>
-                </thead>
-                <tbody id="question-list-body" class="divide-y divide-gray-100 text-sm">
-                    <!-- Loaded dynamically -->
-                </tbody>
-            </table>
+
+        <div id="question-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+            <!-- Question cards will be loaded here -->
+        </div>
+
+        <div id="load-more-container" class="pb-10 flex justify-center hidden">
+            <button id="load-more-btn"
+                class="px-8 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center gap-2 group">
+                <span
+                    class="material-symbols-outlined group-hover:translate-y-1 transition-transform">expand_more</span>
+                Load More Questions
+            </button>
+        </div>
+
+        <div id="no-questions-message" class="hidden text-center py-20">
+            <span class="material-symbols-outlined text-6xl text-gray-200 mb-4">search_off</span>
+            <p class="text-gray-500 font-medium">No questions found matching the filters.</p>
+        </div>
+    </div>
+
+    <!-- Exam Creation Modal -->
+    <div id="exam-modal"
+        class="fixed inset-0 z-[300] hidden items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0 duration-300"
+            id="exam-modal-content">
+            <!-- Modal Header -->
+            <div class="p-6 pb-0 flex items-center justify-between">
+                <h3 id="exam-modal-title" class="text-xl font-bold text-gray-800">Create Custom Exam</h3>
+                <button id="close-exam-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <!-- Modal Body (Input Step) -->
+            <div id="modal-step-input" class="p-6 pt-4">
+                <p id="exam-modal-desc" class="text-sm text-gray-500 mb-4">Enter a title for your targeted practice
+                    exam.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label for="new-exam-title" class="block text-sm font-semibold text-gray-700 mb-1">Exam
+                            Title</label>
+                        <input type="text" id="new-exam-title"
+                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium"
+                            placeholder="e.g., Targeted Wrong Questions">
+                    </div>
+                </div>
+                <div class="mt-8 flex gap-3">
+                    <button id="cancel-exam-creation"
+                        class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirm-exam-creation"
+                        class="flex-1 px-4 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+                        Create Exam <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Success Step) -->
+            <div id="modal-step-success" class="p-6 pt-4 hidden text-center">
+                <div
+                    class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="material-symbols-outlined text-4xl">check_circle</span>
+                </div>
+                <h4 class="text-xl font-bold text-gray-800 mb-2">Exam Created!</h4>
+                <p class="text-sm text-gray-500 mb-8">Your custom exam is ready. Do you want to start taking it right
+                    now?</p>
+
+                <div class="flex flex-col gap-3">
+                    <button id="go-to-exam"
+                        class="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+                        Start Now <span class="material-symbols-outlined text-lg">play_arrow</span>
+                    </button>
+                    <button id="stay-on-page"
+                        class="w-full px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+                        Maybe Later
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Overlay -->
+            <div id="modal-loading" class="absolute inset-0 bg-white/80 hidden items-center justify-center">
+                <div class="flex flex-col items-center gap-3">
+                    <span class="material-symbols-outlined text-4xl animate-spin text-blue-600">sync</span>
+                    <p class="text-sm font-bold text-gray-600">Creating your exam...</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>

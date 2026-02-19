@@ -32,6 +32,14 @@ if (!empty($where_clauses)) {
 
 $sql .= " ORDER BY p.attempt_time DESC";
 
+// Pagination
+$limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+$offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
+$sql .= " LIMIT ? OFFSET ?";
+$params[] = $limit;
+$params[] = $offset;
+$types .= "ii";
+
 $stmt = $conn->prepare($sql);
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);

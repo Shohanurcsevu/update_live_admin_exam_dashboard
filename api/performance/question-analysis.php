@@ -44,6 +44,25 @@ $sql = "SELECT
         GROUP BY q.question
         ORDER BY total_attempts DESC, priority DESC";
 
+// Pagination
+$limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+$offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
+
+// Total Count
+$count_sql = "SELECT COUNT(DISTINCT q.question) as total FROM questions q WHERE $where_clause";
+$count_stmt = $conn->prepare($count_sql);
+if (!empty($params)) {
+    $count_stmt->bind_param($types, ...$params);
+}
+$count_stmt->execute();
+$total_count = $count_stmt->get_result()->fetch_assoc()['total'];
+$count_stmt->close();
+
+$sql .= " LIMIT ? OFFSET ?";
+$params[] = $limit;
+$params[] = $offset;
+$types .= "ii";
+
 $stmt = $conn->prepare($sql);
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
@@ -81,7 +100,8 @@ $summary['accuracy'] = $summary['total_attempts'] > 0 ? round(($summary['total_c
 echo json_encode([
     'success' => true,
     'summary' => $summary,
-    'questions' => $questions
+    'questions' => $questions,
+    'total_count' => $total_count
 ]);
 
 $conn->close();
