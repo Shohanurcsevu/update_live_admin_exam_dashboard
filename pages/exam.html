@@ -17,7 +17,7 @@
 </style>
 
 <!-- Main Content -->
-<div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+<div class="bg-white p-4 sm:p-6 pb-6 rounded-lg shadow-md">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-4 sm:space-y-0">
         <h2 class="text-2xl font-bold text-gray-800">Manage Exams</h2>
         <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -35,7 +35,8 @@
     </div>
 
     <!-- Stats Bar -->
-    <div class="flex items-center justify-between mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+    <div
+        class="flex flex-wrap items-center justify-between gap-3 mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
         <div class="flex items-center gap-2">
             <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                 <span class="material-symbols-outlined text-blue-600">assignment</span>
@@ -84,12 +85,12 @@
     </div>
 
     <!-- Mobile View: Cards -->
-    <div id="exams-card-view" class="md:hidden grid grid-cols-1 gap-4 mt-6">
+    <div id="exams-card-view" class="md:hidden grid grid-cols-1 gap-4 mt-6 pb-2">
         <!-- Cards will be injected here -->
     </div>
 
     <!-- Load More Button -->
-    <div id="load-more-container" class="mt-8 flex justify-center hidden px-4 sm:px-0">
+    <div id="load-more-container" class="mt-6 mb-4 flex justify-center hidden px-4 sm:px-0">
         <button id="load-more-btn"
             class="w-full sm:w-auto bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-bold py-3 px-10 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all">
             <span class="material-symbols-outlined mr-2">expand_more</span>
