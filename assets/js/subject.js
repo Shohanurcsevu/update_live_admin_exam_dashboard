@@ -21,7 +21,7 @@ function initializeSubjectPage() {
         console.error("One or more modal elements not found. Aborting script initialization.");
         return;
     }
-    
+
     // --- Toast Function ---
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
@@ -81,7 +81,7 @@ function initializeSubjectPage() {
                     subjectsTableBody.innerHTML += row;
                 });
             } else {
-                 subjectsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">No subjects found.</td></tr>`;
+                subjectsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">No subjects found.</td></tr>`;
             }
         } catch (error) { showToast('An error occurred while fetching subjects.', 'error'); }
     }
@@ -94,19 +94,19 @@ function initializeSubjectPage() {
     function generateCalendar() {
         const calendarGrid = document.getElementById('calendar-grid');
         const monthYearLabel = document.getElementById('month-year-label');
-        if (!currentAnalyticsData || !currentAnalyticsData.data) return; 
+        if (!currentAnalyticsData || !currentAnalyticsData.data) return;
         const { subject_details, reading_logs } = currentAnalyticsData.data;
-        
+
         const startDate = new Date(subject_details.start_date + 'T00:00:00');
         const endDate = new Date(subject_details.end_date + 'T00:00:00');
 
         monthYearLabel.textContent = calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
         calendarGrid.innerHTML = '';
-        
+
         ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => {
             calendarGrid.innerHTML += `<div class="font-bold text-gray-500">${day}</div>`;
         });
-        
+
         const firstDayOfMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1).getDay();
         const daysInMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0).getDate();
 
@@ -126,7 +126,7 @@ function initializeSubjectPage() {
                 else classes += " hover:bg-gray-100";
             }
             if (date.toDateString() === new Date().toDateString()) classes += " border-2 border-blue-500";
-            
+
             calendarGrid.innerHTML += `<div class="${classes}" data-date="${dateString}" ${isDisabled ? 'disabled' : ''}>${day}</div>`;
         }
     }
@@ -140,12 +140,12 @@ function initializeSubjectPage() {
         document.getElementById('days-left').textContent = calculations.daysLeft;
         document.getElementById('required-pace').textContent = calculations.needToReadPagePerDay;
         document.getElementById('current-avg').textContent = calculations.averageReading;
-        
+
         const statusIcon = document.getElementById('status-icon');
         const statusText = document.getElementById('status-text');
         const statusIndicator = document.getElementById('status-indicator');
         statusIndicator.className = 'flex items-center p-3 rounded-lg mt-1';
-        
+
         if (calculations.readingBehindPages <= 0) {
             statusIndicator.classList.add('bg-green-100', 'text-green-800');
             statusIcon.textContent = 'check_circle';
@@ -166,7 +166,7 @@ function initializeSubjectPage() {
             const response = await fetch(`${READING_API_URL}analytics.php?subject_id=${subjectId}`);
             const analyticsResponse = await response.json();
             if (analyticsResponse.success) {
-                currentAnalyticsData.data = analyticsResponse.data; 
+                currentAnalyticsData.data = analyticsResponse.data;
                 generateCalendar();
                 updateAnalyticsDisplay();
             } else {
@@ -189,7 +189,7 @@ function initializeSubjectPage() {
         document.getElementById('log-entry-form').addEventListener('submit', handleLogEntrySubmit);
         subjectsTableBody.addEventListener('click', handleTableActions);
     }
-    
+
     async function handleTableActions(e) {
         const targetBtn = e.target.closest('button');
         if (!targetBtn) return;
@@ -200,11 +200,11 @@ function initializeSubjectPage() {
             openModal(analyticsModal);
             const response = await fetch(`${SUBJECT_API_URL}?action=get_single&id=${id}`);
             const result = await response.json();
-            if(result.success) {
-                 document.getElementById('analytics-modal-title').textContent = `Analytics for: ${result.data.subject_name}`;
-                 calendarDate = new Date(result.data.start_date + 'T00:00:00');
-                 currentAnalyticsData = { subjectId: id };
-                 refreshAnalytics(id);
+            if (result.success) {
+                document.getElementById('analytics-modal-title').textContent = `Analytics for: ${result.data.subject_name}`;
+                calendarDate = new Date(result.data.start_date + 'T00:00:00');
+                currentAnalyticsData = { subjectId: id };
+                refreshAnalytics(id);
             }
         } else if (targetBtn.classList.contains('edit-btn')) {
             const response = await fetch(`${SUBJECT_API_URL}?action=get_single&id=${id}`);
@@ -253,7 +253,7 @@ function initializeSubjectPage() {
         } catch (error) { showToast('Network error.', 'error'); }
         finally { closeModal(deleteConfirmModal); fetchAndDisplaySubjects(); }
     }
-    
+
     function handleCalendarDayClick(e) {
         const dayEl = e.target.closest('div[data-date]');
         if (!dayEl || dayEl.hasAttribute('disabled')) return;
@@ -291,6 +291,25 @@ function initializeSubjectPage() {
     // --- Initial Execution ---
     setupEventListeners();
     fetchAndDisplaySubjects();
+
+    // Handle incoming subject_id for analytics
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetSubjectId = urlParams.get('subject_id');
+    if (targetSubjectId) {
+        // Wait a bit for subjects to load or just fetch single
+        setTimeout(async () => {
+            document.getElementById('analytics-modal-title').textContent = 'Loading Analytics...';
+            openModal(analyticsModal);
+            const response = await fetch(`${SUBJECT_API_URL}?action=get_single&id=${targetSubjectId}`);
+            const result = await response.json();
+            if (result.success) {
+                document.getElementById('analytics-modal-title').textContent = `Analytics for: ${result.data.subject_name}`;
+                calendarDate = new Date(result.data.start_date + 'T00:00:00');
+                currentAnalyticsData = { subjectId: targetSubjectId };
+                refreshAnalytics(targetSubjectId);
+            }
+        }, 500);
+    }
 }
 
 initializeSubjectPage();

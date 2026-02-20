@@ -1,13 +1,15 @@
 <?php
 require_once 'api/subject/db_connect.php';
-$tables = ['questions', 'performance', 'exams'];
+
+$tables = ['subjects', 'lessons', 'topics', 'study_sessions', 'performance'];
+$schema = [];
+
 foreach ($tables as $table) {
-    echo "--- $table ---\n";
-    $result = $conn->query("DESCRIBE $table");
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
-            echo json_encode($row) . "\n";
-        }
+    $res = $conn->query("DESCRIBE $table");
+    if ($res) {
+        $schema[$table] = $res->fetch_all(MYSQLI_ASSOC);
     }
 }
+
+echo json_encode($schema, JSON_PRETTY_PRINT);
 ?>

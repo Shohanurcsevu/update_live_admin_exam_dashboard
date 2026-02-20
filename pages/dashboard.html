@@ -196,12 +196,6 @@
 
                     </div>
 
-                    <!-- AI Insights Section -->
-                    <div id="ai-insights-container" class="mt-6 pt-6 border-t border-white/30 hidden">
-                        <div id="ai-recommendation-text"
-                            class="text-xs font-bold text-gray-800 leading-tight bg-white/30 p-4 rounded-2xl border border-white/50">
-                            Analyzing your study patterns...</div>
-                    </div>
                 </div>
             </div>
 
@@ -347,6 +341,32 @@
         </div>
     </div>
 
+    <!-- Smart Study Recommendations (NEW & PROMINENT) -->
+    <div id="recommendations-container" class="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg animate-bounce">
+                    <span class="material-symbols-outlined">psychology</span>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">Smart Study Recommendations</h3>
+                    <p class="text-sm text-gray-500">Based on your recent activity and weak areas.</p>
+                </div>
+            </div>
+            <span
+                class="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider">AI
+                Analysis Active</span>
+        </div>
+        <div id="ai-recommendation-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Recommendations will be injected here -->
+            <div class="col-span-full text-center py-8 text-gray-400">
+                <span class="material-symbols-outlined animate-spin text-4xl mb-2">sync</span>
+                <p>Analyzing your performance graph...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Action Hub: Resume & Rapid Fire -->
     <div id="action-hub" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Resume Card -->
@@ -373,6 +393,40 @@
                 <div id="resume-progress" class="text-sm font-medium text-blue-100 italic">
                     <!-- Progress string here -->
                 </div>
+            </div>
+        </div>
+
+        <!-- Revision Queue Card (NEW for SRS) -->
+        <div
+            class="mission-card group relative bg-white rounded-[2.5rem] p-8 border border-gray-100/50 shadow-[0_20px_50px_rgba(0,0,0,0.02)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_40px_80px_rgba(0,0,0,0.06)] overflow-hidden">
+            <div
+                class="absolute top-0 right-0 w-40 h-40 bg-rose-50 rounded-full -mr-20 -mt-20 transition-transform duration-700 group-hover:scale-150 group-hover:bg-rose-100/50 opacity-50">
+            </div>
+
+            <div class="relative z-10">
+                <div class="flex items-center justify-between mb-8">
+                    <div
+                        class="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 transition-colors duration-500 group-hover:bg-rose-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-rose-200">
+                        <span class="material-symbols-outlined text-3xl">history_edu</span>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="text-2xl font-black text-gray-900 tracking-tight mb-2">Revision Queue</h3>
+                    <p class="text-gray-500 font-bold leading-snug">Personalized SRS reviews based on your mistakes.</p>
+                </div>
+
+                <div class="py-4 border-y border-gray-50 flex items-center justify-between mb-6">
+                    <div>
+                        <span id="srs-due-count" class="text-3xl font-black text-rose-500">0</span>
+                        <span class="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Due Now</span>
+                    </div>
+                </div>
+
+                <button id="start-srs-review-btn"
+                    class="w-full py-5 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 hover:bg-rose-600 hover:shadow-xl hover:shadow-rose-200 active:scale-95 flex items-center justify-center gap-2">
+                    Review Now <span class="material-symbols-outlined text-sm">auto_fix_high</span>
+                </button>
             </div>
         </div>
 
@@ -597,7 +651,7 @@
                     disabled></select>
             </div>
             <div>
-                <button id="clear-dashboard-filters" 
+                <button id="clear-dashboard-filters"
                     class="w-full bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
                     <span class="material-symbols-outlined text-sm">filter_alt_off</span>
                     Clear Filters

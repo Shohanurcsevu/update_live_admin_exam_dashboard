@@ -41,9 +41,16 @@ function initializeTakeExamListPage() {
                     subjectFilter.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
                 });
 
-                // Restore from localStorage
+                // Restore from URL params first, then localStorage
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlSubject = urlParams.get('subject_id');
+                const urlLesson = urlParams.get('lesson_id');
                 const savedSubject = localStorage.getItem('filter_take_exam_subject');
-                if (savedSubject && savedSubject !== '0') {
+
+                if (urlSubject) {
+                    subjectFilter.value = urlSubject;
+                    populateLessons(urlSubject, urlLesson);
+                } else if (savedSubject && savedSubject !== '0') {
                     subjectFilter.value = savedSubject;
                     populateLessons(savedSubject);
                 } else {
@@ -53,7 +60,7 @@ function initializeTakeExamListPage() {
         } catch (error) { showToast('Failed to load subjects.'); }
     }
 
-    async function populateLessons(subjectId) {
+    async function populateLessons(subjectId, targetLessonId = null) {
         // Reset and disable lesson and topic filters
         lessonFilter.innerHTML = '<option value="0">All Lessons</option>';
         lessonFilter.disabled = true;
@@ -77,9 +84,12 @@ function initializeTakeExamListPage() {
                 });
                 lessonFilter.disabled = false;
 
-                // Restore from localStorage
+                // Restore from Target (URL) or localStorage
                 const savedLesson = localStorage.getItem('filter_take_exam_lesson');
-                if (savedLesson && savedLesson !== '0') {
+                if (targetLessonId) {
+                    lessonFilter.value = targetLessonId;
+                    populateTopics(targetLessonId);
+                } else if (savedLesson && savedLesson !== '0') {
                     lessonFilter.value = savedLesson;
                     populateTopics(savedLesson);
                 }

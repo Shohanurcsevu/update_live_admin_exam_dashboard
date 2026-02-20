@@ -43,6 +43,12 @@ $where_clause = implode(" AND ", $where);
 // 3. Sort by priority, then randomize.
 // 4. Create new persistent exam.
 
+// Join with question_srs for SRS mode
+$srs_join = "";
+if ($mode === 'srs_review') {
+    $srs_join = "JOIN question_srs srs ON q.id = srs.question_id AND srs.next_review_at <= CURRENT_TIMESTAMP";
+}
+
 $sql = "SELECT 
             q.question,
             MAX(q.id) as ref_id,
@@ -51,6 +57,7 @@ $sql = "SELECT
             SUM(CASE WHEN qa.selected_answer IS NULL AND qa.id IS NOT NULL THEN 1 ELSE 0 END) as unattempted_count,
             COUNT(qa.id) as total_attempts
         FROM questions q
+        $srs_join
         LEFT JOIN question_attempts qa ON q.id = qa.question_id
         WHERE $where_clause
         GROUP BY q.question";

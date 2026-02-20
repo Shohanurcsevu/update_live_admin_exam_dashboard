@@ -94,6 +94,8 @@ function initializeDashboardPage() {
             fetchAndRenderDisciplineTracker();
             fetchAndRenderBadges();
             fetchAndRenderMasteryTrends(); // NEW: Mastery Trends
+            fetchAndDisplayRecommendations(); // NEW: Smart Recommendations
+            fetchSRSStats(); // NEW: SRS Stats
 
             // Initialize Study Target Tracker (NEW)
             if (window.StudyTargetTracker && typeof window.StudyTargetTracker.init === 'function') {
@@ -104,6 +106,159 @@ function initializeDashboardPage() {
         } catch (error) {
             console.error("[Dashboard] Error fetching metrics:", error);
             showToast('Failed to load some dashboard metrics.', 'error');
+        }
+    }
+
+    async function fetchSRSStats() {
+        const countEl = document.getElementById('srs-due-count');
+        const btn = document.getElementById('start-srs-review-btn');
+        if (!countEl || !btn) return;
+
+        try {
+            const response = await fetch('api/performance/srs-stats.php');
+            const result = await response.json();
+
+            if (result.success) {
+                animateCount(countEl, result.due_count);
+                if (result.due_count === 0) {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    btn.innerHTML = 'Queue Empty <span class="material-symbols-outlined text-sm">done_all</span>';
+                } else {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btn.innerHTML = `Review ${result.due_count} Items <span class="material-symbols-outlined text-sm">auto_fix_high</span>`;
+                }
+            }
+        } catch (error) {
+            console.error("[Dashboard] SRS Fetch Error:", error);
+        }
+
+        // Setup button click
+        btn.onclick = async () => {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Loading Queue...';
+
+            try {
+                const createResponse = await fetch('api/custom-exam/create-from-performance.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mode: 'srs_review',
+                        exam_title: 'Daily SRS Review',
+                        limit: 20
+                    })
+                });
+                const createResult = await createResponse.json();
+
+                if (createResult.success) {
+                    if (confirm("Your revision queue is ready. Start now?")) {
+                        window.loadPage('take-exam-interface', `?exam_id=${createResult.exam_id}`);
+                    }
+                } else {
+                    alert(createResult.message || "No items due for review right now.");
+                }
+            } catch (err) {
+                console.error("SRS Creation failed", err);
+                alert("A network error occurred.");
+            } finally {
+                btn.disabled = false;
+                fetchSRSStats(); // Refresh count
+            }
+        };
+    }
+
+    async function fetchAndDisplayRecommendations(skipRevalidate = false) {
+        const container = document.getElementById('recommendations-container');
+        const list = document.getElementById('ai-recommendation-list');
+        if (!container || !list) return;
+
+        try {
+            const response = await fetch('api/performance/get-recommendations.php');
+            const result = await response.json();
+
+            if (result.success && result.recommendations.length > 0) {
+                list.innerHTML = result.recommendations.map(rec => {
+                    const icon = rec.type === 'critical' ? 'priority_high' : (rec.type === 'revision' ? 'history' : 'explore');
+                    const bgColor = rec.type === 'critical' ? 'bg-red-600' : (rec.type === 'revision' ? 'bg-amber-600' : 'bg-blue-600');
+                    const textAccent = rec.type === 'critical' ? 'text-red-700' : (rec.type === 'revision' ? 'text-amber-700' : 'text-blue-700');
+                    const bgAccent = rec.type === 'critical' ? 'bg-red-100' : (rec.type === 'revision' ? 'bg-amber-100' : 'bg-blue-100');
+
+                    return `
+                        <div class="bg-white border-2 border-transparent hover:border-indigo-100 p-5 rounded-2xl flex flex-col justify-between shadow-sm transition-all hover:shadow-md group">
+                            <div class="flex items-start gap-4 mb-4">
+                                <div class="w-12 h-12 rounded-xl ${bgAccent} ${textAccent} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <span class="material-symbols-outlined text-2xl">${icon}</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="text-[10px] font-black uppercase tracking-widest ${textAccent} mb-1">${rec.title}</h4>
+                                    <p class="text-sm font-bold text-gray-900 leading-snug">${rec.message}</p>
+                                </div>
+                            </div>
+                            <button class="start-practice-btn w-full py-3 ${bgColor} text-white text-xs font-black rounded-xl uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-indigo-200/50 hover:opacity-90 active:scale-95 transition-all"
+                                data-subject-id="${rec.subject_id}" 
+                                data-lesson-id="${rec.lesson_id}" 
+                                data-mode="${rec.type === 'critical' ? 'wrong' : 'mixed'}">
+                                Start Session <span class="material-symbols-outlined text-sm">rocket_launch</span>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+                // Add event listeners to buttons
+                list.querySelectorAll('.start-practice-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const target = e.currentTarget;
+                        const subjectId = target.dataset.subjectId;
+                        const lessonId = target.dataset.lessonId;
+                        const mode = target.dataset.mode;
+
+                        target.disabled = true;
+                        target.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Creating...';
+
+                        try {
+                            const createResponse = await fetch('api/custom-exam/create-from-performance.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    mode: mode,
+                                    exam_title: `Recommended Practice: ${mode.toUpperCase()}`,
+                                    subject_id: subjectId,
+                                    lesson_id: lessonId
+                                })
+                            });
+                            const createResult = await createResponse.json();
+
+                            if (createResult.success) {
+                                if (confirm("Recommended exam created successfully! Go to exam taking page?")) {
+                                    window.loadPage('take-exam-interface', `?exam_id=${createResult.exam_id}`);
+                                }
+                            } else {
+                                alert(createResult.message || "Failed to create exam.");
+                            }
+                        } catch (err) {
+                            console.error("Practice creation failed", err);
+                            alert("A network error occurred.");
+                        } finally {
+                            target.disabled = false;
+                            target.innerHTML = 'Start Practice <span class="material-symbols-outlined text-sm">arrow_forward</span>';
+                        }
+                    });
+                });
+            } else {
+                list.innerHTML = `<div class="col-span-full bg-white p-8 rounded-2xl border-2 border-dashed border-gray-100 text-center">
+                    <span class="material-symbols-outlined text-4xl text-gray-200 mb-2">auto_awesome</span>
+                    <p class="text-gray-400 font-bold text-sm">You're doing great! Keep studying to unlock more personalized analysis.</p>
+                </div>`;
+            }
+        } catch (error) {
+            console.error("Recommendations Error:", error);
+            if (list) {
+                list.innerHTML = `<div class="text-xs text-red-500 font-bold p-4 bg-red-50 rounded-xl border border-red-100 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">error</span>
+                    Failed to load recommendations. Please check console.
+                </div>`;
+            }
         }
     }
 

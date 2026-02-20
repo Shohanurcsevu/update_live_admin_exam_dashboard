@@ -23,19 +23,25 @@
         if (!foundationList || !dailyList) return;
 
         try {
-            const response = await fetch('api/performance/goal-status.php');
-            const result = await response.json();
+            // 1. Fetch Foundation Goals
+            const statusResponse = await fetch('api/performance/goal-status.php');
+            const statusResult = await statusResponse.json();
 
-            if (result.success && result.goals) {
-                const goals = result.goals;
+            // 2. Fetch Intelligent Routine
+            const routineResponse = await fetch('api/performance/get-daily-routine.php');
+            const routineResult = await routineResponse.json();
 
-                // 1. Render Foundation Goals
+            if (statusResult.success && routineResult.success) {
+                const goals = statusResult.goals;
+                const missions = routineResult.missions;
+
+                // Render Foundation Goals
                 foundationList.innerHTML = Object.keys(goals.setup).map(key => {
                     const goal = goals.setup[key];
                     const icon = goal.completed ? 'check_circle' : 'pending';
                     const iconColor = goal.completed ? 'text-emerald-500' : 'text-gray-300';
                     return `
-                        <li class="flex items-center justify-between group">
+                        <li class="flex items-center justify-between group p-3 rounded-xl hover:bg-gray-50 transition-colors">
                             <div class="flex items-center gap-3">
                                 <span class="material-symbols-outlined ${iconColor}">${icon}</span>
                                 <span class="text-sm font-semibold ${goal.completed ? 'text-gray-900' : 'text-gray-600'}">${goal.title}</span>
@@ -45,27 +51,45 @@
                     `;
                 }).join('');
 
-                // 2. Render Daily Routine
-                dailyList.innerHTML = Object.keys(goals.daily).map(key => {
-                    const goal = goals.daily[key];
-                    const icon = goal.completed ? 'verified' : 'circle';
-                    const iconColor = goal.completed ? 'text-emerald-500' : 'text-indigo-200';
+                // Render Intelligent Daily Routine
+                dailyList.innerHTML = missions.map(mission => {
+                    const isDone = mission.completed || false;
+                    const iconColor = isDone ? 'text-emerald-500' : 'text-indigo-500';
+
                     return `
-                        <li class="flex items-center justify-between group">
-                            <div class="flex items-center gap-3">
-                                <span class="material-symbols-outlined ${iconColor}">${icon}</span>
-                                <span class="text-sm font-semibold ${goal.completed ? 'text-gray-900' : 'text-gray-600'}">${goal.title}</span>
+                        <li class="flex flex-col gap-2 p-4 rounded-2xl border ${isDone ? 'border-emerald-100 bg-emerald-50/30' : 'border-indigo-50 bg-indigo-50/30'} group transition-all hover:shadow-md">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl ${isDone ? 'bg-emerald-100 text-emerald-600' : 'bg-white text-indigo-600 shadow-sm'} flex items-center justify-center">
+                                        <span class="material-symbols-outlined">${mission.icon}</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-black text-gray-900">${mission.title}</h4>
+                                        <p class="text-[10px] font-bold text-gray-500 line-clamp-1">${mission.description}</p>
+                                    </div>
+                                </div>
+                                ${isDone ?
+                            '<span class="material-symbols-outlined text-emerald-500">verified</span>' :
+                            `<button onclick="handleMissionAction('${mission.target_page}', '${mission.id}', ${JSON.stringify(mission.params).replace(/"/g, '&quot;')})" class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm shadow-indigo-200">
+                                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                                    </button>`
+                        }
                             </div>
-                            ${goal.completed ? '<span class="text-[10px] font-black text-emerald-600 uppercase">Done</span>' : '<span class="text-[10px] font-bold text-indigo-400 uppercase">Pending</span>'}
                         </li>
                     `;
                 }).join('');
 
                 // 3. Update Overall Progress
-                const allGoals = [...Object.values(goals.setup), ...Object.values(goals.daily)];
-                const completedCount = allGoals.filter(g => g.completed).length;
-                const totalCount = allGoals.length;
-                const percentage = Math.round((completedCount / totalCount) * 100);
+                // Count basic goals + missions
+                const foundationGoals = Object.values(goals.setup);
+                const totalMissions = missions.length;
+                const completedMissions = missions.filter(m => m.completed).length;
+                const completedFoundation = foundationGoals.filter(g => g.completed).length;
+
+                const totalTasks = foundationGoals.length + totalMissions;
+                const completedTasks = completedFoundation + completedMissions;
+
+                const percentage = Math.round((completedTasks / totalTasks) * 100);
 
                 if (progressBar) {
                     const circumference = 2 * Math.PI * 28;
@@ -74,13 +98,28 @@
                 }
                 if (percentageText) percentageText.textContent = `${percentage}%`;
 
-                // Fetch and render small badge summary
                 fetchAndRenderBadges();
             }
         } catch (error) {
-            console.error("Error fetching goal roadmap:", error);
+            console.error("Error fetching roadmap data:", error);
         }
     }
+
+    // Globally expose mission handler
+    window.handleMissionAction = (page, missionId, params) => {
+        console.log(`[Routine] Launching mission ${missionId} on ${page}`, params);
+
+        let queryParams = '';
+        if (params) {
+            queryParams = '?' + Object.keys(params).map(key => `${key}=${params[key]}`).join('&');
+        }
+
+        if (typeof window.loadPage === 'function') {
+            window.loadPage(page, queryParams);
+        } else {
+            console.error("loadPage function not found");
+        }
+    };
 
     async function fetchAndRenderBadges() {
         const summaryBadgeText = document.getElementById('earned-badge-text');

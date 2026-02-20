@@ -95,31 +95,68 @@ if ($stmt->execute()) {
     $update_subject->execute();
     $update_subject->close();
 
-    // --- NEW: Track Question-Level Performance ---
+    // --- NEW: Update Spaced Repetition (SRS) Tracking ---
+    $srs_upsert = $conn->prepare("
+        INSERT INTO question_srs (question_id, next_review_at, interval_days, consecutive_correct)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            next_review_at = VALUES(next_review_at),
+            interval_days = VALUES(interval_days),
+            consecutive_correct = VALUES(consecutive_correct)
+    ");
+
     $q_stmt = $conn->prepare("SELECT id, answer FROM questions WHERE exam_id = ? AND is_deleted = 0");
     $q_stmt->bind_param("i", $exam_id);
     $q_stmt->execute();
     $questions_result = $q_stmt->get_result();
-    
+
     $insert_attempt_stmt = $conn->prepare("INSERT INTO question_attempts (question_id, exam_id, selected_answer, is_correct) VALUES (?, ?, ?, ?)");
-    
-    $selected_answers = $performance['selected_answers']; // question_id => option_key
-    
+    $selected_answers = $performance['selected_answers'];
+
     while ($q_row = $questions_result->fetch_assoc()) {
         $qid = $q_row['id'];
         $correct_answer = $q_row['answer'];
         $selected = isset($selected_answers[$qid]) ? $selected_answers[$qid] : null;
-        $is_correct = null;
-        
-        if ($selected !== null) {
-            $is_correct = ($selected === $correct_answer) ? 1 : 0;
-        }
-        
+        $is_correct = ($selected !== null && $selected === $correct_answer) ? 1 : 0;
+
+        // Insert attempt record
         $insert_attempt_stmt->bind_param("iisi", $qid, $exam_id, $selected, $is_correct);
         $insert_attempt_stmt->execute();
+
+        // SRS Calculation
+        if ($selected !== null) {
+            // Get current SRS state for this question
+            $state_stmt = $conn->prepare("SELECT interval_days, consecutive_correct FROM question_srs WHERE question_id = ?");
+            $state_stmt->bind_param("i", $qid);
+            $state_stmt->execute();
+            $srs_state = $state_stmt->get_result()->fetch_assoc();
+            $state_stmt->close();
+
+            $new_interval = 1;
+            $new_consecutive = 0;
+
+            if ($is_correct) {
+                $cur_consecutive = $srs_state ? $srs_state['consecutive_correct'] : 0;
+                $new_consecutive = $cur_consecutive + 1;
+                
+                // Interval sequence: 1d -> 3d -> 7d
+                if ($new_consecutive === 1) $new_interval = 1;
+                elseif ($new_consecutive === 2) $new_interval = 3;
+                else $new_interval = 7; 
+            } else {
+                // Wrong answer resets the scale
+                $new_consecutive = 0;
+                $new_interval = 1;
+            }
+
+            $next_review = date('Y-m-d H:i:s', strtotime("+$new_interval days"));
+            $srs_upsert->bind_param("isii", $qid, $next_review, $new_interval, $new_consecutive);
+            $srs_upsert->execute();
+        }
     }
     $insert_attempt_stmt->close();
     $q_stmt->close();
+    $srs_upsert->close();
 
     // --- NEW: Update Topic Revision Metadata ---
     $exam_info_stmt = $conn->prepare("SELECT topic_id, is_revision FROM exams WHERE id = ?");

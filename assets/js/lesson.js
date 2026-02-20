@@ -45,9 +45,14 @@ function initializeLessonPage() {
                     subjectIdSelector.innerHTML += option;
                 });
 
-                // Restore from localStorage
+                // Restore from URL params first, then localStorage
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlSubject = urlParams.get('subject_id');
                 const savedSubject = localStorage.getItem('filter_lesson_subject');
-                if (savedSubject && savedSubject !== '0') {
+
+                if (urlSubject) {
+                    subjectFilter.value = urlSubject;
+                } else if (savedSubject && savedSubject !== '0') {
                     subjectFilter.value = savedSubject;
                 }
                 fetchAndDisplayLessons(subjectFilter.value);
