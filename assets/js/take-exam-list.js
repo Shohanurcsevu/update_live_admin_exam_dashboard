@@ -192,15 +192,18 @@ function initializeTakeExamListPage() {
                                 ${scoreDisplay}
                             </td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <button class="take-exam-btn bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow-sm transition-all active:scale-95" data-id="${exam.id}">Take</button>
-                                    <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Print">
-                                        <span class="material-symbols-outlined text-sm">print</span>
-                                    </button>
-                                    <button class="delete-exam-btn bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Delete">
-                                        <span class="material-symbols-outlined text-sm">delete</span>
-                                    </button>
-                                </div>
+                                 <div class="flex items-center justify-center gap-2">
+                                     <button class="take-exam-btn bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow-sm transition-all active:scale-95" data-id="${exam.id}">Take</button>
+                                     <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Study Materials">
+                                        <span class="material-symbols-outlined text-sm">menu_book</span>
+                                     </button>
+                                     <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Print">
+                                         <span class="material-symbols-outlined text-sm">print</span>
+                                     </button>
+                                     <button class="delete-exam-btn bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Delete">
+                                         <span class="material-symbols-outlined text-sm">delete</span>
+                                     </button>
+                                 </div>
                             </td>
                         </tr>`;
                     tableBody.innerHTML += row;
@@ -231,8 +234,11 @@ function initializeTakeExamListPage() {
                                     ${parseFloat(exam.last_percentage).toFixed(0)}%
                                 </span>` : ''}
                             </div>
-                            <div class="grid grid-cols-3 gap-2 pt-2">
+                            <div class="grid grid-cols-2 gap-2 pt-2">
                                 <button class="take-exam-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center" data-id="${exam.id}">Take</button>
+                                <button class="study-exam-btn w-full border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
+                                    <span class="material-symbols-outlined text-sm">menu_book</span> Study
+                                </button>
                                 <button class="print-exam-btn w-full border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">print</span> Print
                                 </button>
@@ -323,6 +329,9 @@ function initializeTakeExamListPage() {
             if (window.loadPage) {
                 window.loadPage('take-exam-interface', `?exam_id=${examId}`);
             }
+        } else if (target.classList.contains('study-exam-btn')) {
+            const examId = target.dataset.id;
+            handleStudyMaterials(examId, target);
         } else if (target.classList.contains('print-exam-btn')) {
             const examId = target.dataset.id;
             handlePrintExam(examId);
@@ -404,6 +413,41 @@ function initializeTakeExamListPage() {
                 generateBtn.innerHTML = originalText;
             }
         };
+    }
+
+    async function handleStudyMaterials(examId, btn) {
+        if (!window.StudyMaterialEngine) {
+            showToast('Study engine not loaded.');
+            return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span>';
+
+        try {
+            const response = await fetch(`api/take-exam/start.php?exam_id=${examId}`);
+            const result = await response.json();
+            if (result.success) {
+                const data = {
+                    questions: result.data.questions,
+                    details: {
+                        title: result.data.details.exam_title || 'Exam Study Materials',
+                        subject: result.data.details.subject_name,
+                        lesson: result.data.details.lesson_name
+                    }
+                };
+                window.StudyMaterialEngine.generate(data);
+                showToast('Materials generated!', 'success');
+            } else {
+                showToast(result.message || 'Failed to fetch exam data.');
+            }
+        } catch (error) {
+            showToast('An error occurred while fetching exam data.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 
     // --- Initial Load ---

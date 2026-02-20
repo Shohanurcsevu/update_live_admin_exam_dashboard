@@ -1,0 +1,64 @@
+<div class="p-4 sm:p-6 space-y-6">
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[200]"></div>
+
+    <!-- Header -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Study Materials</h2>
+        <p class="text-gray-600">Generate well-structured PDFs for specific topics to enhance your study and practice.
+        </p>
+    </div>
+
+    <!-- Selection Panel -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Select Subject & Lesson</h3>
+        <p class="text-gray-600 mb-6">Expand subjects and lessons to view topics. Click "Generate Materials" for any
+            topic.</p>
+
+        <!-- Loading State -->
+        <div id="hierarchy-loading" class="text-center py-8">
+            <span class="material-symbols-outlined animate-spin text-4xl text-blue-600">sync</span>
+            <p class="text-gray-500 mt-2">Loading subjects...</p>
+        </div>
+
+        <!-- Hierarchical Tree -->
+        <div id="hierarchy-tree" class="hidden space-y-4"></div>
+    </div>
+</div>
+
+<style>
+    .hierarchy-item {
+        border-left: 2px solid #e5e7eb;
+        padding-left: 1.5rem;
+        margin-left: 0.75rem;
+    }
+
+    .hierarchy-header {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        cursor: pointer;
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .hierarchy-header:hover {
+        background-color: #f8fafc;
+    }
+
+    .expand-icon {
+        transition: transform 0.2s;
+    }
+
+    .expand-icon.expanded {
+        transform: rotate(90deg);
+    }
+
+    .generate-btn {
+        transition: all 0.2s;
+    }
+
+    .generate-btn:active {
+        transform: scale(0.95);
+    }
+</style>

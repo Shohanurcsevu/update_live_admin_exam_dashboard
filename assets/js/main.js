@@ -126,7 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'discipline-tracker': 'assets/js/discipline-tracker.js', 'flashcards': 'assets/js/flashcards.js',
             'analytics': 'assets/js/analytics.js', 'times': 'assets/js/times.js',
             'question-analysis': 'assets/js/question-analysis.js',
-            'revision-planner': 'assets/js/revision-planner.js'
+            'revision-planner': 'assets/js/revision-planner.js',
+            'study-materials': 'assets/js/study-materials.js'
         };
 
 
