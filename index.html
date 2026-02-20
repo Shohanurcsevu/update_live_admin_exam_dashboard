@@ -31,20 +31,22 @@
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 </head>
 
-<body class="bg-gray-100 font-[Inter] flex h-screen overflow-hidden">
+<body class="bg-slate-100 font-[Inter] h-screen overflow-hidden">
 
-    <!-- Sidebar container -->
-    <div id="sidebar-container" class="w-0 md:w-72 flex-shrink-0 z-[200]"></div>
+    <div id="app-frame" class="md:p-3 flex h-full w-full md:gap-3 box-border">
+        <!-- Sidebar container -->
+        <div id="sidebar-container" class="flex-shrink-0 z-[200] h-full"></div>
 
-    <!-- Main Content Wrapper -->
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <!-- Header container -->
-        <div id="header-container" class="flex-shrink-0 sticky top-0 z-[110]"></div>
+        <!-- Main Content Wrapper -->
+        <div id="content-wrapper" class="flex-1 flex flex-col overflow-hidden h-full">
+            <!-- Header container -->
+            <div id="header-container" class="flex-shrink-0 sticky top-0 z-[110]"></div>
 
-        <!-- Dynamic Page Content -->
-        <main id="main-content" class="p-4 md:p-6 lg:p-8 pb-8 flex-1 overflow-y-auto">
-            <!-- Content from pages will be loaded here -->
-        </main>
+            <!-- Dynamic Page Content -->
+            <main id="main-content" class="p-4 md:p-6 lg:p-8 pb-8 flex-1 overflow-y-auto">
+                <!-- Content from pages will be loaded here -->
+            </main>
+        </div>
     </div>
 
     <!-- COMPACT SOFT GRADIENT PRINT STUDIO -->

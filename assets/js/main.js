@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const navLinkPage = link.dataset.page;
                 const parentPages = { 'take-exam-interface': 'take-exam-list', 'performance-review': 'check-performance', 'questions-list': 'import-questions' };
                 const parentPage = parentPages[page];
-                link.classList.toggle('bg-gray-700', navLinkPage === page || navLinkPage === parentPage);
+                link.classList.toggle('bg-gray-700', !!navLinkPage && (navLinkPage === page || navLinkPage === parentPage));
             });
             await loadPageScript(page);
         } catch (e) {

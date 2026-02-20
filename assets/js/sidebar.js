@@ -76,16 +76,21 @@ function initSidebarToggle() {
 
     // --- Desktop Collapse Logic ---
     if (collapseToggle) {
+        const sidebarContainer = document.getElementById('sidebar-container');
+
         // Restore state from localStorage
         const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         if (isCollapsed) {
             sidebar.classList.add('collapsed');
+            if (sidebarContainer) sidebarContainer.classList.add('collapsed');
             updateCollapseIcon(true);
         }
 
         collapseToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             const nowCollapsed = sidebar.classList.toggle('collapsed');
+            if (sidebarContainer) sidebarContainer.classList.toggle('collapsed');
+
             localStorage.setItem('sidebarCollapsed', nowCollapsed);
             updateCollapseIcon(nowCollapsed);
         });
@@ -95,7 +100,51 @@ function initSidebarToggle() {
         if (!collapseToggle) return;
         const iconSpan = collapseToggle.querySelector('.material-symbols-outlined');
         if (iconSpan) {
-            iconSpan.textContent = collapsed ? 'menu' : 'menu_open';
+            iconSpan.textContent = collapsed ? 'rocket_launch' : 'menu';
         }
     }
+
+    // --- Submenu Toggle Logic ---
+    const submenuToggles = sidebar.querySelectorAll('.submenu-toggle');
+    submenuToggles.forEach(toggle => {
+        toggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const parent = toggle.closest('.has-submenu');
+            if (!parent) return;
+
+            // If sidebar is collapsed, expand it first
+            if (sidebar.classList.contains('collapsed')) {
+                const sidebarContainer = document.getElementById('sidebar-container');
+                sidebar.classList.remove('collapsed');
+                if (sidebarContainer) sidebarContainer.classList.remove('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false');
+                updateCollapseIcon(false);
+            }
+
+            const isOpen = parent.classList.contains('open');
+            parent.classList.toggle('open');
+
+            // --- Highlight Logic ---
+            // Clear all highlights from all nav-links
+            sidebar.querySelectorAll('.nav-link').forEach(link => link.classList.remove('bg-gray-700'));
+            // Add highlight to the clicked group toggle
+            toggle.classList.add('bg-gray-700');
+
+            const submenu = parent.querySelector('.submenu');
+            if (submenu) {
+                if (parent.classList.contains('open')) {
+                    submenu.classList.remove('hidden');
+                } else {
+                    // CSS handles the smooth slide out via max-height
+                    setTimeout(() => {
+                        if (!parent.classList.contains('open')) {
+                            submenu.classList.add('hidden');
+                        }
+                    }, 300); // Match transition duration
+                }
+            }
+        });
+    });
 }

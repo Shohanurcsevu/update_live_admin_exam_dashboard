@@ -5,102 +5,155 @@
 
 <!-- Sidebar -->
 <aside id="sidebar"
-    class="flex flex-col fixed md:relative top-0 left-0 z-[200] h-screen md:h-full -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl overflow-hidden">
+    class="flex flex-col -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out overflow-hidden">
 
-    <div class="sidebar-header flex justify-between items-center">
-        <div class="flex items-center gap-3">
-            <div class="sidebar-logo-icon">
-                <span class="material-symbols-outlined text-white text-xl">rocket_launch</span>
-            </div>
-            <span class="sidebar-logo-text">RETHINK</span>
+    <div class="sidebar-header flex justify-center items-center relative">
+        <div class="sidebar-logo-icon">
+            <span class="material-symbols-outlined text-white text-xl">rocket_launch</span>
         </div>
+        <span class="sidebar-logo-text">BCS</span>
         <button id="sidebar-collapse-toggle"
             class="p-1 hover:bg-white/10 rounded-lg transition-colors focus:outline-none">
             <span class="material-symbols-outlined text-nav-text-muted">menu_open</span>
         </button>
     </div>
 
-    <nav class="flex-grow overflow-y-auto pt-4 pb-12 custom-scrollbar">
-        <div class="section-label">Menu</div>
+    <nav class="flex-grow overflow-y-auto pb-12 custom-scrollbar">
         <ul class="space-y-1">
-            <li><a href="#" class="nav-link" data-page="dashboard"><span
-                        class="material-symbols-outlined">dashboard</span><span class="nav-label">Dashboard</span></a>
+            <!-- Dashboard -->
+            <li><a href="#" class="nav-link" data-page="dashboard">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">dashboard</span></div>
+                    <span class="nav-label">Dashboard</span>
+                </a>
             </li>
-            <li><a href="#" class="nav-link" data-page="analytics"><span
-                        class="material-symbols-outlined">analytics</span><span class="nav-label">Analytics</span></a>
-            </li>
-            <li><a href="#" class="nav-link" data-page="discipline-tracker"><span
-                        class="material-symbols-outlined">calendar_month</span><span
-                        class="nav-label">Calendar</span></a></li>
-            <li><a href="#" class="nav-link" data-page="study-materials"><span
-                        class="material-symbols-outlined">menu_book</span><span class="nav-label">Study
-                        Materials</span></a></li>
-        </ul>
 
-        <div class="section-label section-builder">Builder</div>
-        <ul class="space-y-1">
-            <li><a href="#" class="nav-link" data-page="custom-exam-builder"><span
-                        class="material-symbols-outlined">construction</span><span class="nav-label">From
-                        Exams</span></a></li>
-            <li><a href="#" class="nav-link" data-page="custom-exam-topics"><span
-                        class="material-symbols-outlined">ballot</span><span class="nav-label">From Topics</span></a>
+            <!-- Curriculum Submenu -->
+            <li class="has-submenu">
+                <a href="#" class="nav-link submenu-toggle" data-group="curriculum">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">menu_book</span></div>
+                    <span class="nav-label">Curriculum</span>
+                    <span class="material-symbols-outlined chevron">expand_more</span>
+                </a>
+                <ul class="submenu hidden">
+                    <li><a href="#" class="nav-link sub-link" data-page="subject">
+                            <span class="nav-label">Subject</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="lesson">
+                            <span class="nav-label">Lesson</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="topic">
+                            <span class="nav-label">Topics</span>
+                        </a></li>
+                </ul>
             </li>
-            <li><a href="#" class="nav-link" data-page="custom-exam-from-lessons"><span
-                        class="material-symbols-outlined">layers</span><span class="nav-label">From Lessons</span></a>
-            </li>
-            <li><a href="#" class="nav-link" data-page="model-test-builder"><span
-                        class="material-symbols-outlined">auto_stories</span><span class="nav-label">Model
-                        Test</span></a></li>
-        </ul>
 
-        <div class="section-label">General</div>
-        <ul class="space-y-1">
-            <li><a href="#" class="nav-link" data-page="subject"><span
-                        class="material-symbols-outlined">subject</span><span class="nav-label">Subject</span></a></li>
-            <li><a href="#" class="nav-link" data-page="lesson"><span
-                        class="material-symbols-outlined">library_books</span><span class="nav-label">Lesson</span></a>
+            <!-- Exam Submenu -->
+            <li class="has-submenu">
+                <a href="#" class="nav-link submenu-toggle" data-group="exam">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">quiz</span></div>
+                    <span class="nav-label">Exam</span>
+                    <span class="material-symbols-outlined chevron">expand_more</span>
+                </a>
+                <ul class="submenu hidden">
+                    <li><a href="#" class="nav-link sub-link" data-page="exam">
+                            <span class="nav-label">Create Exam</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="exams-across-subjects">
+                            <span class="nav-label">Across Subject</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="topic-wise-exams">
+                            <span class="nav-label">Topic Wise</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="lesson-wise-exams">
+                            <span class="nav-label">Lesson Wise</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="timely-model-exam">
+                            <span class="nav-label">Timely Exam</span>
+                        </a></li>
+                </ul>
             </li>
-            <li><a href="#" class="nav-link" data-page="topic"><span class="material-symbols-outlined">topic</span><span
-                        class="nav-label">Topic</span></a></li>
-            <li><a href="#" class="nav-link" data-page="exam"><span class="material-symbols-outlined">quiz</span><span
-                        class="nav-label">Exam</span></a></li>
-            <li><a href="#" class="nav-link" data-page="import-questions"><span
-                        class="material-symbols-outlined">upload_file</span><span class="nav-label">Import</span></a>
-            </li>
-        </ul>
 
-        <div class="section-label section-exams">Exams</div>
-        <ul class="space-y-1">
-            <li><a href="#" class="nav-link" data-page="take-exam-list"><span
-                        class="material-symbols-outlined">edit_document</span><span class="nav-label">Take
-                        Exam</span></a></li>
-            <li><a href="#" class="nav-link" data-page="topic-wise-exams"><span
-                        class="material-symbols-outlined">checklist</span><span class="nav-label">Topic-wise</span></a>
-            </li>
-            <li><a href="#" class="nav-link" data-page="lesson-wise-exams"><span
-                        class="material-symbols-outlined">view_list</span><span class="nav-label">Lesson-wise</span></a>
-            </li>
-            <li><a href="#" class="nav-link" data-page="exams-across-subjects"><span
-                        class="material-symbols-outlined">grid_view</span><span class="nav-label">Across
-                        Subjects</span></a></li>
-            <li><a href="#" class="nav-link" data-page="custom-exams"><span
-                        class="material-symbols-outlined">playlist_add_check</span><span class="nav-label">Custom
-                        List</span></a></li>
-            <li><a href="#" class="nav-link" data-page="offline-exams"><span
-                        class="material-symbols-outlined">offline_pin</span><span class="nav-label">Offline
-                        Exams</span></a></li>
-        </ul>
+            <!-- Top Level Items -->
+            <li><a href="#" class="nav-link" data-page="take-exam-list">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">edit_document</span></div>
+                    <span class="nav-label">Take Exam</span>
+                </a></li>
+            <li><a href="#" class="nav-link" data-page="check-performance">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">fact_check</span></div>
+                    <span class="nav-label">Performance</span>
+                </a></li>
+            <li><a href="#" class="nav-link" data-page="study-materials">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">book</span></div>
+                    <span class="nav-label">Study Materials</span>
+                </a></li>
+            <li><a href="#" class="nav-link" data-page="question-analysis">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">monitoring</span></div>
+                    <span class="nav-label">Question Analysis</span>
+                </a></li>
+            <li><a href="#" class="nav-link" data-page="revision-planner">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">event_note</span></div>
+                    <span class="nav-label">Revision Planner</span>
+                </a></li>
+            <li><a href="#" class="nav-link" data-page="offline-exams">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">offline_pin</span></div>
+                    <span class="nav-label">Offline Exams</span>
+                </a></li>
 
-        <div class="section-label section-insights">Insights</div>
-        <ul class="space-y-1">
-            <li><a href="#" class="nav-link" data-page="check-performance"><span
-                        class="material-symbols-outlined">fact_check</span><span
-                        class="nav-label">Performance</span></a></li>
-            <li><a href="#" class="nav-link" data-page="question-analysis"><span
-                        class="material-symbols-outlined">monitoring</span><span class="nav-label">Analysis</span></a>
+            <!-- Custom Exam Submenu -->
+            <li class="has-submenu">
+                <a href="#" class="nav-link submenu-toggle" data-group="custom-exam">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">construction</span></div>
+                    <span class="nav-label">Custom Exam</span>
+                    <span class="material-symbols-outlined chevron">expand_more</span>
+                </a>
+                <ul class="submenu hidden">
+                    <li><a href="#" class="nav-link sub-link" data-page="custom-exams">
+                            <span class="nav-label">Custom Exams</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="custom-exam-builder">
+                            <span class="nav-label">From Exams</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="custom-exam-topics">
+                            <span class="nav-label">From Topics</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="custom-exam-from-lessons">
+                            <span class="nav-label">From Lessons</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="model-test-builder">
+                            <span class="nav-label">Model Test</span>
+                        </a></li>
+                </ul>
             </li>
-            <li><a href="#" class="nav-link" data-page="revision-planner"><span
-                        class="material-symbols-outlined">event_note</span><span class="nav-label">Revision</span></a>
+
+            <!-- Analytics Submenu -->
+            <li class="has-submenu">
+                <a href="#" class="nav-link submenu-toggle" data-group="analytics">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">analytics</span></div>
+                    <span class="nav-label">Analytics</span>
+                    <span class="material-symbols-outlined chevron">expand_more</span>
+                </a>
+                <ul class="submenu hidden">
+                    <li><a href="#" class="nav-link sub-link" data-page="analytics">
+                            <span class="nav-label">Study Analytics</span>
+                        </a></li>
+                    <li><a href="#" class="nav-link sub-link" data-page="discipline-tracker">
+                            <span class="nav-label">Discipline Tracker</span>
+                        </a></li>
+                </ul>
+            </li>
+
+            <!-- Others Submenu -->
+            <li class="has-submenu">
+                <a href="#" class="nav-link submenu-toggle" data-group="others">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">more_horiz</span></div>
+                    <span class="nav-label">Others</span>
+                    <span class="material-symbols-outlined chevron">expand_more</span>
+                </a>
+                <ul class="submenu hidden">
+                    <li><a href="#" class="nav-link sub-link" data-page="import-questions">
+                            <span class="nav-label">Import Questions</span>
+                        </a></li>
+                </ul>
             </li>
         </ul>
     </nav>
