@@ -368,152 +368,145 @@
     </div>
 
     <!-- Action Hub: Resume & Rapid Fire -->
-    <div id="action-hub" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div id="action-hub" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
         <!-- Resume Card -->
         <div id="resume-card"
-            class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-6 text-white shadow-lg hidden">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <span class="bg-blue-500/30 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">In
-                        Progress</span>
-                    <h3 id="resume-exam-title" class="text-xl font-bold mt-2">Resume Last Exam</h3>
-                    <p id="resume-exam-subtitle" class="text-blue-100 text-sm opacity-90">Pick up where you left
-                        off
-                    </p>
+            class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-lg hidden lg:col-span-4 transition-all">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white/20 p-2 rounded-lg">
+                        <span class="material-symbols-outlined text-2xl">play_circle</span>
+                    </div>
+                    <div>
+                        <span
+                            class="bg-blue-500/30 text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider">In
+                            Progress</span>
+                        <h3 id="resume-exam-title" class="text-lg font-bold">Resume Last Exam</h3>
+                        <p id="resume-exam-subtitle" class="text-blue-100 text-xs opacity-90">Pick up where you left off
+                        </p>
+                    </div>
                 </div>
-                <div class="bg-white/20 p-2 rounded-lg">
-                    <span class="material-symbols-outlined text-3xl">play_circle</span>
-                </div>
-            </div>
-            <div class="flex items-center gap-4 mt-6">
-                <button id="resume-btn"
-                    class="bg-white text-blue-600 px-6 py-2 rounded-lg font-bold hover:bg-blue-50 transition-colors shadow-sm">
-                    Resume Now
-                </button>
-                <div id="resume-progress" class="text-sm font-medium text-blue-100 italic">
-                    <!-- Progress string here -->
+                <div class="flex items-center gap-4">
+                    <div id="resume-progress" class="text-xs font-medium text-blue-100 italic"></div>
+                    <button id="resume-btn"
+                        class="bg-white text-blue-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors shadow-sm">
+                        Resume Now
+                    </button>
                 </div>
             </div>
         </div>
+
 
         <!-- Revision Queue Card (NEW for SRS) -->
         <div
-            class="mission-card group relative bg-white rounded-[2.5rem] p-8 border border-gray-100/50 shadow-[0_20px_50px_rgba(0,0,0,0.02)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_40px_80px_rgba(0,0,0,0.06)] overflow-hidden">
-            <div
-                class="absolute top-0 right-0 w-40 h-40 bg-rose-50 rounded-full -mr-20 -mt-20 transition-transform duration-700 group-hover:scale-150 group-hover:bg-rose-100/50 opacity-50">
+            class="bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl p-4 text-white shadow-lg hover:-translate-y-1 transition-transform">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <span class="bg-white/20 text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider">SRS
+                        Review</span>
+                    <h3 class="text-lg font-bold mt-1">Revision Queue</h3>
+                    <p class="text-rose-50 text-xs opacity-90">Personalized SRS reviews</p>
+                </div>
+                <div class="bg-white/20 p-1.5 rounded-lg">
+                    <span class="material-symbols-outlined text-2xl">history_edu</span>
+                </div>
             </div>
-
-            <div class="relative z-10">
-                <div class="flex items-center justify-between mb-8">
-                    <div
-                        class="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 transition-colors duration-500 group-hover:bg-rose-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-rose-200">
-                        <span class="material-symbols-outlined text-3xl">history_edu</span>
-                    </div>
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <span id="srs-due-count" class="text-2xl font-black">0</span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest ml-1 opacity-80">Due Now</span>
                 </div>
-
-                <div class="mb-4">
-                    <h3 class="text-2xl font-black text-gray-900 tracking-tight mb-2">Revision Queue</h3>
-                    <p class="text-gray-500 font-bold leading-snug">Personalized SRS reviews based on your mistakes.</p>
-                </div>
-
-                <div class="py-4 border-y border-gray-50 flex items-center justify-between mb-6">
-                    <div>
-                        <span id="srs-due-count" class="text-3xl font-black text-rose-500">0</span>
-                        <span class="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Due Now</span>
-                    </div>
-                </div>
-
-                <button id="start-srs-review-btn"
-                    class="w-full py-5 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 hover:bg-rose-600 hover:shadow-xl hover:shadow-rose-200 active:scale-95 flex items-center justify-center gap-2">
-                    Review Now <span class="material-symbols-outlined text-sm">auto_fix_high</span>
-                </button>
             </div>
+            <button id="start-srs-review-btn"
+                class="w-full py-2.5 bg-white text-rose-600 rounded-lg font-bold text-xs uppercase tracking-widest transition-all hover:bg-rose-50 shadow-sm flex items-center justify-center gap-2">
+                Review Now <span class="material-symbols-outlined text-sm">auto_fix_high</span>
+            </button>
         </div>
 
+
         <!-- Rapid Fire Card -->
-        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-3.5 text-white shadow-lg">
+        <div
+            class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-4 text-white shadow-lg hover:-translate-y-1 transition-transform">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <span
-                        class="bg-emerald-400/30 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">Rapid
+                        class="bg-emerald-400/30 text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider">Rapid
                         Fire</span>
-                    <h3 class="text-xl font-bold mt-2">Daily 15 Challenge</h3>
-                    <p class="text-emerald-50 text-sm opacity-90">15 random questions from all subjects</p>
+                    <h3 class="text-lg font-bold mt-1">Daily 15 Challenge</h3>
+                    <p class="text-emerald-50 text-xs opacity-90">15 random questions</p>
                 </div>
                 <div class="bg-white/20 p-1.5 rounded-lg">
-                    <span class="material-symbols-outlined text-3xl">bolt</span>
+                    <span class="material-symbols-outlined text-2xl">bolt</span>
                 </div>
             </div>
-            <div class="mt-3">
-                <button id="daily-10-btn"
-                    onclick="if(window.loadPage) window.loadPage('take-offline-exam', '?mode=daily_15')"
-                    class="bg-white text-emerald-600 px-6 py-2 rounded-lg font-bold hover:bg-emerald-50 transition-colors shadow-sm flex items-center gap-2">
-                    <span class="material-symbols-outlined text-lg">rocket_launch</span>
-                    Start Quiz
-                </button>
-            </div>
+            <div class="mb-4 h-[32px]"></div> <!-- Spacer to match height -->
+            <button id="daily-10-btn"
+                onclick="if(window.loadPage) window.loadPage('take-offline-exam', '?mode=daily_15')"
+                class="w-full bg-white text-emerald-600 px-4 py-2.5 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-colors shadow-sm flex items-center justify-center gap-2 uppercase tracking-widest">
+                <span class="material-symbols-outlined text-sm">rocket_launch</span>
+                Start Quiz
+            </button>
         </div>
+
 
         <!-- Mistake Bank Card -->
-        <div class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-xl p-3.5 text-white shadow-lg">
+        <div
+            class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-xl p-4 text-white shadow-lg hover:-translate-y-1 transition-transform">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <span class="bg-white/20 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">Adaptive
+                    <span
+                        class="bg-white/20 text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider">Adaptive
                         Learning</span>
-                    <h3 class="text-xl font-bold mt-2">Mistake Bank</h3>
-                    <p class="text-rose-50 text-sm opacity-90"><span id="mistake-count">0</span> persistent
-                        errors
-                        tracked</p>
+                    <h3 class="text-lg font-bold mt-1">Mistake Bank</h3>
+                    <p class="text-rose-50 text-xs opacity-90"><span id="mistake-count">0</span> persistent errors</p>
                 </div>
                 <div class="bg-white/20 p-1.5 rounded-lg">
-                    <span class="material-symbols-outlined text-3xl">psychology</span>
+                    <span class="material-symbols-outlined text-2xl">psychology</span>
                 </div>
             </div>
-            <div class="mt-3">
-                <button id="mastery-quiz-btn" onclick="if(window.loadPage) window.loadPage('mistake-bank')"
-                    class="bg-white text-rose-600 px-6 py-2 rounded-lg font-bold hover:bg-rose-50 transition-colors shadow-sm flex items-center gap-2">
-                    <span class="material-symbols-outlined text-lg">manage_history</span>
-                    Manage Mistakes
-                </button>
-            </div>
+            <div class="mb-4 h-[32px]"></div> <!-- Spacer to match height -->
+            <button id="mastery-quiz-btn" onclick="if(window.loadPage) window.loadPage('mistake-bank')"
+                class="w-full bg-white text-rose-600 px-4 py-2.5 rounded-lg font-bold text-xs hover:bg-rose-50 transition-colors shadow-sm flex items-center justify-center gap-2 uppercase tracking-widest">
+                <span class="material-symbols-outlined text-sm">manage_history</span>
+                Manage Mistakes
+            </button>
         </div>
 
+
         <!-- Study Time Card (Daily Focus) -->
-        <div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-xl p-3.5 text-white shadow-lg">
-            <div class="flex justify-between items-start mb-4">
+        <div
+            class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-xl p-4 text-white shadow-lg hover:-translate-y-1 transition-transform">
+            <div class="flex justify-between items-start mb-2">
                 <div>
-                    <span class="bg-white/20 text-xs font-semibold px-2 py-1 rounded uppercase tracking-wider">Today's
-                        Analytics</span>
-                    <h3 class="text-xl font-bold mt-2">Study Time</h3>
+                    <span
+                        class="bg-white/20 text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider">Daily
+                        focus</span>
+                    <h3 class="text-lg font-bold mt-1">Study Time</h3>
                     <div class="flex items-center gap-2 mt-1">
-                        <p class="text-violet-50 text-2xl font-black"><span id="study-today-total">0h 0m</span>
-                        </p>
+                        <p class="text-violet-50 text-xl font-black"><span id="study-today-total">0h 0m</span></p>
                         <span id="study-improvement-badge"
-                            class="hidden text-xs font-bold px-2 py-0.5 rounded-full"></span>
+                            class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full"></span>
                     </div>
                 </div>
                 <div class="bg-white/20 p-1.5 rounded-lg">
-                    <span class="material-symbols-outlined text-3xl">schedule</span>
+                    <span class="material-symbols-outlined text-2xl">schedule</span>
                 </div>
             </div>
 
-            <!-- Per-Subject Breakdown -->
-            <div id="study-subjects-container" class="space-y-1 mb-1.5 max-h-28 overflow-y-auto">
-                <!-- Subject bars will be injected here -->
-                <div class="text-center py-4 text-violet-100 text-sm opacity-70">
-                    <span class="material-symbols-outlined text-2xl mb-1 opacity-50">hourglass_empty</span>
+            <div id="study-subjects-container" class="space-y-1 mb-2 max-h-16 overflow-y-auto custom-scrollbar">
+                <div class="text-center py-2 text-violet-100 text-[10px] opacity-70">
                     <p>No study sessions today yet</p>
                 </div>
             </div>
 
-            <div class="mt-1.5 pt-1.5 border-t border-white/20">
-                <button id="view-study-time-btn" onclick="if(window.loadPage) window.loadPage('times')"
-                    class="w-full bg-white text-violet-600 px-6 py-2 rounded-lg font-bold hover:bg-violet-50 transition-colors shadow-sm flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined text-lg">insights</span>
-                    View Full Analytics
-                </button>
-            </div>
+            <button id="view-study-time-btn" onclick="if(window.loadPage) window.loadPage('times')"
+                class="w-full bg-white text-violet-600 px-4 py-2.5 rounded-lg font-bold text-xs hover:bg-violet-50 transition-colors shadow-sm flex items-center justify-center gap-2 uppercase tracking-widest">
+                <span class="material-symbols-outlined text-sm">insights</span>
+                Analytics
+            </button>
         </div>
+
     </div>
     <!-- Section 1: Dashboard Overview -->
     <div>
