@@ -1,116 +1,107 @@
+<!-- Mobile Backdrop -->
+<div id="sidebar-overlay"
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[190] hidden md:hidden transition-opacity duration-300 opacity-0">
+</div>
+
 <!-- Sidebar -->
 <aside id="sidebar"
-    class="bg-gray-800 text-white w-64 flex flex-col fixed md:relative -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-[200] h-full">
+    class="flex flex-col fixed md:relative top-0 left-0 z-[200] h-screen md:h-full -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl overflow-hidden">
 
-    <div class="text-2xl font-bold p-4 text-center flex-shrink-0 border-b border-gray-700">
-        ExamApp
+    <div class="sidebar-header flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="sidebar-logo-icon">
+                <span class="material-symbols-outlined text-white text-xl">rocket_launch</span>
+            </div>
+            <span class="sidebar-logo-text">RETHINK</span>
+        </div>
+        <button id="sidebar-collapse-toggle"
+            class="p-1 hover:bg-white/10 rounded-lg transition-colors focus:outline-none">
+            <span class="material-symbols-outlined text-nav-text-muted">menu_open</span>
+        </button>
     </div>
 
-    <nav class="flex-grow overflow-y-auto px-4 py-4">
-        <ul class="space-y-2">
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="dashboard"><span class="material-symbols-outlined">dashboard</span><span
-                        class="ml-3">Dashboard</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="analytics"><span class="material-symbols-outlined">analytics</span><span
-                        class="ml-3">Analytics</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="discipline-tracker"><span class="material-symbols-outlined">calendar_month</span><span
-                        class="ml-3">Discipline Tracker</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="subject"><span class="material-symbols-outlined">subject</span><span
-                        class="ml-3">Subject</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="lesson"><span class="material-symbols-outlined">library_books</span><span
-                        class="ml-3">Lesson</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="topic"><span class="material-symbols-outlined">topic</span><span
-                        class="ml-3">Topic</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="exam"><span class="material-symbols-outlined">quiz</span><span
-                        class="ml-3">Exam</span></a></li>
+    <nav class="flex-grow overflow-y-auto pt-4 pb-12 custom-scrollbar">
+        <div class="section-label">Menu</div>
+        <ul class="space-y-1">
+            <li><a href="#" class="nav-link" data-page="dashboard"><span
+                        class="material-symbols-outlined">dashboard</span><span class="nav-label">Dashboard</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="analytics"><span
+                        class="material-symbols-outlined">analytics</span><span class="nav-label">Analytics</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="discipline-tracker"><span
+                        class="material-symbols-outlined">calendar_month</span><span
+                        class="nav-label">Calendar</span></a></li>
+            <li><a href="#" class="nav-link" data-page="study-materials"><span
+                        class="material-symbols-outlined">menu_book</span><span class="nav-label">Study
+                        Materials</span></a></li>
+        </ul>
 
-            <!-- MODIFIED: "MCQ Generator" now uses the internal navigation system -->
-            <!-- <li>
-                <a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="mcq-generator">
-                    <span class="material-symbols-outlined">smart_toy</span>
-                    <span class="ml-3">MCQ Generator</span>
-                </a>
-            </li> -->
+        <div class="section-label section-builder">Builder</div>
+        <ul class="space-y-1">
+            <li><a href="#" class="nav-link" data-page="custom-exam-builder"><span
+                        class="material-symbols-outlined">construction</span><span class="nav-label">From
+                        Exams</span></a></li>
+            <li><a href="#" class="nav-link" data-page="custom-exam-topics"><span
+                        class="material-symbols-outlined">ballot</span><span class="nav-label">From Topics</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="custom-exam-from-lessons"><span
+                        class="material-symbols-outlined">layers</span><span class="nav-label">From Lessons</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="model-test-builder"><span
+                        class="material-symbols-outlined">auto_stories</span><span class="nav-label">Model
+                        Test</span></a></li>
+        </ul>
 
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="import-questions"><span class="material-symbols-outlined">upload_file</span><span
-                        class="ml-3">Import Questions</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="custom-exam-builder"><span class="material-symbols-outlined">construction</span><span
-                        class="ml-3">Builder (from Exams)</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="custom-exam-topics"><span class="material-symbols-outlined">ballot</span><span
-                        class="ml-3">Builder (from Topics)</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="custom-exam-from-lessons"><span class="material-symbols-outlined">layers</span><span
-                        class="ml-3">Builder (from Lessons)</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="model-test-builder"><span class="material-symbols-outlined">auto_stories</span><span
-                        class="ml-3">Model Test Builder</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="exams-across-subjects"><span class="material-symbols-outlined">grid_view</span><span
-                        class="ml-3">Exams Across Subjects</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="timely-model-exam"><span class="material-symbols-outlined">schedule</span><span
-                        class="ml-3">Timely Model Exam Creator</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="topic-wise-exams"><span class="material-symbols-outlined">checklist</span><span
-                        class="ml-3">Topic-wise Exams</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="lesson-wise-exams"><span class="material-symbols-outlined">view_list</span><span
-                        class="ml-3">Lesson-wise Exams</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="custom-exams"><span class="material-symbols-outlined">playlist_add_check</span><span
-                        class="ml-3">Custom Exams</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="offline-exams"><span class="material-symbols-outlined">offline_pin</span><span
-                        class="ml-3">Offline Exams</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="study-materials"><span class="material-symbols-outlined">menu_book</span><span
-                        class="ml-3">Study Materials</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="take-exam-list"><span class="material-symbols-outlined">edit_document</span><span
-                        class="ml-3">Take Exam</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="check-performance"><span class="material-symbols-outlined">fact_check</span><span
-                        class="ml-3">Check Performance</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="question-analysis"><span class="material-symbols-outlined">monitoring</span><span
-                        class="ml-3">Question Analysis</span></a></li>
-            <li><a href="#"
-                    class="nav-link flex items-center p-2 text-base font-normal text-gray-300 rounded-lg hover:bg-gray-700"
-                    data-page="revision-planner"><span class="material-symbols-outlined">event_note</span><span
-                        class="ml-3">Revision Planner</span></a></li>
+        <div class="section-label">General</div>
+        <ul class="space-y-1">
+            <li><a href="#" class="nav-link" data-page="subject"><span
+                        class="material-symbols-outlined">subject</span><span class="nav-label">Subject</span></a></li>
+            <li><a href="#" class="nav-link" data-page="lesson"><span
+                        class="material-symbols-outlined">library_books</span><span class="nav-label">Lesson</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="topic"><span class="material-symbols-outlined">topic</span><span
+                        class="nav-label">Topic</span></a></li>
+            <li><a href="#" class="nav-link" data-page="exam"><span class="material-symbols-outlined">quiz</span><span
+                        class="nav-label">Exam</span></a></li>
+            <li><a href="#" class="nav-link" data-page="import-questions"><span
+                        class="material-symbols-outlined">upload_file</span><span class="nav-label">Import</span></a>
+            </li>
+        </ul>
+
+        <div class="section-label section-exams">Exams</div>
+        <ul class="space-y-1">
+            <li><a href="#" class="nav-link" data-page="take-exam-list"><span
+                        class="material-symbols-outlined">edit_document</span><span class="nav-label">Take
+                        Exam</span></a></li>
+            <li><a href="#" class="nav-link" data-page="topic-wise-exams"><span
+                        class="material-symbols-outlined">checklist</span><span class="nav-label">Topic-wise</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="lesson-wise-exams"><span
+                        class="material-symbols-outlined">view_list</span><span class="nav-label">Lesson-wise</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="exams-across-subjects"><span
+                        class="material-symbols-outlined">grid_view</span><span class="nav-label">Across
+                        Subjects</span></a></li>
+            <li><a href="#" class="nav-link" data-page="custom-exams"><span
+                        class="material-symbols-outlined">playlist_add_check</span><span class="nav-label">Custom
+                        List</span></a></li>
+            <li><a href="#" class="nav-link" data-page="offline-exams"><span
+                        class="material-symbols-outlined">offline_pin</span><span class="nav-label">Offline
+                        Exams</span></a></li>
+        </ul>
+
+        <div class="section-label section-insights">Insights</div>
+        <ul class="space-y-1">
+            <li><a href="#" class="nav-link" data-page="check-performance"><span
+                        class="material-symbols-outlined">fact_check</span><span
+                        class="nav-label">Performance</span></a></li>
+            <li><a href="#" class="nav-link" data-page="question-analysis"><span
+                        class="material-symbols-outlined">monitoring</span><span class="nav-label">Analysis</span></a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="revision-planner"><span
+                        class="material-symbols-outlined">event_note</span><span class="nav-label">Revision</span></a>
+            </li>
         </ul>
     </nav>
 </aside>

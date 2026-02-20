@@ -1,0 +1,233 @@
+/* Premium "Cyber-Glass" Sidebar Styles */
+:root {
+    --sidebar-bg-base: #0a0f1d;
+    --sidebar-mesh-1: rgba(30, 58, 138, 0.4);
+    --sidebar-mesh-2: rgba(17, 24, 39, 0.8);
+    --accent-glow: #3b82f6;
+    --nav-text-primary: #e2e8f0;
+    --nav-text-muted: #94a3b8;
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+#sidebar {
+    background-color: var(--sidebar-bg-base);
+    background-image:
+        radial-gradient(at 0% 0%, var(--sidebar-mesh-1) 0, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0, transparent 50%);
+    border-right: 1px solid var(--glass-border);
+    color: var(--nav-text-primary);
+    position: relative;
+    overflow-x: hidden;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 18rem;
+    /* 72 * 4px */
+}
+
+@media (min-width: 768px) {
+    #sidebar.collapsed {
+        width: 5rem;
+    }
+
+    #sidebar.collapsed .sidebar-header .sidebar-logo-text,
+    #sidebar.collapsed .section-label,
+    #sidebar.collapsed .nav-label {
+        opacity: 0;
+        max-width: 0;
+        overflow: hidden;
+        margin: 0;
+        padding-left: 0;
+        padding-right: 0;
+        white-space: nowrap;
+        display: block;
+        pointer-events: none;
+        transition: opacity 0.2s ease, max-width 0.3s ease, padding 0.3s ease;
+    }
+
+    #sidebar.collapsed .nav-link {
+        justify-content: center;
+        padding: 0.75rem 0;
+        margin: 0.25rem 0.75rem;
+    }
+
+    #sidebar.collapsed .nav-link .material-symbols-outlined {
+        margin-right: 0;
+    }
+}
+
+#sidebar:not(.collapsed) .sidebar-logo-text,
+#sidebar:not(.collapsed) .section-label,
+#sidebar:not(.collapsed) .nav-label {
+    opacity: 1;
+    max-width: 250px;
+    white-space: nowrap;
+    transition: opacity 0.3s ease 0.1s, max-width 0.3s ease, padding 0.3s ease;
+}
+
+#sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.15;
+    pointer-events: none;
+}
+
+.sidebar-header {
+    padding: 2rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 900;
+    font-size: 1.4rem;
+    letter-spacing: -0.05em;
+    color: white;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.sidebar-logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+.section-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--nav-text-muted);
+    padding: 1.5rem 1.5rem 0.5rem;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+
+.sidebar-logo-text {
+    transition: opacity 0.3s ease;
+}
+
+@media (min-width: 768px) {
+    #sidebar.collapsed .sidebar-header {
+        justify-content: center;
+        padding: 1.5rem 0;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    #sidebar.collapsed .sidebar-header #sidebar-collapse-toggle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 0.5rem;
+        background: var(--glass-bg);
+    }
+}
+
+/* Ensure toggle is hidden on mobile */
+@media (max-width: 767px) {
+    #sidebar-collapse-toggle {
+        display: none !important;
+    }
+
+    #sidebar {
+        width: 280px !important;
+        /* Fixed width for predictable mobile behavior */
+        left: 0 !important;
+        right: auto !important;
+        position: fixed !important;
+        top: 0 !important;
+        height: 100vh !important;
+        z-index: 500 !important;
+        transform: translateX(-100%) !important;
+        /* Ensure it starts off-screen */
+        /* Ensure it stays above everything */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        background-color: var(--sidebar-bg-base) !important;
+        visibility: visible !important;
+    }
+
+    #sidebar.mobile-open {
+        transform: translateX(0) !important;
+        box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5) !important;
+    }
+}
+
+.nav-link {
+    margin: 0.25rem 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    color: var(--nav-text-muted);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+}
+
+.nav-link:hover {
+    background: var(--glass-bg);
+    color: white;
+    transform: translateX(4px);
+    border-color: var(--glass-border);
+}
+
+.nav-link.bg-gray-700 {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #60a5fa !important;
+    font-weight: 700;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        inset 0 0 10px rgba(59, 130, 246, 0.1);
+}
+
+.nav-link .material-symbols-outlined {
+    font-size: 1.25rem;
+    margin-right: 0.75rem;
+    transition: inherit;
+}
+
+.nav-link.bg-gray-700 .material-symbols-outlined {
+    color: #60a5fa;
+    font-variation-settings: 'FILL' 1;
+    filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5));
+}
+
+/* Category Based Glows (Optional subtle coloring) */
+.section-builder~ul .nav-link:hover .material-symbols-outlined {
+    color: #34d399;
+}
+
+/* Emerald */
+.section-exams~ul .nav-link:hover .material-symbols-outlined {
+    color: #fb7185;
+}
+
+/* Rose */
+.section-insights~ul .nav-link:hover .material-symbols-outlined {
+    color: #fbbf24;
+}
+
+/* Amber */
+
+/* Custom Scrollbar for Cyber Theme */
+#sidebar nav::-webkit-scrollbar {
+    width: 3px;
+}
+
+#sidebar nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+#sidebar nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
