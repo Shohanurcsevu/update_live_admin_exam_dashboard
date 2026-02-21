@@ -46,8 +46,9 @@ $where_clause = implode(" AND ", $where);
 // Join with question_srs for SRS mode
 $srs_join = "";
 if ($mode === 'srs_review') {
-    $srs_join = "JOIN question_srs srs ON q.id = srs.question_id AND srs.next_review_at <= CURRENT_TIMESTAMP";
+    $srs_join = "JOIN question_srs srs ON MD5(TRIM(q.question)) = srs.question_text_hash AND srs.next_review_at <= CURRENT_TIMESTAMP";
 }
+
 
 $sql = "SELECT 
             q.question,
@@ -107,7 +108,7 @@ try {
     $total_marks = $q_count;
     $pass_mark = ceil($total_marks * 0.4);
     
-    $insert_exam = $conn->prepare("INSERT INTO exams (subject_id, lesson_id, topic_id, exam_title, duration, total_marks, pass_mark, instructions, negative_mark_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.5)");
+    $insert_exam = $conn->prepare("INSERT INTO exams (subject_id, lesson_id, topic_id, exam_title, duration, total_marks, pass_mark, instructions, negative_mark_value, is_revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.5, 1)");
     $instructions = "Custom performance-based exam focuses on $mode questions. MISSION: MASTER EVERYTHING.";
     $insert_exam->bind_param("iiisidss", $subject_id, $lesson_id, $topic_id, $exam_title, $duration, $total_marks, $pass_mark, $instructions);
     $insert_exam->execute();

@@ -1,4 +1,5 @@
 <div id="toast-container" class="fixed top-5 right-5 z-[200]"></div>
+
 <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
     <div class="mb-6">
         <h2 class="text-2xl font-bold text-gray-800">Custom Exams List</h2>
@@ -17,5 +18,25 @@
             </thead>
             <tbody id="custom-exams-table-body" class="text-gray-600 text-sm font-light"></tbody>
         </table>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="custom-exam-delete-modal"
+    class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-[300] p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-auto p-6">
+        <div class="flex flex-col items-center text-center">
+            <div class="bg-red-100 p-3 rounded-full mb-4">
+                <span class="material-symbols-outlined text-4xl text-red-600">warning</span>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800">Delete Custom Exam</h3>
+            <p class="text-gray-500 mt-2 text-sm">Are you sure you want to delete <span id="custom-exam-delete-title" class="font-semibold text-gray-800"></span>? This action cannot be undone.</p>
+        </div>
+        <div class="flex justify-center mt-6 gap-3">
+            <button id="custom-exam-cancel-delete"
+                class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
+            <button id="custom-exam-confirm-delete"
+                class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Delete</button>
+        </div>
     </div>
 </div>

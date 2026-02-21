@@ -22,15 +22,14 @@ try {
     $sql = "SELECT 
                 COUNT(*) as count,
                 SUM(CASE WHEN next_review_at <= CURRENT_TIMESTAMP THEN 1 ELSE 0 END) as due
-            FROM question_srs s
-            JOIN questions q ON s.question_id = q.id
-            WHERE q.is_deleted = 0";
+            FROM question_srs";
 
     $result = $conn->query($sql);
     if ($result && $row = $result->fetch_assoc()) {
         $response['due_count'] = intval($row['due']);
         $response['total_tracked'] = intval($row['count']);
     }
+
 
 } catch (Exception $e) {
     $response['success'] = false;

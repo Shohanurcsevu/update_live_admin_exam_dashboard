@@ -79,7 +79,7 @@ function initializeDashboardPage() {
 
     async function fetchAndDisplayMetrics(skipRevalidate = false) {
         try {
-            const result = await CacheManager.fetchWithCache(METRICS_API_URL, 15, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache(METRICS_API_URL, 0.5, false, skipRevalidate);
             const metrics = result;
             animateCount(document.getElementById('total-subjects'), metrics.subjects);
             animateCount(document.getElementById('total-lessons'), metrics.lessons);
@@ -268,7 +268,7 @@ function initializeDashboardPage() {
         if (!insightsContainer) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/performance/mastery-trends.php', 30, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache('api/performance/mastery-trends.php', 0.5, false, skipRevalidate);
             if (!result) return;
 
             const { subjects, insights } = result;
@@ -390,7 +390,7 @@ function initializeDashboardPage() {
         if (!trackerList) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/mistakes/discipline-stats.php', 15, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache('api/mistakes/discipline-stats.php', 0.5, false, skipRevalidate);
 
             if (result) {
                 trackerList.innerHTML = result.map(subject => {
@@ -435,7 +435,7 @@ function initializeDashboardPage() {
         if (!heatmapGrid) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/mistakes/subject-stats.php', 10, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache('api/mistakes/subject-stats.php', 0.5, false, skipRevalidate);
 
             if (result) {
                 heatmapGrid.innerHTML = result.map(subject => {
@@ -493,7 +493,7 @@ function initializeDashboardPage() {
         if (!badgeGrid) return;
 
         try {
-            const result = await CacheManager.fetchWithCache('api/performance/badges.php', 30, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache('api/performance/badges.php', 0.5, false, skipRevalidate);
 
             if (result && result.badges) {
                 badgeGrid.innerHTML = result.badges.map(badge => {
@@ -534,7 +534,7 @@ function initializeDashboardPage() {
 
     async function fetchMistakeStats(skipRevalidate = false) {
         try {
-            const result = await CacheManager.fetchWithCache('api/mistakes/stats.php', 10, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache('api/mistakes/stats.php', 0.5, false, skipRevalidate);
             const count = result.count;
             const countEl = document.getElementById('mistake-count');
             if (countEl) animateCount(countEl, count);
@@ -555,7 +555,7 @@ function initializeDashboardPage() {
 
     async function fetchStudyTimeStats(skipRevalidate = false) {
         try {
-            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 10, false, skipRevalidate);
+            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 0.5, false, skipRevalidate);
 
             if (result) {
                 const totalEl = document.getElementById('study-today-total');
@@ -624,7 +624,7 @@ function initializeDashboardPage() {
         selector.innerHTML = `<option value="0">${placeholder}</option>`;
         if (isDependent) selector.disabled = true;
         try {
-            const result = await CacheManager.fetchWithCache(url, 60, false, false);
+            const result = await CacheManager.fetchWithCache(url, 0.5, false, false);
             if (result && result.length > 0) {
                 result.forEach(item => {
                     selector.innerHTML += `<option value="${item.id}">${item.subject_name || item.lesson_name || item.topic_name}</option>`;
@@ -733,7 +733,7 @@ function initializeDashboardPage() {
             }
 
             // --- Cache integration for Exam List ---
-            const result = await CacheManager.fetchWithCache(url, 15, false, skipRevalidate, true);
+            const result = await CacheManager.fetchWithCache(url, 0.5, false, skipRevalidate, true);
 
             if (result && result.success) {
                 const exams = result.data || [];

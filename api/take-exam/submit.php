@@ -97,15 +97,16 @@ if ($stmt->execute()) {
 
     // --- NEW: Update Spaced Repetition (SRS) Tracking ---
     $srs_upsert = $conn->prepare("
-        INSERT INTO question_srs (question_id, next_review_at, interval_days, consecutive_correct)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO question_srs (question_id, question_text_hash, next_review_at, interval_days, consecutive_correct)
+        VALUES (?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
+            question_id = VALUES(question_id),
             next_review_at = VALUES(next_review_at),
             interval_days = VALUES(interval_days),
             consecutive_correct = VALUES(consecutive_correct)
     ");
 
-    $q_stmt = $conn->prepare("SELECT id, answer FROM questions WHERE exam_id = ? AND is_deleted = 0");
+    $q_stmt = $conn->prepare("SELECT id, question, answer FROM questions WHERE exam_id = ? AND is_deleted = 0");
     $q_stmt->bind_param("i", $exam_id);
     $q_stmt->execute();
     $questions_result = $q_stmt->get_result();
@@ -116,6 +117,9 @@ if ($stmt->execute()) {
     while ($q_row = $questions_result->fetch_assoc()) {
         $qid = $q_row['id'];
         $correct_answer = $q_row['answer'];
+        $q_text = trim($q_row['question']);
+        $q_hash = md5($q_text);
+
         $selected = isset($selected_answers[$qid]) ? $selected_answers[$qid] : null;
         $is_correct = ($selected !== null && $selected === $correct_answer) ? 1 : 0;
 
@@ -125,9 +129,9 @@ if ($stmt->execute()) {
 
         // SRS Calculation
         if ($selected !== null) {
-            // Get current SRS state for this question
-            $state_stmt = $conn->prepare("SELECT interval_days, consecutive_correct FROM question_srs WHERE question_id = ?");
-            $state_stmt->bind_param("i", $qid);
+            // Get current SRS state for this question (BY HASH)
+            $state_stmt = $conn->prepare("SELECT interval_days, consecutive_correct FROM question_srs WHERE question_text_hash = ?");
+            $state_stmt->bind_param("s", $q_hash);
             $state_stmt->execute();
             $srs_state = $state_stmt->get_result()->fetch_assoc();
             $state_stmt->close();
@@ -149,11 +153,13 @@ if ($stmt->execute()) {
                 $new_interval = 1;
             }
 
-            $next_review = date('Y-m-d H:i:s', strtotime("+$new_interval days"));
-            $srs_upsert->bind_param("isii", $qid, $next_review, $new_interval, $new_consecutive);
+            // Schedule at midnight of the target day, not 24h from now
+            $next_review = date('Y-m-d 00:00:00', strtotime("+$new_interval days"));
+            $srs_upsert->bind_param("issii", $qid, $q_hash, $next_review, $new_interval, $new_consecutive);
             $srs_upsert->execute();
         }
     }
+
     $insert_attempt_stmt->close();
     $q_stmt->close();
     $srs_upsert->close();
