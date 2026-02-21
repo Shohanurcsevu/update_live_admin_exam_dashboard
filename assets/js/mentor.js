@@ -197,19 +197,26 @@ class StudyMentor {
 
                 // If session is completed and we haven't processed it yet
                 if (session.status === 'completed' || session.status === 'finished' || session.status === 'skipped' || session.status === 'dismissed') {
-                    if (session.id !== this.lastProcessedSessionId || this.lastProcessedSessionStatus !== session.status) {
-                        this.lastProcessedSessionId = session.id;
-                        this.lastProcessedSessionStatus = session.status;
-
-                        if (session.status === 'dismissed') {
+                    // 'dismissed' is a TERMINAL state — always clear on ALL devices, no ID guard needed
+                    if (session.status === 'dismissed') {
+                        if (this.isContinuationPromptActive || this.focusSession.isActive || this.breakSession.isActive) {
                             this.stopFocusSession(true);
                             this.sessionChain.isActive = false;
                             this.isContinuationPromptActive = false;
                             const teaser = document.getElementById('mentor-teaser');
                             if (teaser) teaser.classList.add('hidden');
-                        } else if (session.session_type === 'break') {
+                        }
+                        this.lastProcessedSessionId = session.id;
+                        this.lastProcessedSessionStatus = 'dismissed';
+                        return;
+                    }
+
+                    if (session.id !== this.lastProcessedSessionId || this.lastProcessedSessionStatus !== session.status) {
+                        this.lastProcessedSessionId = session.id;
+                        this.lastProcessedSessionStatus = session.status;
+
+                        if (session.session_type === 'break') {
                             if (session.status === 'skipped') {
-                                // If skipped from another device, skip it here too and show resume prompt immediately
                                 this.stopFocusSession(true);
                             }
                             if (this.isOnDashboard()) {
@@ -219,13 +226,38 @@ class StudyMentor {
                             }
                         } else {
                             if (session.status === 'completed') {
-                                this.completeFocusSession(true); // handles focus session completion
+                                // Populate session context from server data BEFORE completing
+                                // This is critical for secondary devices that never started the session locally
+                                this.focusSession.subject = session.subject_name;
+                                this.focusSession.subjectId = session.subject_id;
+                                this.sessionChain.completedSessions = result.completed_today ?? this.sessionChain.completedSessions ?? 0;
+                                this.completeFocusSession(true);
                             } else {
                                 this.stopFocusSession(true);
                                 this.sessionChain.isActive = false;
                                 this.isContinuationPromptActive = false;
                                 const teaser = document.getElementById('mentor-teaser');
                                 if (teaser) teaser.classList.add('hidden');
+                            }
+                        }
+                    } else {
+                        // Already processed this session — re-show the nudge if it's not visible
+                        // This handles: mobile opening fresh while laptop has the nudge active,
+                        // or nudge that disappeared due to DOM manipulation
+                        if (session.status === 'completed' && session.session_type !== 'break'
+                            && this.isOnDashboard()
+                            && !this.focusSession.isActive && !this.breakSession.isActive) {
+                            const teaser = document.getElementById('mentor-teaser');
+                            const nudgeVisible = teaser && !teaser.classList.contains('hidden');
+                            if (!nudgeVisible || !this.isContinuationPromptActive) {
+                                // Re-sync session chain context
+                                this.sessionChain.isActive = true;
+                                this.sessionChain.subjectId = session.subject_id;
+                                this.sessionChain.subjectName = session.subject_name;
+                                this.sessionChain.completedSessions = result.completed_today ?? this.sessionChain.completedSessions ?? 0;
+                                this.focusSession.subject = session.subject_name;
+                                this.isContinuationPromptActive = false; // Reset so showContinuationPrompt sets it
+                                this.showContinuationPrompt();
                             }
                         }
                     }
@@ -3022,7 +3054,7 @@ class StudyMentor {
 
             // Auto-hide teaser after 8 seconds
             setTimeout(() => {
-                if (this.isFocusModeActive() || this.isBreakModeActive()) return;
+                if (this.isFocusModeActive() || this.isBreakModeActive() || this.isContinuationPromptActive) return;
                 teaser?.classList.add('hidden');
             }, 8000);
         } else {
