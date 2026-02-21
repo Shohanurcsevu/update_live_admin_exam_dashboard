@@ -7,25 +7,38 @@ date_default_timezone_set('Asia/Dhaka');
 $data = json_decode(file_get_contents('php://input'), true);
 $action = $data['action'] ?? null; // 'pause', 'resume', 'update'
 $remaining = $data['remaining_seconds'] ?? null;
+$session_id = $data['session_id'] ?? null;
 
-// Implicitly we update the single active session. 
-// A more robust system would pass session_id, but per user requirement "no user", we assume single session context.
+// We update the session based on session_id if provided.
 
 try {
     if ($action === 'pause') {
-        $stmt = $conn->prepare("UPDATE study_sessions SET status = 'paused', remaining_seconds = ?, last_heartbeat = NOW() WHERE status = 'active' ORDER BY id DESC LIMIT 1");
-        $stmt->bind_param("i", $remaining);
+        if ($session_id) {
+            $stmt = $conn->prepare("UPDATE study_sessions SET status = 'paused', remaining_seconds = ?, last_heartbeat = NOW() WHERE id = ? AND status = 'active'");
+            $stmt->bind_param("ii", $remaining, $session_id);
+        } else {
+            $stmt = $conn->prepare("UPDATE study_sessions SET status = 'paused', remaining_seconds = ?, last_heartbeat = NOW() WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+            $stmt->bind_param("i", $remaining);
+        }
         $stmt->execute();
     } 
     elseif ($action === 'resume') {
-        // When resuming, we don't necessarily update remaining time from client (trust server or client? client has latest timer tick)
-        // But usually we just flip status.
-        $conn->query("UPDATE study_sessions SET status = 'active', last_heartbeat = NOW() WHERE status = 'paused' ORDER BY id DESC LIMIT 1");
+        if ($session_id) {
+            $stmt = $conn->prepare("UPDATE study_sessions SET status = 'active', last_heartbeat = NOW() WHERE id = ? AND status = 'paused'");
+            $stmt->bind_param("i", $session_id);
+            $stmt->execute();
+        } else {
+            $conn->query("UPDATE study_sessions SET status = 'active', last_heartbeat = NOW() WHERE status = 'paused' ORDER BY id DESC LIMIT 1");
+        }
     } 
     elseif ($action === 'update') {
-        // Regular heartbeat
-        $stmt = $conn->prepare("UPDATE study_sessions SET remaining_seconds = ?, last_heartbeat = NOW() WHERE status = 'active' ORDER BY id DESC LIMIT 1");
-        $stmt->bind_param("i", $remaining);
+        if ($session_id) {
+            $stmt = $conn->prepare("UPDATE study_sessions SET remaining_seconds = ?, last_heartbeat = NOW() WHERE id = ? AND status = 'active'");
+            $stmt->bind_param("ii", $remaining, $session_id);
+        } else {
+            $stmt = $conn->prepare("UPDATE study_sessions SET remaining_seconds = ?, last_heartbeat = NOW() WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+            $stmt->bind_param("i", $remaining);
+        }
         $stmt->execute();
     }
 

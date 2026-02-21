@@ -16,7 +16,7 @@ try {
 
     if ($row = $result->fetch_assoc()) {
         // Valid if active/paused OR completed within the last hour
-        $isRecentlyCompleted = (in_array($row['status'], ['completed', 'finished']) && strtotime($row['last_heartbeat']) >= time() - 3600);
+        $isRecentlyCompleted = (in_array($row['status'], ['completed', 'finished', 'skipped', 'dismissed']) && strtotime($row['last_heartbeat']) >= time() - 3600);
         $isActiveOrPaused = in_array($row['status'], ['active', 'paused']);
 
         if ($isActiveOrPaused || $isRecentlyCompleted) {

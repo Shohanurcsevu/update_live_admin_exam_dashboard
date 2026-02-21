@@ -101,10 +101,10 @@ class StudyMentor {
             this.restoreSession(); // Re-sync when window/tab gets focus (e.g. mobile wake)
         });
 
-        // NEW: Periodic sync poll (every 1s) to catch actions from other devices instantly
+        // NEW: Periodic sync poll (every 500ms) to catch actions from other devices almost instantly
         setInterval(() => {
             this.restoreSession();
-        }, 1000);
+        }, 500);
 
         // Also check on any URL parameter change (for SPA navigation)
         const originalPushState = history.pushState;
@@ -185,20 +185,48 @@ class StudyMentor {
                     driftAdjustedRemaining = Math.max(0, session.remaining_seconds - elapsedSinceHb);
                 }
 
+                // Reconstruct session chain logically based on server data
+                if (!this.sessionChain.isActive) {
+                    this.sessionChain.isActive = true;
+                    this.sessionChain.subjectName = session.subject_name;
+                    this.sessionChain.subjectId = session.subject_id;
+                } else if (session.subject_id && this.sessionChain.subjectId !== session.subject_id) {
+                    this.sessionChain.subjectName = session.subject_name;
+                    this.sessionChain.subjectId = session.subject_id;
+                }
+
                 // If session is completed and we haven't processed it yet
-                if (session.status === 'completed' || session.status === 'finished') {
+                if (session.status === 'completed' || session.status === 'finished' || session.status === 'skipped' || session.status === 'dismissed') {
                     if (session.id !== this.lastProcessedSessionId || this.lastProcessedSessionStatus !== session.status) {
                         this.lastProcessedSessionId = session.id;
                         this.lastProcessedSessionStatus = session.status;
 
-                        if (session.session_type === 'break' && this.sessionChain.isActive) {
+                        if (session.status === 'dismissed') {
+                            this.stopFocusSession(true);
+                            this.sessionChain.isActive = false;
+                            this.isContinuationPromptActive = false;
+                            const teaser = document.getElementById('mentor-teaser');
+                            if (teaser) teaser.classList.add('hidden');
+                        } else if (session.session_type === 'break') {
+                            if (session.status === 'skipped') {
+                                // If skipped from another device, skip it here too and show resume prompt immediately
+                                this.stopFocusSession(true);
+                            }
                             if (this.isOnDashboard()) {
                                 this.showResumePrompt();
                             } else {
                                 this.sessionChain.awaitingResumeConfirmation = true;
                             }
                         } else {
-                            this.completeFocusSession(true); // handles focus session completion
+                            if (session.status === 'completed') {
+                                this.completeFocusSession(true); // handles focus session completion
+                            } else {
+                                this.stopFocusSession(true);
+                                this.sessionChain.isActive = false;
+                                this.isContinuationPromptActive = false;
+                                const teaser = document.getElementById('mentor-teaser');
+                                if (teaser) teaser.classList.add('hidden');
+                            }
                         }
                     }
                     return;
@@ -288,7 +316,7 @@ class StudyMentor {
         // meaningful data: subject_id, subject_name, duration (for start)
         // remaining_seconds (for update/pause)
 
-        const payload = { action: action, ...data };
+        const payload = { action: action, session_id: this.lastProcessedSessionId, ...data };
 
         // Map to specific endpoints
         let endpoint = 'api/pomodoro/update.php';
@@ -399,8 +427,12 @@ class StudyMentor {
                 isActive: true,
                 subjectId: subjectId,
                 subjectName: subjectName,
-                completedSessions: 0
+                completedSessions: 0 // Reset for new subject
             };
+        } else {
+            // Same subject being started manually: just ensure active flag
+            this.sessionChain.isActive = true;
+            // The counter remains, and will catch up with server tally on next sync
         }
 
         // Reset inactivity logically (will be verified by server on next sync)
@@ -461,8 +493,8 @@ class StudyMentor {
                 console.log('Triggered 5-minute notification');
             }
 
-            // Sync to DB every 30 seconds
-            if (this.focusSession.timeRemaining % 30 === 0 && previousTime !== this.focusSession.timeRemaining) {
+            // Sync to DB every 10 seconds for more granular catch-up
+            if (this.focusSession.timeRemaining % 10 === 0 && previousTime !== this.focusSession.timeRemaining) {
                 this.saveSession('update', { remaining_seconds: this.focusSession.timeRemaining, type: 'focus' });
             }
 
@@ -500,8 +532,13 @@ class StudyMentor {
                 return; // Exit early, timer continues in background
             }
 
-            teaser.classList.remove('hidden');
-            badge?.classList.remove('hidden');
+            // Honor the Mentor Panel open state
+            if (this.isOpen) {
+                teaser.classList.add('hidden');
+            } else {
+                teaser.classList.remove('hidden');
+                badge?.classList.remove('hidden');
+            }
 
             // Force Boss Theme Visuals for Timer
             this.applyTimerTheme();
@@ -585,9 +622,13 @@ class StudyMentor {
                 </div>
             `;
 
-            // Show teaser
-            teaser.classList.remove('hidden');
-            badge?.classList.remove('hidden');
+            // Error Prevention / Honor Panel
+            if (this.isOpen) {
+                teaser.classList.add('hidden');
+            } else {
+                teaser.classList.remove('hidden');
+                badge?.classList.remove('hidden');
+            }
 
             // Auto-hide after 10 seconds
             setTimeout(() => {
@@ -670,8 +711,14 @@ class StudyMentor {
             `;
             const teaser = document.getElementById('mentor-teaser');
             const badge = document.getElementById('mentor-badge');
-            if (teaser) teaser.classList.remove('hidden');
-            if (badge) badge.classList.remove('hidden');
+
+            // Honor Panel State
+            if (this.isOpen) {
+                if (teaser) teaser.classList.add('hidden');
+            } else {
+                if (teaser) teaser.classList.remove('hidden');
+                if (badge) badge.classList.remove('hidden');
+            }
         }
     }
 
@@ -704,8 +751,14 @@ class StudyMentor {
             `;
             const teaser = document.getElementById('mentor-teaser');
             const badge = document.getElementById('mentor-badge');
-            if (teaser) teaser.classList.remove('hidden');
-            if (badge) badge.classList.remove('hidden');
+
+            // Honor Panel State
+            if (this.isOpen) {
+                if (teaser) teaser.classList.add('hidden');
+            } else {
+                if (teaser) teaser.classList.remove('hidden');
+                if (badge) badge.classList.remove('hidden');
+            }
         }
     }
 
@@ -744,7 +797,7 @@ class StudyMentor {
         };
 
         // Notify server that we've dismissed the prompt/chain to sync other devices
-        this.saveSession('complete', { status: 'finished', remaining_seconds: 0 });
+        this.saveSession('complete', { status: 'dismissed', remaining_seconds: 0 });
 
         // Refresh mentor data to show updated stats
         setTimeout(() => this.fetchMentorData(), 1000);
@@ -753,7 +806,7 @@ class StudyMentor {
     showResumePrompt() {
         this.isContinuationPromptActive = true;
         const subject = this.sessionChain.subjectName || this.breakSession.subject || this.focusSession.subject || "your subject";
-        const nextSession = this.sessionChain.completedSessions + 1;
+        const nextSession = (this.sessionChain.completedSessions || 0) + 1; // Fallback correctly to 1 if missing
 
         const teaserText = document.getElementById('teaser-text');
         if (teaserText) {
@@ -775,8 +828,14 @@ class StudyMentor {
             `;
             const teaser = document.getElementById('mentor-teaser');
             const badge = document.getElementById('mentor-badge');
-            if (teaser) teaser.classList.remove('hidden');
-            if (badge) badge.classList.remove('hidden');
+
+            // Honor Panel State
+            if (this.isOpen) {
+                if (teaser) teaser.classList.add('hidden');
+            } else {
+                if (teaser) teaser.classList.remove('hidden');
+                if (badge) badge.classList.remove('hidden');
+            }
         }
     }
 
@@ -864,8 +923,8 @@ class StudyMentor {
 
             this.updateBreakUI();
 
-            // Sync to DB every 30 seconds
-            if (this.breakSession.timeRemaining % 30 === 0 && previousTime !== this.breakSession.timeRemaining) {
+            // Sync to DB every 10 seconds
+            if (this.breakSession.timeRemaining % 10 === 0 && previousTime !== this.breakSession.timeRemaining) {
                 this.saveSession('update', { remaining_seconds: this.breakSession.timeRemaining, type: 'break' });
             }
 
@@ -917,14 +976,16 @@ class StudyMentor {
 
     skipBreak() {
         if (this.sessionChain.isActive) {
-            this.stopFocusSession(); // Clear break session state
+            this.saveSession('complete', { status: 'skipped', remaining_seconds: 0 });
+            this.stopFocusSession(true); // Clear break session state
             if (this.isOnDashboard()) {
                 this.showResumePrompt();
             } else {
                 this.sessionChain.awaitingResumeConfirmation = true;
             }
         } else {
-            this.stopFocusSession();
+            this.saveSession('complete', { status: 'skipped', remaining_seconds: 0 });
+            this.stopFocusSession(true);
             this.showWelcomeGreeting();
         }
     }
@@ -950,8 +1011,13 @@ class StudyMentor {
                 return; // Exit early, timer continues in background
             }
 
-            teaser.classList.remove('hidden');
-            badge?.classList.remove('hidden');
+            // Honor Panel State
+            if (this.isOpen) {
+                teaser.classList.add('hidden');
+            } else {
+                teaser.classList.remove('hidden');
+                badge?.classList.remove('hidden');
+            }
 
             this.applyBreakTheme();
 
@@ -1502,6 +1568,11 @@ class StudyMentor {
 
             panel?.classList.remove('hidden');
             this.isOpen = true;
+
+            // Hide the teaser/nudge when panel is open
+            const teaser = document.getElementById('mentor-teaser');
+            if (teaser) teaser.classList.add('hidden');
+
             // Always fetch fresh data when opening to reflect recent study sessions
             this.fetchMentorData();
 
@@ -1553,6 +1624,16 @@ class StudyMentor {
         const panel = document.getElementById('mentor-panel');
         panel?.classList.add('hidden');
         this.isOpen = false;
+
+        // Restore teaser/nudge visibility if there's an active session or prompt
+        const teaser = document.getElementById('mentor-teaser');
+        if (teaser && (this.isFocusModeActive() || this.isBreakModeActive() || this.isContinuationPromptActive || this.isMotivationalNudgeActive)) {
+            // Only restore if we are originally supposed to be showing it.
+            // On dashboard, we show prompts. Everywhere, we show active timers.
+            if (this.isOnDashboard() || this.isFocusModeActive() || this.isBreakModeActive()) {
+                teaser.classList.remove('hidden');
+            }
+        }
 
         if (this.reportRefreshInterval) {
             clearInterval(this.reportRefreshInterval);

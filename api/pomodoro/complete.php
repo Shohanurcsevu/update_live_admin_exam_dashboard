@@ -8,11 +8,20 @@ $data = json_decode(file_get_contents('php://input'), true);
 // Even if we don't pass ID, complete the active one
 $remaining = $data['remaining_seconds'] ?? 0;
 $customDuration = isset($data['duration']) ? floatval($data['duration']) : null;
+$session_id = $data['session_id'] ?? null;
 
 try {
     // 1. Get the active or recently completed session to log it or update its status
-    $sql = "SELECT * FROM study_sessions WHERE status IN ('active', 'paused', 'completed') ORDER BY id DESC LIMIT 1";
-    $result = $conn->query($sql);
+    if ($session_id) {
+        $sql = "SELECT * FROM study_sessions WHERE id = ? AND status IN ('active', 'paused', 'completed', 'skipped', 'finished', 'dismissed')";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("i", $session_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } else {
+        $sql = "SELECT * FROM study_sessions WHERE status IN ('active', 'paused', 'completed', 'skipped', 'finished', 'dismissed') ORDER BY id DESC LIMIT 1";
+        $result = $conn->query($sql);
+    }
     
     if ($row = $result->fetch_assoc()) {
         $targetStatus = $data['status'] ?? 'completed';
