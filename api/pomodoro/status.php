@@ -51,14 +51,25 @@ try {
             // NOTE: To prevent "active" session from seeming stalled, we'll return it as is.
         }
 
-        // Fetch daily count for this subject to keep multiple devices in sync on session number
+        // Count today's completed focus sessions using JSON_EXTRACT on activity_details
+        // Filters by subject_id and status entirely in SQL — no subject_name matching issues
         $completedToday = 0;
         if ($row['subject_id']) {
-            $countSql = "SELECT COUNT(*) as total FROM study_sessions 
-                         WHERE subject_id = ? AND status = 'completed' 
-                         AND DATE(last_heartbeat) = CURDATE()";
+            $today = date('Y-m-d');
+            $today_start = $today . ' 00:00:00';
+            $today_end   = $today . ' 23:59:59';
+            $sessionSubjectId = intval($row['subject_id']);
+
+            $countSql = "SELECT COUNT(*) as total FROM activity_log 
+                         WHERE activity_type = 'pomodoro_session'
+                         AND timestamp BETWEEN ? AND ?
+                         AND JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.subject_id')) = ?
+                         AND (
+                             JSON_EXTRACT(activity_details, '$.status') IS NULL
+                             OR JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.status')) = 'completed'
+                         )";
             $countStmt = $conn->prepare($countSql);
-            $countStmt->bind_param("i", $row['subject_id']);
+            $countStmt->bind_param("ssi", $today_start, $today_end, $sessionSubjectId);
             $countStmt->execute();
             $countRes = $countStmt->get_result();
             if ($countRow = $countRes->fetch_assoc()) {

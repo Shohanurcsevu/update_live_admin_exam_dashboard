@@ -52,7 +52,7 @@ $trends_sql = "
         AVG(CASE WHEN p.attempt_time >= DATE_SUB(CURRENT_DATE, INTERVAL 14 DAY) AND p.attempt_time < DATE_SUB(CURRENT_DATE, INTERVAL 7 DAY) THEN (p.score_with_negative / e.total_marks) * 100 END) as accuracy_last_week
     FROM subjects s
     LEFT JOIN performance p ON s.id = p.subject_id
-    LEFT JOIN exams e ON p.exam_id = e.id
+    LEFT JOIN exams e ON p.exam_id = e.id AND e.subject_id IS NOT NULL
     WHERE s.is_deleted = 0
     GROUP BY s.id, s.subject_name
 ";
@@ -91,6 +91,9 @@ if ($result) {
                 AND e.created_at BETWEEN '$today_start' AND '$today_end'
                 AND e.is_deleted = 0
                 AND e.is_revision = 0
+                AND e.subject_id IS NOT NULL
+                AND e.lesson_id IS NOT NULL
+                AND e.topic_id IS NOT NULL
             GROUP BY e.id, e.exam_title, e.total_marks
         ";
         
@@ -199,7 +202,7 @@ foreach ($subjects as $subject) {
             COUNT(e.id) as exam_count,
             AVG((p.score_with_negative / e.total_marks) * 100) as topic_accuracy
         FROM topics t
-        LEFT JOIN exams e ON t.id = e.topic_id AND e.is_deleted = 0 AND e.is_revision = 0
+        LEFT JOIN exams e ON t.id = e.topic_id AND e.is_deleted = 0 AND e.is_revision = 0 AND e.subject_id IS NOT NULL AND e.lesson_id IS NOT NULL AND e.topic_id IS NOT NULL
         LEFT JOIN performance p ON e.id = p.exam_id
         WHERE t.subject_id = ?
         GROUP BY t.id, t.topic_name
@@ -237,7 +240,7 @@ $daily_exams_sql = "
         COUNT(DISTINCT e.id) as created_count,
         COUNT(DISTINCT p.id) as taken_count
     FROM subjects s
-    LEFT JOIN exams e ON s.id = e.subject_id AND e.created_at BETWEEN '$today_start' AND '$today_end' AND e.is_deleted = 0 AND e.is_revision = 0
+    LEFT JOIN exams e ON s.id = e.subject_id AND e.created_at BETWEEN '$today_start' AND '$today_end' AND e.is_deleted = 0 AND e.is_revision = 0 AND e.subject_id IS NOT NULL AND e.lesson_id IS NOT NULL AND e.topic_id IS NOT NULL
     LEFT JOIN performance p ON e.id = p.exam_id AND p.attempt_time BETWEEN '$today_start' AND '$today_end'
     WHERE s.is_deleted = 0
     GROUP BY s.id, s.subject_name
@@ -363,6 +366,9 @@ $online_sql = "
     WHERE p.attempt_time BETWEEN '$today_start' AND '$today_end' 
     AND e.is_deleted = 0
     AND e.is_revision = 0
+    AND e.subject_id IS NOT NULL
+    AND e.lesson_id IS NOT NULL
+    AND e.topic_id IS NOT NULL
 ";
 $online_res = $conn->query($online_sql);
 if ($online_res) {
@@ -382,7 +388,7 @@ if ($manual_logs_res) {
     // Validate manual IDs exist and aren't deleted/revision
     if (!empty($man_ids)) {
         $ids_csv = implode(',', $man_ids);
-        $valid_manual_res = $conn->query("SELECT id FROM exams WHERE id IN ($ids_csv) AND is_deleted = 0 AND is_revision = 0");
+        $valid_manual_res = $conn->query("SELECT id FROM exams WHERE id IN ($ids_csv) AND is_deleted = 0 AND is_revision = 0 AND subject_id IS NOT NULL AND lesson_id IS NOT NULL AND topic_id IS NOT NULL");
         if ($valid_manual_res) {
             while ($row = $valid_manual_res->fetch_row()) $completed_exam_ids[] = intval($row[0]);
         }
@@ -412,6 +418,9 @@ $uncompleted_sql = "
     WHERE e.created_at BETWEEN '$today_start' AND '$today_end' 
     AND e.is_deleted = 0
     AND e.is_revision = 0
+    AND e.subject_id IS NOT NULL
+    AND e.lesson_id IS NOT NULL
+    AND e.topic_id IS NOT NULL
     AND p.id IS NULL
 ";
 
@@ -437,6 +446,9 @@ $roadmap_sql = "
     WHERE DATE(p.attempt_time) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY)
     AND s.is_deleted = 0
     AND e.is_revision = 0
+    AND e.subject_id IS NOT NULL
+    AND e.lesson_id IS NOT NULL
+    AND e.topic_id IS NOT NULL
     GROUP BY s.id, s.subject_name
     ORDER BY avg_accuracy ASC
     LIMIT 3

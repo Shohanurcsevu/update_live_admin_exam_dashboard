@@ -161,7 +161,7 @@ class StudyMentor {
                 const session = result.session;
 
                 // Sync the completed session count from server to ensure all devices show same "Session X"
-                if (result.completed_today !== undefined) {
+                if (result.completed_today !== undefined && this.sessionChain.isActive && session.subject_id === this.sessionChain.subjectId) {
                     this.sessionChain.completedSessions = result.completed_today;
                 }
 
@@ -312,10 +312,11 @@ class StudyMentor {
     }
 
     async saveSession(action, data = {}) {
-        // Actions: start, pause, resume, update, complete
-        // meaningful data: subject_id, subject_name, duration (for start)
-        // remaining_seconds (for update/pause)
+        await this.saveSessionWithResult(action, data);
+    }
 
+    async saveSessionWithResult(action, data = {}) {
+        // Actions: start, pause, resume, update, complete
         const payload = { action: action, session_id: this.lastProcessedSessionId, ...data };
 
         // Map to specific endpoints
@@ -332,9 +333,17 @@ class StudyMentor {
             });
             const result = await response.json();
 
-            // --- NEW: Track ID immediately to avoid redundant sync polls ---
-            if (result.success && result.session_id) {
-                this.lastProcessedSessionId = result.session_id;
+            // Track session ID immediately to avoid redundant sync polls
+            if (result.success) {
+                if (result.session_id) {
+                    this.lastProcessedSessionId = result.session_id;
+                }
+
+                // Sync completed count if provided (start.php returns this)
+                if (result.completed_today !== undefined && this.sessionChain.isActive) {
+                    this.sessionChain.completedSessions = result.completed_today;
+                    console.log(`[StudyMentor] Synced completedSessions to ${result.completed_today} for subject ${this.sessionChain.subjectName}`);
+                }
             }
 
             // If an update was sent but nothing was changed on server (session terminated elsewhere)
@@ -343,19 +352,24 @@ class StudyMentor {
                 this.restoreSession();
             }
 
-            // --- Cache Invalidation on completion ---
+            // Cache Invalidation on completion
             if (action === 'complete' && result.success) {
                 if (typeof CacheManager !== 'undefined') {
                     CacheManager.clearGroup('analytics');
                     CacheManager.clearGroup('dashboard');
                 }
             }
-            // --- Force local verification poll immediately after save ---
+
+            // Force local verification poll immediately after save
             setTimeout(() => this.restoreSession(), 100);
+
+            return result;
         } catch (e) {
             console.error('Failed to save session state:', e);
+            return null;
         }
     }
+
 
     injectPressureCSS() {
         if (document.getElementById('boss-pressure-css')) return;
@@ -405,9 +419,7 @@ class StudyMentor {
         // If there's an active session (even if different subject), stop it first
         if (this.focusSession.isActive || this.breakSession.isActive) {
             if (this.focusSession.isActive && this.focusSession.subject === subjectName) {
-                // Same subject, maybe just accidentally closed the widget? Just toggling would be enough
-                // However, we want "Start" to be a clean start or a resume.
-                // Let's check status. If it's active in our memory, we just return.
+                // Same subject already running, just return
                 return;
             }
             // Stop current session (focus or break)
@@ -417,35 +429,39 @@ class StudyMentor {
         this.focusSession.isActive = true;
         this.focusSession.subject = subjectName;
         this.focusSession.subjectId = subjectId;
-        this.isContinuationPromptActive = false; // Starting new session clears prompt state
+        this.isContinuationPromptActive = false;
         this.focusSession.timeRemaining = 25 * 60;
         this.focusSession.totalDuration = 25 * 60;
 
-        // Initialize or continue session chain
-        if (!this.sessionChain.isActive || this.sessionChain.subjectId !== subjectId) {
-            this.sessionChain = {
-                isActive: true,
-                subjectId: subjectId,
-                subjectName: subjectName,
-                completedSessions: 0 // Reset for new subject
-            };
-        } else {
-            // Same subject being started manually: just ensure active flag
-            this.sessionChain.isActive = true;
-            // The counter remains, and will catch up with server tally on next sync
-        }
-
-        // Reset inactivity logically (will be verified by server on next sync)
+        // Reset inactivity logically
         this.serverInactivityData.lastPomodoroEnd = Math.floor(Date.now() / 1000) + this.serverInactivityData.serverOffset;
         this.serverInactivityData.totalBreakSeconds = 0;
 
-        // DB Call to Start
-        await this.saveSession('start', {
+        // DB Call to Start — FIRST, so we get completed_today back from API
+        const startResult = await this.saveSessionWithResult('start', {
             subject_id: subjectId,
             subject_name: subjectName,
             duration: 25,
             type: 'focus'
         });
+
+        // Initialize session chain with AUTHORITATIVE count from API response
+        if (!this.sessionChain.isActive || this.sessionChain.subjectId !== subjectId) {
+            this.sessionChain = {
+                isActive: true,
+                subjectId: subjectId,
+                subjectName: subjectName,
+                completedSessions: (startResult?.completed_today ?? 0)
+            };
+        } else {
+            // Same subject, update count from server if available
+            if (startResult?.completed_today !== undefined) {
+                this.sessionChain.completedSessions = startResult.completed_today;
+            }
+            this.sessionChain.isActive = true;
+        }
+
+        console.log('[StudyMentor] Session started. completedSessions =', this.sessionChain.completedSessions, '(Session', this.sessionChain.completedSessions + 1, ')');
 
         this.startFocusTimer();
         this.updateFocusUI();

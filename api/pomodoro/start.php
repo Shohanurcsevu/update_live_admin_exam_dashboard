@@ -17,8 +17,9 @@ if ($type === 'focus' && !$subject_id) {
 }
 
 try {
-    // 1. Abandon any existing active or completed sessions that are awaiting decision
-    $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused', 'completed')");
+    // 1. Abandon only current in-progress sessions (active/paused) when starting a new one.
+    // DO NOT abandon 'completed' or 'finished' sessions as they are part of the daily tally.
+    $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
 
     // 2. Create new session
     $stmt = $conn->prepare("INSERT INTO study_sessions (subject_id, subject_name, duration_minutes, remaining_seconds, status, start_time, last_heartbeat, session_type) VALUES (?, ?, ?, ?, 'active', NOW(), NOW(), ?)");
@@ -27,7 +28,39 @@ try {
     $stmt->bind_param("isiis", $subject_id, $subject_name, $duration, $seconds, $type);
     
     if ($stmt->execute()) {
-        echo json_encode(['success' => true, 'session_id' => $conn->insert_id]);
+        $sessionId = $conn->insert_id;
+        
+        // Count today's completed focus sessions using JSON_EXTRACT on activity_details
+        // Filters by subject_id and status in SQL — no subject_name encoding issues
+        $completedToday = 0;
+        if ($subject_id) {
+            $today = date('Y-m-d');
+            $today_start = $today . ' 00:00:00';
+            $today_end   = $today . ' 23:59:59';
+            $currentSubjectId = intval($subject_id);
+
+            $countSql = "SELECT COUNT(*) as total FROM activity_log 
+                         WHERE activity_type = 'pomodoro_session'
+                         AND timestamp BETWEEN ? AND ?
+                         AND JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.subject_id')) = ?
+                         AND (
+                             JSON_EXTRACT(activity_details, '$.status') IS NULL
+                             OR JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.status')) = 'completed'
+                         )";
+            $countStmt = $conn->prepare($countSql);
+            $countStmt->bind_param("ssi", $today_start, $today_end, $currentSubjectId);
+            $countStmt->execute();
+            $countRes = $countStmt->get_result();
+            if ($countRow = $countRes->fetch_assoc()) {
+                $completedToday = intval($countRow['total']);
+            }
+        }
+
+        echo json_encode([
+            'success' => true, 
+            'session_id' => $sessionId,
+            'completed_today' => $completedToday
+        ]);
     } else {
         throw new Exception($stmt->error);
     }
