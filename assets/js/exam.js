@@ -31,7 +31,23 @@ function initializeExamPage() {
     const previewQuestionsBtn = document.getElementById('preview-imported-questions-btn');
     const previewContainer = document.getElementById('imported-questions-preview');
 
+    // Tab Elements
+    const tabManual = document.getElementById('tab-manual');
+    const tabBulk = document.getElementById('tab-bulk');
+    const manualModeContent = document.getElementById('manual-mode-content');
+    const bulkModeContent = document.getElementById('bulk-mode-content');
+
+    // Bulk Import Elements
+    const bulkManualJsonInput = document.getElementById('bulk-manual-json-input');
+    const bulkInitQueueBtn = document.getElementById('bulk-init-queue-btn');
+    const bulkCategorizationContainer = document.getElementById('bulk-categorization-container');
+    const sectionsContainer = document.getElementById('sections-container');
+    const resultsPlaceholder = document.getElementById('results-placeholder');
+    const bulkResetBtn = document.getElementById('bulk-reset-btn');
+
     let examIdToDelete = null;
+    let subjects = []; // Shared subjects for bulk categorization
+    let extractedSections = []; // Queue for bulk import
     let importedQuestions = [];
     const defaultInstructions = 'প্রতিটি প্রশ্নের ৪ (চার) টি উত্তরের মধ্যে ১ (এক) টি সঠিক উত্তর রয়েছে। প্রতিটি শুদ্ধ উত্তরের জন্য প্রার্থী ১ (এক) নম্বর পাবেন। প্রতিটি ভুল উত্তরের জন্য ০.৫ ( শূন্য দশমিক পাঁচ ) নম্বর কাটা যাবে।';
 
@@ -62,6 +78,58 @@ function initializeExamPage() {
         }, 3000);
     }
 
+    // Modal Helpers
+    function showConfirmModal(title, message, onConfirm) {
+        const modal = document.getElementById('custom-confirm-modal');
+        const content = document.getElementById('modal-content');
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-message').textContent = message;
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+
+        const cancelBtn = document.getElementById('modal-cancel-btn');
+        const confirmBtn = document.getElementById('modal-confirm-btn');
+
+        const close = () => {
+            content.classList.add('scale-95', 'opacity-0');
+            content.classList.remove('scale-100', 'opacity-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        };
+
+        cancelBtn.onclick = close;
+        confirmBtn.onclick = () => {
+            close();
+            onConfirm();
+        };
+    }
+
+    function switchTab(mode) {
+        if (mode === 'manual') {
+            tabManual.classList.add('border-blue-600', 'text-blue-600');
+            tabManual.classList.remove('border-transparent', 'text-slate-400');
+            tabBulk.classList.remove('border-blue-600', 'text-blue-600');
+            tabBulk.classList.add('border-transparent', 'text-slate-400');
+            manualModeContent.classList.remove('hidden');
+            bulkModeContent.classList.add('hidden');
+        } else {
+            tabBulk.classList.add('border-blue-600', 'text-blue-600');
+            tabBulk.classList.remove('border-transparent', 'text-slate-400');
+            tabManual.classList.remove('border-blue-600', 'text-blue-600');
+            tabManual.classList.add('border-transparent', 'text-slate-400');
+            bulkModeContent.classList.remove('hidden');
+            manualModeContent.classList.add('hidden');
+        }
+    }
+
     function updateExamMetrics(count) {
         if (count > 0) {
             const durationInput = document.getElementById('duration');
@@ -87,6 +155,7 @@ function initializeExamPage() {
         try {
             const result = await CacheManager.fetchWithCache(SUBJECT_API_URL, 60);
             if (result) {
+                subjects = result; // Store for bulk mode
                 selector.innerHTML = selector === subjectFilter ? '<option value="0">All Subjects</option>' : '<option value="">Select Subject</option>';
                 result.forEach(subject => {
                     selector.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
@@ -318,6 +387,12 @@ function initializeExamPage() {
                 previewContainer.innerHTML = '';
                 previewContainer.classList.add('hidden');
             }
+            // Reset bulk state
+            extractedSections = [];
+            if (bulkManualJsonInput) bulkManualJsonInput.value = '';
+            if (bulkCategorizationContainer) bulkCategorizationContainer.classList.add('hidden');
+            if (sectionsContainer) sectionsContainer.classList.add('hidden');
+            if (resultsPlaceholder) resultsPlaceholder.classList.remove('hidden');
         }
     }
     function openModal(modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
@@ -414,6 +489,7 @@ function initializeExamPage() {
                     };
 
                     openModal(examModal);
+                    switchTab('manual');
                 }
             } catch (error) { showToast('Failed to fetch exam details.', 'error'); }
         }
@@ -448,6 +524,11 @@ function initializeExamPage() {
         document.getElementById('pass-mark').value = 10;
 
         initialExamMetrics = null; // Reset for new exam
+        extractedSections = []; // Clear bulk queue
+        bulkManualJsonInput.value = '';
+        renderSections();
+        renderBulkTable();
+        switchTab('manual'); // Default to manual for New/Edit
 
         modalTopicSelector.innerHTML = '<option value="">Select Lesson First</option>';
         modalTopicSelector.disabled = true;
@@ -534,6 +615,54 @@ function initializeExamPage() {
     document.getElementById('cancel-exam-delete-btn').addEventListener('click', () => closeModal(deleteModal));
     document.getElementById('confirm-exam-delete-btn').addEventListener('click', handleDeleteConfirm);
 
+    // Tab Listeners
+    tabManual.onclick = () => switchTab('manual');
+    tabBulk.onclick = () => switchTab('bulk');
+
+    // Bulk Import Listeners
+    bulkInitQueueBtn.onclick = () => {
+        const json = bulkManualJsonInput.value.trim();
+        if (!json) return showToast('Please paste JSON payload.', 'error');
+
+        try {
+            const data = JSON.parse(json);
+            const arrayData = Array.isArray(data) ? data : [data];
+
+            extractedSections = arrayData.map(item => ({
+                title: item["Exam Title"] || item["title"] || "Untitled Exam",
+                questions: (item.data || item.questions || []).map(q => ({
+                    ...q,
+                    priority: parseInt(q.priority) || 0
+                })),
+                target: { subject: 0, lesson: 0, topic: 0 },
+                isExcluded: false
+            })).filter(s => s.questions.length > 0);
+
+            if (!extractedSections.length) throw new Error("No valid exams/questions found.");
+
+            renderBulkTable();
+            renderSections();
+            showToast(`Queue Initialized: ${extractedSections.length} Exams detected.`);
+        } catch (e) {
+            showToast(`JSON Error: ${e.message}`, 'error');
+        }
+    };
+
+    // Reset Bulk Import
+    bulkResetBtn.onclick = () => {
+        showConfirmModal(
+            'Confirm Reset',
+            'This will clear all pasted JSON and all exams in the current queue. Are you sure?',
+            () => {
+                bulkManualJsonInput.value = '';
+                extractedSections = [];
+                renderSections();
+                renderBulkTable();
+                showToast('Bulk queue cleared.');
+            }
+        );
+    };
+
     // Question Import Handlers
     if (previewQuestionsBtn) {
         previewQuestionsBtn.addEventListener('click', () => {
@@ -581,6 +710,338 @@ function initializeExamPage() {
                 modalQuestionsJson.value = JSON.stringify(importedQuestions, null, 2);
             });
         });
+    }
+
+    // --- Bulk Import Logic ---
+
+    function renderBulkTable() {
+        if (!extractedSections.length) {
+            bulkCategorizationContainer.innerHTML = '';
+            bulkCategorizationContainer.classList.add('hidden');
+            return;
+        }
+
+        bulkCategorizationContainer.classList.remove('hidden');
+        bulkCategorizationContainer.innerHTML = `
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800">Bulk Categorization</h3>
+                        <p class="text-slate-400 text-sm font-medium">Map all exams and import at once</p>
+                    </div>
+                </div>
+                
+                <div class="hidden md:grid md:grid-cols-[45px_1.5fr_1.2fr_1.5fr_1.5fr_50px] gap-4 px-6 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div class="text-center">Incl.</div>
+                    <div>Exam Title</div>
+                    <div>Subject</div>
+                    <div>Lesson</div>
+                    <div>Topic</div>
+                    <div class="text-center">Same</div>
+                </div>
+
+                <div class="divide-y divide-slate-100" id="bulk-table-body">
+                </div>
+
+                <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-center sm:justify-end">
+                    <button id="import-all-btn" class="w-full sm:w-auto px-10 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-100 transition-all flex items-center justify-center gap-2 transform active:scale-95">
+                        <span class="material-symbols-outlined text-lg">rocket_launch</span> Import All Exams
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const body = document.getElementById('bulk-table-body');
+        extractedSections.forEach((section, i) => {
+            const row = document.createElement('div');
+            row.className = `p-4 md:p-6 md:grid md:grid-cols-[45px_1.5fr_1.2fr_1.5fr_1.5fr_50px] gap-4 transition-all ${section.isExcluded ? 'bg-slate-50/50 grayscale opacity-60' : 'hover:bg-slate-50'}`;
+
+            row.innerHTML = `
+                <div class="flex items-center justify-between mb-4 md:mb-0 md:justify-center">
+                    <input type="checkbox" class="exclude-check w-6 h-6 rounded-lg border-slate-200 text-blue-600 focus:ring-blue-500 cursor-pointer" ${!section.isExcluded ? 'checked' : ''}>
+                </div>
+
+                <div class="mb-4 md:mb-0">
+                    <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Exam Title</span>
+                    <div class="font-bold text-slate-800 text-sm leading-tight flex items-center gap-2">
+                        ${section.title}
+                        <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[9px] font-black uppercase whitespace-nowrap shadow-sm">
+                            ${section.questions.length} QS
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-3 md:mb-0">
+                    <select class="bulk-subject-select w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all" ${section.isExcluded ? 'disabled' : ''}>
+                        <option value="0">Subject</option>
+                        ${subjects.map(s => `<option value="${s.id}" ${section.target.subject == s.id ? 'selected' : ''}>${s.subject_name}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div class="mb-3 md:mb-0">
+                    <select class="bulk-lesson-select w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all" ${section.isExcluded || !section.target.subject ? 'disabled' : ''}>
+                        <option value="0">Lesson</option>
+                    </select>
+                </div>
+
+                <div class="mb-4 md:mb-0">
+                    <select class="bulk-topic-select w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all" ${section.isExcluded || !section.target.lesson ? 'disabled' : ''}>
+                        <option value="0">Topic</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center justify-center">
+                    ${i > 0 && !section.isExcluded ? `
+                        <button class="check-same-btn w-10 h-10 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-all" data-idx="${i}" title="Same Above">
+                            <span class="material-symbols-outlined text-sm">double_arrow</span>
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+
+            // Listeners for this row
+            const excludeCheck = row.querySelector('.exclude-check');
+            excludeCheck.onchange = () => {
+                section.isExcluded = !excludeCheck.checked;
+                renderBulkTable();
+                renderSections();
+            };
+
+            const subSel = row.querySelector('.bulk-subject-select');
+            const lesSel = row.querySelector('.bulk-lesson-select');
+            const topSel = row.querySelector('.bulk-topic-select');
+
+            // Populate current selects if data exists
+            if (section.target.subject > 0) {
+                populateLessons(section.target.subject, lesSel, section.target.lesson || 0).then(() => {
+                    if (section.target.lesson > 0) {
+                        populateTopics(section.target.lesson, topSel, section.target.topic || 0);
+                    }
+                });
+            }
+
+            subSel.onchange = () => {
+                section.target.subject = subSel.value;
+                section.target.lesson = 0;
+                section.target.topic = 0;
+                renderBulkTable();
+            };
+            lesSel.onchange = () => {
+                section.target.lesson = lesSel.value;
+                section.target.topic = 0;
+                renderBulkTable();
+            };
+            topSel.onchange = () => {
+                section.target.topic = topSel.value;
+            };
+
+            if (i > 0) {
+                const sameBtn = row.querySelector('.check-same-btn');
+                if (sameBtn) {
+                    sameBtn.onclick = () => {
+                        const prev = extractedSections[i - 1];
+                        section.target = { ...prev.target };
+                        renderBulkTable();
+                    };
+                }
+            }
+
+            body.appendChild(row);
+        });
+
+        document.getElementById('import-all-btn').onclick = processImportAll;
+    }
+
+    function renderSections() {
+        sectionsContainer.innerHTML = '';
+        if (!extractedSections.length) {
+            sectionsContainer.classList.add('hidden');
+            resultsPlaceholder.classList.remove('hidden');
+            return;
+        }
+
+        sectionsContainer.classList.remove('hidden');
+        resultsPlaceholder.classList.add('hidden');
+
+        extractedSections.forEach((section, i) => {
+            const sectionEl = document.createElement('div');
+            sectionEl.className = 'bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden mb-8';
+            sectionEl.innerHTML = `
+                <div class="p-6 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black">
+                            ${i + 1}
+                        </div>
+                        <h3 class="text-xl font-black text-slate-800">${section.title}</h3>
+                    </div>
+                </div>
+                <div class="p-6 space-y-4">
+                    ${section.questions.map((q, qIdx) => {
+                const prioColors = {
+                    0: 'bg-blue-50 text-blue-600 border-blue-100',
+                    1: 'bg-slate-50 text-slate-500 border-slate-200',
+                    2: 'bg-amber-50 text-amber-600 border-amber-100',
+                    3: 'bg-rose-50 text-rose-600 border-rose-100'
+                };
+                const prioColor = prioColors[q.priority] || prioColors[0];
+                return `
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 group relative transition-all hover:bg-white hover:shadow-md">
+                            <div class="flex flex-col gap-4">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <span class="text-[10px] font-black text-slate-300 uppercase">#${qIdx + 1}</span>
+                                            <select class="priority-select text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border transition-all ${prioColor}" data-sec-idx="${i}" data-q-idx="${qIdx}">
+                                                <option value="0" ${q.priority == 0 ? 'selected' : ''}>Standard</option>
+                                                <option value="1" ${q.priority == 1 ? 'selected' : ''}>🔵 Low</option>
+                                                <option value="2" ${q.priority == 2 ? 'selected' : ''}>🟡 Medium</option>
+                                                <option value="3" ${q.priority == 3 ? 'selected' : ''}>🔴 High</option>
+                                            </select>
+                                        </div>
+                                        <p contenteditable="true" class="edit-field font-bold text-slate-800 text-sm mb-4 outline-none focus:text-blue-600 transition-colors" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="question">${q.question}</p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-4">
+                                            ${['A', 'B', 'C', 'D'].map(opt => `
+                                                <div class="flex items-center gap-3 p-1 rounded-lg border border-transparent hover:border-slate-100 focus-within:border-blue-100 transition-all">
+                                                    <span class="${q.answer === opt ? 'text-emerald-600 font-black' : 'text-slate-400 font-bold'}">${opt}:</span>
+                                                    <span contenteditable="true" class="edit-field flex-1 outline-none text-slate-600 ${q.answer === opt ? 'font-medium' : ''}" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="options" data-opt="${opt}">${q.options[opt]}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <div class="group/exp relative">
+                                            <div contenteditable="true" class="edit-field text-[10px] bg-white p-3 rounded-xl text-slate-500 font-medium italic border border-slate-100 outline-none focus:border-blue-200" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="explanation">
+                                                ${q.explanation || 'No explanation provided.'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                        <button class="delete-q p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm" data-sec-idx="${i}" data-q-idx="${qIdx}">
+                                            <span class="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+            }).join('')}
+                </div>
+            `;
+            sectionsContainer.appendChild(sectionEl);
+        });
+
+        // Event Listeners for editing
+        document.querySelectorAll('.edit-field').forEach(field => {
+            field.onblur = () => {
+                const { secIdx, qIdx, field: fieldName, opt } = field.dataset;
+                const value = field.innerText.trim();
+                if (fieldName === 'options') extractedSections[secIdx].questions[qIdx].options[opt] = value;
+                else extractedSections[secIdx].questions[qIdx][fieldName] = value;
+            };
+        });
+
+        document.querySelectorAll('.priority-select').forEach(sel => {
+            sel.onchange = () => {
+                extractedSections[sel.dataset.secIdx].questions[sel.dataset.qIdx].priority = parseInt(sel.value);
+                renderSections();
+            };
+        });
+
+        document.querySelectorAll('.delete-q').forEach(btn => {
+            btn.onclick = () => {
+                extractedSections[btn.dataset.secIdx].questions.splice(btn.dataset.qIdx, 1);
+                renderSections();
+                renderBulkTable();
+            };
+        });
+    }
+
+    async function processImportAll() {
+        const activeSections = extractedSections.filter(s => !s.isExcluded && s.target.subject > 0 && s.target.lesson > 0 && s.target.topic > 0);
+
+        if (!activeSections.length) {
+            showToast('No fully categorized exams to import.', 'error');
+            return;
+        }
+
+        const skippedCount = extractedSections.length - activeSections.length;
+        const skipText = skippedCount > 0 ? ` (${skippedCount} will be skipped)` : '';
+
+        showConfirmModal('Confirm Bulk Import', `Are you sure you want to import ${activeSections.length} exams?${skipText} Only exams with complete categorization (Subject, Lesson, Topic) will be processed.`, async () => {
+            const btn = document.getElementById('import-all-btn');
+            const original = btn.innerHTML;
+            btn.disabled = true;
+
+            let success = 0, fail = 0;
+            // Iterate over a copy of sections that are ready to import
+            const toImport = [...activeSections];
+
+            for (const section of toImport) {
+                const currentIdx = extractedSections.indexOf(section);
+                if (currentIdx === -1) continue;
+
+                btn.innerHTML = `<span class="animate-spin text-sm">sync</span> ${success + fail + 1}/${activeSections.length}`;
+
+                try {
+                    await executeImportFlow(currentIdx);
+                    success++;
+                } catch (e) {
+                    fail++;
+                    console.error('Bulk item failed', e);
+                }
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = original;
+            showToast(`Import Complete: ${success} Success, ${fail} Failed`);
+
+            if (success > 0) {
+                fetchAndDisplayExams(false, true);
+                if (typeof CacheManager !== 'undefined') CacheManager.clearGroup('exam');
+            }
+
+            // Close if we had successes and no errors during this batch
+            if (success > 0 && fail === 0) {
+                closeModal(examModal);
+            } else {
+                renderSections();
+                renderBulkTable();
+                if (fail > 0) showToast(`${fail} items failed to import. Check console for details.`, 'error');
+            }
+        });
+    }
+
+    async function executeImportFlow(idx) {
+        const section = extractedSections[idx];
+        const qCount = section.questions.length;
+        const examResp = await fetch(`${EXAM_API_URL}?action=create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                exam_title: section.title,
+                subject_id: section.target.subject,
+                lesson_id: section.target.lesson,
+                topic_id: section.target.topic,
+                duration: qCount,
+                instructions: defaultInstructions,
+                total_marks: qCount,
+                pass_mark: (qCount * 0.99).toFixed(2)
+            })
+        });
+        const examRes = await examResp.json();
+        if (!examRes.success) throw new Error(examRes.message);
+
+        const importResp = await fetch('api/question/import.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                exam_id: examRes.id,
+                questions: section.questions
+            })
+        });
+        const importRes = await importResp.json();
+        if (!importRes.success) throw new Error(importRes.message);
+
+        extractedSections.splice(idx, 1);
+        return true;
     }
 
     // --- Initial Load ---
