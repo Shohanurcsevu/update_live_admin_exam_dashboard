@@ -127,7 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'analytics': 'assets/js/analytics.js', 'times': 'assets/js/times.js',
             'question-analysis': 'assets/js/question-analysis.js',
             'revision-planner': 'assets/js/revision-planner.js',
-            'study-materials': 'assets/js/study-materials.js'
+            'study-materials': 'assets/js/study-materials.js',
+            'question-creator': 'assets/js/question-creator.js'
         };
 
 
