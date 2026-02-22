@@ -46,6 +46,7 @@
     const examMarksInput = document.getElementById('exam-marks');
     const examNegativeInput = document.getElementById('exam-negative');
     const examTotalQuestionsInput = document.getElementById('exam-total-questions');
+    const bulkQuestionCountSelect = document.getElementById('bulk-question-count');
 
     // State
     let hierarchyData = {};
@@ -294,7 +295,10 @@
             input.disabled = !e.target.checked;
             if (e.target.checked) {
                 if (!input.value) {
-                    input.value = Math.min(5, exam.total_questions);
+                    // Use bulk dropdown value if set, otherwise default to min(5, total)
+                    const bulkCount = parseInt(bulkQuestionCountSelect?.value) || 0;
+                    const defaultCount = bulkCount > 0 ? bulkCount : Math.min(5, exam.total_questions);
+                    input.value = Math.min(defaultCount, exam.total_questions);
                 }
                 handleExamSelection(input);
             } else {
@@ -487,6 +491,46 @@
             generateExamBtn.disabled = false;
             generateExamBtn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Generate Exam';
         }
+    }
+
+    // Bulk question count dropdown listener
+    if (bulkQuestionCountSelect) {
+        bulkQuestionCountSelect.addEventListener('change', () => {
+            const count = parseInt(bulkQuestionCountSelect.value);
+            if (!count) return;
+
+            const allExamInputs = document.querySelectorAll('.exam-input');
+            if (allExamInputs.length === 0) {
+                showToast('No exams loaded yet. Please wait or apply a date filter first.', 'error');
+                return;
+            }
+
+            const allCheckboxes = document.querySelectorAll('.exam-checkbox');
+
+            // Check if any exams are checked
+            const anyChecked = Array.from(allCheckboxes).some(cb => cb.checked);
+
+            allCheckboxes.forEach(checkbox => {
+                const examId = checkbox.dataset.examId;
+                const input = document.querySelector(`.exam-input[data-exam-id="${examId}"]`);
+                if (!input) return;
+
+                // Auto-check the exam if not already checked
+                if (!checkbox.checked) {
+                    checkbox.checked = true;
+                    input.disabled = false;
+                }
+
+                // Set value capped at the exam's max available questions
+                const maxQ = parseInt(input.dataset.maxQuestions) || count;
+                input.value = Math.min(count, maxQ);
+
+                // Trigger selection handler
+                handleExamSelection(input);
+            });
+
+            showToast(`Set ${count} question(s) for all exams`);
+        });
     }
 
     // Date filter event listeners
