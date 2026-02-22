@@ -236,12 +236,9 @@ function initializeQuestionCreator() {
                     <h3 class="text-xl font-bold text-slate-800 text-center sm:text-left">Bulk Categorization</h3>
                     <p class="text-slate-400 text-sm font-medium text-center sm:text-left">Map all exams and import at once</p>
                 </div>
-                <button id="import-all-btn" class="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined text-sm">rocket_launch</span> Import All
-                </button>
             </div>
             
-            <div class="hidden md:grid md:grid-cols-[60px_1fr_1.1fr_1.5fr_1.5fr_140px] gap-4 px-6 py-4 bg-slate-50/50 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <div class="hidden md:grid md:grid-cols-[45px_1.2fr_1.2fr_1.7fr_1.7fr_50px] gap-4 px-6 py-4 bg-slate-50/50 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
                 <div class="text-center">Incl.</div>
                 <div>Exam Title</div>
                 <div>Subject</div>
@@ -252,6 +249,12 @@ function initializeQuestionCreator() {
 
             <div class="divide-y divide-slate-100" id="bulk-table-body">
             </div>
+
+            <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-center sm:justify-end">
+                <button id="import-all-btn" class="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-sm">rocket_launch</span> Import All
+                </button>
+            </div>
         `;
 
         document.getElementById('import-all-btn').onclick = processImportAll;
@@ -261,7 +264,7 @@ function initializeQuestionCreator() {
         for (let i = 0; i < extractedSections.length; i++) {
             const section = extractedSections[i];
             const row = document.createElement('div');
-            row.className = `p-6 md:px-6 md:py-4 md:grid md:grid-cols-[60px_1fr_1.1fr_1.5fr_1.5fr_140px] gap-4 items-center hover:bg-slate-50 transition-colors group ${section.isExcluded ? 'opacity-40 grayscale-[0.5]' : ''}`;
+            row.className = `p-6 md:px-6 md:py-4 md:grid md:grid-cols-[45px_1.2fr_1.2fr_1.7fr_1.7fr_50px] gap-4 items-center hover:bg-slate-50 transition-colors group ${section.isExcluded ? 'opacity-40 grayscale-[0.5]' : ''}`;
 
             row.innerHTML = `
                 <!-- Mobile Incl Checkbox & Title Row -->
@@ -276,7 +279,7 @@ function initializeQuestionCreator() {
                     <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">Exam Title</span>
                     <div class="font-bold text-slate-700 text-sm leading-tight break-words flex items-center gap-2" title="${section.title}">
                         ${section.title}
-                        <span class="px-2 py-0.5 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase whitespace-nowrap">
+                        <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[9px] font-black uppercase whitespace-nowrap shadow-sm">
                             ${section.questions.length} QS
                         </span>
                     </div>
@@ -304,15 +307,12 @@ function initializeQuestionCreator() {
                     </select>
                 </div>
 
-                <div class="flex items-center gap-2 justify-center pt-4 border-t border-slate-50 md:pt-0 md:border-0">
+                <div class="flex items-center gap-2 justify-center pt-4 border-t border-slate-50 md:pt-0 md:border-0 sticky right-0 bg-inherit">
                     ${i > 0 && !section.isExcluded ? `
-                        <button class="check-same-btn flex-1 md:flex-none flex items-center justify-center gap-1 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl transition-all font-bold text-xs" data-idx="${i}" title="Copy from above">
-                            <span class="material-symbols-outlined text-sm">double_arrow</span> Same
+                        <button class="check-same-btn flex-1 md:flex-none flex items-center justify-center w-10 h-10 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl transition-all font-bold" data-idx="${i}" title="Same Above">
+                            <span class="material-symbols-outlined text-sm">double_arrow</span>
                         </button>
                     ` : ''}
-                    <button class="bulk-import-btn flex-1 md:flex-none px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all ${section.isExcluded ? 'hidden' : ''}" data-idx="${i}">
-                        Import
-                    </button>
                 </div>
             `;
 
@@ -329,9 +329,6 @@ function initializeQuestionCreator() {
             const subSel = row.querySelector('.bulk-subject-select');
             const lesSel = row.querySelector('.bulk-lesson-select');
             const topSel = row.querySelector('.bulk-topic-select');
-            const importBtn = row.querySelector('.bulk-import-btn');
-
-            if (importBtn) importBtn.onclick = () => processImport(i, importBtn);
 
             // Initial load of lessons/topics if already selected
             if (section.target.subject > 0) {
@@ -457,39 +454,104 @@ function initializeQuestionCreator() {
                     </div>
                 </div>
                 <div class="p-6 space-y-4 question-list-inner">
-                    ${section.questions.map((q, qIdx) => `
-                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 group relative">
-                            <div class="flex justify-between gap-4">
-                                <div class="flex-1">
-                                    <p class="font-bold text-slate-800 text-sm mb-3">#${qIdx + 1} ${q.question}</p>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                        <div class="${q.answer === 'A' ? 'text-emerald-600 font-black' : 'text-slate-500'}">A: ${q.options.A}</div>
-                                        <div class="${q.answer === 'B' ? 'text-emerald-600 font-black' : 'text-slate-500'}">B: ${q.options.B}</div>
-                                        <div class="${q.answer === 'C' ? 'text-emerald-600 font-black' : 'text-slate-500'}">C: ${q.options.C}</div>
-                                        <div class="${q.answer === 'D' ? 'text-emerald-600 font-black' : 'text-slate-500'}">D: ${q.options.D}</div>
+                    ${section.questions.map((q, qIdx) => {
+                const prioColors = {
+                    0: 'bg-blue-50 text-blue-600 border-blue-100', // Normal
+                    1: 'bg-slate-50 text-slate-500 border-slate-200', // Low
+                    2: 'bg-amber-50 text-amber-600 border-amber-100', // Medium
+                    3: 'bg-rose-50 text-rose-600 border-rose-100' // High
+                };
+                const prioColor = prioColors[q.priority] || prioColors[0];
+
+                return `
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 group relative transition-all hover:bg-white hover:shadow-md">
+                            <div class="flex flex-col gap-4">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div class="flex-1">
+                                        <!-- Question Header & Priority -->
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <span class="text-[10px] font-black text-slate-300 uppercase">#${qIdx + 1}</span>
+                                            <select class="priority-select text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border transition-all ${prioColor}" data-sec-idx="${i}" data-q-idx="${qIdx}">
+                                                <option value="0" ${q.priority == 0 ? 'selected' : ''}>Standard</option>
+                                                <option value="1" ${q.priority == 1 ? 'selected' : ''}>🔵 Low (1-2x)</option>
+                                                <option value="2" ${q.priority == 2 ? 'selected' : ''}>🟡 Medium (3-5x)</option>
+                                                <option value="3" ${q.priority == 3 ? 'selected' : ''}>🔴 High (5x+)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <!-- Editable Question -->
+                                        <p contenteditable="true" class="edit-field font-bold text-slate-800 text-sm mb-4 outline-none focus:text-indigo-600 transition-colors" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="question">${q.question}</p>
+                                        
+                                        <!-- Editable Options -->
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-4">
+                                            ${['A', 'B', 'C', 'D'].map(opt => `
+                                                <div class="flex items-center gap-2 p-1 rounded-lg border border-transparent hover:border-slate-100 focus-within:border-indigo-100 transition-all">
+                                                    <span class="${q.answer === opt ? 'text-emerald-600 font-black' : 'text-slate-400 font-bold'}">${opt}:</span>
+                                                    <span contenteditable="true" class="edit-field flex-1 outline-none text-slate-600 ${q.answer === opt ? 'font-medium' : ''}" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="options" data-opt="${opt}">${q.options[opt]}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+
+                                        <!-- Editable Explanation -->
+                                        <div class="group/exp relative">
+                                            <span class="absolute -top-2 left-3 px-1 bg-white text-[9px] font-bold text-slate-300 uppercase tracking-widest opacity-0 group-hover/exp:opacity-100 transition-opacity">Explanation</span>
+                                            <div contenteditable="true" class="edit-field text-[10px] bg-white p-3 rounded-xl text-slate-500 font-medium italic border border-slate-100 outline-none focus:border-indigo-200 focus:shadow-sm" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="explanation">
+                                                ${q.explanation}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="mt-3 text-[10px] bg-white p-2 rounded-lg text-slate-400 font-medium italic border border-slate-100">
-                                        ${q.explanation}
+
+                                    <!-- Action Buttons -->
+                                    <div class="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                        <button class="delete-q p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100" data-sec-idx="${i}" data-q-idx="${qIdx}" title="Delete Question">
+                                            <span class="material-symbols-outlined text-sm">delete</span>
+                                        </button>
                                     </div>
-                                </div>
-                                <div class="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                    <button class="delete-q p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100" data-sec-idx="${i}" data-q-idx="${qIdx}"><span class="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                             </div>
                         </div>
-                    `).join('')}
+                    `;
+            }).join('')}
                 </div>
-                <div class="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center px-8">
-                    <span class="text-xs font-bold text-slate-400 capitalize">${section.questions.length} Questions detected</span>
-                    <button class="import-section-btn px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-100 transition-all" data-idx="${i}">
-                        Import Section
-                    </button>
+                <div class="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-center items-center px-8">
+                    <span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-100 shadow-sm">
+                        ${section.questions.length} Questions Detected
+                    </span>
                 </div>
             `;
             sectionsContainer.appendChild(sectionEl);
         }
 
-        // Bind Actions
+        // Bind Priority Changes
+        document.querySelectorAll('.priority-select').forEach(sel => {
+            sel.onchange = () => {
+                const sIdx = sel.dataset.secIdx;
+                const qIdx = sel.dataset.qIdx;
+                extractedSections[sIdx].questions[qIdx].priority = parseInt(sel.value);
+                renderSections(); // Re-render to update colors
+            };
+        });
+
+        // Bind Inline Editing (Save on Blur)
+        document.querySelectorAll('.edit-field').forEach(field => {
+            field.onblur = () => {
+                const sIdx = field.dataset.secIdx;
+                const qIdx = field.dataset.qIdx;
+                const fieldName = field.dataset.field;
+                const newValue = field.innerText.trim();
+
+                if (fieldName === 'options') {
+                    const optKey = field.dataset.opt;
+                    extractedSections[sIdx].questions[qIdx].options[optKey] = newValue;
+                } else {
+                    extractedSections[sIdx].questions[qIdx][fieldName] = newValue;
+                }
+                // No need to re-render here to avoid losing focus/state, 
+                // data is already sync'd in memory.
+            };
+        });
+
+        // Bind Question Deletion
         document.querySelectorAll('.delete-q').forEach(btn => {
             btn.onclick = () => {
                 const sIdx = btn.dataset.secIdx;
@@ -542,7 +604,7 @@ function initializeQuestionCreator() {
                 if (questions.length > 0) {
                     extractedSections.push({
                         title: title,
-                        questions: questions,
+                        questions: questions.map(q => ({ ...q, priority: parseInt(q.priority) || 0 })),
                         target: { subject: 0, lesson: 0, topic: 0 },
                         isExcluded: false
                     });
