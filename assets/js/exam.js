@@ -127,6 +127,22 @@ function initializeExamPage() {
             tabManual.classList.add('border-transparent', 'text-slate-400');
             bulkModeContent.classList.remove('hidden');
             manualModeContent.classList.add('hidden');
+
+            // Auto-paste from clipboard if empty and valid JSON found
+            if (!bulkManualJsonInput.value.trim() && navigator.clipboard) {
+                navigator.clipboard.readText().then(text => {
+                    const trimmed = text.trim();
+                    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+                        try {
+                            JSON.parse(trimmed);
+                            bulkManualJsonInput.value = trimmed;
+                            showToast('Smart-pasted JSON from clipboard!');
+                        } catch (e) { }
+                    }
+                }).catch(err => {
+                    console.log('Clipboard access denied or unavailable');
+                });
+            }
         }
     }
 
@@ -620,10 +636,8 @@ function initializeExamPage() {
     tabBulk.onclick = () => switchTab('bulk');
 
     // Bulk Import Listeners
-    bulkInitQueueBtn.onclick = () => {
-        const json = bulkManualJsonInput.value.trim();
-        if (!json) return showToast('Please paste JSON payload.', 'error');
-
+    function handleBulkJSON(json) {
+        if (!json) return;
         try {
             const data = JSON.parse(json);
             const arrayData = Array.isArray(data) ? data : [data];
@@ -643,10 +657,33 @@ function initializeExamPage() {
             renderBulkTable();
             renderSections();
             showToast(`Queue Initialized: ${extractedSections.length} Exams detected.`);
+            bulkManualJsonInput.value = ''; // Clear after successful parse
         } catch (e) {
-            showToast(`JSON Error: ${e.message}`, 'error');
+            // Only show toast if it was a manual button click OR if the paste was clearly intended to be JSON
+            if (json.trim().startsWith('[') || json.trim().startsWith('{')) {
+                showToast(`JSON Error: ${e.message}`, 'error');
+            }
         }
+    }
+
+    bulkInitQueueBtn.onclick = () => {
+        handleBulkJSON(bulkManualJsonInput.value.trim());
     };
+
+    bulkManualJsonInput.addEventListener('paste', (e) => {
+        const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+        if (pastedData) {
+            try {
+                const trimmed = pastedData.trim();
+                if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+                    JSON.parse(trimmed); // Validate
+                    showToast('Valid JSON detected! Click "Init Import Queue" to proceed.');
+                }
+            } catch (err) {
+                // Not valid JSON or parsing error, do nothing (normal paste)
+            }
+        }
+    });
 
     // Reset Bulk Import
     bulkResetBtn.onclick = () => {
@@ -758,11 +795,14 @@ function initializeExamPage() {
 
             row.innerHTML = `
                 <div class="flex items-center justify-between mb-4 md:mb-0 md:justify-center">
-                    <input type="checkbox" class="exclude-check w-6 h-6 rounded-lg border-slate-200 text-blue-600 focus:ring-blue-500 cursor-pointer" ${!section.isExcluded ? 'checked' : ''}>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" class="exclude-check w-6 h-6 rounded-lg border-slate-200 text-blue-600 focus:ring-blue-500 cursor-pointer" ${!section.isExcluded ? 'checked' : ''}>
+                        <span class="md:hidden text-xs font-bold text-slate-500">Include in Import</span>
+                    </div>
                 </div>
 
                 <div class="mb-4 md:mb-0">
-                    <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Exam Title</span>
+                    <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Exam Title</span>
                     <div class="font-bold text-slate-800 text-sm leading-tight flex items-center gap-2">
                         ${section.title}
                         <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[9px] font-black uppercase whitespace-nowrap shadow-sm">
@@ -772,28 +812,32 @@ function initializeExamPage() {
                 </div>
 
                 <div class="mb-3 md:mb-0">
+                    <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Subject</span>
                     <select class="bulk-subject-select w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all" ${section.isExcluded ? 'disabled' : ''}>
-                        <option value="0">Subject</option>
+                        <option value="0">Select Subject</option>
                         ${subjects.map(s => `<option value="${s.id}" ${section.target.subject == s.id ? 'selected' : ''}>${s.subject_name}</option>`).join('')}
                     </select>
                 </div>
 
                 <div class="mb-3 md:mb-0">
+                    <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Lesson</span>
                     <select class="bulk-lesson-select w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all" ${section.isExcluded || !section.target.subject ? 'disabled' : ''}>
-                        <option value="0">Lesson</option>
+                        <option value="0">Select Lesson</option>
                     </select>
                 </div>
 
                 <div class="mb-4 md:mb-0">
+                    <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Topic</span>
                     <select class="bulk-topic-select w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all" ${section.isExcluded || !section.target.lesson ? 'disabled' : ''}>
-                        <option value="0">Topic</option>
+                        <option value="0">Select Topic</option>
                     </select>
                 </div>
 
-                <div class="flex items-center justify-center">
+                <div class="flex items-center justify-center md:pb-0 pb-2">
                     ${i > 0 && !section.isExcluded ? `
-                        <button class="check-same-btn w-10 h-10 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-all" data-idx="${i}" title="Same Above">
+                        <button class="check-same-btn w-full md:w-10 h-11 md:h-10 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-all flex items-center justify-center gap-2" data-idx="${i}" title="Same Above">
                             <span class="material-symbols-outlined text-sm">double_arrow</span>
+                            <span class="md:hidden text-xs font-bold">Same as Above</span>
                         </button>
                     ` : ''}
                 </div>
@@ -913,8 +957,8 @@ function initializeExamPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                        <button class="delete-q p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm" data-sec-idx="${i}" data-q-idx="${qIdx}">
+                                    <div class="flex flex-col gap-2 md:opacity-0 group-hover:opacity-100 transition-all">
+                                        <button class="delete-q p-3 md:p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm" data-sec-idx="${i}" data-q-idx="${qIdx}">
                                             <span class="material-symbols-outlined text-sm">delete</span>
                                         </button>
                                     </div>
