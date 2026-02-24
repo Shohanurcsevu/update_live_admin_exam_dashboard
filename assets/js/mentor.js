@@ -1372,39 +1372,63 @@ class StudyMentor {
                     50% { transform: scale(1.05); opacity: 1; }
                 }
 
-                /* BOOK FLIP ANIMATION (Focus) */
-                .book-container {
-                    width: 32px;
-                    height: 22px;
+                /* NEURAL FOCUS ANIMATION (New Deep Work) */
+                .neural-focus-container {
+                    width: 36px;
+                    height: 36px;
                     position: relative;
-                    perspective: 200px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 }
-                .book-icon {
-                    width: 100%;
-                    height: 100%;
-                    background: #10b981;
-                    border-radius: 3px;
-                    position: relative;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                }
-                .book-page {
-                    position: absolute;
-                    top: 3px;
-                    right: 3px;
-                    width: 13px;
-                    height: 16px;
-                    background: #f8fafc;
-                    transform-origin: left center;
-                    animation: page-turn 3s infinite ease-in-out;
-                    border-radius: 0 2px 2px 0;
-                    box-shadow: -1px 0 2px rgba(0,0,0,0.05);
-                }
-                .book-page:nth-child(2) { animation-delay: 1s; }
-                .book-page:nth-child(3) { animation-delay: 2s; }
 
-                @keyframes page-turn {
-                    0% { transform: rotateY(0deg); opacity: 1; }
-                    50%, 100% { transform: rotateY(-180deg); opacity: 0; }
+                .neural-core {
+                    width: 14px;
+                    height: 14px;
+                    background: #10b981;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10;
+                    box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+                    animation: neural-breathe 2s infinite ease-in-out;
+                }
+
+                .neural-ring {
+                    position: absolute;
+                    border: 1.5px solid rgba(16, 185, 129, 0.4);
+                    border-radius: 50%;
+                    animation: neural-pulse 3s infinite linear;
+                    opacity: 0;
+                }
+
+                .neural-ring:nth-child(2) { animation-delay: 0s; }
+                .neural-ring:nth-child(3) { animation-delay: 1s; }
+                .neural-ring:nth-child(4) { animation-delay: 2s; }
+
+                @keyframes neural-breathe {
+                    0%, 100% { transform: scale(1); filter: brightness(1); }
+                    50% { transform: scale(1.1); filter: brightness(1.3); }
+                }
+
+                @keyframes neural-pulse {
+                    0% { transform: scale(0.5); opacity: 0.8; }
+                    100% { transform: scale(2.5); opacity: 0; }
+                }
+
+                .neural-stream {
+                    position: absolute;
+                    inset: -4px;
+                    border: 1.5px solid transparent;
+                    border-top-color: rgba(16, 185, 129, 0.3);
+                    border-radius: 50%;
+                    animation: neural-spin 4s infinite linear;
+                }
+
+                @keyframes neural-spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
                 }
 
                 .core-noise {
@@ -1910,32 +1934,48 @@ class StudyMentor {
         }
 
         if (this.isFocusModeActive()) {
-            // Timer is hidden during Focus
+            const time = this.focusSession.timeRemaining;
+            const mins = Math.floor(time / 60);
+            const secs = time % 60;
+            const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+            // Updated Header Indicator for Focus Session with Neural Animation & Timer
             indicator.innerHTML = `
                 <div class="flex items-center gap-2">
-                    <div class="book-container">
-                        <div class="book-icon">
-                            <div class="book-page"></div>
-                            <div class="book-page"></div>
-                            <div class="book-page"></div>
+                    <div class="neural-focus-container scale-75">
+                        <div class="neural-stream"></div>
+                        <div class="neural-ring"></div>
+                        <div class="neural-ring"></div>
+                        <div class="neural-ring"></div>
+                        <div class="neural-core">
+                            <span class="material-symbols-outlined text-[10px] text-white font-bold">timer</span>
                         </div>
                     </div>
-                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">Deep Work Active</span>
+                    <div class="flex flex-col items-start leading-none">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[14px] font-black text-emerald-600 tracking-tight">${timeStr}</span>
+                            <span class="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">Focusing</span>
+                        </div>
+                        <span class="text-[8px] font-bold text-emerald-400 opacity-60 uppercase tracking-widest mt-0.5">Deep Work Active</span>
+                    </div>
                 </div>
             `;
         } else if (this.isBreakModeActive()) {
-            // Timer is visible but paused during Break
+            const time = this.breakSession.timeRemaining;
+            const mins = Math.floor(time / 60);
+            const secs = time % 60;
+            const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+            // Updated Header Indicator for Break Session with Timer
             indicator.innerHTML = `
                 <div class="flex items-center gap-3">
-                    <div class="meltdown-core stable" style="background: radial-gradient(circle, #e0f2fe 0%, #0ea5e9 100%); box-shadow: 0 0 15px rgba(14, 165, 233, 0.4);"></div>
-                    <div class="flex flex-col items-start border-l border-sky-100 pl-3">
-                        <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest">Idle Time</span>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[11px] font-black text-sky-800 opacity-60">${inactiveTimeDisplay}</span>
-                             <button id="toggle-mentor-sound" class="text-gray-400 hover:text-sky-600 transition-colors">
-                                <span class="material-symbols-outlined text-sm">${soundIcon}</span>
-                            </button>
+                    <div class="meltdown-core stable shadow-lg shadow-sky-200" style="background: radial-gradient(circle, #e0f2fe 0%, #0ea5e9 100%);"></div>
+                    <div class="flex flex-col items-start border-l border-sky-100 pl-3 leading-none">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[14px] font-black text-sky-600 tracking-tight">${timeStr}</span>
+                            <span class="text-[9px] font-black text-sky-500 uppercase tracking-tighter">Break</span>
                         </div>
+                        <span class="text-[8px] font-bold text-sky-400 opacity-60 uppercase tracking-widest mt-0.5">Time to Recharge</span>
                     </div>
                 </div>
             `;
