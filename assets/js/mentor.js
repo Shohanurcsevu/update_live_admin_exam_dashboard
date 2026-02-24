@@ -146,8 +146,8 @@ class StudyMentor {
 
             // Handle No Active Session (e.g. stopped/dismissed on another device)
             if (result.success && !result.session) {
-                if (this.focusSession.isActive || this.breakSession.isActive) {
-                    this.stopFocusSession(); // Local cleanup
+                if (this.focusSession.isActive || this.breakSession.isActive || this.isContinuationPromptActive || this.sessionChain.awaitingContinuationChoice || this.sessionChain.awaitingResumeConfirmation) {
+                    this.stopFocusSession(true); // Local cleanup
                     this.isContinuationPromptActive = false;
                     this.sessionChain.awaitingContinuationChoice = false;
                     this.sessionChain.awaitingResumeConfirmation = false;
@@ -198,16 +198,23 @@ class StudyMentor {
                 // If session is completed and we haven't processed it yet
                 if (session.status === 'completed' || session.status === 'finished' || session.status === 'skipped' || session.status === 'dismissed') {
                     // 'dismissed' is a TERMINAL state — always clear on ALL devices, no ID guard needed
-                    if (session.status === 'dismissed') {
-                        if (this.isContinuationPromptActive || this.focusSession.isActive || this.breakSession.isActive) {
+                    if (session.status === 'dismissed' || session.status === 'finished' || session.status === 'skipped') {
+                        if (this.isContinuationPromptActive || this.focusSession.isActive || this.breakSession.isActive || this.sessionChain.awaitingContinuationChoice || this.sessionChain.awaitingResumeConfirmation) {
                             this.stopFocusSession(true);
-                            this.sessionChain.isActive = false;
+                            this.sessionChain.isActive = (session.status === 'skipped'); // Keep chain if skip break
                             this.isContinuationPromptActive = false;
+                            this.sessionChain.awaitingContinuationChoice = false;
+                            this.sessionChain.awaitingResumeConfirmation = false;
                             const teaser = document.getElementById('mentor-teaser');
                             if (teaser) teaser.classList.add('hidden');
                         }
                         this.lastProcessedSessionId = session.id;
-                        this.lastProcessedSessionStatus = 'dismissed';
+                        this.lastProcessedSessionStatus = session.status;
+
+                        // Special case: if it was a break skipped on another device, we might need to show the resume prompt here
+                        if (session.status === 'skipped' && session.session_type === 'break' && this.isOnDashboard()) {
+                            this.showResumePrompt();
+                        }
                         return;
                     }
 
@@ -236,6 +243,8 @@ class StudyMentor {
                                 this.stopFocusSession(true);
                                 this.sessionChain.isActive = false;
                                 this.isContinuationPromptActive = false;
+                                this.sessionChain.awaitingContinuationChoice = false;
+                                this.sessionChain.awaitingResumeConfirmation = false;
                                 const teaser = document.getElementById('mentor-teaser');
                                 if (teaser) teaser.classList.add('hidden');
                             }
@@ -822,6 +831,8 @@ class StudyMentor {
 
     endSessionChain() {
         this.isContinuationPromptActive = false;
+        this.sessionChain.awaitingContinuationChoice = false;
+        this.sessionChain.awaitingResumeConfirmation = false;
         const teaser = document.getElementById('mentor-teaser');
         if (teaser) teaser.classList.add('hidden'); // Ensure prompt UI disappears immediately
 
@@ -841,10 +852,13 @@ class StudyMentor {
             isActive: false,
             subjectId: null,
             subjectName: null,
-            completedSessions: 0
+            completedSessions: 0,
+            awaitingContinuationChoice: false,
+            awaitingResumeConfirmation: false
         };
 
         // Notify server that we've dismissed the prompt/chain to sync other devices
+        // This is the KEY sync call — other devices poll status.php and detect 'dismissed'
         this.saveSession('complete', { status: 'dismissed', remaining_seconds: 0 });
 
         // Refresh mentor data to show updated stats
@@ -898,11 +912,14 @@ class StudyMentor {
                 remaining_seconds: 0,
                 status: 'finished'
             });
-        } else if (this.breakSession.isActive || this.isContinuationPromptActive) {
-            // Explicitly signal stop for breaks or pending prompts (Manual Stop)
+        } else if (this.breakSession.isActive) {
+            // Explicitly signal stop for breaks (Manual Stop during break)
             if (!keepTeaser) {
                 this.saveSession('complete', { status: 'finished', remaining_seconds: 0 });
             }
+        } else if (this.isContinuationPromptActive && !keepTeaser) {
+            // User manually closed a continuation/resume nudge — send dismissed so ALL devices clear it
+            this.saveSession('complete', { status: 'dismissed', remaining_seconds: 0 });
         }
 
         clearInterval(this.focusSession.intervalId);
@@ -914,6 +931,8 @@ class StudyMentor {
 
         if (!keepTeaser) {
             this.isContinuationPromptActive = false;
+            this.sessionChain.awaitingContinuationChoice = false;
+            this.sessionChain.awaitingResumeConfirmation = false;
             this.updateStatusIndicator();
             const teaser = document.getElementById('mentor-teaser');
             if (teaser) teaser.classList.add('hidden');
