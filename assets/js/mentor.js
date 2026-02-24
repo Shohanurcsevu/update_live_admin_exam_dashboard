@@ -250,23 +250,36 @@ class StudyMentor {
                             }
                         }
                     } else {
-                        // Already processed this session — re-show the nudge if it's not visible
+                        // Already processed this session ID — re-show the nudge if it's not visible
                         // This handles: mobile opening fresh while laptop has the nudge active,
-                        // or nudge that disappeared due to DOM manipulation
-                        if (session.status === 'completed' && session.session_type !== 'break'
+                        // or nudge that disappeared due to DOM manipulation or page navigation
+                        if (session.status === 'completed'
                             && this.isOnDashboard()
                             && !this.focusSession.isActive && !this.breakSession.isActive) {
+
                             const teaser = document.getElementById('mentor-teaser');
                             const nudgeVisible = teaser && !teaser.classList.contains('hidden');
+
                             if (!nudgeVisible || !this.isContinuationPromptActive) {
-                                // Re-sync session chain context
+                                // Re-sync session context
+                                const isBreak = (session.session_type === 'break');
+
                                 this.sessionChain.isActive = true;
                                 this.sessionChain.subjectId = session.subject_id;
                                 this.sessionChain.subjectName = session.subject_name;
                                 this.sessionChain.completedSessions = result.completed_today ?? this.sessionChain.completedSessions ?? 0;
-                                this.focusSession.subject = session.subject_name;
-                                this.isContinuationPromptActive = false; // Reset so showContinuationPrompt sets it
-                                this.showContinuationPrompt();
+
+                                if (isBreak) {
+                                    this.breakSession.subject = session.subject_name;
+                                    this.breakSession.subjectId = session.subject_id;
+                                    this.isContinuationPromptActive = false;
+                                    this.showResumePrompt();
+                                } else {
+                                    this.focusSession.subject = session.subject_name;
+                                    this.focusSession.subjectId = session.subject_id;
+                                    this.isContinuationPromptActive = false;
+                                    this.showContinuationPrompt();
+                                }
                             }
                         }
                     }
