@@ -17,7 +17,7 @@ $stmt = $conn->prepare("
     WHERE t.lesson_id = ? AND q.is_deleted = 0 AND e.is_deleted = 0 AND e.topic_id IS NOT NULL
     GROUP BY t.id, t.topic_name
     HAVING total_questions > 0
-    ORDER BY t.topic_name ASC
+    ORDER BY total_questions DESC, t.topic_name ASC
 ");
 $stmt->bind_param("i", $lesson_id);
 $stmt->execute();
