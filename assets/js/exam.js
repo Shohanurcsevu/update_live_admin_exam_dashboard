@@ -20,8 +20,18 @@ function initializeExamPage() {
     const subjectFilter = document.getElementById('subject-filter');
     const lessonFilter = document.getElementById('lesson-filter');
     const topicFilter = document.getElementById('topic-filter');
+    const globalSearch = document.getElementById('global-search');
     const mainClearFiltersBtn = document.getElementById('main-clear-filters-btn');
     const clearFiltersBtn = document.getElementById('clear-filters-btn');
+
+    // Bulk Action State
+    let selectedExamIds = new Set();
+    const bulkActionBar = document.getElementById('bulk-action-bar');
+    const selectedCountEl = document.getElementById('selected-count');
+    const bulkSubjectTarget = document.getElementById('bulk-subject-target');
+    const bulkLessonTarget = document.getElementById('bulk-lesson-target');
+    const bulkTopicTarget = document.getElementById('bulk-topic-target');
+    const selectAllExams = document.getElementById('select-all-exams');
 
     // Modal Selectors
     const modalSubjectSelector = document.getElementById('modal-subject-selector');
@@ -248,6 +258,12 @@ function initializeExamPage() {
         } catch (error) { showToast('Failed to load topics.', 'error'); }
     }
 
+    function highlightText(text, term) {
+        if (!term || !text) return text;
+        const regex = new RegExp(`(${term.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')})`, 'gi');
+        return text.replace(regex, '<mark class="bg-yellow-100 text-yellow-900 font-bold px-0.5 rounded">$1</mark>');
+    }
+
     async function fetchAndDisplayExams(append = false, forceRefresh = false) {
         if (isFetching) return;
         isFetching = true;
@@ -264,6 +280,7 @@ function initializeExamPage() {
         if (subjectFilter.value > 0) params.append('subject_id', subjectFilter.value);
         if (lessonFilter.value > 0) params.append('lesson_id', lessonFilter.value);
         if (topicFilter.value > 0) params.append('topic_id', topicFilter.value);
+        if (globalSearch && globalSearch.value.trim()) params.append('search', globalSearch.value.trim());
         const query = params.toString();
         if (query) url += `&${query}`;
 
@@ -276,18 +293,51 @@ function initializeExamPage() {
             }
 
             if (result && result.success && result.data.length > 0) {
+                const searchTerm = globalSearch ? globalSearch.value.trim() : "";
                 result.data.forEach(exam => {
+                    const isSelected = selectedExamIds.has(exam.id.toString());
+                    // Search Match HTML
+                    let matchHtml = "";
+                    if (searchTerm && exam.match_type) {
+                        const highlightedSnippet = exam.match_text ?
+                            `<div class="mt-1 text-[10px] text-gray-400 italic line-clamp-1 border-l-2 border-blue-100 pl-2">
+                                ...${highlightText(exam.match_text, searchTerm)}...
+                             </div>` : "";
+
+                        matchHtml = `
+                            <div class="mt-2 flex flex-col gap-1">
+                                <span class="inline-flex items-center w-fit px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-tight border border-blue-100">
+                                    <span class="material-symbols-outlined text-[10px] mr-1">info</span>
+                                    Matched in ${exam.match_type}
+                                </span>
+                                ${highlightedSnippet}
+                            </div>`;
+                    }
+
                     // Desktop Table Row
                     const row = `
-                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50/30' : ''}">
                             <td class="py-4 px-6 text-left">
-                                <span class="font-bold text-gray-900 block" title="${exam.exam_title}">${exam.exam_title}</span>
+                                <input type="checkbox" class="exam-checkbox w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300" data-id="${exam.id}" ${isSelected ? 'checked' : ''}>
                             </td>
                             <td class="py-4 px-6 text-left">
-                                <div class="flex flex-col text-[11px] leading-tight text-gray-500">
-                                    <span class="font-bold text-blue-600 uppercase tracking-tighter">${exam.subject_name || 'N/A'}</span>
-                                    <span class="truncate max-w-[150px]">${exam.lesson_name || 'N/A'}</span>
-                                    <span class="italic text-gray-400 truncate max-w-[150px]">${exam.topic_name || 'N/A'}</span>
+                                <span class="font-bold text-gray-900 block" title="${exam.exam_title}">${searchTerm ? highlightText(exam.exam_title, searchTerm) : exam.exam_title}</span>
+                                ${matchHtml}
+                            </td>
+                            <td class="py-4 px-6 text-left">
+                                <div class="flex flex-col text-[10px] leading-tight text-gray-500 gap-1">
+                                    <div class="flex items-center gap-1">
+                                        <span class="bg-blue-100 text-blue-700 font-black px-1 rounded-[4px] scale-90">S</span>
+                                        <span class="font-bold text-blue-800 uppercase tracking-tighter">${exam.subject_name || 'N/A'}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <span class="bg-gray-100 text-gray-600 font-black px-1 rounded-[4px] scale-90">L</span>
+                                        <span class="truncate max-w-[130px]">${exam.lesson_name || 'N/A'}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <span class="bg-gray-50 text-gray-400 font-black px-1 rounded-[4px] scale-90">T</span>
+                                        <span class="italic text-gray-400 truncate max-w-[130px]">${exam.topic_name || 'N/A'}</span>
+                                    </div>
                                 </div>
                             </td>
                             <td class="py-4 px-6 text-center">
@@ -314,15 +364,29 @@ function initializeExamPage() {
 
                     // Mobile Card
                     const card = `
-                        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3 relative overflow-hidden group">
+                        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3 relative overflow-hidden group ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/10' : ''}">
+                           <div class="absolute top-2 left-2 z-20">
+                                <input type="checkbox" class="exam-checkbox w-5 h-5 rounded-full text-blue-600 focus:ring-blue-500 border-gray-300 shadow-sm" data-id="${exam.id}" ${isSelected ? 'checked' : ''}>
+                           </div>
                            <div class="absolute top-0 right-0 w-16 h-16 bg-blue-50/50 rounded-bl-[60px] flex items-start justify-end p-2 z-0">
                                 <span class="material-symbols-outlined text-blue-200/50 text-4xl">assignment</span>
                            </div>
                            <div class="relative z-10">
-                                <h3 class="font-black text-gray-900 leading-tight pr-8">${exam.exam_title}</h3>
-                                <div class="mt-2 flex flex-col gap-0.5 text-[11px] font-medium text-gray-500">
-                                    <span class="text-blue-600 font-black uppercase tracking-widest">${exam.subject_name || 'N/A'}</span>
-                                    <span class="text-gray-400 italic">${exam.lesson_name || 'N/A'} / ${exam.topic_name || 'N/A'}</span>
+                                <h3 class="font-black text-gray-900 leading-tight pr-8">${searchTerm ? highlightText(exam.exam_title, searchTerm) : exam.exam_title}</h3>
+                                ${matchHtml}
+                                <div class="mt-2 flex flex-col gap-1 text-[10px] font-medium text-gray-500">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="bg-blue-50 text-blue-600 font-black px-1 rounded-sm scale-90">S</span>
+                                        <span class="text-blue-600 font-bold uppercase tracking-wider">${exam.subject_name || 'N/A'}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="bg-gray-50 text-gray-400 font-black px-1 rounded-sm scale-90">L</span>
+                                        <span class="text-gray-400">${exam.lesson_name || 'N/A'}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="bg-gray-50 text-gray-300 font-black px-1 rounded-sm scale-90">T</span>
+                                        <span class="text-gray-400/80 italic">${exam.topic_name || 'N/A'}</span>
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-3 mt-3">
                                     <span class="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1 leading-none">
@@ -527,6 +591,47 @@ function initializeExamPage() {
                 window.location.href = url;
             }
         }
+
+        if (e.target.classList.contains('exam-checkbox')) {
+            toggleSelected(e.target.dataset.id, e.target.checked);
+        }
+    }
+
+    function toggleSelected(id, isSelected) {
+        if (isSelected) {
+            selectedExamIds.add(id);
+        } else {
+            selectedExamIds.delete(id);
+        }
+        updateBulkBar();
+        // Update row/card visual state
+        document.querySelectorAll(`.exam-checkbox[data-id="${id}"]`).forEach(cb => {
+            cb.checked = isSelected;
+            const container = cb.closest('tr') || cb.closest('.group');
+            if (container) {
+                if (isSelected) {
+                    if (container.tagName === 'TR') container.classList.add('bg-blue-50/30');
+                    else container.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50/10');
+                } else {
+                    if (container.tagName === 'TR') container.classList.remove('bg-blue-50/30');
+                    else container.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50/10');
+                }
+            }
+        });
+    }
+
+    function updateBulkBar() {
+        if (selectedExamIds.size > 0) {
+            bulkActionBar.classList.remove('hidden');
+            selectedCountEl.textContent = selectedExamIds.size;
+            // Lazy load subjects for bulk re-categorization dropdown
+            if (bulkSubjectTarget.options.length <= 1) {
+                populateSubjects(bulkSubjectTarget);
+            }
+        } else {
+            bulkActionBar.classList.add('hidden');
+            if (selectAllExams) selectAllExams.checked = false;
+        }
     }
 
     // --- Setup Listeners ---
@@ -617,6 +722,8 @@ function initializeExamPage() {
             topicFilter.innerHTML = '<option value="0">All Topics</option>';
             topicFilter.disabled = true;
 
+            if (globalSearch) globalSearch.value = "";
+
             fetchAndDisplayExams(false);
         });
     }
@@ -624,6 +731,72 @@ function initializeExamPage() {
     // Modal dependent dropdown listeners
     modalSubjectSelector.addEventListener('change', () => populateLessons(modalSubjectSelector.value, modalLessonSelector));
     modalLessonSelector.addEventListener('change', () => populateTopics(modalLessonSelector.value, modalTopicSelector));
+
+    // Global Search Debouncing
+    let searchTimeout;
+    if (globalSearch) {
+        globalSearch.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentOffset = 0; // Reset pagination on search
+                fetchAndDisplayExams(false);
+            }, 500);
+        });
+    }
+
+    // Bulk Action Listeners
+    if (selectAllExams) {
+        selectAllExams.addEventListener('change', () => {
+            const checkboxes = document.querySelectorAll('.exam-checkbox');
+            checkboxes.forEach(cb => toggleSelected(cb.dataset.id, selectAllExams.checked));
+        });
+    }
+
+    if (bulkSubjectTarget) {
+        bulkSubjectTarget.addEventListener('change', () => populateLessons(bulkSubjectTarget.value, bulkLessonTarget));
+        bulkLessonTarget.addEventListener('change', () => populateTopics(bulkLessonTarget.value, bulkTopicTarget));
+    }
+
+    document.getElementById('cancel-bulk-btn').addEventListener('click', () => {
+        selectedExamIds.clear();
+        document.querySelectorAll('.exam-checkbox').forEach(cb => toggleSelected(cb.dataset.id, false));
+    });
+
+    document.getElementById('apply-bulk-btn').addEventListener('click', async () => {
+        const subjectId = bulkSubjectTarget.value;
+        const lessonId = bulkLessonTarget.value;
+        const topicId = bulkTopicTarget.value;
+
+        if (!subjectId || !lessonId || !topicId) {
+            showToast('Please select all target categories.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${EXAM_API_URL}?action=bulk_update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ids: Array.from(selectedExamIds),
+                    subject_id: subjectId,
+                    lesson_id: lessonId,
+                    topic_id: topicId
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                showToast(result.message);
+                selectedExamIds.clear();
+                updateBulkBar();
+                fetchAndDisplayExams(false, true); // Refresh and bypass cache
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Bulk update failed.', 'error');
+        }
+    });
 
     // Modal close buttons
     document.getElementById('close-exam-modal-btn').addEventListener('click', () => closeModal(examModal));

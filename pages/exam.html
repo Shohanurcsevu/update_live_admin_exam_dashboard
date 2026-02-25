@@ -54,6 +54,19 @@
         </div>
     </div>
 
+    <!-- Global Search -->
+    <div class="mb-6">
+        <div class="relative group">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <span
+                    class="material-symbols-outlined text-gray-400 group-focus-within:text-blue-500 transition-colors">search</span>
+            </div>
+            <input type="text" id="global-search"
+                class="block w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-50/50 outline-none transition-all"
+                placeholder="Search by exam title, subject, topic, or question content...">
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div><label for="subject-filter" class="block text-sm font-medium text-gray-700">Filter by
                 Subject</label><select id="subject-filter"
@@ -73,6 +86,10 @@
         <table class="min-w-full bg-white">
             <thead class="bg-gray-50 text-gray-500 uppercase text-[11px] font-black tracking-widest border-b">
                 <tr>
+                    <th class="py-4 px-6 text-left w-10">
+                        <input type="checkbox" id="select-all-exams"
+                            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300">
+                    </th>
                     <th class="py-4 px-6 text-left">Exam Title</th>
                     <th class="py-4 px-6 text-left">Hierarchy</th>
                     <th class="py-4 px-6 text-center">Duration</th>
@@ -96,6 +113,37 @@
             <span class="material-symbols-outlined mr-2">expand_more</span>
             Load More Exams
         </button>
+    </div>
+
+    <!-- Bulk Action Bar (Sticky) -->
+    <div id="bulk-action-bar"
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-4xl bg-white/80 backdrop-blur-md border border-gray-200 rounded-2xl shadow-2xl p-4 z-[100] hidden animate-slide-up">
+        <div class="flex flex-col md:flex-row items-center gap-4">
+            <div class="flex items-center gap-3 pr-4 md:border-r border-gray-100">
+                <span
+                    class="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-black text-sm"
+                    id="selected-count">0</span>
+                <span class="text-gray-700 font-bold text-sm tracking-tight">Exams Selected</span>
+            </div>
+
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
+                <select id="bulk-subject-target"
+                    class="text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition-all"></select>
+                <select id="bulk-lesson-target"
+                    class="text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                    disabled></select>
+                <select id="bulk-topic-target"
+                    class="text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                    disabled></select>
+            </div>
+
+            <div class="flex gap-2 w-full md:w-auto">
+                <button id="cancel-bulk-btn"
+                    class="flex-1 md:flex-none px-6 py-2.5 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors">Cancel</button>
+                <button id="apply-bulk-btn"
+                    class="flex-1 md:flex-none px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-blue-200 active:scale-95 transition-all">Apply</button>
+            </div>
+        </div>
     </div>
 </div>
 

@@ -14,6 +14,7 @@ switch ($action) {
     case 'create': create_exam($conn); break;
     case 'update': update_exam($conn); break;
     case 'delete': delete_exam($conn); break;
+    case 'bulk_update': bulk_update_exams($conn); break;
     default: echo json_encode(['success' => false, 'message' => 'Invalid action for exams.']); break;
 }
 // Helper function to add to the activity log
@@ -64,19 +65,67 @@ function list_exams($conn) {
         $where_clauses[] = "e.is_revision = 0";
     }
 
-    // Filter out custom exams (those not linked to full hierarchy)
-    $where_clauses[] = "e.subject_id IS NOT NULL";
-    $where_clauses[] = "e.lesson_id IS NOT NULL";
-    $where_clauses[] = "e.topic_id IS NOT NULL";
     $where_clauses[] = "e.is_deleted = 0";
+
+    $match_select = "";
+    $match_join = "";
+    if (!empty($_GET['search'])) {
+        $searchTerm = '%' . $_GET['search'] . '%';
+        $where_clauses[] = "(e.exam_title LIKE ? OR s.subject_name LIKE ? OR l.lesson_name LIKE ? OR t.topic_name LIKE ? OR EXISTS (
+            SELECT 1 FROM questions q 
+            WHERE q.exam_id = e.id 
+            AND q.is_deleted = 0 
+            AND (q.question LIKE ? OR q.explanation LIKE ?)
+        ))";
+        
+        $match_select = ", 
+            CASE 
+                WHEN e.exam_title LIKE ? THEN 'Title'
+                WHEN s.subject_name LIKE ? THEN 'Subject'
+                WHEN l.lesson_name LIKE ? THEN 'Lesson'
+                WHEN t.topic_name LIKE ? THEN 'Topic'
+                WHEN mq.question LIKE ? THEN 'Question'
+                WHEN mq.explanation LIKE ? THEN 'Explanation'
+                ELSE 'Misc'
+            END as match_type,
+            COALESCE(mq.question, mq.explanation) as match_text";
+            
+        $match_join = "LEFT JOIN (
+            SELECT exam_id, question, explanation 
+            FROM questions 
+            WHERE is_deleted = 0 
+            AND (question LIKE ? OR explanation LIKE ?)
+            ORDER BY id ASC
+        ) mq ON e.id = mq.exam_id";
+
+        // Parameters for WHERE clause
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $types .= 'ssssss';
+        
+        // Parameters for SELECT CASE
+        $select_params = [$searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm];
+        $select_types = "ssssss";
+        
+        // Parameters for JOIN mq
+        $join_params = [$searchTerm, $searchTerm];
+        $join_types = "ss";
+    }
+
     $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
 
     $sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name,
                    q_count.total_questions
+                   $match_select
             FROM exams e
             LEFT JOIN subjects s ON e.subject_id = s.id
             LEFT JOIN lessons l ON e.lesson_id = l.id
             LEFT JOIN topics t ON e.topic_id = t.id
+            $match_join
             LEFT JOIN (
                 SELECT exam_id, COUNT(*) as total_questions 
                 FROM questions 
@@ -84,12 +133,24 @@ function list_exams($conn) {
                 GROUP BY exam_id
             ) q_count ON e.id = q_count.exam_id
             $where_sql
+            GROUP BY e.id
             ORDER BY e.id DESC
             LIMIT ? OFFSET ?";
     
-    $params[] = $limit;
-    $params[] = $offset;
-    $types .= 'ii';
+    $final_params = [];
+    $final_types = "";
+    
+    if (!empty($_GET['search'])) {
+        $final_params = array_merge($select_params, $join_params, $params);
+        $final_types = $select_types . $join_types . $types;
+    } else {
+        $final_params = $params;
+        $final_types = $types;
+    }
+    
+    $final_params[] = $limit;
+    $final_params[] = $offset;
+    $final_types .= 'ii';
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -97,8 +158,8 @@ function list_exams($conn) {
         return;
     }
     
-    if (!empty($params)) {
-        $stmt->bind_param($types, ...$params);
+    if (!empty($final_params)) {
+        $stmt->bind_param($final_types, ...$final_params);
     }
     
     if (!$stmt->execute()) {
@@ -114,10 +175,14 @@ function list_exams($conn) {
     }
 
     // Get total count for pagination info
-    $count_sql = "SELECT COUNT(*) as total FROM exams e $where_sql";
+    $count_sql = "SELECT COUNT(*) as total FROM exams e 
+                  LEFT JOIN subjects s ON e.subject_id = s.id
+                  LEFT JOIN lessons l ON e.lesson_id = l.id
+                  LEFT JOIN topics t ON e.topic_id = t.id
+                  $where_sql";
     $count_stmt = $conn->prepare($count_sql);
-    $count_types = substr($types, 0, -2); // Remove 'ii' from limit/offset
-    $count_params = array_slice($params, 0, -2);
+    $count_types = $types;
+    $count_params = $params;
     if ($count_types !== "") {
         $count_stmt->bind_param($count_types, ...$count_params);
     }
@@ -355,6 +420,53 @@ function delete_exam($conn) {
     $stmt->close();
 }
 
+
+function bulk_update_exams($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    if (empty($data['ids']) || !is_array($data['ids'])) {
+        echo json_encode(['success' => false, 'message' => 'No exams selected for bulk update.']);
+        return;
+    }
+
+    $ids = $data['ids'];
+    $subject_id = intval($data['subject_id']);
+    $lesson_id = intval($data['lesson_id']);
+    $topic_id = intval($data['topic_id']);
+
+    if ($subject_id === 0 || $lesson_id === 0 || $topic_id === 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid target categorization.']);
+        return;
+    }
+
+    $conn->begin_transaction();
+    try {
+        // Build the IN clause placeholder
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = "UPDATE exams SET subject_id = ?, lesson_id = ?, topic_id = ? WHERE id IN ($placeholders)";
+        $stmt = $conn->prepare($sql);
+        
+        $types = "iii" . str_repeat("i", count($ids));
+        $params = array_merge([$subject_id, $lesson_id, $topic_id], array_map('intval', $ids));
+        
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to execute bulk update.");
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+
+        $message = "Bulk Re-categorization: Updated categories for " . count($ids) . " exams (Affected: $affected_rows) to Subject ID $subject_id, Lesson ID $lesson_id, Topic ID $topic_id.";
+        log_activity($conn, 'Bulk Exam Update', $message);
+
+        $conn->commit();
+        echo json_encode(['success' => true, 'message' => "Successfully re-categorized " . count($ids) . " exams."]);
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
 
 $conn->close();
 ?>
