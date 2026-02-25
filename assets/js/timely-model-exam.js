@@ -182,6 +182,11 @@
                 });
 
                 console.log('✅ All sections created and appended');
+
+                // If "Select All" is active, we need to refresh the summary as new exams were added to state
+                if (selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked) {
+                    updateSelectionSummary();
+                }
             }
         } catch (error) {
             console.error('Error loading exams:', error);
@@ -251,7 +256,16 @@
     function createHierarchyItem() { }
 
     function createExamItem(exam) {
-        const isChecked = !!selectedExams[exam.id];
+        const selectAllChecked = selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked;
+        const isChecked = !!selectedExams[exam.id] || selectAllChecked;
+
+        let initialValue = '';
+        if (selectedExams[exam.id]) {
+            initialValue = selectedExams[exam.id].selectedCount;
+        } else if (selectAllChecked) {
+            initialValue = exam.total_questions;
+        }
+
         const div = document.createElement('div');
         div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2';
 
@@ -283,13 +297,29 @@
                        max="${exam.total_questions}" 
                        placeholder="Qty"
                        ${isChecked ? '' : 'disabled'}
-                       value="${selectedExams[exam.id]?.selectedCount || ''}">
+                       value="${initialValue}">
                 <span class="text-sm text-gray-600">questions</span>
             </div>
         `;
 
         const checkbox = div.querySelector('.exam-checkbox');
         const input = div.querySelector('.exam-input');
+
+        // If it was auto-selected via "Select All", we need to update the state
+        if (selectAllChecked && !selectedExams[exam.id]) {
+            // We can't call handleExamSelection directly here because it updates summary which might be slow in loop
+            // But for a few exams it's fine. 
+            // Better: update state manually if needed, or let the caller handle it.
+            // Actually, handleExamSelection is fine for now as it's async-friendly.
+
+            // Delay slightly to ensure DOM is ready if needed, or just update state
+            selectedExams[exam.id] = {
+                examTitle: exam.exam_title,
+                maxQuestions: exam.total_questions,
+                selectedCount: exam.total_questions
+            };
+            // Note: We'll call updateSelectionSummary once after the loop in loadAllExams
+        }
 
         checkbox.addEventListener('change', (e) => {
             input.disabled = !e.target.checked;
@@ -493,11 +523,21 @@
         }
     }
 
+    const selectAllQuestionsCheckbox = document.getElementById('select-all-questions');
+
     // Bulk question count dropdown listener
     if (bulkQuestionCountSelect) {
         bulkQuestionCountSelect.addEventListener('change', () => {
             const count = parseInt(bulkQuestionCountSelect.value);
             if (!count) return;
+
+            // If "Select All" is checked, we don't want the bulk dropdown to override everything in a confusing way
+            // But if it's not checked, we proceed as normal
+            if (selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked) {
+                showToast('Turn off "Select All Questions" to manual set a fixed number of questions', 'error');
+                bulkQuestionCountSelect.value = "";
+                return;
+            }
 
             const allExamInputs = document.querySelectorAll('.exam-input');
             if (allExamInputs.length === 0) {
@@ -507,29 +547,78 @@
 
             const allCheckboxes = document.querySelectorAll('.exam-checkbox');
 
-            // Check if any exams are checked
-            const anyChecked = Array.from(allCheckboxes).some(cb => cb.checked);
-
             allCheckboxes.forEach(checkbox => {
                 const examId = checkbox.dataset.examId;
                 const input = document.querySelector(`.exam-input[data-exam-id="${examId}"]`);
                 if (!input) return;
 
-                // Auto-check the exam if not already checked
                 if (!checkbox.checked) {
                     checkbox.checked = true;
                     input.disabled = false;
                 }
 
-                // Set value capped at the exam's max available questions
                 const maxQ = parseInt(input.dataset.maxQuestions) || count;
                 input.value = Math.min(count, maxQ);
 
-                // Trigger selection handler
                 handleExamSelection(input);
             });
 
             showToast(`Set ${count} question(s) for all exams`);
+        });
+    }
+
+    // "Select All Questions" listener
+    if (selectAllQuestionsCheckbox) {
+        selectAllQuestionsCheckbox.addEventListener('change', () => {
+            const isChecked = selectAllQuestionsCheckbox.checked;
+
+            if (isChecked) {
+                // Disable bulk dropdown as they conflict
+                if (bulkQuestionCountSelect) {
+                    bulkQuestionCountSelect.disabled = true;
+                    bulkQuestionCountSelect.value = "";
+                }
+
+                // Select all available questions for all exams
+                const allCheckboxes = document.querySelectorAll('.exam-checkbox');
+                allCheckboxes.forEach(checkbox => {
+                    const examId = checkbox.dataset.examId;
+                    const input = document.querySelector(`.exam-input[data-exam-id="${examId}"]`);
+                    if (!input) return;
+
+                    checkbox.checked = true;
+                    input.disabled = false;
+
+                    const maxQ = parseInt(input.dataset.maxQuestions) || 0;
+                    input.value = maxQ;
+
+                    handleExamSelection(input);
+                });
+
+                showToast('All available questions selected from all filtered exams');
+            } else {
+                // Enable bulk dropdown
+                if (bulkQuestionCountSelect) {
+                    bulkQuestionCountSelect.disabled = false;
+                }
+
+                // Clear all selections when "Select All" is turned off
+                selectedExams = {};
+
+                const allCheckboxes = document.querySelectorAll('.exam-checkbox');
+                allCheckboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                    const examId = checkbox.dataset.examId;
+                    const input = document.querySelector(`.exam-input[data-exam-id="${examId}"]`);
+                    if (input) {
+                        input.disabled = true;
+                        input.value = "";
+                    }
+                });
+
+                updateSelectionSummary();
+                showToast('Selection cleared');
+            }
         });
     }
 
