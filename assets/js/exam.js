@@ -264,6 +264,22 @@ function initializeExamPage() {
         return text.replace(regex, '<mark class="bg-yellow-100 text-yellow-900 font-bold px-0.5 rounded">$1</mark>');
     }
 
+    function getDifficultyBadge(passRate, totalAttempts) {
+        if (!totalAttempts || totalAttempts == 0) return `<span class="bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-gray-100">No Data</span>`;
+
+        let colorClass = "";
+        let text = "";
+        if (passRate >= 80) { colorClass = "bg-emerald-50 text-emerald-600 border-emerald-100"; text = "Easy"; }
+        else if (passRate >= 50) { colorClass = "bg-amber-50 text-amber-600 border-amber-100"; text = "Medium"; }
+        else { colorClass = "bg-rose-50 text-rose-600 border-rose-100"; text = "Hard"; }
+
+        return `<span class="${colorClass} px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-1 w-fit shadow-xs cursor-help" 
+                    title="Pass Rate: ${parseFloat(passRate).toFixed(1)}% (${totalAttempts} attempts)">
+                    <span class="w-1.5 h-1.5 rounded-full ${colorClass.replace('bg-', 'bg-').split(' ')[1]}"></span>
+                    ${text}
+                </span>`;
+    }
+
     async function fetchAndDisplayExams(append = false, forceRefresh = false) {
         if (isFetching) return;
         isFetching = true;
@@ -341,6 +357,9 @@ function initializeExamPage() {
                                 </div>
                             </td>
                             <td class="py-4 px-6 text-center">
+                                <div class="flex justify-center">${getDifficultyBadge(exam.pass_rate, exam.total_attempts)}</div>
+                            </td>
+                            <td class="py-4 px-6 text-center">
                                 <span class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-black tracking-tight">${exam.duration}m</span>
                             </td>
                             <td class="py-4 px-6 text-center">
@@ -388,15 +407,16 @@ function initializeExamPage() {
                                         <span class="text-gray-400/80 italic">${exam.topic_name || 'N/A'}</span>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-3 mt-3">
+                                <div class="flex items-center gap-2 mt-3 flex-wrap">
                                     <span class="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1 leading-none">
                                         <span class="material-symbols-outlined text-sm">schedule</span>
                                         ${exam.duration}m
                                     </span>
-                                    <span class="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1 leading-none">
+                                    <span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1 leading-none shadow-sm">
                                         <span class="material-symbols-outlined text-sm">military_tech</span>
                                         ${exam.total_marks}M
                                     </span>
+                                    ${getDifficultyBadge(exam.pass_rate, exam.total_attempts)}
                                 </div>
                                 <div class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-50">
                                     <button class="edit-btn w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl flex items-center justify-center shadow-md active:scale-95 transition-all" data-id="${exam.id}" title="Edit">

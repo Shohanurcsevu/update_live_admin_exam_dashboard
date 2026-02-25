@@ -119,7 +119,10 @@ function list_exams($conn) {
     $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
 
     $sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name,
-                   q_count.total_questions
+                   q_count.total_questions,
+                   IFNULL(perf.total_attempts, 0) as total_attempts,
+                   IFNULL(perf.pass_count, 0) as pass_count,
+                   IFNULL(perf.pass_rate, 0) as pass_rate
                    $match_select
             FROM exams e
             LEFT JOIN subjects s ON e.subject_id = s.id
@@ -132,6 +135,16 @@ function list_exams($conn) {
                 WHERE is_deleted = 0
                 GROUP BY exam_id
             ) q_count ON e.id = q_count.exam_id
+            LEFT JOIN (
+                SELECT 
+                    p.exam_id, 
+                    COUNT(*) as total_attempts,
+                    SUM(CASE WHEN p.score_with_negative >= e2.pass_mark THEN 1 ELSE 0 END) as pass_count,
+                    (SUM(CASE WHEN p.score_with_negative >= e2.pass_mark THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as pass_rate
+                FROM performance p
+                JOIN exams e2 ON p.exam_id = e2.id
+                GROUP BY p.exam_id
+            ) perf ON e.id = perf.exam_id
             $where_sql
             GROUP BY e.id
             ORDER BY e.id DESC
