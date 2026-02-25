@@ -370,3 +370,47 @@
         </div>
     </div>
 </div>
+
+<!-- Quick Look Question Preview Modal -->
+<div id="preview-questions-modal"
+    class="fixed inset-0 z-[500] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div
+        class="bg-white rounded-[40px] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all">
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                    <span class="material-symbols-outlined text-2xl">visibility</span>
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800" id="preview-exam-title">Exam Preview</h3>
+                    <p class="text-xs text-slate-500 font-medium" id="preview-exam-subtitle">Reviewing questions and
+                        answers</p>
+                </div>
+            </div>
+            <button id="close-preview-modal-btn"
+                class="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Modal Body (Scrollable) -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50" id="preview-questions-container">
+            <!-- Loading State -->
+            <div id="preview-loading" class="flex flex-col items-center justify-center py-20 space-y-4">
+                <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                <p class="text-gray-500 font-bold animate-pulse">Fetching questions...</p>
+            </div>
+
+            <!-- Question List will be injected here -->
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 bg-white border-t border-gray-100 flex justify-end">
+            <button id="close-preview-footer-btn"
+                class="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl shadow-slate-200">
+                Close Preview
+            </button>
+        </div>
+    </div>
+</div>

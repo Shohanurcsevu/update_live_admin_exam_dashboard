@@ -41,6 +41,15 @@ function initializeExamPage() {
     const previewQuestionsBtn = document.getElementById('preview-imported-questions-btn');
     const previewContainer = document.getElementById('imported-questions-preview');
 
+    // Quick Look Selectors
+    const quickLookModal = document.getElementById('preview-questions-modal');
+    const previewExamTitle = document.getElementById('preview-exam-title');
+    const previewExamSubtitle = document.getElementById('preview-exam-subtitle');
+    const previewQuestionsContainer = document.getElementById('preview-questions-container');
+    const previewLoading = document.getElementById('preview-loading');
+    const closePreviewBtn = document.getElementById('close-preview-modal-btn');
+    const closePreviewFooterBtn = document.getElementById('close-preview-footer-btn');
+
     // Tab Elements
     const tabManual = document.getElementById('tab-manual');
     const tabBulk = document.getElementById('tab-bulk');
@@ -367,6 +376,9 @@ function initializeExamPage() {
                             </td>
                             <td class="py-4 px-6 text-center">
                                 <div class="flex items-center justify-center gap-2">
+                                    <button class="quick-look-btn p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" data-title="${exam.exam_title}" title="Quick Look">
+                                        <span class="material-symbols-outlined text-lg">visibility</span>
+                                    </button>
                                     <button class="edit-btn p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" title="Edit Exam">
                                         <span class="material-symbols-outlined text-lg">edit</span>
                                     </button>
@@ -418,15 +430,18 @@ function initializeExamPage() {
                                     </span>
                                     ${getDifficultyBadge(exam.pass_rate, exam.total_attempts)}
                                 </div>
-                                <div class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-50">
-                                    <button class="edit-btn w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl flex items-center justify-center shadow-md active:scale-95 transition-all" data-id="${exam.id}" title="Edit">
-                                        <span class="material-symbols-outlined text-xl">edit</span>
+                                <div class="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-gray-100">
+                                    <button class="quick-look-btn bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" data-title="${exam.exam_title}" title="Quick Look">
+                                        <span class="material-symbols-outlined text-lg">visibility</span>
                                     </button>
-                                    <button class="manage-questions-btn w-full bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white py-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}" title="Manage Questions">
-                                        <span class="material-symbols-outlined text-xl">quiz</span>
+                                    <button class="edit-btn bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" title="Edit">
+                                        <span class="material-symbols-outlined text-lg">edit</span>
                                     </button>
-                                    <button class="delete-btn w-full bg-red-50 text-red-600 hover:bg-red-600 hover:text-white py-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all" data-id="${exam.id}" title="Delete">
-                                        <span class="material-symbols-outlined text-xl">delete</span>
+                                    <button class="manage-questions-btn bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" data-title="${exam.exam_title}" title="Manage Questions">
+                                        <span class="material-symbols-outlined text-lg">quiz</span>
+                                    </button>
+                                    <button class="delete-btn bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" title="Delete">
+                                        <span class="material-symbols-outlined text-lg">delete</span>
                                     </button>
                                 </div>
                            </div>
@@ -612,6 +627,11 @@ function initializeExamPage() {
             }
         }
 
+        const quickLookBtn = e.target.closest('.quick-look-btn');
+        if (quickLookBtn) {
+            handleQuickLook(quickLookBtn.dataset.id, quickLookBtn.dataset.title);
+        }
+
         if (e.target.classList.contains('exam-checkbox')) {
             toggleSelected(e.target.dataset.id, e.target.checked);
         }
@@ -652,6 +672,75 @@ function initializeExamPage() {
             bulkActionBar.classList.add('hidden');
             if (selectAllExams) selectAllExams.checked = false;
         }
+    }
+
+    async function handleQuickLook(id, title) {
+        previewExamTitle.textContent = title;
+        previewExamSubtitle.textContent = "Loading questions...";
+        previewQuestionsContainer.innerHTML = '';
+        previewQuestionsContainer.appendChild(previewLoading);
+        previewLoading.classList.remove('hidden');
+        openModal(quickLookModal);
+
+        try {
+            const response = await fetch(`api/question/list.php?exam_id=${id}`);
+            const result = await response.json();
+
+            previewLoading.classList.add('hidden');
+            if (result.success && result.data.length > 0) {
+                previewExamSubtitle.textContent = `Reviewing ${result.data.length} questions`;
+                renderPreviewQuestions(result.data);
+            } else {
+                previewExamSubtitle.textContent = "No questions found";
+                previewQuestionsContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-20 text-gray-400">
+                        <span class="material-symbols-outlined text-6xl mb-4">description</span>
+                        <p class="font-bold text-lg text-gray-500">No questions added yet.</p>
+                        <p class="text-sm">Click 'Manage Questions' to start adding content.</p>
+                    </div>`;
+            }
+        } catch (error) {
+            previewLoading.classList.add('hidden');
+            previewExamSubtitle.textContent = "Error loading questions";
+            showToast('Failed to fetch questions.', 'error');
+        }
+    }
+
+    function renderPreviewQuestions(questions) {
+        previewQuestionsContainer.innerHTML = '';
+        questions.forEach((q, index) => {
+            const options = q.options ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options) : {};
+            let optionsHtml = '';
+
+            Object.entries(options).forEach(([key, val]) => {
+                const isCorrect = key === q.answer;
+                optionsHtml += `
+                    <div class="flex items-center gap-3 p-3 rounded-xl border ${isCorrect ? 'border-emerald-200 bg-emerald-50/50 text-emerald-900' : 'border-gray-100 bg-white text-gray-600'}">
+                        <span class="w-6 h-6 flex items-center justify-center rounded-full ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-500'} font-bold text-xs">
+                            ${key.toUpperCase()}
+                        </span>
+                        <span class="flex-1 font-medium">${val}</span>
+                        ${isCorrect ? '<span class="material-symbols-outlined text-emerald-600">check_circle</span>' : ''}
+                    </div>`;
+            });
+
+            const qCard = document.createElement('div');
+            qCard.className = 'bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4';
+            qCard.innerHTML = `
+                <div class="flex items-start gap-4">
+                    <span class="bg-slate-100 text-slate-500 w-8 h-8 rounded-full flex items-center justify-center font-black flex-shrink-0">
+                        ${index + 1}
+                    </span>
+                    <div class="flex-1">
+                        <h4 class="text-slate-800 font-bold leading-relaxed">${q.question}</h4>
+                        ${q.explanation ? `<p class="mt-2 text-xs text-gray-400 bg-gray-50 p-3 rounded-xl border border-dashed border-gray-200"><span class="font-black uppercase text-[9px] block mb-1">Explanation</span>${q.explanation}</p>` : ''}
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pl-12">
+                    ${optionsHtml}
+                </div>`;
+            previewQuestionsContainer.appendChild(qCard);
+        });
     }
 
     // --- Setup Listeners ---
@@ -823,6 +912,9 @@ function initializeExamPage() {
     document.getElementById('cancel-exam-modal-btn').addEventListener('click', () => closeModal(examModal));
     document.getElementById('cancel-exam-delete-btn').addEventListener('click', () => closeModal(deleteModal));
     document.getElementById('confirm-exam-delete-btn').addEventListener('click', handleDeleteConfirm);
+
+    if (closePreviewBtn) closePreviewBtn.addEventListener('click', () => closeModal(quickLookModal));
+    if (closePreviewFooterBtn) closePreviewFooterBtn.addEventListener('click', () => closeModal(quickLookModal));
 
     // Tab Listeners
     tabManual.onclick = () => switchTab('manual');
