@@ -954,7 +954,7 @@ function initializeExamPage() {
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-4">
                                             ${['A', 'B', 'C', 'D'].map(opt => `
                                                 <div class="flex items-center gap-3 p-1 rounded-lg border ${q.answer === opt ? 'bg-emerald-50 border-emerald-100' : 'border-transparent'} hover:border-slate-100 focus-within:border-blue-100 transition-all">
-                                                    <span class="${q.answer === opt ? 'text-emerald-600 font-black' : 'text-slate-400 font-bold'}">${opt}:</span>
+                                                    <span class="answer-toggle cursor-pointer hover:underline ${q.answer === opt ? 'text-emerald-600 font-black' : 'text-slate-400 font-bold'}" data-sec-idx="${i}" data-q-idx="${qIdx}" data-opt="${opt}" title="Set as correct answer">${opt}:</span>
                                                     <span contenteditable="true" class="edit-field flex-1 outline-none text-slate-600 ${q.answer === opt ? 'font-medium' : ''}" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="options" data-opt="${opt}">${q.options[opt]}</span>
                                                 </div>
                                             `).join('')}
@@ -1011,6 +1011,14 @@ function initializeExamPage() {
                 extractedSections[btn.dataset.secIdx].questions.splice(btn.dataset.qIdx, 1);
                 renderSections();
                 renderBulkTable();
+            };
+        });
+
+        document.querySelectorAll('.answer-toggle').forEach(btn => {
+            btn.onclick = () => {
+                const { secIdx, qIdx, opt } = btn.dataset;
+                extractedSections[secIdx].questions[qIdx].answer = opt;
+                renderSections();
             };
         });
     }
