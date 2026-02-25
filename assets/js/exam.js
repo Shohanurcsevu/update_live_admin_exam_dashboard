@@ -15,6 +15,8 @@ function initializeExamPage() {
     const loadMoreBtn = document.getElementById('load-more-btn');
     const currentCountEl = document.getElementById('current-count');
     const totalCountEl = document.getElementById('total-count');
+    const inventoryContainer = document.getElementById('exam-inventory-main');
+    const progressBar = document.getElementById('loading-progress');
 
     // Filters
     const subjectFilter = document.getElementById('subject-filter');
@@ -66,7 +68,11 @@ function initializeExamPage() {
 
     let examIdToDelete = null;
     let subjects = []; // Shared subjects for bulk categorization
-    let extractedSections = []; // Queue for bulk import
+    extractedSections = []; // Queue for bulk import
+
+    // Sorting State
+    let currentSortBy = 'id';
+    let currentSortOrder = 'desc';
     let importedQuestions = [];
     const defaultInstructions = 'প্রতিটি প্রশ্নের ৪ (চার) টি উত্তরের মধ্যে ১ (এক) টি সঠিক উত্তর রয়েছে। প্রতিটি শুদ্ধ উত্তরের জন্য প্রার্থী ১ (এক) নম্বর পাবেন। প্রতিটি ভুল উত্তরের জন্য ০.৫ ( শূন্য দশমিক পাঁচ ) নম্বর কাটা যাবে।';
 
@@ -295,8 +301,15 @@ function initializeExamPage() {
 
         if (!append) {
             currentOffset = 0;
-            tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-8"><span class="material-symbols-outlined animate-spin text-4xl text-blue-500">sync</span><p class="mt-2 text-gray-500 font-medium tracking-tight">Loading exams...</p></td></tr>';
-            cardView.innerHTML = '<div class="flex flex-col items-center justify-center py-12 text-blue-500"><span class="material-symbols-outlined animate-spin text-5xl">sync</span><p class="mt-4 text-gray-600 font-medium">Loading exams...</p></div>';
+            // If we already have items, don't clear, just dim
+            if (tableBody.children.length > 0 && tableBody.querySelector('tr td span.animate-spin') === null) {
+                inventoryContainer.classList.add('content-dimmed');
+                progressBar.classList.remove('hidden');
+                progressBar.classList.add('content-loading');
+            } else {
+                tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-8"><span class="material-symbols-outlined animate-spin text-4xl text-blue-500">sync</span><p class="mt-2 text-gray-500 font-medium tracking-tight">Loading exams...</p></td></tr>';
+                cardView.innerHTML = '<div class="flex flex-col items-center justify-center py-12 text-blue-500"><span class="material-symbols-outlined animate-spin text-5xl">sync</span><p class="mt-4 text-gray-600 font-medium">Loading exams...</p></div>';
+            }
             document.getElementById('load-more-container').classList.add('hidden');
         }
 
@@ -306,11 +319,21 @@ function initializeExamPage() {
         if (lessonFilter.value > 0) params.append('lesson_id', lessonFilter.value);
         if (topicFilter.value > 0) params.append('topic_id', topicFilter.value);
         if (globalSearch && globalSearch.value.trim()) params.append('search', globalSearch.value.trim());
+
+        // Add sorting params
+        params.append('sort_by', currentSortBy);
+        params.append('sort_direction', currentSortOrder);
+
         const query = params.toString();
         if (query) url += `&${query}`;
 
         try {
             const result = await CacheManager.fetchWithCache(url, 2, forceRefresh, false, true);
+
+            // Cleanup loading state
+            inventoryContainer.classList.remove('content-dimmed');
+            progressBar.classList.add('hidden');
+            progressBar.classList.remove('content-loading');
 
             if (!append) {
                 tableBody.innerHTML = '';
@@ -473,9 +496,13 @@ function initializeExamPage() {
         } catch (error) {
             console.error('Fetch error:', error);
             showToast('Failed to load exams.', 'error');
-            if (!append) tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500 font-bold">Error loading exams.</td></tr>`;
+            if (!append) tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500 font-bold">Error loading exams.</td></tr>`;
         } finally {
             isFetching = false;
+            // Always cleanup loading state
+            inventoryContainer.classList.remove('content-dimmed');
+            progressBar.classList.add('hidden');
+            progressBar.classList.remove('content-loading');
         }
     }
 
@@ -916,9 +943,63 @@ function initializeExamPage() {
     if (closePreviewBtn) closePreviewBtn.addEventListener('click', () => closeModal(quickLookModal));
     if (closePreviewFooterBtn) closePreviewFooterBtn.addEventListener('click', () => closeModal(quickLookModal));
 
-    // Tab Listeners
     tabManual.onclick = () => switchTab('manual');
     tabBulk.onclick = () => switchTab('bulk');
+
+    // Sorting Listeners
+    document.querySelectorAll('th[data-sort]').forEach(header => {
+        header.addEventListener('click', () => {
+            const sortBy = header.dataset.sort;
+            if (currentSortBy === sortBy) {
+                currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortBy = sortBy;
+                currentSortOrder = 'desc'; // Default to desc for new column
+            }
+            updateSortUI();
+            fetchAndDisplayExams(false, true);
+        });
+    });
+
+    const mobileSortSelector = document.getElementById('mobile-sort-selector');
+    if (mobileSortSelector) {
+        mobileSortSelector.addEventListener('change', (e) => {
+            const [sortBy, sortOrder] = e.target.value.split('-');
+            currentSortBy = sortBy;
+            currentSortOrder = sortOrder;
+            updateSortUI();
+            fetchAndDisplayExams(false, true);
+        });
+    }
+
+    const resetSortBtn = document.getElementById('reset-sort-btn');
+    if (resetSortBtn) {
+        resetSortBtn.addEventListener('click', () => {
+            currentSortBy = 'id';
+            currentSortOrder = 'desc';
+            if (mobileSortSelector) mobileSortSelector.value = 'id-desc';
+            updateSortUI();
+            fetchAndDisplayExams(false, true);
+            showToast('Sorting reset to newest first.', 'success');
+        });
+    }
+
+    function updateSortUI() {
+        document.querySelectorAll('th[data-sort]').forEach(header => {
+            const icon = header.querySelector('.sort-icon');
+            if (header.dataset.sort === currentSortBy) {
+                header.classList.add('text-blue-600');
+                icon.textContent = currentSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward';
+                icon.classList.remove('opacity-20');
+                icon.classList.add('opacity-100');
+            } else {
+                header.classList.remove('text-blue-600');
+                icon.textContent = 'unfold_more';
+                icon.classList.remove('opacity-100');
+                icon.classList.add('opacity-20');
+            }
+        });
+    }
 
     // Bulk Import Listeners
     function handleBulkJSON(json) {

@@ -14,6 +14,49 @@
             transform: translateY(0);
         }
     }
+
+    .content-dimmed {
+        opacity: 0.4;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .loading-progress-container {
+        position: relative;
+        height: 3px;
+        width: 100%;
+        overflow: hidden;
+        background: transparent;
+        z-index: 40;
+    }
+
+    .loading-progress-bar {
+        position: absolute;
+        height: 100%;
+        background: #2563eb;
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+
+    .content-loading .loading-progress-bar {
+        animation: progress-indeterminate 2s infinite linear;
+        width: 30%;
+    }
+
+    @keyframes progress-indeterminate {
+        0% {
+            left: -30%;
+        }
+
+        100% {
+            left: 100%;
+        }
+    }
+
+    .exam-inventory-container {
+        min-height: 400px;
+        transition: opacity 0.3s ease;
+    }
 </style>
 
 <!-- Main Content -->
@@ -82,29 +125,86 @@
     </div>
 
     <!-- Desktop View: Table -->
-    <div class="hidden md:block overflow-x-auto border border-gray-100 rounded-xl mt-6">
-        <table class="min-w-full bg-white">
-            <thead class="bg-gray-50 text-gray-500 uppercase text-[11px] font-black tracking-widest border-b">
-                <tr>
-                    <th class="py-4 px-6 text-left w-10">
-                        <input type="checkbox" id="select-all-exams"
-                            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300">
-                    </th>
-                    <th class="py-4 px-6 text-left">Exam Title</th>
-                    <th class="py-4 px-6 text-left">Hierarchy</th>
-                    <th class="py-4 px-6 text-center">Difficulty</th>
-                    <th class="py-4 px-6 text-center">Duration</th>
-                    <th class="py-4 px-6 text-center">Marks</th>
-                    <th class="py-4 px-6 text-center">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="exams-table-body" class="text-gray-600 text-sm font-medium divide-y divide-gray-50"></tbody>
-        </table>
+    <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+            <h3 class="text-sm font-black text-gray-400 uppercase tracking-widest px-2">Exam Inventory</h3>
+            <button id="reset-sort-btn"
+                class="p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition-all group"
+                title="Reset Sort (Newest First)">
+                <span
+                    class="material-symbols-outlined text-sm group-active:rotate-180 transition-transform duration-500">restart_alt</span>
+            </button>
+        </div>
+        <div class="md:hidden flex items-center gap-2">
+            <span class="text-[10px] font-bold text-gray-400 uppercase">Sort by:</span>
+            <select id="mobile-sort-selector"
+                class="bg-gray-50 border border-gray-200 text-xs rounded-lg px-2 py-1 outline-none">
+                <option value="id-desc">Newest First</option>
+                <option value="title-asc">Title (A-Z)</option>
+                <option value="pass_rate-desc">Hardest (Heatmap)</option>
+                <option="pass_rate-asc">Easiest (Heatmap)</option>
+                    <option value="attempts-desc">Most Attempts</option>
+                    <option value="marks-desc">High Marks</option>
+                    <option value="duration-desc">Long Duration</option>
+            </select>
+        </div>
     </div>
+    <div id="loading-progress" class="loading-progress-container hidden">
+        <div class="loading-progress-bar"></div>
+    </div>
+    <div id="exam-inventory-main" class="exam-inventory-container">
+        <div class="hidden md:block overflow-x-auto border border-gray-100 rounded-xl">
+            <table class="min-w-full bg-white">
+                <thead class="bg-gray-50 text-gray-500 uppercase text-[11px] font-black tracking-widest border-b">
+                    <tr>
+                        <th class="py-4 px-6 text-left w-10">
+                            <input type="checkbox" id="select-all-exams"
+                                class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300">
+                        </th>
+                        <th class="py-4 px-6 text-left cursor-pointer hover:text-blue-600 transition-colors group"
+                            data-sort="title">
+                            <div class="flex items-center gap-1">
+                                Exam Title
+                                <span
+                                    class="sort-icon material-symbols-outlined text-sm opacity-20 group-hover:opacity-100 transition-opacity">unfold_more</span>
+                            </div>
+                        </th>
+                        <th class="py-4 px-6 text-left">Hierarchy</th>
+                        <th class="py-4 px-6 text-center cursor-pointer hover:text-blue-600 transition-colors group"
+                            data-sort="pass_rate">
+                            <div class="flex items-center justify-center gap-1">
+                                Difficulty
+                                <span
+                                    class="sort-icon material-symbols-outlined text-sm opacity-20 group-hover:opacity-100 transition-opacity">unfold_more</span>
+                            </div>
+                        </th>
+                        <th class="py-4 px-6 text-center cursor-pointer hover:text-blue-600 transition-colors group"
+                            data-sort="duration">
+                            <div class="flex items-center justify-center gap-1">
+                                Duration
+                                <span
+                                    class="sort-icon material-symbols-outlined text-sm opacity-20 group-hover:opacity-100 transition-opacity">unfold_more</span>
+                            </div>
+                        </th>
+                        <th class="py-4 px-6 text-center cursor-pointer hover:text-blue-600 transition-colors group"
+                            data-sort="marks">
+                            <div class="flex items-center justify-center gap-1">
+                                Marks
+                                <span
+                                    class="sort-icon material-symbols-outlined text-sm opacity-20 group-hover:opacity-100 transition-opacity">unfold_more</span>
+                            </div>
+                        </th>
+                        <th class="py-4 px-6 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="exams-table-body" class="text-gray-600 text-sm font-medium divide-y divide-gray-50"></tbody>
+            </table>
+        </div>
 
-    <!-- Mobile View: Cards -->
-    <div id="exams-card-view" class="md:hidden grid grid-cols-1 gap-4 mt-6 pb-2">
-        <!-- Cards will be injected here -->
+        <!-- Mobile View: Cards -->
+        <div id="exams-card-view" class="md:hidden space-y-4">
+            <!-- Cards will be injected here -->
+        </div>
     </div>
 
     <!-- Load More Button -->

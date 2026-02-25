@@ -146,9 +146,28 @@ function list_exams($conn) {
                 GROUP BY p.exam_id
             ) perf ON e.id = perf.exam_id
             $where_sql
-            GROUP BY e.id
-            ORDER BY e.id DESC
-            LIMIT ? OFFSET ?";
+            GROUP BY e.id";
+
+    // Dynamic Sorting logic
+    $allowed_sort_columns = [
+        'id' => 'e.id',
+        'title' => 'e.exam_title',
+        'pass_rate' => 'pass_rate',
+        'attempts' => 'total_attempts',
+        'duration' => 'e.duration',
+        'marks' => 'e.total_marks'
+    ];
+    
+    $sort_by = isset($_GET['sort_by']) && isset($allowed_sort_columns[$_GET['sort_by']]) 
+               ? $allowed_sort_columns[$_GET['sort_by']] 
+               : 'e.id';
+               
+    $sort_direction = isset($_GET['sort_direction']) && strtoupper($_GET['sort_direction']) === 'ASC' 
+                      ? 'ASC' 
+                      : 'DESC';
+
+    $sql .= " ORDER BY $sort_by $sort_direction";
+    $sql .= " LIMIT ? OFFSET ?";
     
     $final_params = [];
     $final_types = "";
