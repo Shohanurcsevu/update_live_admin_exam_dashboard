@@ -86,20 +86,41 @@ function initializeTopicPage() {
         } catch (error) { showToast('Failed to load lessons.', 'error'); }
     }
 
-    async function fetchAndDisplayTopics() {
+    let currentPage = 1;
+    const LIMIT = 10;
+
+    // DOM Elements updates
+    const totalTopicsBadge = document.getElementById('total-topics-badge');
+    const loadMoreContainer = document.getElementById('load-more-container');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+
+    async function fetchAndDisplayTopics(append = false) {
+        if (!append) {
+            currentPage = 1;
+            // Only show loading if we are not appending
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="flex items-center justify-center gap-2"><span class="animate-spin material-symbols-outlined text-blue-600">progress_activity</span> Loading topics...</div></td></tr>';
+        }
+
         const subjectId = subjectFilter.value;
         const lessonId = lessonFilter.value;
-        let url = `${TOPIC_API_URL}?action=list`;
+        let url = `${TOPIC_API_URL}?action=list&page=${currentPage}&limit=${LIMIT}`;
         if (subjectId > 0) url += `&subject_id=${subjectId}`;
         if (lessonId > 0) url += `&lesson_id=${lessonId}`;
 
         try {
             const response = await fetch(url);
             const result = await response.json();
-            tableBody.innerHTML = '';
+
+            if (!append) tableBody.innerHTML = '';
+
             if (result.success && result.data.length > 0) {
+                // Update total topics counter
+                if (totalTopicsBadge) {
+                    totalTopicsBadge.textContent = result.total_count;
+                    totalTopicsBadge.classList.remove('hidden');
+                }
+
                 result.data.forEach(topic => {
-                    // --- NEW: Exam progress calculation ---
                     const createdExams = parseInt(topic.created_exams) || 0;
                     const expectedExams = parseInt(topic.expected_exams) || 0;
                     const examsLeft = Math.max(0, expectedExams - createdExams);
@@ -107,8 +128,8 @@ function initializeTopicPage() {
                     const progressBarColor = progressPercent >= 100 ? 'bg-green-600' : 'bg-blue-600';
 
                     const row = `
-                        <tr class="border-b border-gray-200 hover:bg-gray-100">
-                            <td class="py-3 px-6 text-left font-medium">${topic.topic_name}</td>
+                        <tr class="border-b border-gray-200 hover:bg-gray-100 transition-colors">
+                            <td class="py-3 px-6 text-left font-medium text-gray-900">${topic.topic_name}</td>
                             <td class="py-3 px-6 text-left">${topic.lesson_name}</td>
                             <td class="py-3 px-6 text-left">${topic.subject_name}</td>
                             <td class="py-3 px-6 text-center">${topic.start_page} - ${topic.end_page}</td>
@@ -118,25 +139,45 @@ function initializeTopicPage() {
                                         <span>${createdExams} / ${expectedExams}</span>
                                         <span>${progressPercent.toFixed(0)}%</span>
                                     </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="${progressBarColor} h-2.5 rounded-full" style="width: ${progressPercent}%"></div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="${progressBarColor} h-2 rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">${examsLeft} exams left</div>
+                                    <div class="text-[10px] text-gray-500 mt-1 uppercase font-semibold tracking-wider">${examsLeft} exams left</div>
                                 </div>
                             </td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex item-center justify-center">
-                                    <button class="edit-btn w-8 h-8 rounded-full bg-green-200 text-green-700" data-id="${topic.id}"><span class="material-symbols-outlined text-lg">edit</span></button>
-                                    <button class="delete-btn w-8 h-8 rounded-full bg-red-200 text-red-700 ml-2" data-id="${topic.id}"><span class="material-symbols-outlined text-lg">delete</span></button>
+                                <div class="flex item-center justify-center gap-2">
+                                    <button class="edit-btn p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition" data-id="${topic.id}" title="Edit Topic"><span class="material-symbols-outlined text-lg">edit</span></button>
+                                    <button class="delete-btn p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition" data-id="${topic.id}" title="Delete Topic"><span class="material-symbols-outlined text-lg">delete</span></button>
                                 </div>
                             </td>
                         </tr>`;
-                    tableBody.innerHTML += row;
+                    tableBody.insertAdjacentHTML('beforeend', row);
                 });
+
+                // Show/Hide "Load More" button
+                if (loadMoreContainer) {
+                    if (result.page < result.total_pages) {
+                        loadMoreContainer.classList.remove('hidden');
+                    } else {
+                        loadMoreContainer.classList.add('hidden');
+                    }
+                }
             } else {
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">No topics found.</td></tr>`;
+                if (!append) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-gray-500">
+                        <span class="material-symbols-outlined text-5xl mb-2 block text-gray-300">topic</span>
+                        No topics found matching your criteria.
+                    </td></tr>`;
+                    if (totalTopicsBadge) totalTopicsBadge.classList.add('hidden');
+                }
+                if (loadMoreContainer) loadMoreContainer.classList.add('hidden');
             }
-        } catch (error) { showToast('Failed to load topics.', 'error'); }
+        } catch (error) {
+            console.error('Error fetching topics:', error);
+            showToast('Failed to load topics.', 'error');
+            if (!append) tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-red-500 font-medium">Error loading topics. Please try again.</td></tr>`;
+        }
     }
 
     function closeModal(modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
@@ -252,6 +293,13 @@ function initializeTopicPage() {
 
     topicForm.addEventListener('submit', handleFormSubmit);
     tableBody.addEventListener('click', handleTableClick);
+
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', () => {
+            currentPage++;
+            fetchAndDisplayTopics(true);
+        });
+    }
 
     // Filter listeners
     subjectFilter.addEventListener('change', () => {

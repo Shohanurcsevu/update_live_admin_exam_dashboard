@@ -34,13 +34,10 @@ function log_activity($conn, $type, $message) {
 
 function list_lessons($conn) {
     $subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
+    $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+    $offset = ($page - 1) * $limit;
 
-    // --- MODIFIED: Added LEFT JOIN and COUNT to get created_topics ---
-    $sql = "SELECT l.*, s.subject_name, COUNT(t.id) as created_topics 
-            FROM lessons l 
-            JOIN subjects s ON l.subject_id = s.id
-            LEFT JOIN topics t ON l.id = t.lesson_id AND t.is_deleted = 0";
-    
     $where_clauses = ["l.is_deleted = 0"];
     $params = [];
     $types = '';
@@ -50,16 +47,38 @@ function list_lessons($conn) {
         $types .= 'i';
     }
 
+    // --- Get Total Count ---
+    $count_sql = "SELECT COUNT(DISTINCT l.id) as total FROM lessons l";
+    if (!empty($where_clauses)) {
+        $count_sql .= " WHERE " . implode(' AND ', $where_clauses);
+    }
+    $count_stmt = $conn->prepare($count_sql);
+    if (!empty($params)) {
+        $count_stmt->bind_param($types, ...$params);
+    }
+    $count_stmt->execute();
+    $total_count = $count_stmt->get_result()->fetch_assoc()['total'];
+    $count_stmt->close();
+
+    // --- Get Lessons ---
+    $sql = "SELECT l.*, s.subject_name, COUNT(t.id) as created_topics 
+            FROM lessons l 
+            JOIN subjects s ON l.subject_id = s.id
+            LEFT JOIN topics t ON l.id = t.lesson_id AND t.is_deleted = 0";
+    
     if (!empty($where_clauses)) {
         $sql .= " WHERE " . implode(' AND ', $where_clauses);
     }
 
-    $sql .= " GROUP BY l.id ORDER BY l.id ASC";
+    $sql .= " GROUP BY l.id ORDER BY l.id DESC LIMIT ? OFFSET ?";
     
+    $list_params = $params;
+    $list_params[] = $limit;
+    $list_params[] = $offset;
+    $list_types = $types . 'ii';
+
     $stmt = $conn->prepare($sql);
-    if (!empty($params)) {
-        $stmt->bind_param($types, ...$params);
-    }
+    $stmt->bind_param($list_types, ...$list_params);
     
     $stmt->execute();
     $result = $stmt->get_result();
@@ -68,7 +87,14 @@ function list_lessons($conn) {
         $lessons[] = $row;
     }
     
-    echo json_encode(['success' => true, 'data' => $lessons]);
+    echo json_encode([
+        'success' => true, 
+        'data' => $lessons,
+        'total_count' => $total_count,
+        'page' => $page,
+        'limit' => $limit,
+        'total_pages' => ceil($total_count / $limit)
+    ]);
     $stmt->close();
 }
 

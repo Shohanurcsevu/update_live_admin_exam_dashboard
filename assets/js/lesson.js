@@ -62,15 +62,37 @@ function initializeLessonPage() {
         }
     }
 
-    async function fetchAndDisplayLessons(subjectId = 0) {
-        const url = subjectId > 0 ? `${LESSON_API_URL}?action=list&subject_id=${subjectId}` : `${LESSON_API_URL}?action=list`;
+    let currentPage = 1;
+    const LIMIT = 10;
+
+    // DOM Elements updates
+    const totalLessonsBadge = document.getElementById('total-lessons-badge');
+    const loadMoreContainer = document.getElementById('load-more-container');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+
+    async function fetchAndDisplayLessons(subjectId = 0, append = false) {
+        if (!append) {
+            currentPage = 1;
+            // Only show loading if we are not appending
+            lessonsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="flex items-center justify-center gap-2"><span class="animate-spin material-symbols-outlined text-blue-600">progress_activity</span> Loading lessons...</div></td></tr>';
+        }
+
+        const url = `${LESSON_API_URL}?action=list&page=${currentPage}&limit=${LIMIT}` + (subjectId > 0 ? `&subject_id=${subjectId}` : '');
+
         try {
             const response = await fetch(url);
             const result = await response.json();
-            lessonsTableBody.innerHTML = '';
+
+            if (!append) lessonsTableBody.innerHTML = '';
+
             if (result.success && result.data.length > 0) {
+                // Update total lessons counter
+                if (totalLessonsBadge) {
+                    totalLessonsBadge.textContent = result.total_count;
+                    totalLessonsBadge.classList.remove('hidden');
+                }
+
                 result.data.forEach(lesson => {
-                    // --- NEW: Topic progress calculation ---
                     const createdTopics = parseInt(lesson.created_topics) || 0;
                     const expectedTopics = parseInt(lesson.expected_topics) || 0;
                     const topicsLeft = Math.max(0, expectedTopics - createdTopics);
@@ -78,8 +100,8 @@ function initializeLessonPage() {
                     const progressBarColor = progressPercent >= 100 ? 'bg-green-600' : 'bg-blue-600';
 
                     const row = `
-                        <tr class="border-b border-gray-200 hover:bg-gray-100">
-                            <td class="py-3 px-6 text-left whitespace-nowrap font-medium">${lesson.lesson_name}</td>
+                        <tr class="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                            <td class="py-3 px-6 text-left whitespace-nowrap font-medium text-gray-900">${lesson.lesson_name}</td>
                             <td class="py-3 px-6 text-left">${lesson.subject_name}</td>
                             <td class="py-3 px-6 text-center">
                                 <div class="w-full">
@@ -87,28 +109,46 @@ function initializeLessonPage() {
                                         <span>${createdTopics} / ${expectedTopics}</span>
                                         <span>${progressPercent.toFixed(0)}%</span>
                                     </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="${progressBarColor} h-2.5 rounded-full" style="width: ${progressPercent}%"></div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="${progressBarColor} h-2 rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">${topicsLeft} topics left</div>
+                                    <div class="text-[10px] text-gray-500 mt-1 uppercase font-semibold tracking-wider">${topicsLeft} topics left</div>
                                 </div>
                             </td>
-                            <td class="py-3 px-6 text-center">${lesson.start_page} - ${lesson.end_page}</td>
-                            <td class="py-3 px-6 text-center">${lesson.py_bcs_ques}</td>
+                            <td class="py-3 px-6 text-center text-gray-700 font-medium">${lesson.start_page} - ${lesson.end_page}</td>
+                            <td class="py-3 px-6 text-center text-gray-700">${lesson.py_bcs_ques}</td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex item-center justify-center">
-                                    <button class="edit-btn w-8 h-8 rounded-full bg-green-200 text-green-700 hover:bg-green-300 mr-2" data-id="${lesson.id}"><span class="material-symbols-outlined text-lg">edit</span></button>
-                                    <button class="delete-btn w-8 h-8 rounded-full bg-red-200 text-red-700 hover:bg-red-300" data-id="${lesson.id}"><span class="material-symbols-outlined text-lg">delete</span></button>
+                                <div class="flex item-center justify-center gap-2">
+                                    <button class="edit-btn p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition" data-id="${lesson.id}" title="Edit Lesson"><span class="material-symbols-outlined text-lg">edit</span></button>
+                                    <button class="delete-btn p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition" data-id="${lesson.id}" title="Delete Lesson"><span class="material-symbols-outlined text-lg">delete</span></button>
                                 </div>
                             </td>
                         </tr>`;
-                    lessonsTableBody.innerHTML += row;
+                    lessonsTableBody.insertAdjacentHTML('beforeend', row);
                 });
+
+                // Show/Hide "Load More" button
+                if (loadMoreContainer) {
+                    if (result.page < result.total_pages) {
+                        loadMoreContainer.classList.remove('hidden');
+                    } else {
+                        loadMoreContainer.classList.add('hidden');
+                    }
+                }
             } else {
-                lessonsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">No lessons found.</td></tr>`;
+                if (!append) {
+                    lessonsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-gray-500">
+                        <span class="material-symbols-outlined text-5xl mb-2 block text-gray-300">book</span>
+                        No lessons found matching your criteria.
+                    </td></tr>`;
+                    if (totalLessonsBadge) totalLessonsBadge.classList.add('hidden');
+                }
+                if (loadMoreContainer) loadMoreContainer.classList.add('hidden');
             }
         } catch (error) {
+            console.error('Error fetching lessons:', error);
             showToast('Failed to load lessons.', 'error');
+            if (!append) lessonsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-red-500 font-medium">Error loading lessons. Please try again.</td></tr>`;
         }
     }
 
@@ -189,6 +229,13 @@ function initializeLessonPage() {
     createLessonBtn.addEventListener('click', handleCreateClick);
     lessonForm.addEventListener('submit', handleFormSubmit);
     lessonsTableBody.addEventListener('click', handleTableClick);
+
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', () => {
+            currentPage++;
+            fetchAndDisplayLessons(subjectFilter.value, true);
+        });
+    }
     subjectFilter.addEventListener('change', () => {
         localStorage.setItem('filter_lesson_subject', subjectFilter.value);
         fetchAndDisplayLessons(subjectFilter.value);
