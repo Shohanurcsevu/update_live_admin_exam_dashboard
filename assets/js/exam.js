@@ -803,8 +803,8 @@ function initializeExamPage() {
 
                 <div class="mb-4 md:mb-0">
                     <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Exam Title</span>
-                    <div class="font-bold text-slate-800 text-sm leading-tight flex items-center gap-2">
-                        ${section.title}
+                    <div class="flex items-center gap-2">
+                        <input type="text" class="bulk-title-input w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all shadow-sm" value="${section.title}">
                         <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[9px] font-black uppercase whitespace-nowrap shadow-sm">
                             ${section.questions.length} QS
                         </span>
@@ -855,7 +855,8 @@ function initializeExamPage() {
             const lesSel = row.querySelector('.bulk-lesson-select');
             const topSel = row.querySelector('.bulk-topic-select');
 
-            // Populate current selects if data exists
+            const titleInput = row.querySelector('.bulk-title-input');
+
             if (section.target.subject > 0) {
                 populateLessons(section.target.subject, lesSel, section.target.lesson || 0).then(() => {
                     if (section.target.lesson > 0) {
@@ -863,6 +864,13 @@ function initializeExamPage() {
                     }
                 });
             }
+
+            titleInput.oninput = () => {
+                section.title = titleInput.value;
+                // Sync the detail section title without full re-render
+                const detailTitle = document.querySelector(`.detail-exam-title[data-idx="${i}"]`);
+                if (detailTitle) detailTitle.textContent = titleInput.value;
+            };
 
             subSel.onchange = () => {
                 section.target.subject = subSel.value;
@@ -916,7 +924,7 @@ function initializeExamPage() {
                         <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black">
                             ${i + 1}
                         </div>
-                        <h3 class="text-xl font-black text-slate-800">${section.title}</h3>
+                        <h3 class="detail-exam-title text-xl font-black text-slate-800 outline-none focus:text-blue-600 transition-colors" contenteditable="true" data-idx="${i}">${section.title}</h3>
                     </div>
                 </div>
                 <div class="p-6 space-y-4">
@@ -969,6 +977,15 @@ function initializeExamPage() {
             }).join('')}
                 </div>
             `;
+
+            const detailTitle = sectionEl.querySelector('.detail-exam-title');
+            detailTitle.onblur = () => {
+                section.title = detailTitle.textContent.trim();
+                // Sync the table input without full re-render
+                const tableInput = document.querySelectorAll('.bulk-title-input')[i];
+                if (tableInput) tableInput.value = detailTitle.textContent.trim();
+            };
+
             sectionsContainer.appendChild(sectionEl);
         });
 
