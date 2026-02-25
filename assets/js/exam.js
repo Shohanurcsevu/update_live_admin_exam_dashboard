@@ -805,7 +805,7 @@ function initializeExamPage() {
                     <span class="md:hidden block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Exam Title</span>
                     <div class="flex items-center gap-2">
                         <input type="text" class="bulk-title-input w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-blue-300 transition-all shadow-sm" value="${section.title}">
-                        <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[9px] font-black uppercase whitespace-nowrap shadow-sm">
+                        <span class="px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-[9px] font-black uppercase whitespace-nowrap shadow-sm">
                             ${section.questions.length} QS
                         </span>
                     </div>
@@ -953,7 +953,7 @@ function initializeExamPage() {
                                         <p contenteditable="true" class="edit-field font-bold text-slate-800 text-sm mb-4 outline-none focus:text-blue-600 transition-colors" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="question">${q.question}</p>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-4">
                                             ${['A', 'B', 'C', 'D'].map(opt => `
-                                                <div class="flex items-center gap-3 p-1 rounded-lg border border-transparent hover:border-slate-100 focus-within:border-blue-100 transition-all">
+                                                <div class="flex items-center gap-3 p-1 rounded-lg border ${q.answer === opt ? 'bg-emerald-50 border-emerald-100' : 'border-transparent'} hover:border-slate-100 focus-within:border-blue-100 transition-all">
                                                     <span class="${q.answer === opt ? 'text-emerald-600 font-black' : 'text-slate-400 font-bold'}">${opt}:</span>
                                                     <span contenteditable="true" class="edit-field flex-1 outline-none text-slate-600 ${q.answer === opt ? 'font-medium' : ''}" data-sec-idx="${i}" data-q-idx="${qIdx}" data-field="options" data-opt="${opt}">${q.options[opt]}</span>
                                                 </div>
