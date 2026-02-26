@@ -95,9 +95,9 @@ if ($file['error'] !== UPLOAD_ERR_OK) {
     respond(false, 'File upload error code: ' . $file['error']);
 }
 
-// Max 50 MB
-if ($file['size'] > 50 * 1024 * 1024) {
-    respond(false, 'Backup file is too large (max 50 MB).');
+// Max 100 MB
+if ($file['size'] > 100 * 1024 * 1024) {
+    respond(false, 'Backup file is too large (max 100 MB).');
 }
 
 $raw = file_get_contents($file['tmp_name']);

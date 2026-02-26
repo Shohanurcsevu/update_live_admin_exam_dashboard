@@ -405,38 +405,6 @@
 
     // ─── Toast ────────────────────────────────────────────────────────────────────
 
-    function showToast(message, type = 'info') {
-        const toastContainer = document.getElementById('toast-container')
-            || (() => {
-                const el = document.createElement('div');
-                el.id = 'toast-container';
-                el.className = 'fixed bottom-5 right-5 z-[500] pointer-events-none space-y-2';
-                document.body.appendChild(el);
-                return el;
-            })();
-
-        const colors = {
-            success: 'bg-emerald-600 text-white',
-            error: 'bg-red-600 text-white',
-            warning: 'bg-amber-500 text-white',
-            info: 'bg-gray-800 text-white',
-        };
-        const icons = { success: 'check_circle', error: 'error', warning: 'warning', info: 'info' };
-
-        const toast = document.createElement('div');
-        toast.className = `flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-bold pointer-events-auto max-w-xs transition-all duration-300 opacity-0 translate-y-2 ${colors[type] || colors.info}`;
-        toast.innerHTML = `<span class="material-symbols-outlined text-base">${icons[type] || 'info'}</span><span>${message}</span>`;
-        toastContainer.appendChild(toast);
-
-        requestAnimationFrame(() => {
-            toast.classList.remove('opacity-0', 'translate-y-2');
-        });
-
-        setTimeout(() => {
-            toast.classList.add('opacity-0', 'translate-y-2');
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
 
     // ─── Auto-Backup UI ───────────────────────────────────────────────────────
 
@@ -682,11 +650,9 @@
             if (result.success) {
                 setProgress(100, result.usedFallback ? 'Downloaded to browser ✓' : 'Saved to cloud folder ✓');
                 progressBar.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
-                showToast(result.usedFallback ? 'Backup downloaded to Downloads folder ✓' : 'Auto-backup saved to cloud folder ✓', 'success');
             } else {
                 setProgress(100, 'Backup failed: ' + result.message);
                 progressBar.style.background = 'linear-gradient(to right, #ef4444, #dc2626)';
-                showToast('Backup failed: ' + result.message, 'error');
             }
 
             setTimeout(hideProgress, 3000);
@@ -698,15 +664,18 @@
             runNowBtn.innerHTML = '<span class="material-symbols-outlined text-sm">backup</span> Run Backup Now';
         });
 
-        // Listen for background auto-backup events
-        window.addEventListener('autoBackupComplete', async (e) => {
-            const result = e.detail;
-            if (result.success) {
-                showToast(result.usedFallback ? 'Auto-backup downloaded ✓' : 'Auto-backup saved to cloud ✓', 'success');
-            }
-            applySettingsToUI(abm.getSettings());
-            await renderHistory();
-        });
+        // Listen for background auto-backup events to refresh UI only
+        // Named function to allow removal if needed, though with SPA navigation it might still accumulate
+        // Best approach: check if we already initialized or use a flag.
+        if (!window._backupUIListenerAdded) {
+            window.addEventListener('autoBackupComplete', async (e) => {
+                const result = e.detail;
+                // Toast is handled by main.js globally
+                applySettingsToUI(abm.getSettings());
+                await renderHistory();
+            });
+            window._backupUIListenerAdded = true;
+        }
 
         // ── Initial render ────────────────────────────────────────────────────
         applySettingsToUI(abm.getSettings());

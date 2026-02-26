@@ -190,6 +190,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     window.loadPage = loadPage;
 
+    // --- Global Toast Notification System ---
+    window.showToast = function (message, type = 'info') {
+        const toastContainer = document.getElementById('toast-container')
+            || (() => {
+                const el = document.createElement('div');
+                el.id = 'toast-container';
+                el.className = 'fixed bottom-5 right-5 z-[500] pointer-events-none space-y-2';
+                document.body.appendChild(el);
+                return el;
+            })();
+
+        const colors = {
+            success: 'bg-emerald-600 text-white',
+            error: 'bg-red-600 text-white',
+            warning: 'bg-amber-500 text-white',
+            info: 'bg-gray-800 text-white',
+        };
+        const icons = { success: 'check_circle', error: 'error', warning: 'warning', info: 'info' };
+
+        const toast = document.createElement('div');
+        toast.className = `flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-bold pointer-events-auto max-w-xs transition-all duration-300 opacity-0 translate-y-2 ${colors[type] || colors.info}`;
+        toast.innerHTML = `<span class="material-symbols-outlined text-base">${icons[type] || 'info'}</span><span>${message}</span>`;
+        toastContainer.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.remove('opacity-0', 'translate-y-2');
+        });
+
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    };
+
+    // Listen for background auto-backup events globally
+    window.addEventListener('autoBackupComplete', (e) => {
+        const result = e.detail;
+        if (result.success && !result.folderRestored) { // Don't show toast for silent folder restoration
+            window.showToast(result.usedFallback ? 'Auto-backup downloaded ✓' : 'Auto-backup saved to cloud ✓', 'success');
+        } else if (!result.success && result.message) {
+            window.showToast('Backup failed: ' + result.message, 'error');
+        }
+    });
+
     // --- Global: one-click re-auth if folder permission needs a user gesture ---
     window.addEventListener('autoBackupNeedsFolderAuth', (e) => {
         const { handle, folderName } = e.detail;
