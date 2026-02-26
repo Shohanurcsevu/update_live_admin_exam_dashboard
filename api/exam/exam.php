@@ -140,9 +140,11 @@ function list_exams($conn) {
                     p.exam_id, 
                     COUNT(*) as total_attempts,
                     SUM(CASE WHEN p.score_with_negative >= e2.pass_mark THEN 1 ELSE 0 END) as pass_count,
-                    (SUM(CASE WHEN p.score_with_negative >= e2.pass_mark THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as pass_rate
+                    (SUM(CASE WHEN p.score_with_negative >= e2.pass_mark THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as pass_rate,
+                    AVG(p.score_with_negative) as avg_score
                 FROM performance p
                 JOIN exams e2 ON p.exam_id = e2.id
+                WHERE p.id IN (SELECT MAX(id) FROM performance GROUP BY exam_id)
                 GROUP BY p.exam_id
             ) perf ON e.id = perf.exam_id
             $where_sql

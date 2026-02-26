@@ -279,19 +279,31 @@ function initializeExamPage() {
         return text.replace(regex, '<mark class="bg-yellow-100 text-yellow-900 font-bold px-0.5 rounded">$1</mark>');
     }
 
-    function getDifficultyBadge(passRate, totalAttempts) {
+    function getDifficultyBadge(passRate, totalAttempts, avgScore) {
         if (!totalAttempts || totalAttempts == 0) return `<span class="bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-gray-100">No Data</span>`;
 
         let colorClass = "";
         let text = "";
-        if (passRate >= 80) { colorClass = "bg-emerald-50 text-emerald-600 border-emerald-100"; text = "Easy"; }
-        else if (passRate >= 50) { colorClass = "bg-amber-50 text-amber-600 border-amber-100"; text = "Medium"; }
-        else { colorClass = "bg-rose-50 text-rose-600 border-rose-100"; text = "Hard"; }
+        const rate = parseFloat(passRate);
 
-        return `<span class="${colorClass} px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-1 w-fit shadow-xs cursor-help" 
-                    title="Pass Rate: ${parseFloat(passRate).toFixed(1)}% (${totalAttempts} attempts)">
-                    <span class="w-1.5 h-1.5 rounded-full ${colorClass.replace('bg-', 'bg-').split(' ')[1]}"></span>
-                    ${text}
+        if (rate >= 95) { colorClass = "bg-blue-50 text-blue-600 border-blue-100"; text = "Ace"; }
+        else if (rate >= 80) { colorClass = "bg-emerald-50 text-emerald-600 border-emerald-100"; text = "Easy"; }
+        else if (rate >= 50) { colorClass = "bg-amber-50 text-amber-600 border-amber-100"; text = "Regular"; }
+        else if (rate >= 20) { colorClass = "bg-orange-50 text-orange-600 border-orange-100"; text = "Challenge"; }
+        else { colorClass = "bg-rose-50 text-rose-600 border-rose-100"; text = "Elite"; }
+
+        const avgScoreText = avgScore !== null && avgScore !== undefined ? `Avg Score: ${parseFloat(avgScore).toFixed(1)}` : 'No score data';
+
+        return `<span class="${colorClass} px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-tight border flex items-center gap-1.5 w-fit shadow-xs cursor-help transition-all hover:brightness-95" 
+                    title="Pass Rate: ${rate.toFixed(1)}% | Attempts: ${totalAttempts} | ${avgScoreText}">
+                    <span class="w-1.5 h-1.5 rounded-full ${colorClass.split(' ')[1].replace('text-', 'bg-')} animate-pulse"></span>
+                    <span class="flex items-center gap-1">
+                        ${text} 
+                        <span class="opacity-20 font-light">|</span> 
+                        ${Math.round(rate)}% 
+                        <span class="opacity-20 font-light">|</span> 
+                        ${totalAttempts}<span class="text-[8px] opacity-60 lowercase">att</span>
+                    </span>
                 </span>`;
     }
 
@@ -389,7 +401,7 @@ function initializeExamPage() {
                                 </div>
                             </td>
                             <td class="py-4 px-6 text-center">
-                                <div class="flex justify-center">${getDifficultyBadge(exam.pass_rate, exam.total_attempts)}</div>
+                                <div class="flex justify-center">${getDifficultyBadge(exam.pass_rate, exam.total_attempts, exam.avg_score)}</div>
                             </td>
                             <td class="py-4 px-6 text-center">
                                 <span class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-black tracking-tight">${exam.duration}m</span>
@@ -451,7 +463,7 @@ function initializeExamPage() {
                                         <span class="material-symbols-outlined text-sm">military_tech</span>
                                         ${exam.total_marks}M
                                     </span>
-                                    ${getDifficultyBadge(exam.pass_rate, exam.total_attempts)}
+                                    ${getDifficultyBadge(exam.pass_rate, exam.total_attempts, exam.avg_score)}
                                 </div>
                                 <div class="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-gray-100">
                                     <button class="quick-look-btn bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" data-title="${exam.exam_title}" title="Quick Look">
