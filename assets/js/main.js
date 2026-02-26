@@ -128,7 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'question-analysis': 'assets/js/question-analysis.js',
             'revision-planner': 'assets/js/revision-planner.js',
             'study-materials': 'assets/js/study-materials.js',
-            'question-creator': 'assets/js/question-creator.js'
+            'question-creator': 'assets/js/question-creator.js',
+            'backup-restore': 'assets/js/backup-restore.js'
         };
 
 
