@@ -438,7 +438,292 @@
         }, 4000);
     }
 
-    // ─── Start ────────────────────────────────────────────────────────────────────
+    // ─── Auto-Backup UI ───────────────────────────────────────────────────────
+
+    function initAutoBackupUI() {
+        if (!window.autoBackupManager) return; // manager not loaded
+
+        const abm = window.autoBackupManager;
+
+        // DOM refs
+        const toggleEl = document.getElementById('ab-enabled-toggle');
+        const intervalSel = document.getElementById('ab-interval-select');
+        const pickBtn = document.getElementById('ab-pick-folder-btn');
+        const folderNameEl = document.getElementById('ab-folder-name');
+        const noFsaWarn = document.getElementById('ab-no-fsa-warning');
+        const folderTip = document.getElementById('ab-folder-tip');
+        const runNowBtn = document.getElementById('ab-run-now-btn');
+        const progressEl = document.getElementById('ab-progress');
+        const progressBar = document.getElementById('ab-progress-bar');
+        const progressTxt = document.getElementById('ab-progress-text');
+        const progressPct = document.getElementById('ab-progress-pct');
+        const lastRunEl = document.getElementById('ab-last-run');
+        const nextRunEl = document.getElementById('ab-next-run');
+        const runCountEl = document.getElementById('ab-run-count');
+        const historyList = document.getElementById('ab-history-list');
+
+        if (!toggleEl) return; // page not loaded
+
+        let nextRunTimer = null;
+        let nextRunTarget = null; // Date object for next run
+
+        // ── Helpers ────────────────────────────────────────────────────────────
+
+        function fmtTime(isoStr) {
+            if (!isoStr) return 'Never';
+            const d = new Date(isoStr);
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
+                ' · ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+
+        function fmtSize(bytes) {
+            if (!bytes) return '—';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        }
+
+        function fmtCountdown(ms) {
+            if (ms <= 0) return 'now';
+            const s = Math.floor(ms / 1000);
+            const m = Math.floor(s / 60);
+            const h = Math.floor(m / 60);
+            if (h > 0) return `in ${h}h ${m % 60}m`;
+            if (m > 0) return `in ${m}m ${s % 60}s`;
+            return `in ${s}s`;
+        }
+
+        // ── Apply settings to UI ──────────────────────────────────────────────
+
+        function applySettingsToUI(settings) {
+            toggleEl.checked = !!settings.enabled;
+            // Interval select
+            const opt = intervalSel.querySelector(`option[value="${settings.intervalMs}"]`);
+            if (opt) opt.selected = true;
+            // Folder name
+            if (settings.folderName) {
+                folderNameEl.textContent = '📁 ' + settings.folderName;
+                folderTip.classList.add('hidden');
+            } else {
+                folderNameEl.textContent = 'Choose folder…';
+                folderTip.classList.remove('hidden');
+            }
+            // FSA warning
+            if (!abm.supportsFileSystemAccess()) {
+                noFsaWarn.classList.remove('hidden');
+                pickBtn.disabled = false; // still clickable for UX
+            }
+            // Stats
+            lastRunEl.textContent = fmtTime(settings.lastRunAt);
+            runCountEl.textContent = settings.runCount || 0;
+            // Countdown
+            updateCountdown(settings);
+        }
+
+        function updateCountdown(settings) {
+            clearInterval(nextRunTimer);
+            nextRunTarget = null;
+            if (!settings.enabled || !settings.lastRunAt) {
+                nextRunEl.textContent = settings.enabled ? 'Starting soon…' : '—';
+                return;
+            }
+            nextRunTarget = new Date(new Date(settings.lastRunAt).getTime() + settings.intervalMs);
+            nextRunTimer = setInterval(() => {
+                const remaining = nextRunTarget - Date.now();
+                nextRunEl.textContent = fmtCountdown(remaining);
+                if (remaining <= 0) clearInterval(nextRunTimer);
+            }, 1000);
+            nextRunEl.textContent = fmtCountdown(nextRunTarget - Date.now());
+        }
+
+        // ── Progress bar helpers ───────────────────────────────────────────────
+
+        function setProgress(pct, text) {
+            progressBar.style.width = pct + '%';
+            progressTxt.textContent = text;
+            progressPct.textContent = pct + '%';
+        }
+
+        function showProgress() {
+            progressEl.classList.remove('hidden');
+            progressBar.style.background = '';
+            setProgress(0, 'Fetching data…');
+        }
+
+        function hideProgress() {
+            progressEl.classList.add('hidden');
+        }
+
+        // ── History rendering ─────────────────────────────────────────────────
+
+        async function renderHistory() {
+            const items = await abm.getHistory();
+            if (!items || items.length === 0) {
+                historyList.innerHTML = '<p class="text-xs text-gray-400 italic">No snapshots yet. Run your first backup above.</p>';
+                return;
+            }
+            historyList.innerHTML = items.map((item, idx) => {
+                const ago = fmtTime(item.savedAt);
+                const size = fmtSize(item.sizeBytes);
+                const records = item.recordCount ? `${item.recordCount} records` : '';
+                const cloudBadge = item.folderUsed
+                    ? '<span class="text-[9px] font-bold bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded uppercase tracking-wider">☁ Cloud</span>'
+                    : '<span class="text-[9px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded uppercase tracking-wider">Local</span>';
+                return `
+                <div class="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3 hover:border-violet-200 transition-colors group">
+                    <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-violet-500 text-base">data_object</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <p class="text-xs font-bold text-gray-700 truncate">${idx === 0 ? '⭐ Latest · ' : ''}${ago}</p>
+                            ${cloudBadge}
+                        </div>
+                        <p class="text-[10px] text-gray-400 font-medium">${size}${records ? ' · ' + records : ''}</p>
+                    </div>
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <button data-id="${item.id}" data-action="download"
+                            class="ab-history-btn p-1.5 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors" title="Download this snapshot">
+                            <span class="material-symbols-outlined text-base">download</span>
+                        </button>
+                        <button data-id="${item.id}" data-action="restore"
+                            class="ab-history-btn p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors" title="Restore from this snapshot">
+                            <span class="material-symbols-outlined text-base">restore</span>
+                        </button>
+                        <button data-id="${item.id}" data-action="delete"
+                            class="ab-history-btn p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Delete this snapshot">
+                            <span class="material-symbols-outlined text-base">delete</span>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Wire per-row buttons
+            historyList.querySelectorAll('.ab-history-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = parseInt(btn.dataset.id, 10);
+                    const action = btn.dataset.action;
+                    if (action === 'delete') {
+                        await abm.deleteHistory(id);
+                        await renderHistory();
+                        showToast('Snapshot deleted.', 'info');
+                    } else if (action === 'download') {
+                        const blob = await abm.restoreFromHistory(id);
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `rethink-snapshot-${id}.json`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        showToast('Snapshot downloaded.', 'success');
+                    } else if (action === 'restore') {
+                        // Reuse existing import flow via selectedFile trick
+                        const blob = await abm.restoreFromHistory(id);
+                        const file = new File([blob], `rethink-snapshot-${id}.json`, { type: 'application/json' });
+                        setFile(file); // sets selectedFile & enables Import button
+                        // Scroll to import section
+                        document.getElementById('br-dropzone')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        showToast('Snapshot loaded. Review conflict mode then click Import Backup.', 'info');
+                    }
+                });
+            });
+        }
+
+        // ── Bind controls ──────────────────────────────────────────────────────
+
+        // Toggle
+        toggleEl.addEventListener('change', () => {
+            abm.saveSettings({ enabled: toggleEl.checked });
+            applySettingsToUI(abm.getSettings());
+            showToast(toggleEl.checked ? 'Auto-backup enabled ✓' : 'Auto-backup disabled.', toggleEl.checked ? 'success' : 'info');
+        });
+
+        // Interval
+        intervalSel.addEventListener('change', () => {
+            abm.saveSettings({ intervalMs: parseInt(intervalSel.value, 10) });
+            applySettingsToUI(abm.getSettings());
+        });
+
+        // Folder picker
+        pickBtn.addEventListener('click', async () => {
+            if (!abm.supportsFileSystemAccess()) {
+                showToast('Folder picker not supported. Backups will download to your Downloads folder.', 'warning');
+                return;
+            }
+            pickBtn.disabled = true;
+            const result = await abm.pickFolder();
+            pickBtn.disabled = false;
+            if (result.success) {
+                folderNameEl.textContent = '📁 ' + result.folderName;
+                folderTip.classList.add('hidden');
+                showToast(`Folder selected: ${result.folderName} ✓`, 'success');
+            } else if (result.error !== 'Cancelled.') {
+                showToast('Could not access folder: ' + result.error, 'error');
+            }
+        });
+
+        // Run Now
+        runNowBtn.addEventListener('click', async () => {
+            runNowBtn.disabled = true;
+            runNowBtn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">sync</span> Backing up…';
+            showProgress();
+            setProgress(10, 'Fetching data…');
+
+            // Fake incremental progress while awaiting
+            let pct = 10;
+            const ticker = setInterval(() => {
+                pct = Math.min(pct + 15, 85);
+                setProgress(pct, pct < 50 ? 'Querying database…' : 'Writing file…');
+            }, 400);
+
+            const result = await abm.runBackupNow();
+
+            clearInterval(ticker);
+            if (result.success) {
+                setProgress(100, result.usedFallback ? 'Downloaded to browser ✓' : 'Saved to cloud folder ✓');
+                progressBar.style.background = 'linear-gradient(to right, #7c3aed, #9333ea)';
+                showToast(result.usedFallback ? 'Backup downloaded to Downloads folder ✓' : 'Auto-backup saved to cloud folder ✓', 'success');
+            } else {
+                setProgress(100, 'Backup failed: ' + result.message);
+                progressBar.style.background = 'linear-gradient(to right, #ef4444, #dc2626)';
+                showToast('Backup failed: ' + result.message, 'error');
+            }
+
+            setTimeout(hideProgress, 3000);
+
+            applySettingsToUI(abm.getSettings());
+            await renderHistory();
+
+            runNowBtn.disabled = false;
+            runNowBtn.innerHTML = '<span class="material-symbols-outlined text-sm">backup</span> Run Backup Now';
+        });
+
+        // Listen for background auto-backup events
+        window.addEventListener('autoBackupComplete', async (e) => {
+            const result = e.detail;
+            if (result.success) {
+                showToast(result.usedFallback ? 'Auto-backup downloaded ✓' : 'Auto-backup saved to cloud ✓', 'success');
+            }
+            applySettingsToUI(abm.getSettings());
+            await renderHistory();
+        });
+
+        // ── Initial render ────────────────────────────────────────────────────
+        applySettingsToUI(abm.getSettings());
+        renderHistory();
+    }
+
+    // ─── Start ────────────────────────────────────────────────────────────────
+
+    function init() {
+        renderTableList();
+        fetchRecordStats();
+        bindExport();
+        bindImport();
+        bindModal();
+        bindDragDrop();
+        initAutoBackupUI();
+    }
 
     init();
 

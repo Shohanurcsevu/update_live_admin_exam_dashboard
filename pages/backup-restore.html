@@ -195,6 +195,129 @@
         </div>
     </div>
 
+    <!-- === AUTO-BACKUP CARD === -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <!-- Card Header -->
+        <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-violet-50/60 to-purple-50/40 flex items-center gap-4">
+            <div class="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow">
+                <span class="material-symbols-outlined">cloud_sync</span>
+            </div>
+            <div class="flex-1">
+                <h2 class="text-base font-bold text-gray-800">Auto-Backup</h2>
+                <p class="text-xs text-gray-500">Silently overwrites <code class="text-violet-600">rethink-latest-backup.json</code> in your cloud folder.</p>
+            </div>
+            <!-- Enable Toggle -->
+            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Enable / disable auto-backup">
+                <input type="checkbox" id="ab-enabled-toggle" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
+            </label>
+        </div>
+
+        <div class="p-6 space-y-5">
+
+            <!-- Status Row -->
+            <div class="flex flex-wrap gap-3">
+                <!-- Last Run -->
+                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[160px]">
+                    <span class="material-symbols-outlined text-violet-400 text-base">history</span>
+                    <div>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Last Backup</p>
+                        <p id="ab-last-run" class="text-xs font-bold text-gray-700">Never</p>
+                    </div>
+                </div>
+                <!-- Next Run -->
+                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[160px]">
+                    <span class="material-symbols-outlined text-violet-400 text-base">schedule</span>
+                    <div>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Next Backup</p>
+                        <p id="ab-next-run" class="text-xs font-bold text-gray-700">—</p>
+                    </div>
+                </div>
+                <!-- Run Count -->
+                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[120px]">
+                    <span class="material-symbols-outlined text-violet-400 text-base">check_circle</span>
+                    <div>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Runs</p>
+                        <p id="ab-run-count" class="text-xs font-bold text-gray-700">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Interval -->
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Backup Interval</p>
+                    <select id="ab-interval-select"
+                        class="w-full text-sm font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer">
+                        <option value="900000">Every 15 minutes</option>
+                        <option value="1800000" selected>Every 30 minutes</option>
+                        <option value="3600000">Every 1 hour</option>
+                        <option value="10800000">Every 3 hours</option>
+                    </select>
+                </div>
+
+                <!-- Folder Picker -->
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Backup Folder</p>
+                    <button id="ab-pick-folder-btn"
+                        class="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-violet-50 border border-gray-200 hover:border-violet-400 rounded-xl text-sm font-bold text-gray-600 hover:text-violet-700 transition-all duration-200">
+                        <span class="material-symbols-outlined text-base text-violet-400">folder_open</span>
+                        <span id="ab-folder-name" class="truncate flex-1 text-left">Choose folder…</span>
+                        <span class="material-symbols-outlined text-xs text-gray-400">chevron_right</span>
+                    </button>
+                    <p id="ab-no-fsa-warning" class="hidden mt-1.5 text-[10px] text-amber-600 font-semibold">
+                        ⚠ Your browser doesn't support silent folder writes. Each backup triggers a download instead.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Cloud folder tip -->
+            <div id="ab-folder-tip" class="hidden bg-violet-50 border border-violet-100 rounded-xl p-4 flex gap-3">
+                <span class="material-symbols-outlined text-violet-400 text-lg flex-shrink-0 mt-0.5">tips_and_updates</span>
+                <div class="text-xs text-violet-700 space-y-0.5">
+                    <p class="font-bold">For crash protection, choose a cloud-synced folder:</p>
+                    <p class="text-violet-600">📁 <strong>OneDrive</strong> — <code>C:\Users\YourName\OneDrive\</code></p>
+                    <p class="text-violet-600">📁 <strong>Google Drive</strong> — <code>G:\My Drive\</code></p>
+                    <p class="text-violet-600">📁 <strong>Dropbox</strong> — <code>C:\Users\YourName\Dropbox\</code></p>
+                    <p class="mt-1 text-violet-500">Each auto-backup <strong>replaces</strong> the previous file — only one file ever exists in your folder.</p>
+                </div>
+            </div>
+
+            <!-- Run Now + in-progress -->
+            <div class="flex flex-wrap items-center gap-3">
+                <button id="ab-run-now-btn"
+                    class="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm shadow-lg shadow-violet-100 transition-all duration-200">
+                    <span class="material-symbols-outlined text-sm">backup</span>
+                    Run Backup Now
+                </button>
+                <div id="ab-progress" class="hidden flex-1 min-w-[180px] space-y-1">
+                    <div class="flex justify-between text-[10px] font-bold text-gray-400">
+                        <span id="ab-progress-text">Fetching data…</span>
+                        <span id="ab-progress-pct">0%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div id="ab-progress-bar"
+                            class="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-500"
+                            style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History List -->
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Recent Snapshots
+                    <span class="text-gray-300 font-medium normal-case tracking-normal">(stored locally — last 5)</span>
+                </p>
+                <div id="ab-history-list" class="space-y-2">
+                    <!-- Populated by JS -->
+                    <p class="text-xs text-gray-400 italic">No snapshots yet. Run your first backup above.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
     <!-- === INFO FOOTER === -->
     <div class="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex gap-4">
         <span class="material-symbols-outlined text-blue-400 text-xl flex-shrink-0 mt-0.5">info</span>

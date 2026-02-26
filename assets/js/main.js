@@ -1,6 +1,6 @@
 let loadPage;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const mainContent = document.getElementById('main-content');
     const headerContainer = document.getElementById('header-container');
     const sidebarContainer = document.getElementById('sidebar-container');
@@ -190,6 +190,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.loadPage = loadPage;
 
+    // --- Global: one-click re-auth if folder permission needs a user gesture ---
+    window.addEventListener('autoBackupNeedsFolderAuth', (e) => {
+        const { handle, folderName } = e.detail;
+        // Show a small sticky toast button anywhere in the app
+        const existing = document.getElementById('ab-reauth-toast');
+        if (existing) return; // already shown
+
+        const toast = document.createElement('div');
+        toast.id = 'ab-reauth-toast';
+        toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;' +
+            'background:#4f46e5;color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;' +
+            'display:flex;align-items:center;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,.25);cursor:pointer;';
+        toast.innerHTML = '<span style="font-size:18px">📁</span> Tap to re-authorize backup folder: <b>' + folderName + '</b>';
+        toast.addEventListener('click', async () => {
+            try {
+                const perm = await handle.requestPermission({ mode: 'readwrite' });
+                if (perm === 'granted') {
+                    window.autoBackupManager._restoreHandleFromEvent(handle);
+                    toast.innerHTML = '✅ Backup folder re-authorized!';
+                    setTimeout(() => toast.remove(), 2000);
+                }
+            } catch (_) { toast.remove(); }
+        });
+        document.body.appendChild(toast);
+    });
+
     // --- Service Worker Registration ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -199,50 +225,64 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const initDashboard = async () => {
-        await Promise.all([
-            loadComponent('components/header.html', headerContainer),
-            loadComponent('components/sidebar.html', sidebarContainer)
-        ]);
-        if (typeof initSidebarToggle === 'function') initSidebarToggle();
+    // --- Load Auto-Backup Manager (await so it's guaranteed ready) ---
+    const loadGlobalScript = (src) => new Promise((resolve) => {
+        if (document.querySelector(`script[data-global-src="${src}"]`)) { resolve(); return; }
+        const s = document.createElement('script');
+        s.src = src;
+        s.dataset.globalSrc = src;
+        s.onload = resolve;
+        s.onerror = resolve; // fail silently
+        document.head.appendChild(s);
+    });
 
-        // --- FIX: The function to start the notification system is now being called. ---
-        initializeNotifications();
+    await loadGlobalScript('assets/js/auto-backup-manager.js');
 
-        // Initialize Streak Manager
-        if (typeof streakManager !== 'undefined') {
-            streakManager.init();
+    // Initialize Auto-Backup Manager (script is guaranteed loaded now)
+    if (typeof window.autoBackupManager !== 'undefined') {
+        window.autoBackupManager.initAutoBackup();
+    }
+
+    await Promise.all([
+        loadComponent('components/header.html', headerContainer),
+        loadComponent('components/sidebar.html', sidebarContainer)
+    ]);
+    if (typeof initSidebarToggle === 'function') initSidebarToggle();
+
+    // Start notification polling
+    initializeNotifications();
+
+    // Initialize Streak Manager
+    if (typeof streakManager !== 'undefined') {
+        streakManager.init();
+    }
+
+    // Initialize Auto-Sync
+    if (typeof syncManager !== 'undefined') {
+        syncManager.initAutoSync();
+    }
+
+    const initialParams = new URLSearchParams(window.location.search);
+    const initialPage = initialParams.get('page') || 'dashboard';
+    initialParams.delete('page');
+    await loadPage(initialPage, '?' + initialParams.toString());
+
+    sidebarContainer.addEventListener('click', (e) => {
+        const navLink = e.target.closest('.nav-link');
+        if (navLink && navLink.dataset.page) {
+            e.preventDefault();
+            loadPage(navLink.dataset.page);
         }
+    });
 
-        // Initialize Auto-Sync
-        if (typeof syncManager !== 'undefined') {
-            syncManager.initAutoSync();
+    window.onpopstate = (event) => {
+        if (event.state) {
+            loadPage(event.state.page, event.state.params);
+        } else {
+            const fallbackParams = new URLSearchParams(window.location.search);
+            const fallbackPage = fallbackParams.get('page') || 'dashboard';
+            fallbackParams.delete('page');
+            loadPage(fallbackPage, '?' + fallbackParams.toString());
         }
-
-        const initialParams = new URLSearchParams(window.location.search);
-        const initialPage = initialParams.get('page') || 'dashboard';
-        initialParams.delete('page');
-        await loadPage(initialPage, '?' + initialParams.toString());
-
-        sidebarContainer.addEventListener('click', (e) => {
-            const navLink = e.target.closest('.nav-link');
-            if (navLink && navLink.dataset.page) {
-                e.preventDefault();
-                loadPage(navLink.dataset.page);
-            }
-        });
-
-        window.onpopstate = (event) => {
-            if (event.state) {
-                loadPage(event.state.page, event.state.params);
-            } else {
-                const fallbackParams = new URLSearchParams(window.location.search);
-                const fallbackPage = fallbackParams.get('page') || 'dashboard';
-                fallbackParams.delete('page');
-                loadPage(fallbackPage, '?' + fallbackParams.toString());
-            }
-        };
     };
-
-    initDashboard();
 });
