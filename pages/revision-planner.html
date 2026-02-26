@@ -115,5 +115,141 @@
                 <p>Analyzing your performance...</p>
             </div>
         </div>
+
+        <!-- Pagination -->
+        <div id="load-more-container" class="hidden p-6 bg-gray-50 border-t border-gray-100 text-center">
+            <button id="load-more-btn"
+                class="inline-flex items-center gap-2 px-8 py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95">
+                <span class="material-symbols-outlined text-lg">expand_more</span> Load More Recommendations
+            </button>
+        </div>
     </div>
+
+    <!-- Start Revision Confirmation Modal -->
+    <div id="start-revision-modal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[500] p-4 transition-all duration-300">
+        <div class="bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] w-full max-w-sm overflow-hidden transform transition-all scale-95 opacity-0 duration-300 border border-white/20"
+            id="revision-modal-content">
+            <div class="p-8 text-center">
+                <div
+                    class="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                    <span class="material-symbols-outlined text-4xl">play_circle</span>
+                </div>
+                <h3 class="text-2xl font-black text-gray-800 mb-3 tracking-tight">Ready to Revise?</h3>
+                <p class="text-gray-500 text-sm leading-relaxed mb-8 px-4" id="revision-modal-text">You are about to
+                    start a revision session for this topic.</p>
+
+                <div class="flex gap-3">
+                    <button id="cancel-revision-btn"
+                        class="flex-1 px-4 py-4 rounded-2xl bg-gray-50 text-gray-500 font-bold text-sm hover:bg-gray-100 hover:text-gray-700 transition-all active:scale-95">
+                        Not Now
+                    </button>
+                    <button id="confirm-revision-btn"
+                        class="flex-1 px-4 py-4 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-sm hover:shadow-xl hover:shadow-blue-200 transition-all active:scale-95">
+                        Let's Go
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Study Modal (Side Panel/Large Modal) -->
+    <div id="quick-study-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[600] hidden items-end sm:items-center justify-center p-0 sm:p-4 transition-all duration-300">
+        <div class="bg-white border border-white/20 sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl h-[95vh] sm:h-[85vh] flex flex-col overflow-hidden transform transition-all translate-y-full sm:scale-95 sm:translate-y-0 opacity-0 duration-300"
+            id="quick-study-modal-content">
+            <!-- Modal Header -->
+            <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                        <span class="material-symbols-outlined text-2xl">library_books</span>
+                    </div>
+                    <div>
+                        <h3 id="quick-study-title"
+                            class="text-xl font-bold text-gray-800 tracking-tight truncate max-w-[200px] sm:max-w-md">
+                            Study Materials</h3>
+                        <p id="quick-study-subtitle" class="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                            Quick Review Mode</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="quick-study-print-btn" title="Save as PDF"
+                        class="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                        <span class="material-symbols-outlined text-xl">picture_as_pdf</span>
+                    </button>
+                    <button id="close-quick-study"
+                        class="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+                        <span class="material-symbols-outlined text-xl">close</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Content -->
+            <div id="quick-study-content"
+                class="flex-1 overflow-y-auto p-4 sm:p-10 space-y-10 custom-scrollbar-premium bg-slate-50/30">
+                <div class="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+                    <span class="material-symbols-outlined text-5xl animate-spin mb-4">sync</span>
+                    <p class="font-bold text-gray-600">Preparing your materials...</p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div
+                class="p-6 border-t border-gray-100 bg-white flex flex-col sm:flex-row justify-between items-center gap-4">
+                <p class="text-xs text-gray-400 font-medium hidden sm:block">Scroll to review questions and
+                    explanations.</p>
+                <div class="flex gap-3 w-full sm:w-auto">
+                    <button id="quick-study-dismiss-btn"
+                        class="px-8 py-3.5 text-sm font-bold text-gray-500 hover:bg-gray-50 rounded-2xl transition-all">
+                        Close
+                    </button>
+                    <button id="quick-study-start-exam-btn"
+                        class="px-8 py-3.5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm font-bold rounded-2xl shadow-xl shadow-blue-100 hover:shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-lg">play_arrow</span> Start Revision
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .custom-scrollbar-premium::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar-premium::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar-premium::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar-premium::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+
+        .question-card-study {
+            background: white;
+            border: 1px solid #f1f5f9;
+            border-radius: 24px;
+            padding: 24px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .question-card-study:hover {
+            border-color: #e2e8f0;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .answer-reveal-box {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 16px;
+            margin-top: 20px;
+            border: 1px solid #f1f5f9;
+        }
+    </style>
 </div>

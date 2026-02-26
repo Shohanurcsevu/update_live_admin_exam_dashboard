@@ -18,6 +18,8 @@ $exam_id = isset($_GET['exam_id']) ? intval($_GET['exam_id']) : null;
 $scope = isset($_GET['scope']) ? $_GET['scope'] : 'topic'; // topic, exam
 $weak_only = isset($_GET['weak_only']) && $_GET['weak_only'] === 'true';
 $period = isset($_GET['period']) ? $_GET['period'] : 'all'; // all, today, yesterday, last_2_days, ..., last_7_days, week, month, year
+$limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+$offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
 
 $where = ["t.is_deleted = 0"];
 $params = [];
@@ -86,19 +88,38 @@ if ($scope === 'exam') {
                 s.start_date,
                 s.end_date as exam_date,
                 COUNT(DISTINCT q.id) as total_questions,
-                COUNT(DISTINCT CASE WHEN qa.is_correct = 1 THEN q.id END) as correct_q_count,
-                COUNT(DISTINCT CASE WHEN qa.is_correct = 0 THEN q.id END) as wrong_q_count,
-                SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
-                SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count,
-                (COUNT(DISTINCT q.id) - COUNT(DISTINCT CASE WHEN qa.id IS NOT NULL THEN q.id END)) as unattempted_count,
-                COUNT(DISTINCT qa.id) as total_attempts
+                SUM(COALESCE(att.is_correct_distinct, 0)) as correct_q_count,
+                SUM(COALESCE(att.is_wrong_distinct, 0)) as wrong_q_count,
+                SUM(COALESCE(att.correct_attempts, 0)) as correct_count,
+                SUM(COALESCE(att.wrong_attempts, 0)) as wrong_count,
+                (COUNT(DISTINCT q.id) - COUNT(DISTINCT CASE WHEN att.has_attempts = 1 THEN q.id END)) as unattempted_count,
+                SUM(COALESCE(att.total_attempts, 0)) as total_attempts
             FROM exams e
             JOIN topics t ON e.topic_id = t.id
             JOIN subjects s ON t.subject_id = s.id
             JOIN lessons l ON t.lesson_id = l.id
             LEFT JOIN questions q ON e.id = q.exam_id AND q.is_deleted = 0
-            LEFT JOIN questions q_all ON q.question = q_all.question AND q_all.is_deleted = 0
-            LEFT JOIN question_attempts qa ON q_all.id = qa.question_id
+            LEFT JOIN (
+                SELECT 
+                    q_sub.question,
+                    SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_attempts,
+                    SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_attempts,
+                    COUNT(qa.id) as total_attempts,
+                    -- Display metrics: 1 only if the LATEST attempt has this status
+                    MAX(CASE WHEN qa.id = latest.max_id AND qa.is_correct = 1 THEN 1 ELSE 0 END) as is_correct_distinct,
+                    MAX(CASE WHEN qa.id = latest.max_id AND qa.is_correct = 0 THEN 1 ELSE 0 END) as is_wrong_distinct,
+                    1 as has_attempts
+                FROM questions q_sub
+                JOIN question_attempts qa ON q_sub.id = qa.question_id
+                JOIN (
+                    -- Find latest attempt per unique question text
+                    SELECT q_inn.question, MAX(qa_inn.id) as max_id
+                    FROM questions q_inn
+                    JOIN question_attempts qa_inn ON q_inn.id = qa_inn.question_id
+                    GROUP BY q_inn.question
+                ) latest ON q_sub.question = latest.question
+                GROUP BY q_sub.question
+            ) att ON q.question = att.question
             WHERE $where_clause AND e.is_deleted = 0 AND e.is_revision = 0
             GROUP BY e.id
             HAVING total_questions > 0";
@@ -113,18 +134,37 @@ if ($scope === 'exam') {
                 s.start_date,
                 s.end_date as exam_date,
                 COUNT(DISTINCT q.id) as total_questions,
-                COUNT(DISTINCT CASE WHEN qa.is_correct = 1 THEN q.id END) as correct_q_count,
-                COUNT(DISTINCT CASE WHEN qa.is_correct = 0 THEN q.id END) as wrong_q_count,
-                SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
-                SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count,
-                (COUNT(DISTINCT q.id) - COUNT(DISTINCT CASE WHEN qa.id IS NOT NULL THEN q.id END)) as unattempted_count,
-                COUNT(DISTINCT qa.id) as total_attempts
+                SUM(COALESCE(att.is_correct_distinct, 0)) as correct_q_count,
+                SUM(COALESCE(att.is_wrong_distinct, 0)) as wrong_q_count,
+                SUM(COALESCE(att.correct_attempts, 0)) as correct_count,
+                SUM(COALESCE(att.wrong_attempts, 0)) as wrong_count,
+                (COUNT(DISTINCT q.id) - COUNT(DISTINCT CASE WHEN att.has_attempts = 1 THEN q.id END)) as unattempted_count,
+                SUM(COALESCE(att.total_attempts, 0)) as total_attempts
             FROM topics t
             JOIN subjects s ON t.subject_id = s.id
             JOIN lessons l ON t.lesson_id = l.id
             LEFT JOIN questions q ON t.id = q.topic_id AND q.is_deleted = 0
-            LEFT JOIN questions q_all ON q.question = q_all.question AND q_all.is_deleted = 0
-            LEFT JOIN question_attempts qa ON q_all.id = qa.question_id
+            LEFT JOIN (
+                SELECT 
+                    q_sub.question,
+                    SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_attempts,
+                    SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_attempts,
+                    COUNT(qa.id) as total_attempts,
+                    -- Display metrics: 1 only if the LATEST attempt has this status
+                    MAX(CASE WHEN qa.id = latest.max_id AND qa.is_correct = 1 THEN 1 ELSE 0 END) as is_correct_distinct,
+                    MAX(CASE WHEN qa.id = latest.max_id AND qa.is_correct = 0 THEN 1 ELSE 0 END) as is_wrong_distinct,
+                    1 as has_attempts
+                FROM questions q_sub
+                JOIN question_attempts qa ON q_sub.id = qa.question_id
+                JOIN (
+                    -- Find latest attempt per unique question text
+                    SELECT q_inn.question, MAX(qa_inn.id) as max_id
+                    FROM questions q_inn
+                    JOIN question_attempts qa_inn ON q_inn.id = qa_inn.question_id
+                    GROUP BY q_inn.question
+                ) latest ON q_sub.question = latest.question
+                GROUP BY q_sub.question
+            ) att ON q.question = att.question
             WHERE $where_clause
             GROUP BY t.id
             HAVING total_questions > 0";
@@ -148,9 +188,11 @@ foreach ($topics as $topic) {
     $wrong = intval($topic['wrong_count']);
     $unattempted = intval($topic['unattempted_count']);
     
-    $accuracy = $total_q > 0 ? ($correct / $total_q) * 100 : 100; // If no questions, say 100% just to be safe
+    $accuracy = $total_q > 0 ? (intval($topic['correct_q_count']) / $total_q) * 100 : 100;
     // But we want to prioritize topics with WRONG answers
-    $wrong_rate = $total_q > 0 ? ($wrong / $total_q) : 0;
+    // Keep attempt-based rate for ranking, but distinct-based for display
+    $wrong_rate_score = $total_q > 0 ? ($wrong / $total_q) : 0;
+    $wrong_rate_display = $total_q > 0 ? (intval($topic['wrong_q_count']) / $total_q) : 0;
     
     // 2. Coverage Score (0-1)
     $unattempted_rate = $total_q > 0 ? ($unattempted / $total_q) : 1;
@@ -172,11 +214,12 @@ foreach ($topics as $topic) {
 
     // Final Score Calculation
     // Accuracy (Wrong %) is the most important factor
-    $score = ($wrong_rate * 50) + ($unattempted_rate * 30) + ($recency_weight * 10) + ($urgency_weight * 10);
+    // We use the raw wrong_rate (sum of attempts) for score to penalize repeated failures
+    $score = ($wrong_rate_score * 50) + ($unattempted_rate * 30) + ($recency_weight * 10) + ($urgency_weight * 10);
     
     // Determine priority label and reason
     $reason = "";
-    if ($wrong_rate > 0.3) $reason = round($wrong_rate * 100) . "% wrong answers";
+    if ($wrong_rate_display > 0.3) $reason = round($wrong_rate_display * 100) . "% wrong answers";
     elseif ($unattempted_rate > 0.5) $reason = round($unattempted_rate * 100) . "% not attempted";
     elseif ($topic['last_revised_at'] === null) $reason = "Never revised ($days_since_revision days)";
     elseif ($days_since_revision > 14) $reason = "Not revised in $days_since_revision days";
@@ -212,9 +255,33 @@ usort($recommendations, function($a, $b) {
     return $b['priority_score'] <=> $a['priority_score'];
 });
 
+$total_results = count($recommendations);
+
+// Calculate summary stats for the ENTIRE filtered result set
+$weakest = $total_results > 0 ? $recommendations[0] : null;
+$overdue_count = 0;
+$total_acc = 0;
+foreach ($recommendations as $r) {
+    if ($r['last_revised'] === 'Never' || strpos($r['reason'], 'days') !== false) {
+        $overdue_count++;
+    }
+    $total_acc += $r['accuracy'];
+}
+$avg_acc = $total_results > 0 ? $total_acc / $total_results : 0;
+
+$recommendations = array_slice($recommendations, $offset, $limit);
+
 echo json_encode([
     'success' => true,
-    'data' => $recommendations
+    'data' => $recommendations,
+    'total' => $total_results,
+    'has_more' => ($offset + $limit) < $total_results,
+    'summary' => [
+        'weakest_topic' => $weakest ? $weakest['topic_name'] : 'None',
+        'weakest_reason' => $weakest ? $weakest['reason'] : 'No data',
+        'overdue_count' => $overdue_count,
+        'avg_accuracy' => round($avg_acc, 1) . '%'
+    ]
 ]);
 
 $conn->close();
