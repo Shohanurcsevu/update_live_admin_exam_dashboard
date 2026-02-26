@@ -129,7 +129,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             'revision-planner': 'assets/js/revision-planner.js',
             'study-materials': 'assets/js/study-materials.js',
             'question-creator': 'assets/js/question-creator.js',
-            'backup-restore': 'assets/js/backup-restore.js'
+            'backup-restore': 'assets/js/backup-restore.js',
+            'speed-trivia': 'assets/js/speed-trivia.js'
         };
 
 

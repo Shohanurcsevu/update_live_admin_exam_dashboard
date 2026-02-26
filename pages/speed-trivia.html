@@ -1,0 +1,284 @@
+<style>
+    #trivia-game-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0.5rem;
+    }
+
+    /* Timer Ring Animation */
+    .timer-container {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1rem;
+    }
+
+    .timer-ring {
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+    }
+
+    .timer-ring-circle {
+        stroke-dasharray: 283;
+        stroke-dashoffset: 0;
+        transition: stroke-dashoffset 0.1s linear, stroke 0.3s ease;
+    }
+
+    /* Urgency Colors */
+    .timer-safe {
+        stroke: #10b981;
+    }
+
+    .timer-warning {
+        stroke: #f59e0b;
+    }
+
+    .timer-danger {
+        stroke: #ef4444;
+    }
+
+    /* High Pressure Background Flash */
+    .bg-flash-correct {
+        animation: flash-green 0.5s ease-out;
+    }
+
+    .bg-flash-wrong {
+        animation: flash-red 0.5s ease-out;
+    }
+
+    @keyframes flash-green {
+        0% {
+            background-color: rgba(16, 185, 129, 0.2);
+        }
+
+        100% {
+            background-color: transparent;
+        }
+    }
+
+    @keyframes flash-red {
+        0% {
+            background-color: rgba(239, 68, 68, 0.2);
+        }
+
+        100% {
+            background-color: transparent;
+        }
+    }
+
+    /* Option Button Effects */
+    .option-btn {
+        transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .option-btn:active {
+        transform: scale(0.95);
+    }
+
+    .option-correct {
+        background-color: #10b981 !important;
+        color: white !important;
+        border-color: #059669 !important;
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    }
+
+    .option-wrong {
+        background-color: #ef4444 !important;
+        color: white !important;
+        border-color: #dc2626 !important;
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+    }
+
+    @keyframes shake {
+
+        10%,
+        90% {
+            transform: translate3d(-1px, 0, 0);
+        }
+
+        20%,
+        80% {
+            transform: translate3d(2px, 0, 0);
+        }
+
+        30%,
+        50%,
+        70% {
+            transform: translate3d(-4px, 0, 0);
+        }
+
+        40%,
+        60% {
+            transform: translate3d(4px, 0, 0);
+        }
+    }
+
+    /* Streak HUD pulse */
+    .streak-pulse {
+        animation: streak-pulse 0.5s ease-out;
+    }
+
+    @keyframes streak-pulse {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.2);
+            color: #8b5cf6;
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 640px) {
+        .timer-container {
+            width: 100px;
+            height: 100px;
+        }
+
+        #question-display-text {
+            font-size: 1.1rem;
+        }
+    }
+</style>
+
+<div id="trivia-game-container" class="relative">
+    <!-- Game HUD -->
+    <div
+        class="flex items-center justify-between mb-4 bg-white/80 backdrop-blur-md p-3 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-50">
+        <div class="flex flex-col">
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Score</span>
+            <span id="score-display" class="text-lg font-bold text-slate-800">0000</span>
+        </div>
+
+        <div id="streak-hud" class="flex flex-col items-center">
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Streak</span>
+            <div class="flex items-center gap-1">
+                <span
+                    class="material-symbols-outlined text-orange-500 fill-orange-500 text-sm">local_fire_department</span>
+                <span id="streak-display" class="text-xl font-black text-slate-800 font-mono">0</span>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-end">
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lives</span>
+            <div id="lives-display" class="flex flex-wrap gap-0.5 mt-1 justify-end max-w-[120px]">
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="game-loading" class="py-20 text-center">
+        <div class="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4">
+        </div>
+        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Preparing Questions...</p>
+    </div>
+
+    <!-- Start View -->
+    <div id="game-start-view" class="hidden text-center py-10 animate-fade-in">
+        <div
+            class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-200 rotate-3">
+            <span class="material-symbols-outlined text-white text-5xl">timer</span>
+        </div>
+        <h1 class="text-3xl font-bold text-slate-800 mb-2">Speed Trivia</h1>
+        <p class="text-slate-500 mb-10 max-w-sm mx-auto">15 questions. 20 seconds each. 10 lives. <br><span
+                class="font-bold text-indigo-600">Speed adds a bonus!</span></p>
+
+        <button onclick="triviaGame.start()"
+            class="group relative px-10 py-5 bg-slate-900 text-white rounded-3xl font-bold text-xl transition-all hover:bg-indigo-600 hover:-translate-y-1 active:scale-95 shadow-xl shadow-slate-200">
+            Start Game
+            <div class="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full animate-ping opacity-75"></div>
+        </button>
+    </div>
+
+    <!-- Active Game View -->
+    <div id="game-active-view" class="hidden">
+        <!-- Question Progress -->
+        <div class="flex justify-center mb-4">
+            <span id="question-progress"
+                class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Question 1 of 15</span>
+        </div>
+
+        <!-- Timer -->
+        <div class="timer-container">
+            <svg class="timer-ring" width="80" height="80" viewBox="0 0 100 100">
+                <circle class="stroke-slate-100" stroke-width="8" fill="transparent" r="42" cx="50" cy="50" />
+                <circle id="timer-bar" class="timer-ring-circle timer-safe" stroke-width="8" stroke-linecap="round"
+                    fill="transparent" r="42" cx="50" cy="50" style="stroke-dasharray: 264; stroke-dashoffset: 0;" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <span id="timer-text" class="text-2xl font-black text-slate-800 leading-none">20</span>
+            </div>
+        </div>
+
+        <!-- Question Card -->
+        <div
+            class="bg-white rounded-[1.5rem] p-5 md:p-8 shadow-xl border border-slate-100 mb-4 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <span class="material-symbols-outlined text-8xl">help_center</span>
+            </div>
+
+            <h2 id="question-display-text"
+                class="text-lg md:text-xl font-bold text-slate-800 text-center mb-6 leading-tight relative z-10">
+                Loading question...
+            </h2>
+
+            <div id="options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+                <!-- Options will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Result View -->
+    <div id="game-result-view" class="hidden text-center py-10 animate-scale-up">
+        <div
+            class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span class="material-symbols-outlined text-4xl">emoji_events</span>
+        </div>
+        <h2 class="text-3xl font-bold text-slate-800 mb-2">Game Over!</h2>
+        <p id="result-status" class="text-slate-500 mb-8">Great job! Here's how you performed.</p>
+
+        <div class="grid grid-cols-2 gap-4 mb-10">
+            <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Final
+                    Score</span>
+                <span id="final-score" class="text-3xl font-black text-indigo-600">0</span>
+            </div>
+            <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Max
+                    Streak</span>
+                <span id="final-streak" class="text-3xl font-black text-orange-500">0</span>
+            </div>
+        </div>
+
+        <div class="bg-indigo-50/50 p-6 rounded-3xl mb-10 text-left flex items-center gap-4">
+            <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
+                <span class="material-symbols-outlined">analytics</span>
+            </div>
+            <div>
+                <p class="text-sm font-bold text-slate-800">Accuracy Analysis</p>
+                <p id="accuracy-text" class="text-xs text-slate-500">You answered 7 out of 10 correctly.</p>
+            </div>
+        </div>
+
+        <button onclick="triviaGame.reset()"
+            class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-100">
+            Play Again
+        </button>
+    </div>
+</div>
