@@ -1,148 +1,172 @@
-<!DOCTYPE html>
-<html lang="en">
+<style>
+    .card-flip {
+        perspective: 1000px;
+    }
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flashcards - Spaced Repetition</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-    <style>
-        .card-flip {
-            perspective: 1000px;
-        }
+    .card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+    }
 
+    .card-flip.flipped .card-inner {
+        transform: rotateY(180deg);
+    }
+
+    .card-front,
+    .card-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .card-back {
+        transform: rotateY(180deg);
+    }
+
+    /* Mobile friendly adjustments */
+    @media (max-width: 640px) {
         .card-inner {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            text-align: center;
-            transition: transform 0.6s;
-            transform-style: preserve-3d;
-        }
-
-        .card-flip.flipped .card-inner {
-            transform: rotateY(180deg);
+            height: 350px !important;
         }
 
         .card-front,
         .card-back {
-            position: absolute;
+            padding: 1rem;
+        }
+
+        #question-text {
+            font-size: 1.125rem;
+        }
+
+        #action-buttons button {
             width: 100%;
-            height: 100%;
-            backface-visibility: hidden;
-            border-radius: 1rem;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            padding: 1rem;
         }
+    }
+</style>
 
-        .card-back {
-            transform: rotateY(180deg);
-        }
-    </style>
-</head>
-
-<body class="bg-gray-50">
-    <div class="max-w-4xl mx-auto p-6">
-        <!-- Header -->
-        <div class="mb-8">
-            <button onclick="window.history.back()"
-                class="text-gray-600 hover:text-gray-800 mb-4 flex items-center gap-2">
-                <span class="material-symbols-outlined">arrow_back</span>
-                Back to Dashboard
-            </button>
-            <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                <span class="material-symbols-outlined text-4xl text-purple-600">psychology</span>
-                Spaced Repetition Flashcards
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-3">
+                <span class="material-symbols-outlined text-3xl md:text-4xl text-purple-600">psychology</span>
+                Flashcards
             </h1>
-            <p class="text-gray-600 mt-2">Master your weak topics with intelligent review scheduling</p>
+            <p class="text-sm text-gray-500 mt-1">Master your weak topics with Spaced Repetition (SRS)</p>
         </div>
+        <button onclick="generateNewCards()"
+            class="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-100 flex items-center justify-center gap-2 text-sm font-bold">
+            <span class="material-symbols-outlined text-lg">auto_awesome</span>
+            Generate from Mistakes
+        </button>
+    </div>
 
-        <!-- Deck Selection View -->
-        <div id="deck-selection-view">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-gray-800">Your Decks</h2>
-                    <button onclick="generateNewCards()"
-                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
-                        <span class="material-symbols-outlined">auto_awesome</span>
-                        Generate from Mistakes
-                    </button>
-                </div>
-                <div id="decks-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Decks will be injected here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Review Session View -->
-        <div id="review-session-view" class="hidden">
-            <!-- Progress Bar -->
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-sm font-semibold text-gray-600">Progress</span>
-                    <span id="progress-text" class="text-sm font-bold text-purple-600">0 / 0</span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div id="progress-bar" class="bg-purple-600 h-2 rounded-full transition-all" style="width: 0%">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Flashcard -->
-            <div id="flashcard-container" class="card-flip mb-6" onclick="flipCard()">
-                <div class="card-inner" style="height: 400px;">
-                    <div
-                        class="card-front bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-2xl cursor-pointer">
-                        <span class="material-symbols-outlined text-6xl mb-4 opacity-50">help</span>
-                        <p id="question-text" class="text-xl font-semibold mb-4"></p>
-                        <div id="options-container" class="w-full space-y-2"></div>
-                        <p class="text-sm opacity-75 mt-6">Click to reveal answer</p>
-                    </div>
-                    <div class="card-back bg-white shadow-2xl border-4 border-purple-500">
-                        <span class="material-symbols-outlined text-6xl mb-4 text-purple-600">lightbulb</span>
-                        <div class="text-left w-full">
-                            <p class="text-sm font-bold text-purple-600 mb-2">Correct Answer:</p>
-                            <p id="correct-answer" class="text-lg font-semibold text-gray-800 mb-4"></p>
-                            <p class="text-sm font-bold text-gray-600 mb-2">Explanation:</p>
-                            <p id="explanation-text" class="text-sm text-gray-700"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div id="action-buttons" class="hidden flex gap-4 justify-center">
-                <button onclick="reviewCard(false)"
-                    class="px-8 py-4 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
-                    <span class="material-symbols-outlined">close</span>
-                    Need Review
-                </button>
-                <button onclick="reviewCard(true)"
-                    class="px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
-                    <span class="material-symbols-outlined">check</span>
-                    Know It
-                </button>
-            </div>
-
-            <!-- Session Complete -->
-            <div id="session-complete"
-                class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-                <span class="material-symbols-outlined text-6xl text-green-500 mb-4">celebration</span>
-                <h2 class="text-2xl font-bold text-gray-800 mb-2">Session Complete!</h2>
-                <p id="session-summary" class="text-gray-600 mb-6"></p>
-                <button onclick="location.reload()"
-                    class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                    Back to Decks
-                </button>
+    <!-- Deck Selection View -->
+    <div id="deck-selection-view">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="decks-container">
+            <!-- Decks will be injected here -->
+            <div class="col-span-full py-12 text-center text-gray-400">
+                <div class="animate-pulse">Loading decks...</div>
             </div>
         </div>
     </div>
 
-    <script src="../assets/js/flashcards.js"></script>
-</body>
+    <!-- Review Session View -->
+    <div id="review-session-view" class="hidden">
+        <!-- Progress Bar -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Session Progress</span>
+                <span id="progress-text" class="text-xs font-bold text-purple-600">0 / 0</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-1.5">
+                <div id="progress-bar" class="bg-purple-500 h-1.5 rounded-full transition-all duration-500"
+                    style="width: 0%">
+                </div>
+            </div>
+        </div>
 
-</html>
+        <!-- Flashcard -->
+        <div id="flashcard-container" class="card-flip mb-8 cursor-pointer group" onclick="flipCard()">
+            <div class="card-inner" style="height: 400px;">
+                <!-- Front -->
+                <!-- Front -->
+                <div
+                    class="card-front bg-white text-slate-800 shadow-xl relative overflow-hidden border border-slate-100 rounded-3xl">
+                    <!-- Soft Background Accents -->
+                    <div class="absolute -top-24 -right-24 w-64 h-64 bg-purple-50 rounded-full blur-3xl"></div>
+                    <div class="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-50 rounded-full blur-3xl"></div>
+
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div
+                            class="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 border border-purple-100">
+                            <span class="material-symbols-outlined text-3xl text-purple-500">psychology_alt</span>
+                        </div>
+                        <p id="question-text"
+                            class="text-xl md:text-2xl font-bold text-center mb-8 leading-tight tracking-tight px-4 text-slate-800">
+                        </p>
+                        <div id="options-container" class="w-full space-y-3 max-w-sm"></div>
+
+                        <div
+                            class="mt-10 flex items-center gap-2 px-5 py-2.5 bg-slate-50 rounded-full border border-slate-100 shadow-sm">
+                            <span class="material-symbols-outlined text-sm text-slate-400">touch_app</span>
+                            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Pick an option
+                                to verify</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Back -->
+                <div class="card-back bg-white shadow-2xl border-2 border-purple-500 text-gray-800">
+                    <div class="text-left w-full overflow-y-auto custom-scrollbar pr-2" style="max-height: 100%;">
+                        <div class="mb-6">
+                            <p class="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-1">Correct
+                                Answer</p>
+                            <p id="correct-answer" class="text-lg font-bold text-gray-900"></p>
+                        </div>
+                        <div class="pt-4 border-t border-gray-100">
+                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Explanation
+                            </p>
+                            <p id="explanation-text" class="text-sm leading-relaxed text-gray-600"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="hidden flex flex-col sm:flex-row gap-3 justify-center">
+            <button onclick="reviewCard(true)"
+                class="flex-1 px-8 py-4 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 transition-all font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-100">
+                Next Card
+                <span class="material-symbols-outlined text-lg">arrow_forward</span>
+            </button>
+        </div>
+
+        <!-- Session Complete -->
+        <div id="session-complete"
+            class="hidden bg-white rounded-3xl shadow-xl border border-gray-100 p-10 text-center animate-scale-up">
+            <div
+                class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span class="material-symbols-outlined text-4xl">celebration</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Session Complete!</h2>
+            <p id="session-summary" class="text-gray-500 mb-8"></p>
+            <button onclick="location.reload()"
+                class="px-8 py-3 bg-gray-900 text-white rounded-xl hover:bg-black transition-all font-bold text-sm">
+                Back to Decks
+            </button>
+        </div>
+    </div>
+</div>

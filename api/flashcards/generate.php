@@ -15,12 +15,13 @@ try {
         SELECT 
             mb.question_id,
             COUNT(*) as mistake_count,
-            MAX(mb.added_at) as last_mistake
+            MAX(mb.last_missed_at) as last_mistake
         FROM mistake_bank mb
+        JOIN questions q ON mb.question_id = q.id
         LEFT JOIN flashcards f ON f.question_id = mb.question_id
         WHERE f.id IS NULL
         GROUP BY mb.question_id
-        HAVING mistake_count >= 2
+        HAVING mistake_count >= 1
         ORDER BY mistake_count DESC, last_mistake DESC
     ";
     

@@ -6,9 +6,7 @@ let sessionStats = { correct: 0, incorrect: 0 };
 let isFlipped = false;
 
 // Initialize page
-document.addEventListener('DOMContentLoaded', () => {
-    loadDecks();
-});
+loadDecks();
 
 // Load available decks
 async function loadDecks() {
@@ -40,25 +38,41 @@ function renderDecks(decks) {
     }
 
     container.innerHTML = decks.map(deck => {
-        const priorityColor = deck.cards_due > 10 ? 'red' : deck.cards_due > 0 ? 'amber' : 'green';
+        // More professional color tokens
+        const colors = {
+            red: { bg: 'from-rose-50 to-white', border: 'border-rose-100', text: 'text-rose-600', icon: 'text-rose-400' },
+            amber: { bg: 'from-amber-50 to-white', border: 'border-amber-100', text: 'text-amber-600', icon: 'text-amber-400' },
+            green: { bg: 'from-emerald-50 to-white', border: 'border-emerald-100', text: 'text-emerald-600', icon: 'text-emerald-400' }
+        };
+        const p = deck.cards_due > 15 ? colors.red : deck.cards_due > 0 ? colors.amber : colors.green;
 
         return `
-            <div class="bg-gradient-to-br from-${priorityColor}-50 to-white border border-${priorityColor}-200 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer"
-                 onclick="startReview('${deck.topic}')">
-                <div class="flex justify-between items-start mb-3">
+            <div class="bg-gradient-to-br ${p.bg} border ${p.border} rounded-2xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
+                 onclick="startReview(${deck.topic_id}, '${deck.topic}')">
+                <div class="flex justify-between items-start mb-4">
                     <div>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">${deck.subject}</p>
-                        <h3 class="text-lg font-bold text-gray-800">${deck.topic}</h3>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">${deck.subject}</p>
+                        <h3 class="text-xl font-bold text-gray-800 group-hover:text-purple-600 transition-colors">${deck.topic}</h3>
                     </div>
-                    <span class="material-symbols-outlined text-${priorityColor}-500">style</span>
+                    <div class="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center ${p.icon}">
+                        <span class="material-symbols-outlined text-xl">layers</span>
+                    </div>
                 </div>
                 <div class="flex justify-between items-center text-sm">
-                    <span class="text-gray-600">${deck.total_cards} cards</span>
-                    <span class="font-bold text-${priorityColor}-600">${deck.cards_due} due</span>
+                    <div class="flex items-center gap-1.5 text-gray-500 font-medium">
+                        <span class="material-symbols-outlined text-sm">style</span>
+                        ${deck.total_cards} cards
+                    </div>
+                    <div class="px-3 py-1 rounded-full bg-white/80 shadow-sm border border-inherit ${p.text} font-bold text-xs uppercase tracking-wider">
+                        ${deck.cards_due} due
+                    </div>
                 </div>
                 ${deck.accuracy !== null ? `
-                    <div class="mt-2 pt-2 border-t border-${priorityColor}-200">
-                        <span class="text-xs text-gray-500">Accuracy: ${deck.accuracy}%</span>
+                    <div class="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
+                        <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-purple-500 rounded-full" style="width: ${deck.accuracy}%"></div>
+                        </div>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">${deck.accuracy}%</span>
                     </div>
                 ` : ''}
             </div>
@@ -73,8 +87,20 @@ async function generateNewCards() {
         const result = await response.json();
 
         if (result.success) {
-            alert(result.message);
+            // Using window.showToast if available, fallback to alert
+            if (typeof window.showToast === 'function') {
+                window.showToast(result.message, result.cards_created > 0 ? 'success' : 'info');
+            } else {
+                alert(result.message);
+            }
             loadDecks(); // Reload decks
+        } else {
+            console.error('Generation failed:', result.error);
+            if (typeof window.showToast === 'function') {
+                window.showToast('Generation failed: ' + result.error, 'error');
+            } else {
+                alert('Generation failed: ' + result.error);
+            }
         }
     } catch (error) {
         console.error('Error generating cards:', error);
@@ -82,10 +108,9 @@ async function generateNewCards() {
 }
 
 // Start review session
-async function startReview(topicName) {
+async function startReview(topicId, topicName) {
     try {
-        // For now, fetch all due cards (we'd need topic_id for filtering)
-        const response = await fetch('api/flashcards/review.php');
+        const response = await fetch(`api/flashcards/review.php${topicId ? '?topic_id=' + topicId : ''}`);
         const result = await response.json();
 
         if (result.success && result.cards.length > 0) {
@@ -123,11 +148,13 @@ function showCard(index) {
     // Update question
     document.getElementById('question-text').textContent = question.text;
 
-    // Update options
+    // Update options with click handlers
     const optionsContainer = document.getElementById('options-container');
     optionsContainer.innerHTML = Object.entries(question.options).map(([key, value]) => `
-        <div class="text-left px-4 py-2 bg-white/20 rounded-lg">
-            <span class="font-bold">${key}.</span> ${value}
+        <div class="option-item text-left px-5 py-3.5 bg-slate-50 hover:bg-white hover:shadow-md hover:border-purple-200 rounded-2xl cursor-pointer transition-all border border-slate-100 flex items-center gap-4 group"
+             onclick="selectOption(event, '${key}')">
+            <span class="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center font-bold text-slate-500 group-hover:text-purple-600 group-hover:border-purple-200 transition-all">${key}</span>
+            <span class="flex-1 text-sm md:text-base font-medium text-slate-600 group-hover:text-slate-800">${value}</span>
         </div>
     `).join('');
 
@@ -138,6 +165,62 @@ function showCard(index) {
 
     // Update progress
     updateProgress();
+}
+
+// Select an option and auto-detect correctness
+async function selectOption(event, selectedKey) {
+    if (event) event.stopPropagation(); // Prevent container's flipCard from firing
+    if (isFlipped) return; // Prevent multiple clicks
+
+    const card = currentCards[currentCardIndex];
+    const isCorrect = selectedKey === card.question.correct_answer;
+
+    // Visual feedback on options
+    const options = document.querySelectorAll('.option-item');
+    options.forEach(opt => {
+        const key = opt.querySelector('span').textContent;
+        if (key === card.question.correct_answer) {
+            opt.classList.add('bg-emerald-50', 'border-emerald-200', 'ring-1', 'ring-emerald-200');
+            opt.querySelector('span').classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
+            opt.querySelector('.flex-1').classList.add('text-emerald-700', 'font-bold');
+        } else if (key === selectedKey && !isCorrect) {
+            opt.classList.add('bg-rose-50', 'border-rose-200', 'ring-1', 'ring-rose-200');
+            opt.querySelector('span').classList.add('bg-rose-500', 'text-white', 'border-rose-500');
+            opt.querySelector('.flex-1').classList.add('text-rose-700', 'font-bold');
+        }
+        opt.style.pointerEvents = 'none'; // Disable further clicks
+    });
+
+    // longer delay for feedback before flipping
+    setTimeout(() => {
+        if (!isFlipped) flipCard();
+        // After showing the answer for a bit, auto-advance or let user read
+        // To make it truly "no button", we could auto-advance, but usually users want to read the explanation.
+        // We will mark the record in the background immediately.
+        submitReview(isCorrect);
+    }, 1200);
+}
+
+// Background submission without reloading card immediately
+async function submitReview(isCorrect) {
+    const card = currentCards[currentCardIndex];
+    try {
+        const response = await fetch('api/flashcards/update.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                card_id: card.card_id,
+                is_correct: isCorrect
+            })
+        });
+        const result = await response.json();
+        if (result.success) {
+            if (isCorrect) sessionStats.correct++;
+            else sessionStats.incorrect++;
+        }
+    } catch (error) {
+        console.error('Error updating card:', error);
+    }
 }
 
 // Flip card
@@ -151,34 +234,11 @@ function flipCard() {
     }
 }
 
-// Review card (mark as correct/incorrect)
+// Review card (manual trigger for next)
 async function reviewCard(isCorrect) {
-    const card = currentCards[currentCardIndex];
-
-    try {
-        const response = await fetch('api/flashcards/update.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                card_id: card.card_id,
-                is_correct: isCorrect
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            // Update stats
-            if (isCorrect) sessionStats.correct++;
-            else sessionStats.incorrect++;
-
-            // Move to next card
-            currentCardIndex++;
-            showCard(currentCardIndex);
-        }
-    } catch (error) {
-        console.error('Error updating card:', error);
-    }
+    // If we already submitted via selectOption, just advance
+    currentCardIndex++;
+    showCard(currentCardIndex);
 }
 
 // Update progress bar

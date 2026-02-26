@@ -13,6 +13,7 @@ try {
     $sql = "
         SELECT 
             s.subject_name,
+            t.id as topic_id,
             t.topic_name,
             COUNT(f.id) as total_cards,
             SUM(CASE WHEN f.next_review <= CURRENT_DATE THEN 1 ELSE 0 END) as cards_due,
@@ -34,6 +35,7 @@ try {
     while ($row = $result->fetch_assoc()) {
         $decks[] = [
             'subject' => $row['subject_name'],
+            'topic_id' => intval($row['topic_id']),
             'topic' => $row['topic_name'],
             'total_cards' => intval($row['total_cards']),
             'cards_due' => intval($row['cards_due']),
