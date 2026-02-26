@@ -1,5 +1,6 @@
 function initializeQuestionAnalysis() {
     const ANALYSIS_API_URL = 'api/performance/question-analysis.php';
+    const SKIP_ANALYSIS_API_URL = 'api/performance/skip-analysis.php';
     const EXAM_CREATE_API_URL = 'api/custom-exam/create-from-performance.php';
     const SUBJECT_API_URL = 'api/exam/subjects.php';
     const LESSON_API_URL = 'api/exam/lessons.php';
@@ -10,12 +11,17 @@ function initializeQuestionAnalysis() {
     const subjectFilter = document.getElementById('filter-subject');
     const lessonFilter = document.getElementById('filter-lesson');
     const topicFilter = document.getElementById('filter-topic');
+    const sortFilter = document.getElementById('filter-sort');
     const questionCardsContainer = document.getElementById('question-cards-container');
     const loadMoreBtn = document.getElementById('load-more-btn');
     const loadMoreContainer = document.getElementById('load-more-container');
     const noQuestionsMessage = document.getElementById('no-questions-message');
     const clearAnalysisFiltersBtn = document.getElementById('clear-analysis-filters');
     const loadingSpinner = document.getElementById('loading-spinner');
+
+    // Skip Analysis Elements
+    const skipAnalysisContainer = document.getElementById('skip-analysis-container');
+    const skipAnalysisList = document.getElementById('skip-analysis-list');
 
     // Stats Elements
     const statTotalQuestions = document.getElementById('stat-total-questions');
@@ -122,6 +128,7 @@ function initializeQuestionAnalysis() {
         if (subjectFilter && subjectFilter.value) params.append('subject_id', subjectFilter.value);
         if (lessonFilter && lessonFilter.value) params.append('lesson_id', lessonFilter.value);
         if (topicFilter && topicFilter.value) params.append('topic_id', topicFilter.value);
+        if (sortFilter && sortFilter.value) params.append('sort', sortFilter.value);
 
         params.append('limit', limit);
         params.append('offset', offset);
@@ -147,6 +154,40 @@ function initializeQuestionAnalysis() {
             console.error('Failed to fetch analysis', error);
         } finally {
             if (loadingSpinner) loadingSpinner.classList.add('hidden');
+        }
+    }
+
+    async function fetchSkipAnalysis() {
+        if (!skipAnalysisList) return;
+
+        try {
+            const response = await fetch(SKIP_ANALYSIS_API_URL);
+            const result = await response.json();
+
+            if (result.success && result.analysis.length > 0) {
+                skipAnalysisList.innerHTML = '';
+                skipAnalysisContainer.classList.remove('hidden');
+
+                result.analysis.forEach(item => {
+                    const card = `
+                        <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 group hover:border-amber-200 transition-colors cursor-pointer" 
+                             onclick="localStorage.setItem('filter_analysis_subject', ${item.subject_id}); location.reload();">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-black text-gray-400 uppercase tracking-wider">${item.subject_name}</span>
+                                <span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full">${item.skip_count} Skips</span>
+                            </div>
+                            <div class="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                <div class="bg-amber-500 h-full rounded-full transition-all duration-1000" style="width: ${Math.min(100, (item.skip_count / (result.analysis[0].skip_count || 1)) * 100)}%"></div>
+                            </div>
+                        </div>
+                    `;
+                    skipAnalysisList.insertAdjacentHTML('beforeend', card);
+                });
+            } else {
+                skipAnalysisContainer.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('Failed to fetch skip analysis', error);
         }
     }
 
@@ -347,6 +388,12 @@ function initializeQuestionAnalysis() {
         });
     }
 
+    if (sortFilter) {
+        sortFilter.addEventListener('change', () => {
+            fetchAnalysis();
+        });
+    }
+
     if (clearAnalysisFiltersBtn) {
         clearAnalysisFiltersBtn.addEventListener('click', () => {
             localStorage.removeItem('filter_analysis_subject');
@@ -358,6 +405,7 @@ function initializeQuestionAnalysis() {
             lessonFilter.disabled = true;
             topicFilter.innerHTML = '<option value="">All Topics</option>';
             topicFilter.disabled = true;
+            if (sortFilter) sortFilter.value = 'default';
 
             fetchAnalysis();
         });
@@ -369,6 +417,7 @@ function initializeQuestionAnalysis() {
     if (btnMixedExam) btnMixedExam.addEventListener('click', () => openExamModal('mixed'));
 
     populateSubjects();
+    fetchSkipAnalysis();
 }
 
 initializeQuestionAnalysis();

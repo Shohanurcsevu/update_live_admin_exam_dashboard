@@ -54,8 +54,9 @@ $sql = "SELECT
             q.question,
             MAX(q.id) as ref_id,
             MAX(q.priority) as priority,
-            SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count,
+            SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
             SUM(CASE WHEN qa.selected_answer IS NULL AND qa.id IS NOT NULL THEN 1 ELSE 0 END) as unattempted_count,
+            SUM(CASE WHEN qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as answered_count,
             COUNT(qa.id) as total_attempts
         FROM questions q
         $srs_join
@@ -68,7 +69,7 @@ $having = [];
 if ($mode === 'wrong') {
     $having[] = "wrong_count > 0";
 } elseif ($mode === 'unattempted') {
-    $having[] = "(total_attempts = 0 OR unattempted_count > 0)";
+    $having[] = "answered_count = 0";
 }
 // 'mixed' takes everything. We'll balance it in ordering if needed, 
 // but priority first is usually enough.
@@ -77,10 +78,14 @@ if (!empty($having)) {
     $sql .= " HAVING " . implode(" AND ", $having);
 }
 
-// Ordering based on mode to prefer priority questions first
+// Ordering based on mode to prefer high-issue questions first
 if ($mode === 'mixed') {
-    // For mixed, prefer wrong/unattempted over correct if they have same priority
-    $sql .= " ORDER BY priority DESC, wrong_count DESC, total_attempts ASC, RAND() LIMIT $limit";
+    // For mixed, prefer heavy issues over priority/correctness
+    $sql .= " ORDER BY (wrong_count + unattempted_count) DESC, priority DESC, RAND() LIMIT $limit";
+} elseif ($mode === 'wrong') {
+    $sql .= " ORDER BY wrong_count DESC, priority DESC, RAND() LIMIT $limit";
+} elseif ($mode === 'unattempted') {
+    $sql .= " ORDER BY unattempted_count DESC, priority DESC, RAND() LIMIT $limit";
 } else {
     $sql .= " ORDER BY priority DESC, RAND() LIMIT $limit";
 }

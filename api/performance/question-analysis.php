@@ -35,14 +35,33 @@ $sql = "SELECT
             MAX(q.priority) as priority,
             COUNT(qa.id) as total_attempts,
             SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
-            SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count,
+            SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
             SUM(CASE WHEN qa.selected_answer IS NULL AND qa.id IS NOT NULL THEN 1 ELSE 0 END) as unattempted_count,
             MAX(q.id) as ref_id
         FROM questions q
         LEFT JOIN question_attempts qa ON q.id = qa.question_id
         WHERE $where_clause
-        GROUP BY q.question
-        ORDER BY total_attempts DESC, priority DESC";
+        GROUP BY q.question";
+
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'default';
+$order_by = "total_attempts DESC, priority DESC";
+
+switch ($sort) {
+    case 'attempted':
+        $order_by = "total_attempts DESC, priority DESC";
+        break;
+    case 'unattempted':
+        $order_by = "unattempted_count DESC, priority DESC";
+        break;
+    case 'correct':
+        $order_by = "correct_count DESC, priority DESC";
+        break;
+    case 'wrong':
+        $order_by = "wrong_count DESC, priority DESC";
+        break;
+}
+
+$sql .= " ORDER BY $order_by";
 
 // Pagination
 $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
@@ -59,6 +78,10 @@ $total_count = $count_stmt->get_result()->fetch_assoc()['total'];
 $count_stmt->close();
 
 $sql .= " LIMIT ? OFFSET ?";
+// Clone params for summary query (without limit/offset)
+$params_for_summary = $params;
+$types_for_summary = $types;
+
 $params[] = $limit;
 $params[] = $offset;
 $types .= "ii";
@@ -71,14 +94,40 @@ $stmt->execute();
 $result = $stmt->get_result();
 $questions = $result->fetch_all(MYSQLI_ASSOC);
 
-// Calculate summary
+// Calculate global summary (across all questions matching filters)
+$summary_sql = "SELECT 
+                    COUNT(DISTINCT question) as total_questions,
+                    SUM(correct_count) as total_correct,
+                    SUM(wrong_count) as total_wrong,
+                    SUM(total_attempts) as total_attempts
+                FROM (
+                    SELECT 
+                        q.question,
+                        SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+                        SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
+                        COUNT(qa.id) as total_attempts
+                    FROM questions q
+                    LEFT JOIN question_attempts qa ON q.id = qa.question_id
+                    WHERE $where_clause
+                    GROUP BY q.question
+                ) as filtered_aggregation";
+
+$summary_stmt = $conn->prepare($summary_sql);
+if (!empty($params_for_summary)) {
+    $summary_stmt->bind_param($types_for_summary, ...$params_for_summary);
+}
+$summary_stmt->execute();
+$summary_res = $summary_stmt->get_result()->fetch_assoc();
+$summary_stmt->close();
+
 $summary = [
-    'total_questions' => count($questions),
-    'total_attempts' => 0,
-    'total_correct' => 0,
-    'total_wrong' => 0,
-    'total_unattempted' => 0
+    'total_questions' => intval($summary_res['total_questions']),
+    'total_attempts' => intval($summary_res['total_attempts']),
+    'total_correct' => intval($summary_res['total_correct']),
+    'total_wrong' => intval($summary_res['total_wrong']),
 ];
+
+$summary['accuracy'] = $summary['total_attempts'] > 0 ? round(($summary['total_correct'] / $summary['total_attempts']) * 100, 2) : 0;
 
 foreach ($questions as &$q) {
     $q['total_attempts'] = intval($q['total_attempts']);
@@ -86,16 +135,8 @@ foreach ($questions as &$q) {
     $q['wrong_count'] = intval($q['wrong_count']);
     $q['unattempted_count'] = intval($q['unattempted_count']);
     $q['priority'] = intval($q['priority']);
-    
     $q['accuracy'] = $q['total_attempts'] > 0 ? round(($q['correct_count'] / $q['total_attempts']) * 100, 2) : 0;
-    
-    $summary['total_attempts'] += $q['total_attempts'];
-    $summary['total_correct'] += $q['correct_count'];
-    $summary['total_wrong'] += $q['wrong_count'];
-    $summary['total_unattempted'] += $q['unattempted_count'];
 }
-
-$summary['accuracy'] = $summary['total_attempts'] > 0 ? round(($summary['total_correct'] / $summary['total_attempts']) * 100, 2) : 0;
 
 echo json_encode([
     'success' => true,
