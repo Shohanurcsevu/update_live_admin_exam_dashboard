@@ -484,11 +484,33 @@ function initializeOfflineExamEngine() {
     }
 
     if (questionsArea) questionsArea.addEventListener('click', handleOptionClick);
-    if (submitExamBtn) submitExamBtn.addEventListener('click', async () => {
-        if (confirm("Are you sure you want to submit?")) {
-            await submitExam();
+
+    // Custom Submit Confirmation Logic
+    const confirmSubmitModal = document.getElementById('confirm-submit-modal');
+    const confirmSubmitBtn = document.getElementById('confirm-submit-btn');
+    const cancelSubmitBtn = document.getElementById('cancel-submit-btn');
+
+    if (submitExamBtn && confirmSubmitModal) {
+        submitExamBtn.addEventListener('click', () => {
+            confirmSubmitModal.classList.remove('hidden');
+            confirmSubmitModal.classList.add('flex');
+        });
+
+        if (confirmSubmitBtn) {
+            confirmSubmitBtn.addEventListener('click', async () => {
+                confirmSubmitModal.classList.add('hidden');
+                confirmSubmitModal.classList.remove('flex');
+                await submitExam();
+            });
         }
-    });
+
+        if (cancelSubmitBtn) {
+            cancelSubmitBtn.addEventListener('click', () => {
+                confirmSubmitModal.classList.add('hidden');
+                confirmSubmitModal.classList.remove('flex');
+            });
+        }
+    }
 
     loadOfflineExam();
 }
