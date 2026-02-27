@@ -45,6 +45,7 @@ $tables = [
     'performance', 'question_attempts', 'question_srs',
     'offline_exam_attempts', 'study_sessions', 'activity_log',
     'mistake_bank', 'flashcards', 'reading_logs', 'user_streaks',
+    'job_countdown', 'trivia_snapshots',
 ];
 
 $backup = [
@@ -72,14 +73,17 @@ foreach ($tables as $table) {
 
 $conn->close();
 
-// ─── Emit JSON (no download header — browser JS handles file writing) ─────────
+// ─── Compress & Emit (no download header — browser JS handles file writing) ──
 
-$json = json_encode($backup, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+$json    = json_encode($backup, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+$gzipped = gzencode($json, 6);
 
+header('Content-Type: application/gzip');
+header('Content-Length: ' . strlen($gzipped));
 header('X-Backup-Version: 1.1');
 header('X-Backup-Tables: ' . count($tables));
 header('X-Backup-Records: ' . $total_records);
 header('X-Backup-Type: auto');
 
-echo $json;
+echo $gzipped;
 exit;

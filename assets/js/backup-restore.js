@@ -68,6 +68,8 @@
         { name: 'flashcards', icon: 'style', label: 'Flashcards' },
         { name: 'reading_logs', icon: 'book', label: 'Reading Logs' },
         { name: 'user_streaks', icon: 'local_fire_department', label: 'Streaks' },
+        { name: 'job_countdown', icon: 'timer', label: 'Job Countdown' },
+        { name: 'trivia_snapshots', icon: 'emoji_events', label: 'Trivia Scores' },
     ];
 
     // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -97,9 +99,15 @@
     }
 
     async function fetchRecordStats() {
-        // We get this from the export endpoint by peeking at headers — instead
-        // just show total table count. Record count will appear after first export.
-        statTables.textContent = TABLES.length;
+        try {
+            const res = await fetch('api/backup/stats.php', { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (statTables) statTables.textContent = data.tables ?? TABLES.length;
+            if (statRecords) statRecords.textContent = (data.total_records ?? 0).toLocaleString();
+        } catch (_) {
+            // Silently fall back — stats bar just shows defaults
+        }
     }
 
     // ─── Export / Download ────────────────────────────────────────────────────────
@@ -131,7 +139,7 @@
             // Extract filename from Content-Disposition header if available
             const disposition = response.headers.get('Content-Disposition') || '';
             const match = disposition.match(/filename="([^"]+)"/);
-            const filename = match ? match[1] : `rethink-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            const filename = match ? match[1] : `rethink-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
 
             // Trigger browser download
             const url = URL.createObjectURL(blob);
@@ -198,8 +206,10 @@
     }
 
     function setFile(file) {
-        if (!file.name.endsWith('.json') && file.type !== 'application/json') {
-            showToast('Please select a valid .json backup file.', 'warning');
+        const validExt = file.name.endsWith('.json') || file.name.endsWith('.json.gz');
+        const validType = file.type === 'application/json' || file.type === 'application/gzip' || file.type === 'application/x-gzip';
+        if (!validExt && !validType) {
+            showToast('Please select a valid .json or .json.gz backup file.', 'warning');
             return;
         }
         selectedFile = file;
@@ -580,14 +590,15 @@
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `rethink-snapshot-${id}.json`;
+                        a.download = `rethink-snapshot-${id}.json.gz`;
                         document.body.appendChild(a); a.click(); document.body.removeChild(a);
                         URL.revokeObjectURL(url);
                         showToast('Snapshot downloaded.', 'success');
                     } else if (action === 'restore') {
-                        // Reuse existing import flow via selectedFile trick
+                        // Reuse existing import flow — compressed blob is sent to import.php
+                        // which auto-detects gzip and decompresses server-side
                         const blob = await abm.restoreFromHistory(id);
-                        const file = new File([blob], `rethink-snapshot-${id}.json`, { type: 'application/json' });
+                        const file = new File([blob], `rethink-snapshot-${id}.json.gz`, { type: 'application/gzip' });
                         setFile(file); // sets selectedFile & enables Import button
                         // Scroll to import section
                         document.getElementById('br-dropzone')?.scrollIntoView({ behavior: 'smooth', block: 'center' });

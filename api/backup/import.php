@@ -105,6 +105,14 @@ if ($raw === false) {
     respond(false, 'Could not read uploaded file.');
 }
 
+// Auto-detect gzip (magic bytes: 0x1f 0x8b) and decompress transparently
+if (strlen($raw) >= 2 && $raw[0] === "\x1f" && $raw[1] === "\x8b") {
+    $raw = @gzdecode($raw);
+    if ($raw === false) {
+        respond(false, 'Backup file appears to be gzip-compressed but could not be decompressed.');
+    }
+}
+
 $backup = json_decode($raw, true);
 if (json_last_error() !== JSON_ERROR_NONE) {
     respond(false, 'Invalid JSON file: ' . json_last_error_msg());
@@ -154,6 +162,8 @@ $table_order = [
     'flashcards',
     'reading_logs',
     'user_streaks',
+    'job_countdown',
+    'trivia_snapshots',
 ];
 
 // ─── Schema Bootstrap (v1.1+): Create Tables If They Don't Exist ─────────────

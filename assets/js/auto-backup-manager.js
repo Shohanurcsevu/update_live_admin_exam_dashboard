@@ -26,7 +26,7 @@
     // ─── Constants ────────────────────────────────────────────────────────────
 
     const ENDPOINT = 'api/backup/auto-backup.php';
-    const FILE_NAME = 'rethink-latest-backup.json';
+    const FILE_NAME = 'rethink-latest-backup.json.gz';
     const DB_NAME = 'rethinkAutoBackup';
     const DB_VERSION = 2;          // bumped: added handles store
     const STORE_NAME = 'snapshots';
@@ -222,21 +222,21 @@
 
     /**
      * Write (overwrite) a single file in the chosen folder.
-     * Silently replaces any previous content.
+     * Silently replaces any previous content. Accepts ArrayBuffer or Blob.
      */
-    async function writeToFolder(jsonText) {
+    async function writeToFolder(data) {
         if (!_dirHandle) throw new Error('No folder selected.');
         const fileHandle = await _dirHandle.getFileHandle(FILE_NAME, { create: true });
         const writable = await fileHandle.createWritable();
-        await writable.write(jsonText);
+        await writable.write(data);
         await writable.close();
     }
 
     /**
      * Fallback: trigger a regular browser download (no folder access).
      */
-    function triggerFallbackDownload(jsonText) {
-        const blob = new Blob([jsonText], { type: 'application/json' });
+    function triggerFallbackDownload(data) {
+        const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/gzip' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -255,18 +255,18 @@
         const result = { success: false, usedFallback: false, message: '' };
 
         try {
-            // 1. Fetch from server
+            // 1. Fetch compressed data from server
             const response = await fetch(ENDPOINT, { method: 'GET', cache: 'no-store' });
             if (!response.ok) throw new Error(`Server error ${response.status}`);
 
-            const jsonText = await response.text();
+            const compressedBuffer = await response.arrayBuffer();
             const recordCount = parseInt(response.headers.get('X-Backup-Records') || '0', 10);
             const now = new Date().toISOString();
 
-            // 2a. Write to cloud-synced folder (File System Access API)
+            // 2a. Write compressed file to cloud-synced folder (File System Access API)
             if (_dirHandle) {
                 try {
-                    await writeToFolder(jsonText);
+                    await writeToFolder(compressedBuffer);
                 } catch (writeErr) {
                     // Handle revoked permission gracefully
                     console.warn('[AutoBackup] Could not write to folder:', writeErr.message);
@@ -278,17 +278,17 @@
             } else if (supportsFileSystemAccess() && _settings.folderName) {
                 // Handle lost — re-pick is needed
                 result.usedFallback = true;
-                triggerFallbackDownload(jsonText);
+                triggerFallbackDownload(compressedBuffer);
             } else {
                 // No folder picked at all, or API unsupported
                 result.usedFallback = !_settings.folderName;
                 if (!_dirHandle) {
-                    triggerFallbackDownload(jsonText);
+                    triggerFallbackDownload(compressedBuffer);
                 }
             }
 
-            // 2b. Save to IndexedDB (always, regardless of folder)
-            const blob = new Blob([jsonText], { type: 'application/json' });
+            // 2b. Save compressed blob to IndexedDB (saves storage space)
+            const blob = new Blob([compressedBuffer], { type: 'application/gzip' });
             await idbAdd(blob, {
                 savedAt: now,
                 sizeBytes: blob.size,

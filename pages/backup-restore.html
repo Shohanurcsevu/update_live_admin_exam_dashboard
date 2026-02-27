@@ -35,7 +35,8 @@
             </div>
             <div>
                 <h2 class="text-base font-bold text-gray-800">Download Backup</h2>
-                <p class="text-xs text-gray-500">Exports all 15 tables as a single versioned JSON file.</p>
+                <p class="text-xs text-gray-500">Exports all 17 tables as a compressed <code
+                        class="text-indigo-600">.json.gz</code> file.</p>
             </div>
             <span
                 class="ml-auto text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-indigo-100 text-indigo-600">v1.0</span>
@@ -85,7 +86,8 @@
             </div>
             <div>
                 <h2 class="text-base font-bold text-gray-800">Restore from Backup</h2>
-                <p class="text-xs text-gray-500">Upload a <code class="text-amber-600">.json</code> backup file to
+                <p class="text-xs text-gray-500">Upload a <code class="text-amber-600">.json.gz</code> or <code
+                        class="text-amber-600">.json</code> backup file to
                     restore your data.</p>
             </div>
         </div>
@@ -103,7 +105,8 @@
                 </div>
                 <p class="text-sm font-bold text-gray-600">Drop backup file here or <span
                         class="text-indigo-600 underline underline-offset-2">browse</span></p>
-                <p class="text-xs text-gray-400 mt-1">Accepts <code class="text-amber-600">.json</code> backup files up
+                <p class="text-xs text-gray-400 mt-1">Accepts <code class="text-amber-600">.json.gz</code> and <code
+                        class="text-amber-600">.json</code> backups up
                     to 100 MB</p>
 
                 <!-- File selected indicator -->
@@ -116,7 +119,8 @@
                         <span class="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
-                <input type="file" id="br-file-input" accept=".json,application/json" class="hidden">
+                <input type="file" id="br-file-input" accept=".json,.json.gz,application/json,application/gzip"
+                    class="hidden">
             </div>
 
             <!-- Conflict Mode -->
@@ -198,18 +202,23 @@
     <!-- === AUTO-BACKUP CARD === -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <!-- Card Header -->
-        <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-violet-50/60 to-purple-50/40 flex items-center gap-4">
+        <div
+            class="p-6 border-b border-gray-100 bg-gradient-to-r from-violet-50/60 to-purple-50/40 flex items-center gap-4">
             <div class="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow">
                 <span class="material-symbols-outlined">cloud_sync</span>
             </div>
             <div class="flex-1">
                 <h2 class="text-base font-bold text-gray-800">Auto-Backup</h2>
-                <p class="text-xs text-gray-500">Silently overwrites <code class="text-violet-600">rethink-latest-backup.json</code> in your cloud folder.</p>
+                <p class="text-xs text-gray-500">Silently overwrites <code
+                        class="text-violet-600">rethink-latest-backup.json.gz</code> in your cloud folder.</p>
             </div>
             <!-- Enable Toggle -->
-            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Enable / disable auto-backup">
+            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0"
+                title="Enable / disable auto-backup">
                 <input type="checkbox" id="ab-enabled-toggle" class="sr-only peer">
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
+                <div
+                    class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600">
+                </div>
             </label>
         </div>
 
@@ -218,7 +227,8 @@
             <!-- Status Row -->
             <div class="flex flex-wrap gap-3">
                 <!-- Last Run -->
-                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[160px]">
+                <div
+                    class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[160px]">
                     <span class="material-symbols-outlined text-violet-400 text-base">history</span>
                     <div>
                         <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Last Backup</p>
@@ -226,7 +236,8 @@
                     </div>
                 </div>
                 <!-- Next Run -->
-                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[160px]">
+                <div
+                    class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[160px]">
                     <span class="material-symbols-outlined text-violet-400 text-base">schedule</span>
                     <div>
                         <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Next Backup</p>
@@ -234,7 +245,8 @@
                     </div>
                 </div>
                 <!-- Run Count -->
-                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[120px]">
+                <div
+                    class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[120px]">
                     <span class="material-symbols-outlined text-violet-400 text-base">check_circle</span>
                     <div>
                         <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Runs</p>
@@ -274,13 +286,16 @@
 
             <!-- Cloud folder tip -->
             <div id="ab-folder-tip" class="hidden bg-violet-50 border border-violet-100 rounded-xl p-4 flex gap-3">
-                <span class="material-symbols-outlined text-violet-400 text-lg flex-shrink-0 mt-0.5">tips_and_updates</span>
+                <span
+                    class="material-symbols-outlined text-violet-400 text-lg flex-shrink-0 mt-0.5">tips_and_updates</span>
                 <div class="text-xs text-violet-700 space-y-0.5">
                     <p class="font-bold">For crash protection, choose a cloud-synced folder:</p>
-                    <p class="text-violet-600">📁 <strong>OneDrive</strong> — <code>C:\Users\YourName\OneDrive\</code></p>
+                    <p class="text-violet-600">📁 <strong>OneDrive</strong> — <code>C:\Users\YourName\OneDrive\</code>
+                    </p>
                     <p class="text-violet-600">📁 <strong>Google Drive</strong> — <code>G:\My Drive\</code></p>
                     <p class="text-violet-600">📁 <strong>Dropbox</strong> — <code>C:\Users\YourName\Dropbox\</code></p>
-                    <p class="mt-1 text-violet-500">Each auto-backup <strong>replaces</strong> the previous file — only one file ever exists in your folder.</p>
+                    <p class="mt-1 text-violet-500">Each auto-backup <strong>replaces</strong> the previous file — only
+                        one file ever exists in your folder.</p>
                 </div>
             </div>
 
@@ -324,8 +339,8 @@
         <div class="space-y-1 text-xs text-blue-700">
             <p class="font-bold">How backups work</p>
             <ul class="list-disc list-inside space-y-0.5 text-blue-600 font-medium">
-                <li>Backups are versioned JSON files — open them in any text editor.</li>
-                <li>The file includes all 15 data tables from your account.</li>
+                <li>Backups are gzip-compressed JSON files (<code>.json.gz</code>) — ~85% smaller than raw JSON.</li>
+                <li>The file includes all 17 data tables from your account.</li>
                 <li><b>Skip mode</b> is always safe to run — it won't touch existing data.</li>
                 <li><b>Overwrite mode</b> replaces records by ID — use only when migrating or resetting.</li>
                 <li>Always download a fresh backup before importing to ensure nothing is lost.</li>

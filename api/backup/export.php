@@ -62,6 +62,8 @@ $tables = [
     'flashcards',
     'reading_logs',
     'user_streaks',
+    'job_countdown',
+    'trivia_snapshots',
 ];
 
 foreach ($tables as $table) {
@@ -77,21 +79,22 @@ foreach ($tables as $table) {
 
 $conn->close();
 
-// ─── Stream as Download ───────────────────────────────────────────────────────
+// ─── Compress & Stream as Download ────────────────────────────────────────────
 
 $json     = json_encode($backup, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-$filename = 'rethink-backup-' . date('Y-m-d') . '.json';
+$gzipped  = gzencode($json, 6);        // level 6 = good balance of speed vs size
+$filename = 'rethink-backup-' . date('Y-m-d') . '.json.gz';
 
 while (ob_get_level()) ob_end_clean();
 
-header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: application/gzip');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
-header('Content-Length: ' . strlen($json));
+header('Content-Length: ' . strlen($gzipped));
 header('Pragma: no-cache');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 header('X-Backup-Version: 1.1');
 header('X-Backup-Tables: ' . count($tables));
 
-echo $json;
+echo $gzipped;
 exit;
 
