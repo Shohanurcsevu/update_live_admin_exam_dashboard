@@ -151,10 +151,10 @@ function showCard(index) {
     // Update options with click handlers
     const optionsContainer = document.getElementById('options-container');
     optionsContainer.innerHTML = Object.entries(question.options).map(([key, value]) => `
-        <div class="option-item text-left px-5 py-3.5 bg-slate-50 hover:bg-white hover:shadow-md hover:border-purple-200 rounded-2xl cursor-pointer transition-all border border-slate-100 flex items-center gap-4 group"
+        <div class="option-item text-left px-2 py-2 bg-slate-50 hover:bg-white hover:shadow-md hover:border-purple-200 rounded-xl cursor-pointer transition-all border border-slate-100 flex items-center gap-2 group"
              onclick="selectOption(event, '${key}')">
-            <span class="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center font-bold text-slate-500 group-hover:text-purple-600 group-hover:border-purple-200 transition-all">${key}</span>
-            <span class="flex-1 text-sm md:text-base font-medium text-slate-600 group-hover:text-slate-800">${value}</span>
+            <span class="w-7 h-7 flex-shrink-0 rounded-lg bg-white shadow-sm border border-slate-100 flex items-center justify-center font-bold text-[10px] text-slate-500 group-hover:text-purple-600 group-hover:border-purple-200 transition-all">${key}</span>
+            <span class="flex-1 text-[10px] md:text-sm font-medium text-slate-600 group-hover:text-slate-800 line-clamp-2 leading-tight">${value}</span>
         </div>
     `).join('');
 

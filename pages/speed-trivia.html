@@ -2,7 +2,7 @@
     #trivia-game-container {
         max-width: 900px;
         margin: 0 auto;
-        padding: 0.5rem;
+        padding: 0.5rem 0.5rem 3rem;
     }
 
     /* Timer Ring Animation */
@@ -10,7 +10,7 @@
         position: relative;
         width: 80px;
         height: 80px;
-        margin: 0 auto 1rem;
+        margin: 0 auto 0.5rem;
     }
 
     .timer-ring {
@@ -134,15 +134,110 @@
         }
     }
 
+    /* Level Up Splash */
+    #level-up-splash {
+        pointer-events: none;
+        z-index: 1000;
+    }
+
+    .animate-level-up {
+        animation: level-up-in 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes level-up-in {
+        0% {
+            transform: scale(0) rotate(-45deg);
+            opacity: 0;
+        }
+
+        50% {
+            transform: scale(1.2) rotate(10deg);
+            opacity: 1;
+        }
+
+        100% {
+            transform: scale(1) rotate(0);
+            opacity: 1;
+        }
+    }
+
     /* Mobile adjustments */
     @media (max-width: 640px) {
         .timer-container {
-            width: 100px;
-            height: 100px;
+            width: 90px;
+            height: 90px;
         }
 
         #question-display-text {
             font-size: 1.1rem;
+        }
+    }
+
+    /* Ghost Leaderboard */
+    .ghost-bar-bg {
+        height: 6px;
+        background: #f1f5f9;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .ghost-bar-fill {
+        height: 100%;
+        transition: width 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .ghost-label {
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+    }
+
+    .ghost-value {
+        font-size: 10px;
+        font-weight: 900;
+        color: #475569;
+    }
+
+    .overtake-pulse {
+        animation: overtake-flash 1s infinite;
+    }
+
+    @keyframes overtake-flash {
+
+        0%,
+        100% {
+            opacity: 1;
+            filter: brightness(1);
+        }
+
+        50% {
+            opacity: 0.8;
+            filter: brightness(1.5);
+            color: #10b981;
+        }
+    }
+
+    /* Termination Modal */
+    #terminate-modal-overlay {
+        z-index: 2000;
+        backdrop-filter: blur(8px);
+    }
+
+    .modal-bounce {
+        animation: modal-bounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes modal-bounce {
+        0% {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+
+        100% {
+            transform: scale(1);
+            opacity: 1;
         }
     }
 </style>
@@ -151,9 +246,18 @@
     <!-- Game HUD -->
     <div
         class="flex items-center justify-between mb-4 bg-white/80 backdrop-blur-md p-3 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-50">
-        <div class="flex flex-col">
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Score</span>
-            <span id="score-display" class="text-lg font-bold text-slate-800">0000</span>
+        <div class="flex items-center gap-4">
+            <div class="flex flex-col">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Score</span>
+                <span id="score-display" class="text-lg font-bold text-slate-800">0000</span>
+            </div>
+
+            <div class="h-8 w-[1px] bg-slate-100"></div>
+
+            <div class="flex flex-col">
+                <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Level</span>
+                <span id="level-display" class="text-lg font-black text-indigo-600">1</span>
+            </div>
         </div>
 
         <div id="streak-hud" class="flex flex-col items-center">
@@ -165,20 +269,28 @@
             </div>
         </div>
 
-        <div class="flex flex-col items-end">
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lives</span>
-            <div id="lives-display" class="flex flex-wrap gap-0.5 mt-1 justify-end max-w-[120px]">
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
-                <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-base">favorite</span>
+        <div class="flex items-center gap-3">
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lives</span>
+                <div id="lives-display" class="flex flex-wrap gap-0.5 mt-1 justify-end max-w-[150px]">
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                    <span class="material-symbols-outlined text-rose-500 fill-rose-500 text-sm">favorite</span>
+                </div>
             </div>
+
+            <button id="stop-button" onclick="triviaGame.terminate()"
+                class="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Stop Game">
+                <span class="material-symbols-outlined">stop_circle</span>
+            </button>
         </div>
     </div>
 
@@ -208,38 +320,103 @@
 
     <!-- Active Game View -->
     <div id="game-active-view" class="hidden">
-        <!-- Question Progress -->
-        <div class="flex justify-center mb-4">
-            <span id="question-progress"
-                class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Question 1 of 15</span>
-        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Ghost Sidebar -->
+            <div
+                class="lg:col-span-1 order-last lg:order-first space-y-4 bg-white/50 backdrop-blur-sm p-4 pb-8 lg:pb-4 rounded-3xl border border-dashed border-slate-200">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-indigo-400 text-sm">history</span>
+                    <span
+                        class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Self-Competition</span>
+                </div>
 
-        <!-- Timer -->
-        <div class="timer-container">
-            <svg class="timer-ring" width="80" height="80" viewBox="0 0 100 100">
-                <circle class="stroke-slate-100" stroke-width="8" fill="transparent" r="42" cx="50" cy="50" />
-                <circle id="timer-bar" class="timer-ring-circle timer-safe" stroke-width="8" stroke-linecap="round"
-                    fill="transparent" r="42" cx="50" cy="50" style="stroke-dasharray: 264; stroke-dashoffset: 0;" />
-            </svg>
-            <div class="absolute inset-0 flex items-center justify-center">
-                <span id="timer-text" class="text-2xl font-black text-slate-800 leading-none">20</span>
+                <!-- Ghost Rows -->
+                <div class="space-y-4">
+                    <!-- Today -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between items-end">
+                            <span class="ghost-label text-indigo-600">Today's Ghost</span>
+                            <span id="ghost-today-val" class="ghost-value text-indigo-600">0</span>
+                        </div>
+                        <div class="ghost-bar-bg">
+                            <div id="ghost-today-bar" class="ghost-bar-fill bg-indigo-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="h-[1px] bg-slate-100"></div>
+
+                    <!-- Yesterday -->
+                    <div class="space-y-1 opacity-60 transition-opacity hover:opacity-100">
+                        <div class="flex justify-between items-end">
+                            <span class="ghost-label">Yesterday's You</span>
+                            <span id="ghost-yesterday-val" class="ghost-value">0</span>
+                        </div>
+                        <div class="ghost-bar-bg">
+                            <div id="ghost-yesterday-bar" class="ghost-bar-fill bg-slate-400" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Average -->
+                    <div class="space-y-1 opacity-60 transition-opacity hover:opacity-100">
+                        <div class="flex justify-between items-end">
+                            <span class="ghost-label">Personal Average</span>
+                            <span id="ghost-average-val" class="ghost-value">0</span>
+                        </div>
+                        <div class="ghost-bar-bg">
+                            <div id="ghost-average-bar" class="ghost-bar-fill bg-slate-400" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Best -->
+                    <div class="space-y-1 opacity-60 transition-opacity hover:opacity-100">
+                        <div class="flex justify-between items-end">
+                            <span class="ghost-label text-orange-500">Best Ever</span>
+                            <span id="ghost-best-val" class="ghost-value text-orange-500">0</span>
+                        </div>
+                        <div class="ghost-bar-bg">
+                            <div id="ghost-best-bar" class="ghost-bar-fill bg-orange-400" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <!-- Question Card -->
-        <div
-            class="bg-white rounded-[1.5rem] p-5 md:p-8 shadow-xl border border-slate-100 mb-4 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <span class="material-symbols-outlined text-8xl">help_center</span>
-            </div>
+            <!-- Main Question Area -->
+            <div class="lg:col-span-3">
+                <!-- Question Progress -->
+                <div class="flex justify-center mb-2">
+                    <span id="question-progress"
+                        class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Question 1 of 15</span>
+                </div>
 
-            <h2 id="question-display-text"
-                class="text-lg md:text-xl font-bold text-slate-800 text-center mb-6 leading-tight relative z-10">
-                Loading question...
-            </h2>
+                <!-- Timer -->
+                <div class="timer-container">
+                    <svg class="timer-ring block w-full h-full" viewBox="0 0 100 100">
+                        <circle class="stroke-slate-100" stroke-width="8" fill="transparent" r="42" cx="50" cy="50" />
+                        <circle id="timer-bar" class="timer-ring-circle timer-safe" stroke-width="8"
+                            stroke-linecap="round" fill="transparent" r="42" cx="50" cy="50"
+                            style="stroke-dasharray: 264; stroke-dashoffset: 0;" />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span id="timer-text" class="text-2xl font-black text-slate-800 leading-none">20</span>
+                    </div>
+                </div>
 
-            <div id="options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
-                <!-- Options will be injected here -->
+                <!-- Question Card -->
+                <div
+                    class="bg-white rounded-[1.5rem] p-5 md:p-8 shadow-xl border border-slate-100 mb-4 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <span class="material-symbols-outlined text-8xl">help_center</span>
+                    </div>
+
+                    <h2 id="question-display-text"
+                        class="text-lg md:text-xl font-bold text-slate-800 text-center mb-6 leading-tight relative z-10">
+                        Loading question...
+                    </h2>
+
+                    <div id="options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+                        <!-- Options will be injected here -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -280,5 +457,44 @@
             class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-100">
             Play Again
         </button>
+    </div>
+
+    <!-- Level Up Splash Overlay -->
+    <div id="level-up-splash"
+        class="hidden fixed inset-0 flex items-center justify-center bg-indigo-600/20 backdrop-blur-[2px]">
+        <div class="text-center animate-level-up">
+            <div
+                class="w-32 h-32 bg-white rounded-[2.5rem] flex items-center justify-center mx-auto mb-4 shadow-2xl relative">
+                <span class="material-symbols-outlined text-indigo-600 text-6xl">grade</span>
+                <!-- Decorative particles (visual only) -->
+                <div class="absolute -top-2 -right-2 w-8 h-8 bg-orange-500 rounded-full animate-ping opacity-50"></div>
+            </div>
+            <h2 class="text-5xl font-black text-white drop-shadow-lg uppercase italic tracking-tighter mb-2">Level Up!
+            </h2>
+            <p id="level-up-reward" class="text-indigo-100 font-bold tracking-widest">+500 Bonus Points</p>
+        </div>
+    </div>
+
+    <!-- Termination Modal -->
+    <div id="terminate-modal-overlay" class="hidden fixed inset-0 flex items-center justify-center bg-slate-900/40 p-4">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl modal-bounce border border-slate-100">
+            <div class="w-20 h-20 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <span class="material-symbols-outlined text-4xl">warning</span>
+            </div>
+            <h3 class="text-2xl font-black text-slate-800 text-center mb-2">Stop Game?</h3>
+            <p class="text-slate-500 text-center mb-8 px-4 text-sm">All current progress, score, and streaks will be
+                lost.</p>
+
+            <div class="space-y-3">
+                <button onclick="triviaGame.confirmTerminate()"
+                    class="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-xl shadow-rose-100 italic text-sm">
+                    Yes, End Session
+                </button>
+                <button onclick="triviaGame.hideTerminateModal()"
+                    class="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all text-sm">
+                    No, Keep Playing
+                </button>
+            </div>
+        </div>
     </div>
 </div>

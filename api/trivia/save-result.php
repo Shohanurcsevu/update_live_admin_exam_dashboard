@@ -29,15 +29,32 @@ if ($score > 5000) {
 // In a full implementation, we would save this to a 'trivia_scores' table.
 // To keep it simple for the user, we'll just acknowledge the result.
 
-echo json_encode([
-    'success' => true,
-    'message' => 'Score of ' . $score . ' recorded!',
-    'data' => [
-        'score' => $score,
-        'max_streak' => $max_streak,
-        'questions_answered' => $questions_answered
-    ]
-]);
+    $result = [
+        'success' => true,
+        'message' => 'Result saved successfully',
+        'data' => [
+            'score' => $score,
+            'max_streak' => $max_streak,
+            'questions_answered' => $questions_answered
+        ]
+    ];
+
+    // --- NEW: Save normalized snapshot for Ghosts ---
+    // Formula: Accuracy(500) + Speed(300) + Streak(200)
+    // We expect score, max_streak, questions_answered, total_accuracy, avg_speed, level_reached
+    if (isset($data['normalized_score'])) {
+        $stmt = $conn->prepare("INSERT INTO trivia_snapshots (normalized_score, accuracy, avg_speed, max_streak, level_reached) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("iddii", 
+            $data['normalized_score'], 
+            $data['accuracy'], 
+            $data['avg_speed'], 
+            $data['max_streak'], 
+            $data['level_reached']
+        );
+        $stmt->execute();
+    }
+
+    echo json_encode($result);
 
 $conn->close();
 ?>

@@ -26,8 +26,18 @@
         padding: 1.5rem;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
+        /* Better for scrollable content */
         align-items: center;
+        overflow-y: auto;
+        /* Prevent cutoff */
+        scrollbar-width: none;
+        /* Hide scrollbar for clean look */
+    }
+
+    .card-front::-webkit-scrollbar,
+    .card-back::-webkit-scrollbar {
+        display: none;
     }
 
     .card-back {
@@ -37,16 +47,27 @@
     /* Mobile friendly adjustments */
     @media (max-width: 640px) {
         .card-inner {
-            height: 350px !important;
+            height: 380px !important;
+            /* Shorter to fit button on screen */
         }
 
         .card-front,
         .card-back {
-            padding: 1rem;
+            padding: 1.25rem;
+            justify-content: center;
+            /* Center if content is short */
+        }
+
+        /* If content actually overflows, flex-start is better */
+        .card-front>div.relative,
+        .card-back>div {
+            margin-top: auto;
+            margin-bottom: auto;
         }
 
         #question-text {
-            font-size: 1.125rem;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
         }
 
         #action-buttons button {
@@ -117,10 +138,10 @@
                         <p id="question-text"
                             class="text-xl md:text-2xl font-bold text-center mb-8 leading-tight tracking-tight px-4 text-slate-800">
                         </p>
-                        <div id="options-container" class="w-full space-y-3 max-w-sm"></div>
+                        <div id="options-container" class="w-full grid grid-cols-2 gap-2 max-w-2xl px-1 mb-4"></div>
 
                         <div
-                            class="mt-10 flex items-center gap-2 px-5 py-2.5 bg-slate-50 rounded-full border border-slate-100 shadow-sm">
+                            class="mt-6 flex items-center gap-2 px-5 py-2.5 bg-slate-50 rounded-full border border-slate-100 shadow-sm">
                             <span class="material-symbols-outlined text-sm text-slate-400">touch_app</span>
                             <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Pick an option
                                 to verify</span>

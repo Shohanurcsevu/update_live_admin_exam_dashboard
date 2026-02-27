@@ -1,21 +1,20 @@
 <?php
-require_once 'api/subject/db_connect.php';
+require_once('api/subject/db_connect.php');
 
-$sql = "CREATE TABLE IF NOT EXISTS question_attempts (
+$sql = "CREATE TABLE IF NOT EXISTS trivia_snapshots (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    exam_id INT NOT NULL,
-    selected_answer VARCHAR(10) NULL,
-    is_correct TINYINT(1) NULL,
-    attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX (question_id),
-    INDEX (exam_id)
+    normalized_score INT,
+    accuracy FLOAT,
+    avg_speed FLOAT,
+    max_streak INT,
+    level_reached INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )";
 
 if ($conn->query($sql) === TRUE) {
-    echo "Table question_attempts created successfully\n";
+    echo "Table trivia_snapshots created successfully";
 } else {
-    echo "Error creating table: " . $conn->error . "\n";
+    echo "Error creating table: " . $conn->error;
 }
 
 $conn->close();

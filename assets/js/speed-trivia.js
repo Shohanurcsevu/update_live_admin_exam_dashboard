@@ -10,12 +10,15 @@ window.triviaGame = {
     streak: 0,
     maxStreak: 0,
     lives: 10,
+    currentLevel: 1,
     timer: 20,
     timerInterval: null,
     isProcessing: false,
     results: [],
     solvedIds: new Set(),
-    retryCount: {}, // Track retries for specific QIDs
+    retryCount: {},
+    ghostData: { yesterday: 0, best: 0, average: 0 },
+    stats: { totalRemainingTime: 0, totalAnswered: 0 },
 
     init: async function () {
         this.resetState();
@@ -28,6 +31,7 @@ window.triviaGame = {
 
             if (data.success) {
                 this.questions = data.data;
+                await this.fetchGhosts();
                 this.showView('start');
             } else {
                 window.showToast('Failed to load questions', 'error');
@@ -46,17 +50,21 @@ window.triviaGame = {
         this.streak = 0;
         this.maxStreak = 0;
         this.lives = 10;
+        this.currentLevel = 1;
         this.timer = 20;
         this.isProcessing = false;
         this.results = [];
         this.solvedIds = new Set();
         this.retryCount = {};
+        this.stats = { totalRemainingTime: 0, totalAnswered: 0 };
+        this.updateStopButtonState();
     },
 
     start: function () {
         if (this.questions.length === 0) return;
         this.showView('active');
         this.updateHUD();
+        this.updateStopButtonState();
         this.loadQuestion();
     },
 
@@ -82,7 +90,7 @@ window.triviaGame = {
 
         const q = this.questions[0]; // ALWAYS WORK ON THE HEAD
         this.isProcessing = false;
-        this.timer = 20;
+        this.timer = this.getMaxTimer();
 
         // Update UI
         const progressEl = document.getElementById('question-progress');
@@ -141,16 +149,29 @@ window.triviaGame = {
         window.triviaGameInterval = this.timerInterval;
     },
 
+    pauseTimer: function () {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+    },
+
+    resumeTimer: function () {
+        this.startTimer();
+    },
+
     updateTimerUI: function () {
         const text = document.getElementById('timer-text');
         const bar = document.getElementById('timer-bar');
 
-        if (!text || !bar) return;
+        // Safety: If timer elements are missing, we likely navigated away. Stop the interval.
+        if (!text || !bar) {
+            if (this.timerInterval) clearInterval(this.timerInterval);
+            return;
+        }
 
         text.textContent = this.timer;
 
         // Offset Calculation (stroke-dasharray for r=42 is 263.89, let's use 264)
-        const offset = 264 - (this.timer / 20) * 264;
+        const max = this.getMaxTimer();
+        const offset = 264 - (this.timer / max) * 264;
         bar.style.strokeDashoffset = offset;
 
         // Color Change
@@ -179,12 +200,19 @@ window.triviaGame = {
 
         if (isCorrect) {
             if (buttons[selectedIndex]) buttons[selectedIndex].classList.add('option-correct');
+            const wasSolved = this.solvedIds.has(q.id);
             this.solvedIds.add(q.id);
+
             this.calculateScore(this.timer);
             this.streak++;
             if (this.streak > this.maxStreak) this.maxStreak = this.streak;
             this.flashBackground('correct');
             this.triggerStreakEffects();
+
+            // Check Level Up ONLY if it's a new unique solve
+            if (!wasSolved) {
+                this.checkLevelUp();
+            }
         } else {
             if (buttons[selectedIndex]) buttons[selectedIndex].classList.add('option-wrong');
             if (buttons[q.correct_option - 1]) buttons[q.correct_option - 1].classList.add('option-correct');
@@ -193,13 +221,19 @@ window.triviaGame = {
             this.flashBackground('wrong');
 
             // Re-queue
+            this.shuffleOptions(q);
             this.questions.push(q);
             this.retryCount[q.id] = (this.retryCount[q.id] || 0) + 1;
             window.showToast('Failed! Added back as a RETRY question.', 'error');
         }
 
         this.updateHUD();
+        this.updateGhostBars();
         this.results.push({ qid: q.id, correct: isCorrect, time: 20 - this.timer });
+
+        // Track stats for normalization
+        this.stats.totalAnswered++;
+        if (isCorrect) this.stats.totalRemainingTime += this.timer;
 
         setTimeout(() => {
             this.loadQuestion();
@@ -221,9 +255,13 @@ window.triviaGame = {
         this.lives--;
         this.flashBackground('wrong');
         this.updateHUD();
-        this.results.push({ qid: q.id, correct: false, time: 20, timeout: true });
+        this.updateGhostBars();
+        this.results.push({ qid: q.id, correct: false, time: this.getMaxTimer(), timeout: true });
+
+        this.stats.totalAnswered++;
 
         // Re-queue
+        this.shuffleOptions(q);
         this.questions.push(q);
         this.retryCount[q.id] = (this.retryCount[q.id] || 0) + 1;
         window.showToast('Timeout! Added back as a RETRY question.', 'error');
@@ -235,7 +273,8 @@ window.triviaGame = {
 
     calculateScore: function (remainingTime) {
         const base = 100;
-        const speedBonus = (remainingTime / 20) * 50;
+        const max = this.getMaxTimer();
+        const speedBonus = (remainingTime / max) * 50;
         const streakMultiplier = 1 + (this.streak * 0.1);
         const multiplier = Math.min(streakMultiplier, 2.0); // Cap at 2x
 
@@ -246,6 +285,9 @@ window.triviaGame = {
     updateHUD: function () {
         const scoreEl = document.getElementById('score-display');
         if (scoreEl) scoreEl.textContent = this.score.toString().padStart(4, '0');
+
+        const levelEl = document.getElementById('level-display');
+        if (levelEl) levelEl.textContent = this.currentLevel;
 
         const streakEl = document.getElementById('streak-display');
         if (streakEl) streakEl.textContent = this.streak;
@@ -313,10 +355,68 @@ window.triviaGame = {
             }
         }
 
+        this.updateStopButtonState();
         this.saveResults();
     },
 
+    fetchGhosts: async function () {
+        try {
+            const resp = await fetch('api/trivia/get-ghosts.php');
+            const data = await resp.json();
+            if (data.success) {
+                this.ghostData = data.data;
+                this.updateGhostBars(true); // Initial bars
+            }
+        } catch (e) {
+            console.error('Ghost fetch fail:', e);
+        }
+    },
+
+    getNormalizedScore: function () {
+        if (this.stats.totalAnswered === 0) return 0;
+
+        // 1. Accuracy (600 pts)
+        const accuracy = (this.solvedIds.size / 15) * 600;
+
+        // 2. Speed (250 pts) - Base on correct answers
+        const correctCount = this.solvedIds.size;
+        const avgSpeed = correctCount > 0 ? (this.stats.totalRemainingTime / correctCount) : 0;
+        const speedBonus = (avgSpeed / 20) * 250;
+
+        // 3. Streak (150 pts)
+        const streakBonus = (this.maxStreak / 15) * 150;
+
+        return Math.round(accuracy + speedBonus + streakBonus);
+    },
+
+    updateGhostBars: function (initial = false) {
+        const today = this.getNormalizedScore();
+
+        const ghosts = [
+            { id: 'today', val: today, max: 1000 },
+            { id: 'yesterday', val: this.ghostData.yesterday, max: 1000 },
+            { id: 'best', val: this.ghostData.best, max: 1000 },
+            { id: 'average', val: this.ghostData.average, max: 1000 }
+        ];
+
+        ghosts.forEach(g => {
+            const bar = document.getElementById(`ghost-${g.id}-bar`);
+            const val = document.getElementById(`ghost-${g.id}-val`);
+            if (bar) bar.style.width = `${(g.val / 1000) * 100}%`;
+            if (val) val.textContent = g.val;
+
+            // Overtake effect
+            if (g.id !== 'today' && today > g.val && g.val > 0) {
+                bar.parentElement.parentElement.classList.add('overtake-pulse');
+                bar.classList.replace('bg-slate-400', 'bg-emerald-400');
+            }
+        });
+    },
+
     saveResults: async function () {
+        const normalized = this.getNormalizedScore();
+        const avgRemaining = this.solvedIds.size > 0 ? (this.stats.totalRemainingTime / this.solvedIds.size) : 0;
+
         try {
             await fetch('api/trivia/save-result.php', {
                 method: 'POST',
@@ -324,12 +424,97 @@ window.triviaGame = {
                 body: JSON.stringify({
                     score: this.score,
                     max_streak: this.maxStreak,
-                    questions_answered: this.results.length
+                    questions_answered: this.results.length,
+                    level_reached: this.currentLevel,
+                    // Snapshot data
+                    normalized_score: normalized,
+                    accuracy: (this.solvedIds.size / 15),
+                    avg_speed: avgRemaining,
+                    correct_count: this.solvedIds.size
                 })
             });
         } catch (error) {
             console.error('Failed to save trivia result:', error);
         }
+    },
+
+    getMaxTimer: function () {
+        if (this.currentLevel === 1) return 20;
+        if (this.currentLevel === 2) return 15;
+        return 10;
+    },
+
+    checkLevelUp: function () {
+        const solved = this.solvedIds.size;
+        let newLevel = 1;
+        if (solved >= 10) newLevel = 3;
+        else if (solved >= 5) newLevel = 2;
+
+        if (newLevel > this.currentLevel) {
+            this.currentLevel = newLevel;
+            this.triggerLevelUp();
+        }
+    },
+
+    triggerLevelUp: function () {
+        const splash = document.getElementById('level-up-splash');
+        if (splash) {
+            splash.classList.remove('hidden');
+            // Bonus Rewards
+            this.score += 500;
+            if (this.lives < 10) this.lives++;
+            this.updateHUD();
+
+            setTimeout(() => {
+                splash.classList.add('hidden');
+            }, 1500);
+        }
+    },
+
+    hideTerminateModal: function () {
+        const modal = document.getElementById('terminate-modal-overlay');
+        if (modal) modal.classList.add('hidden');
+        this.resumeTimer();
+    },
+
+    terminate: function () {
+        this.pauseTimer();
+        const modal = document.getElementById('terminate-modal-overlay');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    shuffleOptions: function (q) {
+        if (!q.options || q.options.length < 2) return q;
+
+        const correctText = q.options[q.correct_option - 1];
+
+        // Fisher-Yates Shuffle
+        for (let i = q.options.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [q.options[i], q.options[j]] = [q.options[j], q.options[i]];
+        }
+
+        // Update correct_option index
+        q.correct_option = q.options.indexOf(correctText) + 1;
+        return q;
+    },
+
+    confirmTerminate: function () {
+        this.resetState();
+        this.showView('start');
+        const modal = document.getElementById('terminate-modal-overlay');
+        if (modal) modal.classList.add('hidden');
+        this.updateStopButtonState();
+    },
+
+    updateStopButtonState: function () {
+        const btn = document.getElementById('stop-button');
+        if (!btn) return;
+
+        // Active ONLY during the 'active' view
+        const activeView = document.getElementById('game-active-view');
+        const isActive = activeView && !activeView.classList.contains('hidden');
+        btn.disabled = !isActive;
     },
 
     reset: function () {
