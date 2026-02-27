@@ -113,12 +113,18 @@ class StudyMentor {
 
         history.pushState = function () {
             originalPushState.apply(this, arguments);
-            setTimeout(() => self.checkQueuedPrompts(), 100);
+            setTimeout(() => {
+                self.checkQueuedPrompts();
+                self.ensureVisible();
+            }, 150);
         };
 
         history.replaceState = function () {
             originalReplaceState.apply(this, arguments);
-            setTimeout(() => self.checkQueuedPrompts(), 100);
+            setTimeout(() => {
+                self.checkQueuedPrompts();
+                self.ensureVisible();
+            }, 150);
         };
 
         // Save session on page unload/refresh
@@ -1508,6 +1514,8 @@ class StudyMentor {
 
                     <!-- Content -->
                     <div class="p-4 max-h-96 overflow-y-auto custom-scrollbar">
+                        <!-- Resume Card Container (Dynamic) -->
+                        <div id="mentor-resume-container" class="hidden mb-4"></div>
                         <!-- Quick Actions Section at Top -->
                         <div class="mb-5 pb-4 border-b border-gray-100">
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Quick Actions</p>
@@ -1704,9 +1712,10 @@ class StudyMentor {
                 }
             }
 
-            // Sync SRS and Mistake stats whenever panel opens
+            // Sync SRS, Mistake, and Resume status whenever panel opens
             this.fetchSRSStats();
             this.fetchMistakeStats();
+            this.checkRecentAttempt();
 
             panel?.classList.remove('hidden');
             this.isOpen = true;
@@ -3425,6 +3434,95 @@ class StudyMentor {
                 icon.textContent = 'history_edu';
                 icon.classList.remove('animate-spin');
             }
+        }
+    }
+
+    async checkRecentAttempt() {
+        if (typeof idbManager === 'undefined') return;
+        const container = document.getElementById('mentor-resume-container');
+        if (!container) return;
+
+        try {
+            const attempt = await idbManager.getLatestInProgressAttempt();
+            if (attempt) {
+                const exam = await idbManager.getById('exams', attempt.exam_id);
+                const title = exam ? exam.exam_title : 'Unknown Exam';
+                const answered = Object.keys(attempt.answers || {}).length;
+
+                container.innerHTML = `
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-3 text-white shadow-md cursor-pointer hover:shadow-lg transition-all mentor-resume-btn"
+                         data-exam-id="${attempt.exam_id}" data-attempt-id="${attempt.id}">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-white/20 p-1.5 rounded-lg">
+                                    <span class="material-symbols-outlined text-lg">play_circle</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold uppercase tracking-wider opacity-80">Resume Last Exam</p>
+                                    <h4 class="text-xs font-bold truncate max-w-[150px]">${title}</h4>
+                                    <p class="text-[9px] opacity-70">${answered} questions answered</p>
+                                </div>
+                            </div>
+                            <span class="material-symbols-outlined text-xl">chevron_right</span>
+                        </div>
+                    </div>
+                `;
+
+                // Use onclick property (not addEventListener) to avoid listener accumulation
+                // when panel is opened multiple times before clicking
+                container.onclick = (e) => {
+                    const btn = e.target.closest('.mentor-resume-btn');
+                    if (btn) {
+                        this.handleResumeExam(btn.dataset.examId, btn.dataset.attemptId);
+                    }
+                };
+
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error("[Mentor] Resume check error:", error);
+            container.classList.add('hidden');
+        }
+    }
+
+    handleResumeExam(examId, attemptId) {
+        console.log('[Mentor] handleResumeExam called:', { examId, attemptId });
+        // Close panel first, then navigate after a short delay to avoid race conditions
+        this.closePanel();
+        if (!window.loadPage) {
+            console.error('[Mentor] window.loadPage is not available!');
+            return;
+        }
+
+        setTimeout(() => {
+            // Regular exams are tracked with key "take-exam-{id}"
+            if (String(attemptId).startsWith('take-exam-')) {
+                console.log('[Mentor] Navigating to take-exam-interface, exam_id:', examId);
+                window.loadPage('take-exam-interface', `?exam_id=${examId}`);
+            } else {
+                // Offline exam — resume with full attempt UUID
+                console.log('[Mentor] Navigating to take-offline-exam, exam_id:', examId, 'uuid:', attemptId);
+                window.loadPage('take-offline-exam', `?exam_id=${examId}&attempt_uuid=${attemptId}`);
+            }
+        }, 100);
+    }
+
+    /**
+     * Ensure the mentor widget FAB is visible unless we are on an exam page
+     * that explicitly manages its own visibility.
+     */
+    ensureVisible() {
+        const examPages = ['take-exam-interface', 'take-offline-exam'];
+        const params = new URLSearchParams(window.location.search);
+        const currentPage = params.get('page') || 'dashboard';
+
+        const widget = document.getElementById('study-mentor-widget');
+        if (!widget) return;
+
+        if (!examPages.includes(currentPage)) {
+            widget.classList.remove('hidden');
         }
     }
 

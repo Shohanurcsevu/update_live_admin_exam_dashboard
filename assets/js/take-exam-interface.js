@@ -2,6 +2,7 @@ function initializeTakeExamInterface() {
     const API_URL = 'api/take-exam/';
     const params = new URLSearchParams(window.location.search);
     const examId = params.get('exam_id');
+    const ATTEMPT_IDB_KEY = `take-exam-${examId}`;
 
     let examData = {};
     let userAnswers = {};
@@ -52,10 +53,13 @@ function initializeTakeExamInterface() {
             const optionsHTML = displayOrder.map((displayKey, displayIndex) => {
                 const [originalKey, value] = shuffledOptions[displayIndex];
                 const isSelected = userAnswers[q.id] === originalKey;
+                const isAnswered = !!userAnswers[q.id];
+                const selectedClass = isSelected ? 'bg-blue-50 border-blue-500 shadow-sm' : (isAnswered ? 'bg-white border-gray-100 opacity-60' : 'bg-white border-gray-100');
+                const selectedIconClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-400';
                 return `
-                    <button class="option-btn p-4 text-left rounded-xl border-2 transition-all flex items-start gap-3 active:scale-[0.98] ${isSelected ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-100'}" 
-                        data-question-id="${q.id}" data-option-key="${originalKey}">
-                        <span class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-[10px] font-black ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-400'}">
+                    <button class="option-btn p-4 text-left rounded-xl border-2 transition-all flex items-start gap-3 active:scale-[0.98] ${selectedClass}" 
+                        data-question-id="${q.id}" data-option-key="${originalKey}" ${isAnswered ? 'disabled' : ''}>
+                        <span class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-[10px] font-black ${selectedIconClass}">
                             ${optionLabels[displayKey]}
                         </span>
                         <span class="text-sm font-medium leading-tight text-gray-700">${value}</span>
@@ -79,6 +83,17 @@ function initializeTakeExamInterface() {
         questionsArea.innerHTML = fullHTML;
 
         isExamInProgress = true;
+
+        // Track IN_PROGRESS in IndexedDB so the mentor panel can offer a Resume button
+        if (typeof idbManager !== 'undefined' && examId) {
+            idbManager.saveAttempt({
+                id: ATTEMPT_IDB_KEY,
+                exam_id: parseInt(examId),
+                answers: userAnswers,  // save current answers (important for resume)
+                status: 'IN_PROGRESS',
+                last_saved: new Date().toISOString()
+            }).catch(() => { });
+        }
 
         // Hide Mentor Icon
         if (window.studyMentor) window.studyMentor.closePanel();
@@ -125,14 +140,20 @@ function initializeTakeExamInterface() {
         };
 
         window.addEventListener('pagehide', () => {
-            if (isExamInProgress) emergencySubmit();
+            // Removed emergencySubmit() to allow pausing. IDB already has latest answers.
         });
 
         window.loadPage = async function (page, params = '') {
             if (isExamInProgress) {
-                const confirmed = confirm("An exam is in progress. Exit and submit?");
-                if (confirmed) {
-                    await submitExam(true);
+                const action = confirm(
+                    "You have an exam in progress.\n\n" +
+                    "[OK] to Pause & Exit (Resume later)\n" +
+                    "[Cancel] to stay here."
+                );
+
+                if (action) {
+                    // User wants to pause and exit.
+                    // IDB already has the latest answers and IN_PROGRESS status from handleOptionClick.
                     isExamInProgress = false;
 
                     // Show Mentor Icon
@@ -140,13 +161,15 @@ function initializeTakeExamInterface() {
                     if (mentorWidget) mentorWidget.classList.remove('hidden');
 
                     window.loadPage = originalLoadPage;
+                    if (setupExitPrevention._popStateCleanup) setupExitPrevention._popStateCleanup();
+                    if (setupExitPrevention._visibilityCleanup) setupExitPrevention._visibilityCleanup();
                     return originalLoadPage(page, params);
                 }
+                // User cancelled navigation.
                 return;
             }
             return originalLoadPage(page, params);
         };
-
         history.pushState(null, null, window.location.href);
         const handlePopState = () => {
             if (isExamInProgress) {
@@ -193,6 +216,21 @@ function initializeTakeExamInterface() {
         const questionId = btn.dataset.questionId;
         const optionKey = btn.dataset.optionKey;
         userAnswers[questionId] = optionKey;
+
+        // Auto-save answers to IDB for resume support
+        if (typeof idbManager !== 'undefined' && examId) {
+            console.log('[ExamInterface] Saving attempt to IDB:', {
+                id: ATTEMPT_IDB_KEY, exam_id: examId, answers: userAnswers
+            });
+            idbManager.saveAttempt({
+                id: ATTEMPT_IDB_KEY,
+                exam_id: parseInt(examId),
+                answers: { ...userAnswers },
+                status: 'IN_PROGRESS',
+                last_saved: new Date().toISOString()
+            }).then(() => console.log('[ExamInterface] Saved successfully'))
+                .catch(err => console.error('[ExamInterface] Save failed:', err));
+        }
 
         const parent = btn.parentElement;
         parent.querySelectorAll('.option-btn').forEach(b => {
@@ -335,14 +373,7 @@ function initializeTakeExamInterface() {
         }
     }
 
-    async function emergencySubmit() {
-        if (!isExamInProgress) return;
-        const performance = calculatePerformance();
-        const payload = JSON.stringify({ exam_id: examId, performance: performance });
-        if (navigator.sendBeacon) navigator.sendBeacon(`${API_URL}submit.php`, payload);
-        else fetch(`${API_URL}submit.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true });
-        isExamInProgress = false;
-    }
+    // Removed emergencySubmit as it forces auto-submission on tab close, breaking the pause/resume flow.
 
     function calculatePerformance() {
         let right = 0, wrong = 0, unanswered = 0;
@@ -407,6 +438,17 @@ function initializeTakeExamInterface() {
         // Restore Mentor Icon
         const mentorWidget = document.getElementById('study-mentor-widget');
         if (mentorWidget) mentorWidget.classList.remove('hidden');
+
+        // Clear IN_PROGRESS marker from IndexedDB
+        if (typeof idbManager !== 'undefined' && examId) {
+            idbManager.saveAttempt({
+                id: ATTEMPT_IDB_KEY,
+                exam_id: parseInt(examId),
+                answers: userAnswers,
+                status: 'COMPLETED',
+                last_saved: new Date().toISOString()
+            }).catch(() => { });
+        }
 
         try {
             const response = await fetch(`${API_URL}submit.php`, {
@@ -531,6 +573,19 @@ function initializeTakeExamInterface() {
     async function loadExam() {
         if (!examId) return;
         try {
+            console.log(`[ExamInterface] Starting load for exam ${examId}, IDB key: ${ATTEMPT_IDB_KEY}`);
+            // Restore saved answers if resuming
+            if (typeof idbManager !== 'undefined') {
+                const saved = await idbManager.getAttempt(ATTEMPT_IDB_KEY);
+                console.log('[ExamInterface] Found IDB record:', saved);
+                if (saved && saved.status === 'IN_PROGRESS' && saved.answers) {
+                    userAnswers = { ...saved.answers };
+                    console.log('[ExamInterface] Restored userAnswers:', userAnswers);
+                }
+            } else {
+                console.warn('[ExamInterface] idbManager is undefined!');
+            }
+
             const response = await fetch(`${API_URL}start.php?exam_id=${examId}`);
             const result = await response.json();
             if (result.success) renderExam(result.data);
