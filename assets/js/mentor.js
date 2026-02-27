@@ -1561,19 +1561,53 @@ class StudyMentor {
                                 </div>
 
                                 <!-- Import Questions -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('import-questions')" title="Import Questions">
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('question-creator')" title="Questions Creator">
                                     <div class="quick-action-btn bg-teal-50 text-teal-600">
                                         <span class="material-symbols-outlined text-xl">upload_file</span>
                                     </div>
-                                    <span class="quick-action-label">Import Qs</span>
+                                    <span class="quick-action-label">Qs Creator</span>
                                 </div>
 
                                 <!-- Review Mistake Bank -->
-                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('mistake-bank')" title="Review Mistake Bank">
-                                    <div class="quick-action-btn bg-rose-50 text-rose-600">
+                                <div class="flex flex-col items-center group cursor-pointer relative" onclick="studyMentor.handleQuickAction('mistake-bank')" title="Review Mistake Bank">
+                                    <div id="mentor-mistake-btn" class="quick-action-btn bg-rose-50 text-rose-600 transition-all">
                                         <span class="material-symbols-outlined text-xl">psychology</span>
+                                        <span id="mentor-mistake-count" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white shadow-sm">0</span>
                                     </div>
                                     <span class="quick-action-label">Mistake Bank</span>
+                                </div>
+
+                                <!-- Speed Trivia -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('speed-trivia')" title="Speed Trivia">
+                                    <div class="quick-action-btn bg-amber-50 text-amber-600">
+                                        <span class="material-symbols-outlined text-xl">bolt</span>
+                                    </div>
+                                    <span class="quick-action-label">Trivia</span>
+                                </div>
+
+                                <!-- Flashcards -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('flashcards')" title="Flashcards">
+                                    <div class="quick-action-btn bg-blue-50 text-blue-600">
+                                        <span class="material-symbols-outlined text-xl">style</span>
+                                    </div>
+                                    <span class="quick-action-label">Flashcards</span>
+                                </div>
+
+                                <!-- Rapid Fire (Daily 15) -->
+                                <div class="flex flex-col items-center group cursor-pointer" onclick="studyMentor.handleQuickAction('take-offline-exam', '?mode=daily_15')" title="Daily 15 Challenge (Rapid Fire)">
+                                    <div class="quick-action-btn bg-emerald-50 text-emerald-600">
+                                        <span class="material-symbols-outlined text-xl">rocket_launch</span>
+                                    </div>
+                                    <span class="quick-action-label">Rapid Fire</span>
+                                </div>
+
+                                <!-- Revision Queue (SRS) -->
+                                <div class="flex flex-col items-center group cursor-pointer relative" onclick="studyMentor.handleSRSReview()" title="SRS Revision Queue">
+                                    <div id="mentor-srs-btn" class="quick-action-btn bg-rose-50 text-rose-600 transition-all">
+                                        <span class="material-symbols-outlined text-xl">history_edu</span>
+                                        <span id="mentor-srs-due-count" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white shadow-sm">0</span>
+                                    </div>
+                                    <span class="quick-action-label">SRS Review</span>
                                 </div>
                             </div>
                         </div>
@@ -1669,6 +1703,10 @@ class StudyMentor {
                     });
                 }
             }
+
+            // Sync SRS and Mistake stats whenever panel opens
+            this.fetchSRSStats();
+            this.fetchMistakeStats();
 
             panel?.classList.remove('hidden');
             this.isOpen = true;
@@ -3289,9 +3327,9 @@ class StudyMentor {
         return ''; // Template helper
     }
 
-    async handleQuickAction(pageName) {
+    async handleQuickAction(pageName, params = '') {
         if (typeof window.loadPage === 'function') {
-            await window.loadPage(pageName);
+            await window.loadPage(pageName, params);
             this.closePanel();
         }
     }
@@ -3302,6 +3340,92 @@ class StudyMentor {
 
         // Navigate to take exam interface with the exam ID
         window.loadPage('take-exam-interface', `exam_id=${examId}`);
+    }
+
+    async fetchSRSStats() {
+        const countEl = document.getElementById('mentor-srs-due-count');
+        const btn = document.getElementById('mentor-srs-btn');
+        if (!countEl || !btn) return;
+
+        try {
+            const response = await fetch('api/performance/srs-stats.php');
+            const result = await response.json();
+
+            if (result.success && result.due_count > 0) {
+                countEl.textContent = result.due_count;
+                countEl.classList.remove('hidden');
+                btn.classList.add('animate-pulse');
+            } else {
+                countEl.classList.add('hidden');
+                btn.classList.remove('animate-pulse');
+            }
+        } catch (error) {
+            console.error("[Mentor] SRS Fetch Error:", error);
+        }
+    }
+
+    async fetchMistakeStats() {
+        const countEl = document.getElementById('mentor-mistake-count');
+        const btn = document.getElementById('mentor-mistake-btn');
+        if (!countEl || !btn) return;
+
+        try {
+            const response = await fetch('api/mistakes/stats.php');
+            const result = await response.json();
+
+            if (result.success && result.count > 0) {
+                countEl.textContent = result.count;
+                countEl.classList.remove('hidden');
+                btn.classList.add('animate-pulse');
+            } else {
+                countEl.classList.add('hidden');
+                btn.classList.remove('animate-pulse');
+            }
+        } catch (error) {
+            console.error("[Mentor] Mistake Stats Fetch Error:", error);
+        }
+    }
+
+    async handleSRSReview() {
+        const btn = document.getElementById('mentor-srs-btn');
+        const icon = btn?.querySelector('.material-symbols-outlined');
+
+        if (btn) btn.style.pointerEvents = 'none';
+        if (icon) {
+            icon.textContent = 'sync';
+            icon.classList.add('animate-spin');
+        }
+
+        try {
+            const response = await fetch('api/custom-exam/create-from-performance.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mode: 'srs_review',
+                    exam_title: 'Mentor SRS Review',
+                    limit: 20
+                })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                this.closePanel();
+                if (window.loadPage) {
+                    window.loadPage('take-exam-interface', `?exam_id=${result.exam_id}`);
+                }
+            } else {
+                alert(result.message || "Failed to create SRS review.");
+            }
+        } catch (error) {
+            console.error("[Mentor] SRS Review Error:", error);
+            alert("A network error occurred.");
+        } finally {
+            if (btn) btn.style.pointerEvents = 'auto';
+            if (icon) {
+                icon.textContent = 'history_edu';
+                icon.classList.remove('animate-spin');
+            }
+        }
     }
 
 }
