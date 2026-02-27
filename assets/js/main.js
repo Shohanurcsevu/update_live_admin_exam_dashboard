@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Page Loading Logic ---
     const loadComponent = async (url, element) => {
         try {
-            const response = await fetch(url);
+            const response = await fetch(`${url}?v=${new Date().getTime()}`);
             if (!response.ok) throw new Error(`Failed to fetch ${url}`);
             element.innerHTML = await response.text();
         } catch (error) {
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (pageScripts[page]) {
             try {
-                const response = await fetch(pageScripts[page]);
+                const response = await fetch(`${pageScripts[page]}?v=${new Date().getTime()}`);
                 if (!response.ok) throw new Error(`Could not load script: ${pageScripts[page]}`);
                 const scriptContent = await response.text();
 

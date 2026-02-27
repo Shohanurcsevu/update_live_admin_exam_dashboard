@@ -1128,6 +1128,107 @@ function initializeDashboardPage() {
     }
 
     // --- Section: Countdown Timers ---
+    let targetJobDeadline = '2026-04-30';
+    let targetJobName = 'Target Job Countdown';
+    let targetJobDate = new Date(`${targetJobDeadline}T23:59:59`).getTime();
+
+    async function fetchJobCountdown() {
+        try {
+            const response = await fetch('api/dashboard/job_countdown.php');
+            const result = await response.json();
+            if (result.success && result.data) {
+                targetJobDeadline = result.data.deadline.split(' ')[0]; // Get only date part
+                targetJobName = result.data.job_name;
+                targetJobDate = new Date(`${targetJobDeadline}T23:59:59`).getTime();
+
+                updateJobUI();
+            }
+        } catch (error) {
+            console.error("Error fetching job countdown:", error);
+        }
+    }
+
+    function updateJobUI() {
+        const titleEl = document.getElementById('job-countdown-title');
+        const deadlineDateSpan = document.getElementById('job-deadline-date');
+
+        if (titleEl) titleEl.textContent = targetJobName;
+        if (deadlineDateSpan) {
+            const dateObj = new Date(targetJobDeadline);
+            deadlineDateSpan.textContent = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+    }
+
+    function setupJobCountdownModal() {
+        const card = document.getElementById('job-countdown-card');
+        const modal = document.getElementById('job-countdown-modal');
+        const form = document.getElementById('job-countdown-form');
+        const closeBtn = document.getElementById('close-job-modal');
+        const nameInput = document.getElementById('modal-job-name');
+        const dateInput = document.getElementById('modal-job-deadline');
+
+        console.log("[Dashboard] Setting up countdown modal...", { card, modal, form });
+
+        if (!card || !modal || !form) {
+            console.error("[Dashboard] Missing modal elements:", { card, modal, form });
+            return;
+        }
+
+        card.addEventListener('click', (e) => {
+            console.log("[Dashboard] Countdown card clicked");
+            nameInput.value = targetJobName;
+            dateInput.value = targetJobDeadline;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        });
+
+        const closeModal = () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+
+        closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnContent = submitBtn.innerHTML;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Saving...';
+
+            try {
+                const response = await fetch('api/dashboard/job_countdown.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        job_name: nameInput.value,
+                        deadline: dateInput.value
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    targetJobName = nameInput.value;
+                    targetJobDeadline = dateInput.value;
+                    targetJobDate = new Date(`${targetJobDeadline}T23:59:59`).getTime();
+                    updateJobUI();
+                    closeModal();
+                    if (typeof showToast === 'function') showToast('Mission Objective Updated!', 'success');
+                } else {
+                    alert('Failed to save: ' + result.message);
+                }
+            } catch (error) {
+                console.error("Error saving job countdown:", error);
+                alert('A network error occurred.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnContent;
+            }
+        });
+    }
+
     function startCountdownTimers() {
         const dailyTimerEl = document.getElementById('daily-timer');
         const dailyProgressEl = document.getElementById('daily-progress');
@@ -1141,7 +1242,9 @@ function initializeDashboardPage() {
             return;
         }
 
-        const targetJobDate = new Date('2026-04-30T23:59:59').getTime();
+        // Fetch initial data
+        fetchJobCountdown();
+        setupJobCountdownModal();
 
         const updateTimers = () => {
             const now = new Date();

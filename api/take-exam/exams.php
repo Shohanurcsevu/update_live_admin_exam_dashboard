@@ -35,7 +35,7 @@ $sql = "SELECT
 
 $params = [];
 $types = '';
-$where_clauses = ["e.is_deleted = 0", "e.is_revision = 0"];
+$where_clauses = ["e.is_deleted = 0", "e.is_revision = 0", "e.exam_title NOT LIKE '%Challenge%'"];
 
 // The UI filter logic remains the same and will work as expected.
 // If a filter is applied, it will correctly narrow down the results.
