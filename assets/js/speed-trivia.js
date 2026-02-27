@@ -19,26 +19,35 @@ window.triviaGame = {
     retryCount: {},
     ghostData: { yesterday: 0, best: 0, average: 0 },
     stats: { totalRemainingTime: 0, totalAnswered: 0 },
+    currentSource: {
+        type: 'random',
+        subject_id: null,
+        lesson_id: null,
+        topic_id: null,
+        exam_id: null
+    },
+    categories: null,
 
     init: async function () {
         this.resetState();
         this.showView('loading');
 
         try {
-            // fetch 15 random questions
-            const response = await fetch('api/question/random-trivia.php');
+            // Fetch initial subject list
+            const response = await fetch('api/trivia/get-categories.php?type=subjects');
             const data = await response.json();
 
             if (data.success) {
-                this.questions = data.data;
-                await this.fetchGhosts();
+                this.categories = data.data;
+                this.populateDropdown('subject', data.data.subjects);
                 this.showView('start');
             } else {
-                window.showToast('Failed to load questions', 'error');
+                window.showToast('Failed to load subjects', 'error');
+                this.showView('start');
             }
         } catch (error) {
-            console.error('Trivia loading error:', error);
-            window.showToast('Failed to connect to trivia server', 'error');
+            console.error('Trivia init error:', error);
+            this.showView('start');
         }
     },
 
@@ -57,15 +66,65 @@ window.triviaGame = {
         this.solvedIds = new Set();
         this.retryCount = {};
         this.stats = { totalRemainingTime: 0, totalAnswered: 0 };
+        this.currentSource = {
+            type: 'random',
+            subject_id: null,
+            lesson_id: null,
+            topic_id: null,
+            exam_id: null
+        };
         this.updateStopButtonState();
     },
 
-    start: function () {
-        if (this.questions.length === 0) return;
-        this.showView('active');
-        this.updateHUD();
-        this.updateStopButtonState();
-        this.loadQuestion();
+    start: async function () {
+        // Collect current selections
+        if (this.currentSource.type !== 'random') {
+            this.currentSource.subject_id = document.getElementById('select-subject').value;
+            this.currentSource.lesson_id = document.getElementById('select-lesson').value;
+            this.currentSource.topic_id = document.getElementById('select-topic').value;
+            this.currentSource.exam_id = document.getElementById('select-exam').value;
+
+            if (!this.currentSource.subject_id) {
+                window.showToast('Please select at least a Subject', 'warning');
+                return;
+            }
+        }
+
+        this.showView('loading');
+
+        try {
+            // Fetch questions specifically for this source hierarchy
+            const params = new URLSearchParams({
+                source_type: this.currentSource.type,
+                subject_id: this.currentSource.subject_id || '',
+                lesson_id: this.currentSource.lesson_id || '',
+                topic_id: this.currentSource.topic_id || '',
+                exam_id: this.currentSource.exam_id || ''
+            });
+
+            const qResp = await fetch(`api/question/random-trivia.php?${params}`);
+            const qData = await qResp.json();
+
+            if (!qData.success || qData.data.length === 0) {
+                window.showToast('No questions found for this selection!', 'error');
+                this.showView('start');
+                return;
+            }
+
+            this.questions = qData.data;
+
+            // Fetch ghosts for this specific source
+            await this.fetchGhosts();
+
+            this.showView('active');
+            this.updateHUD();
+            this.updateStopButtonState();
+            this.loadQuestion();
+        } catch (e) {
+            console.error('Start error:', e);
+            window.showToast('Failed to start session', 'error');
+            this.showView('start');
+        }
     },
 
     showView: function (view) {
@@ -361,8 +420,15 @@ window.triviaGame = {
 
     fetchGhosts: async function () {
         try {
-            const resp = await fetch('api/trivia/get-ghosts.php');
-            const data = await resp.json();
+            const params = new URLSearchParams({
+                source_type: this.currentSource.type,
+                subject_id: this.currentSource.subject_id || '',
+                lesson_id: this.currentSource.lesson_id || '',
+                topic_id: this.currentSource.topic_id || '',
+                exam_id: this.currentSource.exam_id || ''
+            });
+            const response = await fetch(`api/trivia/get-ghosts.php?${params}`);
+            const data = await response.json();
             if (data.success) {
                 this.ghostData = data.data;
                 this.updateGhostBars(true); // Initial bars
@@ -426,6 +492,11 @@ window.triviaGame = {
                     max_streak: this.maxStreak,
                     questions_answered: this.results.length,
                     level_reached: this.currentLevel,
+                    source_type: this.currentSource.type,
+                    subject_id: this.currentSource.subject_id,
+                    lesson_id: this.currentSource.lesson_id,
+                    topic_id: this.currentSource.topic_id,
+                    exam_id: this.currentSource.exam_id,
                     // Snapshot data
                     normalized_score: normalized,
                     accuracy: (this.solvedIds.size / 15),
@@ -497,6 +568,95 @@ window.triviaGame = {
         // Update correct_option index
         q.correct_option = q.options.indexOf(correctText) + 1;
         return q;
+    },
+
+    setSource: function (type) {
+        this.currentSource.type = type;
+
+        const randomBtn = document.getElementById('source-btn-random');
+        const categorizedBtn = document.getElementById('source-btn-categorized');
+        const filters = document.getElementById('hierarchical-filters');
+
+        if (type === 'random') {
+            randomBtn.classList.add('active');
+            categorizedBtn.classList.remove('active');
+            filters.classList.add('hidden');
+        } else {
+            randomBtn.classList.remove('active');
+            categorizedBtn.classList.add('active');
+            filters.classList.remove('hidden');
+        }
+    },
+
+    onHierarchyChange: async function (level) {
+        const subjectId = document.getElementById('select-subject').value;
+        const lessonId = document.getElementById('select-lesson').value;
+        const topicId = document.getElementById('select-topic').value;
+
+        if (level === 'subject') {
+            this.resetFilters(['lesson', 'topic', 'exam']);
+            if (subjectId) {
+                this.updateFilter('lessons', { subject_id: subjectId });
+                this.updateFilter('exams', { subject_id: subjectId });
+            }
+        } else if (level === 'lesson') {
+            this.resetFilters(['topic', 'exam']);
+            if (lessonId) {
+                this.updateFilter('topics', { subject_id: subjectId, lesson_id: lessonId });
+                this.updateFilter('exams', { subject_id: subjectId, lesson_id: lessonId });
+            }
+        } else if (level === 'topic') {
+            this.resetFilters(['exam']);
+            if (topicId) {
+                this.updateFilter('exams', { subject_id: subjectId, lesson_id: lessonId, topic_id: topicId });
+            }
+        }
+    },
+
+    resetFilters: function (levels) {
+        levels.forEach(lvl => {
+            const select = document.getElementById(`select-${lvl}`);
+            const wrapper = document.getElementById(`${lvl}-wrapper`);
+            if (select) {
+                select.innerHTML = `<option value="">All ${lvl.charAt(0).toUpperCase() + lvl.slice(1)}s</option>`;
+                select.disabled = true;
+                if (wrapper) wrapper.classList.add('opacity-50');
+            }
+        });
+    },
+
+    updateFilter: async function (type, params) {
+        try {
+            const query = new URLSearchParams({ type, ...params });
+            const resp = await fetch(`api/trivia/get-categories.php?${query}`);
+            const data = await resp.json();
+
+            if (data.success) {
+                const singularMap = { lessons: 'lesson', topics: 'topic', exams: 'exam' };
+                this.populateDropdown(singularMap[type], data.data[type]);
+            }
+        } catch (e) {
+            console.error(`Failed to update ${type}:`, e);
+        }
+    },
+
+    populateDropdown: function (id, items) {
+        const select = document.getElementById(`select-${id}`);
+        const wrapper = document.getElementById(`${id}-wrapper`);
+        if (!select) return;
+
+        const label = id.charAt(0).toUpperCase() + id.slice(1);
+        select.innerHTML = `<option value="">${id === 'subject' ? 'Select ' + label : 'All ' + label + 's'}</option>`;
+
+        items.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.name;
+            select.appendChild(opt);
+        });
+
+        select.disabled = false;
+        if (wrapper) wrapper.classList.remove('opacity-50');
     },
 
     confirmTerminate: function () {

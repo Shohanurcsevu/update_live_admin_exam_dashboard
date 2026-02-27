@@ -40,11 +40,23 @@ if ($score > 5000) {
     ];
 
     // --- NEW: Save normalized snapshot for Ghosts ---
-    // Formula: Accuracy(500) + Speed(300) + Streak(200)
-    // We expect score, max_streak, questions_answered, total_accuracy, avg_speed, level_reached
     if (isset($data['normalized_score'])) {
-        $stmt = $conn->prepare("INSERT INTO trivia_snapshots (normalized_score, accuracy, avg_speed, max_streak, level_reached) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("iddii", 
+        $source_type = $data['source_type'] ?? 'random';
+        $source_id = isset($data['source_id']) ? (int)$data['source_id'] : null;
+        
+        $subject_id = isset($data['subject_id']) ? (int)$data['subject_id'] : null;
+        $lesson_id = isset($data['lesson_id']) ? (int)$data['lesson_id'] : null;
+        $topic_id = isset($data['topic_id']) ? (int)$data['topic_id'] : null;
+        $exam_id = isset($data['exam_id']) ? (int)$data['exam_id'] : null;
+
+        $stmt = $conn->prepare("INSERT INTO trivia_snapshots (source_type, source_id, subject_id, lesson_id, topic_id, exam_id, normalized_score, accuracy, avg_speed, max_streak, level_reached) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("siiiiiddiii", 
+            $source_type,
+            $source_id,
+            $subject_id,
+            $lesson_id,
+            $topic_id,
+            $exam_id,
             $data['normalized_score'], 
             $data['accuracy'], 
             $data['avg_speed'], 

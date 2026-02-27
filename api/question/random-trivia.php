@@ -9,17 +9,54 @@ header('Content-Type: application/json');
 
 $limit = 15;
 
+// --- Filter Parameters ---
+$type = $_GET['source_type'] ?? 'random';
+$subject_id = isset($_GET['subject_id']) ? (int)$_GET['subject_id'] : null;
+$lesson_id = isset($_GET['lesson_id']) ? (int)$_GET['lesson_id'] : null;
+$topic_id = isset($_GET['topic_id']) ? (int)$_GET['topic_id'] : null;
+$exam_id = isset($_GET['exam_id']) ? (int)$_GET['exam_id'] : null;
+
 try {
-    // Select 10 random questions that are not deleted
-    // Aliasing columns to match frontend expectations or project standards
+    $where = "WHERE is_deleted = 0 AND subject_id IS NOT NULL";
+    $params = [];
+    $types = "";
+
+    if ($type !== 'random') {
+        if ($subject_id) {
+            $where .= " AND subject_id = ?";
+            $params[] = $subject_id;
+            $types .= "i";
+        }
+        if ($lesson_id) {
+            $where .= " AND lesson_id = ?";
+            $params[] = $lesson_id;
+            $types .= "i";
+        }
+        if ($topic_id) {
+            $where .= " AND topic_id = ?";
+            $params[] = $topic_id;
+            $types .= "i";
+        }
+        if ($exam_id) {
+            // Questions associated with a specific exam often via an exam_questions mapping or direct topic/lesson links
+            // Here we assume questions are tagged with source context
+            $where .= " AND exam_id = ?";
+            $params[] = $exam_id;
+            $types .= "i";
+        }
+    }
+
     $sql = "SELECT id, question, options, answer, subject_id, topic_id 
             FROM questions 
-            WHERE is_deleted = 0 
+            $where
             ORDER BY RAND() 
             LIMIT ?";
             
+    $params[] = $limit;
+    $types .= "i";
+
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $limit);
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
     
