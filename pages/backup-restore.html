@@ -333,6 +333,112 @@
         </div>
     </div>
 
+    <!-- === DATABASE MAINTENANCE CARD === -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <!-- Card Header -->
+        <div
+            class="p-6 border-b border-gray-100 bg-gradient-to-r from-rose-50/60 to-pink-50/40 flex items-center gap-4">
+            <div class="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow">
+                <span class="material-symbols-outlined">build</span>
+            </div>
+            <div class="flex-1">
+                <h2 class="text-base font-bold text-gray-800">Database Maintenance</h2>
+                <p class="text-xs text-gray-500">Clean up old logs to keep your database fast.</p>
+            </div>
+        </div>
+
+        <div class="p-6 space-y-5">
+
+            <!-- Stats Row -->
+            <div class="flex flex-wrap gap-3">
+                <div
+                    class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[140px]">
+                    <span class="material-symbols-outlined text-rose-400 text-base">storage</span>
+                    <div>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">DB Size</p>
+                        <p id="mt-db-size" class="text-xs font-bold text-gray-700">—</p>
+                    </div>
+                </div>
+                <div
+                    class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex-1 min-w-[140px]">
+                    <span class="material-symbols-outlined text-rose-400 text-base">database</span>
+                    <div>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Rows</p>
+                        <p id="mt-total-rows" class="text-xs font-bold text-gray-700">—</p>
+                    </div>
+                </div>
+                <div
+                    class="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-4 py-2.5 flex-1 min-w-[140px]">
+                    <span class="material-symbols-outlined text-rose-500 text-base">delete_sweep</span>
+                    <div>
+                        <p class="text-[9px] font-black uppercase tracking-widest text-rose-400">Cleanable</p>
+                        <p id="mt-cleanable" class="text-xs font-bold text-rose-600">—</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Retention Setting -->
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Retention Period</p>
+                <select id="mt-retention-days"
+                    class="w-full sm:w-auto text-sm font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-rose-400 cursor-pointer">
+                    <option value="30">Keep last 30 days</option>
+                    <option value="60">Keep last 60 days</option>
+                    <option value="90" selected>Keep last 90 days</option>
+                    <option value="180">Keep last 6 months</option>
+                    <option value="365">Keep last 1 year</option>
+                </select>
+                <p class="text-[10px] text-gray-400 mt-1.5">Old Activity Log entries beyond this period will be deleted.
+                    Question Attempts and Study Sessions are preserved for analytics.</p>
+            </div>
+
+            <!-- Cleanable breakdown -->
+            <div id="mt-breakdown" class="hidden">
+                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Cleanup Preview</p>
+                <div id="mt-breakdown-list" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+            </div>
+
+            <!-- Progress -->
+            <div id="mt-progress" class="hidden space-y-1">
+                <div class="flex justify-between text-[10px] font-bold text-gray-400">
+                    <span id="mt-progress-text">Running cleanup…</span>
+                    <span id="mt-progress-pct">0%</span>
+                </div>
+                <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div id="mt-progress-bar"
+                        class="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full transition-all duration-500"
+                        style="width:0%"></div>
+                </div>
+            </div>
+
+            <!-- Result -->
+            <div id="mt-result" class="hidden rounded-xl border overflow-hidden">
+                <div id="mt-result-inner" class="p-4 flex items-center gap-3">
+                    <span id="mt-result-icon" class="material-symbols-outlined text-2xl"></span>
+                    <div>
+                        <p id="mt-result-title" class="font-bold text-sm"></p>
+                        <p id="mt-result-subtitle" class="text-xs text-gray-500"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-3">
+                <button id="mt-cleanup-btn"
+                    class="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 active:scale-[0.98] text-white rounded-xl font-bold text-sm shadow-lg shadow-rose-100 transition-all duration-200">
+                    <span class="material-symbols-outlined text-sm">delete_sweep</span>
+                    Run Cleanup
+                </button>
+                <button id="mt-optimize-btn"
+                    class="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 active:scale-[0.98] text-gray-700 rounded-xl font-bold text-sm transition-all duration-200">
+                    <span class="material-symbols-outlined text-sm">speed</span>
+                    Optimize Tables
+                </button>
+            </div>
+
+        </div>
+    </div>
+
     <!-- === INFO FOOTER === -->
     <div class="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex gap-4">
         <span class="material-symbols-outlined text-blue-400 text-xl flex-shrink-0 mt-0.5">info</span>

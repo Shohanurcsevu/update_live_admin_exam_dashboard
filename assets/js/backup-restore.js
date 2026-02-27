@@ -830,6 +830,165 @@
         renderHistory();
     }
 
+    // ─── Database Maintenance ──────────────────────────────────────────────────
+
+    function initMaintenance() {
+        const dbSizeEl = document.getElementById('mt-db-size');
+        const totalRowsEl = document.getElementById('mt-total-rows');
+        const cleanableEl = document.getElementById('mt-cleanable');
+        const retentionSel = document.getElementById('mt-retention-days');
+        const breakdownDiv = document.getElementById('mt-breakdown');
+        const breakdownList = document.getElementById('mt-breakdown-list');
+        const progressDiv = document.getElementById('mt-progress');
+        const progressText = document.getElementById('mt-progress-text');
+        const progressPct = document.getElementById('mt-progress-pct');
+        const progressBar = document.getElementById('mt-progress-bar');
+        const resultDiv = document.getElementById('mt-result');
+        const resultInner = document.getElementById('mt-result-inner');
+        const resultIcon = document.getElementById('mt-result-icon');
+        const resultTitle = document.getElementById('mt-result-title');
+        const resultSubtitle = document.getElementById('mt-result-subtitle');
+        const cleanupBtn = document.getElementById('mt-cleanup-btn');
+        const optimizeBtn = document.getElementById('mt-optimize-btn');
+
+        if (!cleanupBtn || !retentionSel) return; // Exit if DOM not present
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function setProgress(pct, text) {
+            progressDiv.classList.remove('hidden');
+            progressBar.style.width = pct + '%';
+            progressPct.textContent = pct + '%';
+            progressText.textContent = text;
+        }
+
+        function showResult(success, title, subtitle) {
+            resultDiv.classList.remove('hidden');
+            resultInner.className = `p-4 flex items-center gap-3 ${success ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`;
+            resultIcon.textContent = success ? 'check_circle' : 'error';
+            resultIcon.className = `material-symbols-outlined text-2xl ${success ? 'text-emerald-500' : 'text-rose-500'}`;
+            resultTitle.textContent = title;
+            resultTitle.className = `font-bold text-sm ${success ? 'text-emerald-700' : 'text-rose-700'}`;
+            resultSubtitle.textContent = subtitle;
+        }
+
+        async function fetchStats() {
+            const days = retentionSel.value;
+            try {
+                const res = await fetch(`api/backup/maintenance.php?action=stats&days=${days}`, { cache: 'no-store' });
+                const data = await res.json();
+
+                dbSizeEl.textContent = formatBytes(data.db_size_bytes || 0);
+                totalRowsEl.textContent = (data.total_rows || 0).toLocaleString();
+                cleanableEl.textContent = (data.total_cleanable || 0).toLocaleString() + ' rows';
+
+                // Breakdown
+                const cleanableTables = (data.tables || []).filter(t => t.cleanable > 0);
+                if (cleanableTables.length > 0) {
+                    breakdownList.innerHTML = cleanableTables.map(t => `
+                        <div class="bg-rose-50/80 border border-rose-100 rounded-lg px-3 py-2">
+                            <p class="text-xs font-bold text-gray-700">${t.label || t.table}</p>
+                            <p class="text-xs text-rose-600 font-medium">${t.cleanable.toLocaleString()} old rows</p>
+                        </div>
+                    `).join('');
+                    breakdownDiv.classList.remove('hidden');
+                } else {
+                    breakdownDiv.classList.add('hidden');
+                }
+            } catch (_) {
+                // Silently ignore
+            }
+        }
+
+        // Fetch stats on load and when retention changes
+        fetchStats();
+        retentionSel.addEventListener('change', fetchStats);
+
+        // Cleanup
+        cleanupBtn.addEventListener('click', async () => {
+            const days = retentionSel.value;
+            const cleanableText = cleanableEl.textContent;
+
+            if (!confirm(`Delete Activity Log entries older than ${days} days?\n\nThis will remove ${cleanableText}. This cannot be undone.`)) return;
+
+            cleanupBtn.disabled = true;
+            optimizeBtn.disabled = true;
+            resultDiv.classList.add('hidden');
+            setProgress(20, 'Deleting old records…');
+
+            try {
+                setProgress(50, 'Cleaning up tables…');
+                const res = await fetch(`api/backup/maintenance.php?action=cleanup&days=${days}`, {
+                    method: 'POST',
+                });
+                const data = await res.json();
+                setProgress(100, 'Cleanup complete!');
+
+                const details = Object.entries(data.per_table || {})
+                    .map(([t, n]) => `${t}: ${n}`)
+                    .join(', ');
+
+                showResult(data.success !== false,
+                    `Deleted ${(data.total_deleted || 0).toLocaleString()} old records`,
+                    details || 'No records to clean up.'
+                );
+
+                showToast(`Cleanup complete — ${(data.total_deleted || 0).toLocaleString()} records removed.`, 'success');
+
+                // Refresh stats
+                setTimeout(fetchStats, 500);
+            } catch (err) {
+                setProgress(100, 'Error');
+                showResult(false, 'Cleanup failed', err.message);
+                showToast('Cleanup failed: ' + err.message, 'error');
+            }
+
+            setTimeout(() => progressDiv.classList.add('hidden'), 2000);
+            cleanupBtn.disabled = false;
+            optimizeBtn.disabled = false;
+        });
+
+        // Optimize
+        optimizeBtn.addEventListener('click', async () => {
+            optimizeBtn.disabled = true;
+            cleanupBtn.disabled = true;
+            resultDiv.classList.add('hidden');
+            setProgress(20, 'Optimizing tables…');
+
+            try {
+                setProgress(50, 'Running OPTIMIZE TABLE…');
+                const res = await fetch('api/backup/maintenance.php?action=optimize', {
+                    method: 'POST',
+                });
+                const data = await res.json();
+                setProgress(100, 'Optimization complete!');
+
+                const count = Object.keys(data.tables || {}).length;
+                showResult(data.success !== false,
+                    `Optimized ${count} tables`,
+                    'Disk space reclaimed and indexes rebuilt.'
+                );
+                showToast(`${count} tables optimized ✓`, 'success');
+
+                setTimeout(fetchStats, 500);
+            } catch (err) {
+                setProgress(100, 'Error');
+                showResult(false, 'Optimization failed', err.message);
+                showToast('Optimization failed: ' + err.message, 'error');
+            }
+
+            setTimeout(() => progressDiv.classList.add('hidden'), 2000);
+            optimizeBtn.disabled = false;
+            cleanupBtn.disabled = false;
+        });
+    }
+
     // ─── Start ────────────────────────────────────────────────────────────────
 
     function init() {
@@ -840,6 +999,7 @@
         bindModal();
         bindDragDrop();
         initAutoBackupUI();
+        initMaintenance();
     }
 
     init();
