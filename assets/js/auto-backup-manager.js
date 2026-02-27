@@ -286,7 +286,12 @@
                 backup.data[tbl] = dataJson.rows || [];
             }
 
-            // 3. Compress with CompressionStream (client-side gzip)
+            // 3. Compute SHA-256 checksum of data section
+            const dataStr = JSON.stringify(backup.data);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
+            backup.checksum = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // 4. Compress with CompressionStream (client-side gzip)
             const jsonText = JSON.stringify(backup);
             let compressedBlob;
 

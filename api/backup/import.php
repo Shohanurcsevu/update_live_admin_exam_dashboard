@@ -131,13 +131,22 @@ if ($backup['app'] !== 'rethink-admin') {
     respond(false, 'Backup file is not from a Rethink admin instance (app mismatch).');
 }
 
-$supported_versions = ['1.0', '1.1'];
+$supported_versions = ['1.0', '1.1', '2.0'];
 if (!in_array($backup['backup_version'], $supported_versions, true)) {
     respond(false, "Unsupported backup version: {$backup['backup_version']}. Supported versions: " . implode(', ', $supported_versions));
 }
 
 if (!is_array($backup['data'])) {
     respond(false, 'Backup data section is invalid.');
+}
+
+// ─── Checksum Verification (v2.0+) ───────────────────────────────────────────
+
+if (!empty($backup['checksum'])) {
+    $computed = hash('sha256', json_encode($backup['data'], JSON_UNESCAPED_UNICODE));
+    if ($computed !== $backup['checksum']) {
+        respond(false, 'Checksum mismatch — this backup file is corrupted or incomplete. The data does not match the embedded SHA-256 hash.');
+    }
 }
 
 // ─── Import Settings ──────────────────────────────────────────────────────────

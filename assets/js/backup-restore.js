@@ -166,9 +166,15 @@
                 backup.data[tbl] = dataJson.rows || [];
             }
 
+            // 3. Compute SHA-256 checksum of data section
+            setExportProgress(88, 'Computing integrity checksum...');
+            const dataStr = JSON.stringify(backup.data);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
+            backup.checksum = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
             setExportProgress(90, 'Compressing backup...');
 
-            // 3. Compress JSON → gzip
+            // 4. Compress JSON → gzip
             const jsonText = JSON.stringify(backup, null, 2);
             const filename = `rethink-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
             let blob;
@@ -370,7 +376,18 @@
                 throw new Error('Invalid backup file: missing data section.');
             }
 
-            // 4. Send schema if present (v1.1+)
+            // 4. Verify integrity checksum (if present)
+            if (backup.checksum) {
+                setImportProgress(16, 'Verifying integrity checksum...');
+                const dataStr = JSON.stringify(backup.data);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
+                const computed = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                if (computed !== backup.checksum) {
+                    throw new Error('Checksum mismatch — this backup file is corrupted or incomplete. Re-download and try again.');
+                }
+            }
+
+            // 5. Send schema if present (v1.1+)
             if (backup.schema && Object.keys(backup.schema).length > 0) {
                 setImportProgress(18, 'Creating tables...');
                 const schemaRes = await fetch('api/backup/import-chunk.php?action=schema', {
