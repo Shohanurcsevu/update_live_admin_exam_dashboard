@@ -255,20 +255,58 @@
         const result = { success: false, usedFallback: false, message: '' };
 
         try {
-            // 1. Fetch compressed data from server
-            const response = await fetch(ENDPOINT, { method: 'GET', cache: 'no-store' });
-            if (!response.ok) throw new Error(`Server error ${response.status}`);
+            // 1. Fetch metadata (schema + row counts, no data)
+            const metaRes = await fetch('api/backup/export-chunk.php?action=meta', { cache: 'no-store' });
+            if (!metaRes.ok) throw new Error(`Server error ${metaRes.status}`);
+            const meta = await metaRes.json();
+            if (meta.error) throw new Error(meta.error);
 
-            const compressedBuffer = await response.arrayBuffer();
-            const recordCount = parseInt(response.headers.get('X-Backup-Records') || '0', 10);
+            const tables = meta.tables || [];
+            const backup = {
+                backup_version: meta.backup_version || '2.0',
+                app: meta.app || 'rethink-admin',
+                exported_at: meta.exported_at,
+                backup_type: 'auto',
+                db_name: meta.db_name,
+                db_charset: meta.db_charset,
+                db_collation: meta.db_collation,
+                table_counts: meta.table_counts || {},
+                schema: meta.schema || {},
+                data: {},
+            };
+
+            const recordCount = meta.total_records || 0;
+
+            // 2. Fetch each table's data one-by-one
+            for (const tbl of tables) {
+                const dataRes = await fetch(`api/backup/export-chunk.php?action=data&table=${encodeURIComponent(tbl)}`, { cache: 'no-store' });
+                if (!dataRes.ok) throw new Error(`Failed to fetch table "${tbl}": ${dataRes.status}`);
+                const dataJson = await dataRes.json();
+                if (dataJson.error) throw new Error(dataJson.error);
+                backup.data[tbl] = dataJson.rows || [];
+            }
+
+            // 3. Compress with CompressionStream (client-side gzip)
+            const jsonText = JSON.stringify(backup);
+            let compressedBlob;
+
+            if (typeof CompressionStream !== 'undefined') {
+                const textBlob = new Blob([jsonText], { type: 'application/json' });
+                const cs = new CompressionStream('gzip');
+                const compressed = textBlob.stream().pipeThrough(cs);
+                compressedBlob = await new Response(compressed).blob();
+            } else {
+                // Fallback: store uncompressed
+                compressedBlob = new Blob([jsonText], { type: 'application/json' });
+            }
+
             const now = new Date().toISOString();
 
-            // 2a. Write compressed file to cloud-synced folder (File System Access API)
+            // 4a. Write compressed file to cloud-synced folder (File System Access API)
             if (_dirHandle) {
                 try {
-                    await writeToFolder(compressedBuffer);
+                    await writeToFolder(compressedBlob);
                 } catch (writeErr) {
-                    // Handle revoked permission gracefully
                     console.warn('[AutoBackup] Could not write to folder:', writeErr.message);
                     _dirHandle = null;
                     _settings.folderName = null;
@@ -276,28 +314,25 @@
                     throw new Error('Folder access was revoked. Please re-select your backup folder.');
                 }
             } else if (supportsFileSystemAccess() && _settings.folderName) {
-                // Handle lost — re-pick is needed
                 result.usedFallback = true;
-                triggerFallbackDownload(compressedBuffer);
+                triggerFallbackDownload(compressedBlob);
             } else {
-                // No folder picked at all, or API unsupported
                 result.usedFallback = !_settings.folderName;
                 if (!_dirHandle) {
-                    triggerFallbackDownload(compressedBuffer);
+                    triggerFallbackDownload(compressedBlob);
                 }
             }
 
-            // 2b. Save compressed blob to IndexedDB (saves storage space)
-            const blob = new Blob([compressedBuffer], { type: 'application/gzip' });
-            await idbAdd(blob, {
+            // 4b. Save compressed blob to IndexedDB
+            await idbAdd(compressedBlob, {
                 savedAt: now,
-                sizeBytes: blob.size,
+                sizeBytes: compressedBlob.size,
                 recordCount: recordCount,
                 folderUsed: !!_dirHandle || (_dirHandle === null && !!_settings.folderName && !result.usedFallback),
             });
             await rotateHistory();
 
-            // 3. Update metadata
+            // 5. Update metadata
             _settings.lastRunAt = now;
             _settings.runCount = (_settings.runCount || 0) + 1;
             persistSettings();

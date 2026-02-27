@@ -121,27 +121,72 @@
         downloadBtn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">sync</span> Preparing...';
 
         exportProgress.classList.remove('hidden');
-        setExportProgress(10, 'Connecting to server...');
+        setExportProgress(5, 'Fetching metadata...');
 
         try {
-            setExportProgress(30, 'Querying database tables...');
-            const response = await fetch('api/backup/export.php', { method: 'GET' });
+            // 1. Fetch metadata (schema + row counts)
+            const metaRes = await fetch('api/backup/export-chunk.php?action=meta', { cache: 'no-store' });
+            if (!metaRes.ok) throw new Error(`Server error: ${metaRes.status}`);
+            const meta = await metaRes.json();
+            if (meta.error) throw new Error(meta.error);
 
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status} ${response.statusText}`);
+            const tables = meta.tables || [];
+            const totalTables = tables.length;
+
+            // Build backup object shell
+            const backup = {
+                backup_version: meta.backup_version || '2.0',
+                app: meta.app || 'rethink-admin',
+                exported_at: meta.exported_at,
+                db_name: meta.db_name,
+                db_charset: meta.db_charset,
+                db_collation: meta.db_collation,
+                table_counts: meta.table_counts || {},
+                schema: meta.schema || {},
+                data: {},
+            };
+
+            // Update stats bar
+            if (statTables) statTables.textContent = totalTables;
+            if (statRecords) statRecords.textContent = (meta.total_records ?? 0).toLocaleString();
+
+            // 2. Fetch each table's data one-by-one
+            for (let i = 0; i < totalTables; i++) {
+                const tbl = tables[i];
+                const tableDef = TABLES.find(t => t.name === tbl);
+                const label = tableDef ? tableDef.label : tbl;
+                const pct = Math.round(10 + (i / totalTables) * 75);
+                setExportProgress(pct, `Exporting ${label} (${i + 1}/${totalTables})...`);
+
+                const dataRes = await fetch(`api/backup/export-chunk.php?action=data&table=${encodeURIComponent(tbl)}`, { cache: 'no-store' });
+                if (!dataRes.ok) throw new Error(`Failed to fetch table "${tbl}": ${dataRes.status}`);
+                const dataJson = await dataRes.json();
+                if (dataJson.error) throw new Error(dataJson.error);
+
+                backup.data[tbl] = dataJson.rows || [];
             }
 
-            setExportProgress(70, 'Receiving data...');
+            setExportProgress(90, 'Compressing backup...');
 
-            const blob = await response.blob();
-            setExportProgress(90, 'Creating download...');
+            // 3. Compress JSON → gzip
+            const jsonText = JSON.stringify(backup, null, 2);
+            const filename = `rethink-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
+            let blob;
 
-            // Extract filename from Content-Disposition header if available
-            const disposition = response.headers.get('Content-Disposition') || '';
-            const match = disposition.match(/filename="([^"]+)"/);
-            const filename = match ? match[1] : `rethink-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
+            if (typeof CompressionStream !== 'undefined') {
+                // Modern browsers: compress client-side
+                const textBlob = new Blob([jsonText], { type: 'application/json' });
+                const cs = new CompressionStream('gzip');
+                const compressed = textBlob.stream().pipeThrough(cs);
+                blob = await new Response(compressed).blob();
+            } else {
+                // Fallback: download as uncompressed .json
+                blob = new Blob([jsonText], { type: 'application/json' });
+            }
 
-            // Trigger browser download
+            setExportProgress(95, 'Creating download...');
+
+            // 4. Trigger download
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -153,11 +198,6 @@
 
             setExportProgress(100, 'Backup downloaded successfully!');
             exportBar.style.background = 'linear-gradient(to right, #10b981, #059669)';
-
-            // Update record count from X-Backup-Tables header
-            const tablesHeader = response.headers.get('X-Backup-Tables');
-            if (tablesHeader) statTables.textContent = tablesHeader;
-
             showToast('Backup downloaded successfully!', 'success');
 
             setTimeout(() => {
@@ -280,31 +320,128 @@
         importBtn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">sync</span> Importing...';
         importResult.classList.add('hidden');
         importProgress.classList.remove('hidden');
-        setImportProgress(10, 'Uploading backup file...');
+        setImportProgress(5, 'Reading backup file...');
 
         const conflict = getConflictMode();
 
         try {
-            const formData = new FormData();
-            formData.append('backup', selectedFile);
+            // 1. Read file as ArrayBuffer
+            const buffer = await selectedFile.arrayBuffer();
+            let jsonText;
 
-            setImportProgress(30, 'Validating backup file...');
+            // 2. Detect gzip and decompress client-side
+            const bytes = new Uint8Array(buffer);
+            const isGzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
 
-            const response = await fetch(`api/backup/import.php?conflict=${conflict}`, {
-                method: 'POST',
-                body: formData,
-            });
+            if (isGzip && typeof DecompressionStream !== 'undefined') {
+                setImportProgress(10, 'Decompressing backup...');
+                const blob = new Blob([buffer]);
+                const ds = new DecompressionStream('gzip');
+                const decompressed = blob.stream().pipeThrough(ds);
+                jsonText = await new Response(decompressed).text();
+            } else if (isGzip) {
+                // Fallback: send compressed file to legacy import.php (server decompresses)
+                setImportProgress(10, 'Uploading to server...');
+                const formData = new FormData();
+                formData.append('backup', selectedFile);
+                setImportProgress(30, 'Server is restoring data...');
+                const response = await fetch(`api/backup/import.php?conflict=${conflict}`, {
+                    method: 'POST', body: formData,
+                });
+                const result = await response.json();
+                setImportProgress(100, result.success ? 'Restore complete!' : 'Restore failed.');
+                setTimeout(() => {
+                    importProgress.classList.add('hidden');
+                    resetImportProgress();
+                    renderImportResult(result);
+                }, 800);
+                importBtn.disabled = false;
+                importBtn.innerHTML = '<span class="material-symbols-outlined text-sm">restore</span> Import Backup';
+                return;
+            } else {
+                jsonText = new TextDecoder().decode(buffer);
+            }
 
-            setImportProgress(70, 'Restoring data...');
+            // 3. Parse JSON
+            setImportProgress(15, 'Parsing backup data...');
+            const backup = JSON.parse(jsonText);
 
-            const result = await response.json();
+            if (!backup.data || typeof backup.data !== 'object') {
+                throw new Error('Invalid backup file: missing data section.');
+            }
 
-            setImportProgress(100, result.success ? 'Restore complete!' : 'Restore failed.');
+            // 4. Send schema if present (v1.1+)
+            if (backup.schema && Object.keys(backup.schema).length > 0) {
+                setImportProgress(18, 'Creating tables...');
+                const schemaRes = await fetch('api/backup/import-chunk.php?action=schema', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schema: backup.schema }),
+                });
+                const schemaResult = await schemaRes.json();
+                if (schemaResult.errors && schemaResult.errors.length > 0) {
+                    console.warn('[Import] Schema errors:', schemaResult.errors);
+                }
+            }
+
+            // 5. Import data table-by-table
+            const tableNames = Object.keys(backup.data);
+            const totalTables = tableNames.length;
+            const imported = {};
+            const allErrors = [];
+            let totalImported = 0;
+            let totalSkipped = 0;
+
+            for (let i = 0; i < totalTables; i++) {
+                const tbl = tableNames[i];
+                const rows = backup.data[tbl];
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    imported[tbl] = 0;
+                    continue;
+                }
+
+                const tableDef = TABLES.find(t => t.name === tbl);
+                const label = tableDef ? tableDef.label : tbl;
+                const pct = Math.round(20 + (i / totalTables) * 75);
+                setImportProgress(pct, `Restoring ${label} (${i + 1}/${totalTables})...`);
+
+                const res = await fetch(
+                    `api/backup/import-chunk.php?action=data&table=${encodeURIComponent(tbl)}&conflict=${conflict}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rows }),
+                    }
+                );
+                const chunkResult = await res.json();
+
+                imported[tbl] = chunkResult.inserted || 0;
+                totalImported += chunkResult.inserted || 0;
+                totalSkipped += chunkResult.skipped || 0;
+                if (chunkResult.errors && chunkResult.errors.length > 0) {
+                    allErrors.push(...chunkResult.errors.map(e => `[${tbl}] ${e}`));
+                }
+            }
+
+            // 6. Show results
+            setImportProgress(100, 'Restore complete!');
+
+            const finalResult = {
+                success: true,
+                conflict_mode: conflict,
+                backup_version: backup.backup_version,
+                exported_at: backup.exported_at,
+                total_imported: totalImported,
+                total_skipped: totalSkipped,
+                imported,
+                error_count: allErrors.length,
+                errors: allErrors,
+            };
 
             setTimeout(() => {
                 importProgress.classList.add('hidden');
                 resetImportProgress();
-                renderImportResult(result);
+                renderImportResult(finalResult);
             }, 800);
 
         } catch (err) {
