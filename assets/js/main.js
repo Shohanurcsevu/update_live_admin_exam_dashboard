@@ -316,18 +316,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const navLink = e.target.closest('.nav-link');
         if (navLink && navLink.dataset.page) {
             e.preventDefault();
-            loadPage(navLink.dataset.page);
+            window.loadPage(navLink.dataset.page);
         }
     });
 
     window.onpopstate = (event) => {
         if (event.state) {
-            loadPage(event.state.page, event.state.params);
+            window.loadPage(event.state.page, event.state.params);
         } else {
             const fallbackParams = new URLSearchParams(window.location.search);
             const fallbackPage = fallbackParams.get('page') || 'dashboard';
             fallbackParams.delete('page');
-            loadPage(fallbackPage, '?' + fallbackParams.toString());
+            window.loadPage(fallbackPage, '?' + fallbackParams.toString());
         }
     };
 });

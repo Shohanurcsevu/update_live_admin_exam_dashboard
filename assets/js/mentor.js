@@ -3451,7 +3451,7 @@ class StudyMentor {
 
                 container.innerHTML = `
                     <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-3 text-white shadow-md cursor-pointer hover:shadow-lg transition-all mentor-resume-btn"
-                         data-exam-id="${attempt.exam_id}" data-attempt-id="${attempt.id}">
+                         data-exam-id="${attempt.exam_id}" data-attempt-id="${attempt.id}" data-exam-title="${title.replace(/"/g, '&quot;')}">
                         <div class="flex justify-between items-center">
                             <div class="flex items-center gap-3">
                                 <div class="bg-white/20 p-1.5 rounded-lg">
@@ -3473,7 +3473,7 @@ class StudyMentor {
                 container.onclick = (e) => {
                     const btn = e.target.closest('.mentor-resume-btn');
                     if (btn) {
-                        this.handleResumeExam(btn.dataset.examId, btn.dataset.attemptId);
+                        this.handleResumeExam(btn.dataset.examId, btn.dataset.attemptId, btn.dataset.examTitle);
                     }
                 };
 
@@ -3487,12 +3487,103 @@ class StudyMentor {
         }
     }
 
-    handleResumeExam(examId, attemptId) {
+    showResumeExamModal(examId, attemptId, examTitle) {
+        return new Promise(resolve => {
+            let modal = document.getElementById('mentor-resume-modal');
+            if (!modal) {
+                const modalHTML = `
+                    <div id="mentor-resume-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-[1000] p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+                        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto overflow-hidden transform scale-95 transition-transform duration-300">
+                            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 text-center relative overflow-hidden">
+                                <div class="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 rounded-full bg-white opacity-10"></div>
+                                <div class="absolute bottom-0 left-0 -ml-8 -mb-8 w-16 h-16 rounded-full bg-white opacity-10"></div>
+                                <span class="material-symbols-outlined text-5xl text-white mb-2 relative z-10">play_circle</span>
+                                <h3 class="text-xl font-bold text-white relative z-10">Resume Exam</h3>
+                            </div>
+                            <div class="p-6 text-center">
+                                <p class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Unfinished Attempt Found</p>
+                                <h4 id="resume-modal-title" class="text-[15px] font-bold text-gray-800 mb-4 line-clamp-2"></h4>
+                                <p class="text-gray-600 mb-6 text-xs">You have an exam in progress. Continue from where you left off?</p>
+                                <div class="flex flex-col gap-3">
+                                    <button id="resume-confirm-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">
+                                        <span class="material-symbols-outlined text-lg">play_arrow</span> Resume Now
+                                    </button>
+                                    <button id="resume-cancel-btn" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-xl transition-all active:scale-95 text-sm">
+                                        Maybe Later
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                modal = document.getElementById('mentor-resume-modal');
+            }
+
+            const titleEl = document.getElementById('resume-modal-title');
+            if (titleEl) titleEl.textContent = examTitle;
+
+            const confirmBtn = document.getElementById('resume-confirm-btn');
+            const cancelBtn = document.getElementById('resume-cancel-btn');
+
+            const showModal = () => {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.children[0].classList.remove('scale-95');
+                }, 10);
+            };
+
+            const hideModal = () => {
+                modal.classList.add('opacity-0');
+                modal.children[0].classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }, 300);
+            };
+
+            const onConfirm = () => { hideModal(); cleanup(); resolve(true); };
+            const onCancel = () => { hideModal(); cleanup(); resolve(false); };
+
+            const cleanup = () => {
+                confirmBtn.removeEventListener('click', onConfirm);
+                cancelBtn.removeEventListener('click', onCancel);
+            };
+
+            confirmBtn.addEventListener('click', onConfirm);
+            cancelBtn.addEventListener('click', onCancel);
+
+            showModal();
+        });
+    }
+
+    async handleResumeExam(examId, attemptId, examTitle = '') {
+        if (this.resumingExamLock) return;
+        this.resumingExamLock = true;
+
         console.log('[Mentor] handleResumeExam called:', { examId, attemptId });
+
+        // Check if we are already on an exam page
+        const params = new URLSearchParams(window.location.search);
+        const currentPage = params.get('page');
+        const isCurrentlyInAnExam = (currentPage === 'take-exam-interface' || currentPage === 'take-offline-exam');
+
+        // Only show Resume Confirmation Modal if we are NOT currently in an exam
+        if (!isCurrentlyInAnExam) {
+            const confirmed = await this.showResumeExamModal(examId, attemptId, examTitle || 'Unfinished Exam');
+            if (!confirmed) {
+                this.resumingExamLock = false;
+                return;
+            }
+        }
+
         // Close panel first, then navigate after a short delay to avoid race conditions
         this.closePanel();
         if (!window.loadPage) {
             console.error('[Mentor] window.loadPage is not available!');
+            this.resumingExamLock = false;
             return;
         }
 
@@ -3506,6 +3597,11 @@ class StudyMentor {
                 console.log('[Mentor] Navigating to take-offline-exam, exam_id:', examId, 'uuid:', attemptId);
                 window.loadPage('take-offline-exam', `?exam_id=${examId}&attempt_uuid=${attemptId}`);
             }
+
+            // Release lock after navigation is initiated (2 seconds is plenty of time to prevent double-clicks from causing racing page loads)
+            setTimeout(() => {
+                this.resumingExamLock = false;
+            }, 2000);
         }, 100);
     }
 

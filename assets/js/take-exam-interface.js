@@ -144,12 +144,80 @@ function initializeTakeExamInterface() {
         });
 
         window.loadPage = async function (page, params = '') {
-            if (isExamInProgress) {
-                const action = confirm(
-                    "You have an exam in progress.\n\n" +
-                    "[OK] to Pause & Exit (Resume later)\n" +
-                    "[Cancel] to stay here."
-                );
+            // If already in an exam and trying to 'navigate' back to the SAME exam (e.g. via Resume button),
+            // just ignore the navigation prevention.
+            const targetParams = new URLSearchParams(params.startsWith('?') ? params.substring(1) : params);
+            const targetExamId = targetParams.get('exam_id');
+            const isNavigatingToSameExam = (page === 'take-exam-interface' && targetExamId == examId);
+
+            if (isExamInProgress && !isNavigatingToSameExam) {
+                const action = await new Promise(resolve => {
+                    let modal = document.getElementById('exit-confirm-modal');
+
+                    if (!modal) {
+                        // Dynamically inject modal to bypass HTML caching issues
+                        const modalHTML = `
+                            <div id="exit-confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-[200] p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+                                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto overflow-hidden transform scale-95 transition-transform duration-300">
+                                    <div class="bg-indigo-600 p-5 text-center relative overflow-hidden">
+                                        <div class="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 rounded-full bg-white opacity-10"></div>
+                                        <div class="absolute bottom-0 left-0 -ml-8 -mb-8 w-16 h-16 rounded-full bg-white opacity-10"></div>
+                                        <span class="material-symbols-outlined text-5xl text-white mb-2 relative z-10">pause_circle</span>
+                                        <h3 class="text-xl font-bold text-white relative z-10">Exam in Progress</h3>
+                                    </div>
+                                    <div class="p-6 text-center">
+                                        <p class="text-gray-600 mb-6 font-medium">Do you want to pause your exam and resume it later, or stay here?</p>
+                                        <div class="flex flex-col gap-3">
+                                            <button id="exit-pause-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">
+                                                <span class="material-symbols-outlined">save</span> Pause & Exit
+                                            </button>
+                                            <button id="exit-cancel-btn" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-xl transition-all active:scale-95">
+                                                Stay Here
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        document.body.insertAdjacentHTML('beforeend', modalHTML);
+                        modal = document.getElementById('exit-confirm-modal');
+                    }
+
+                    const pauseBtn = document.getElementById('exit-pause-btn');
+                    const cancelBtn = document.getElementById('exit-cancel-btn');
+
+                    if (!modal || !pauseBtn || !cancelBtn) {
+                        resolve(confirm("You have an exam in progress.\n\n[OK] to Pause & Exit (Resume later)\n[Cancel] to stay here."));
+                        return;
+                    }
+
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                    setTimeout(() => {
+                        modal.classList.remove('opacity-0');
+                        modal.children[0].classList.remove('scale-95');
+                    }, 10);
+
+                    const hideModal = () => {
+                        modal.classList.add('opacity-0');
+                        modal.children[0].classList.add('scale-95');
+                        setTimeout(() => {
+                            modal.classList.add('hidden');
+                            modal.classList.remove('flex');
+                        }, 300);
+                    };
+
+                    const onPause = () => { hideModal(); cleanup(); resolve(true); };
+                    const onCancel = () => { hideModal(); cleanup(); resolve(false); };
+
+                    const cleanup = () => {
+                        pauseBtn.removeEventListener('click', onPause);
+                        cancelBtn.removeEventListener('click', onCancel);
+                    };
+
+                    pauseBtn.addEventListener('click', onPause);
+                    cancelBtn.addEventListener('click', onCancel);
+                });
 
                 if (action) {
                     // User wants to pause and exit.
