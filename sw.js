@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rethink-exam-v17';
+const CACHE_NAME = 'rethink-exam-v18';
 const PRE_CACHE_ASSETS = [
     './',
     './index.html',
@@ -104,4 +104,27 @@ self.addEventListener('fetch', (event) => {
             return cachedResponse || networkFetch;
         })
     );
+});
+
+// ─── Periodic Background Sync ─────────────────────────────────────────────────
+// Fires even when the page is in the background or on another tab.
+// Requires: Chrome 80+, site served over HTTPS or localhost, PWA installed.
+
+self.addEventListener('periodicsync', (event) => {
+    if (event.tag !== 'rethink-auto-backup') return;
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+            if (clients.length === 0) return; // no open page, skip
+            // Message the first available client to run the backup
+            clients[0].postMessage({ type: 'RUN_AUTO_BACKUP', source: 'periodicsync' });
+        })
+    );
+});
+
+// ─── Message Handler (page → SW communication) ────────────────────────────────
+// The page can send SW_PING to check if the service worker is alive.
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SW_PING') {
+        event.source.postMessage({ type: 'SW_PONG' });
+    }
 });

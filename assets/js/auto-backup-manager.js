@@ -349,9 +349,9 @@
             result.success = false;
             result.message = err.message || 'Unknown error';
             console.error('[AutoBackup] Error:', err);
+        } finally {
+            _running = false; // always unlock, even if catch itself throws
         }
-
-        _running = false;
 
         // Notify UI
         window.dispatchEvent(new CustomEvent('autoBackupComplete', { detail: result }));
@@ -375,6 +375,33 @@
         }
     }
 
+    // ─── Periodic Background Sync Registration ────────────────────────────────
+    // Registers the 'rethink-auto-backup' tag so Chrome can fire the backup
+    // via the service worker even when the user is on another tab.
+
+    async function registerPeriodicSync() {
+        try {
+            if (!('serviceWorker' in navigator) || !('periodicSync' in (await navigator.serviceWorker.ready))) return;
+            const reg = await navigator.serviceWorker.ready;
+            const tags = await reg.periodicSync.getTags();
+            if (!_settings.enabled) {
+                // Unregister if disabled
+                if (tags.includes('rethink-auto-backup')) {
+                    await reg.periodicSync.unregister('rethink-auto-backup');
+                    console.log('[AutoBackup] Periodic sync unregistered.');
+                }
+                return;
+            }
+            await reg.periodicSync.register('rethink-auto-backup', {
+                minInterval: _settings.intervalMs,
+            });
+            console.log('[AutoBackup] Periodic sync registered, min interval:', _settings.intervalMs + 'ms');
+        } catch (e) {
+            // Not supported (Firefox, Safari, or permission denied) — fall through to visibilitychange
+            console.log('[AutoBackup] Periodic Background Sync not available:', e.message);
+        }
+    }
+
     // ─── Public API ───────────────────────────────────────────────────────────
 
     async function initAutoBackup() {
@@ -384,6 +411,42 @@
             await restoreHandle();
         }
         if (_settings.enabled) startInterval();
+
+        // When the tab becomes visible again, check if a backup is overdue.
+        // Browsers throttle/kill setInterval in background tabs, so the interval
+        // may have missed several ticks. Instead of relying on the interval alone,
+        // compare elapsed time vs the configured period.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || !_settings.enabled) return;
+
+            const lastRun = _settings.lastRunAt ? new Date(_settings.lastRunAt).getTime() : 0;
+            const elapsed = Date.now() - lastRun;
+            const overdue = elapsed > _settings.intervalMs;
+
+            if (overdue) {
+                // Missed one or more scheduled runs — fire immediately then reset interval
+                console.log(`[AutoBackup] Overdue by ${Math.round(elapsed / 60000)}m — running now.`);
+                startInterval(); // stops old interval, runs immediately, starts fresh
+            } else if (_intervalId === null) {
+                // Interval was cleared but not overdue yet — just restart it
+                startInterval();
+            }
+        });
+
+        // ── Periodic Background Sync (Chrome 80+ with PWA installed) ──────────
+        // This is the only true background scheduler. The SW fires the
+        // 'rethink-auto-backup' tag and messages this page to run the backup.
+        await registerPeriodicSync();
+
+        // Listen for SW messages (triggered by periodicsync in background)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'RUN_AUTO_BACKUP' && _settings.enabled) {
+                    console.log('[AutoBackup] SW periodic sync fired — running backup now.');
+                    runBackupNow();
+                }
+            });
+        }
     }
 
     function getSettings() {
@@ -400,6 +463,7 @@
         if (_settings.enabled !== wasEnabled || _settings.intervalMs !== wasInterval) {
             if (_settings.enabled) startInterval();
             else stopInterval();
+            registerPeriodicSync(); // re-register with new interval or unregister
         }
     }
 
