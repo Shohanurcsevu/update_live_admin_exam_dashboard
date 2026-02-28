@@ -226,13 +226,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // Listen for background auto-backup events globally
+    window.addEventListener('autoBackupStarted', () => {
+        window.showToast('Auto-backup in progress...', 'info');
+        // Signal any open Backup UI to show loading state
+        if (typeof window.refreshBackupUI === 'function') window.refreshBackupUI({ status: 'running' });
+    });
+
     window.addEventListener('autoBackupComplete', (e) => {
         const result = e.detail;
-        if (result.success && !result.folderRestored) { // Don't show toast for silent folder restoration
+        if (result.success && !result.folderRestored) {
             window.showToast(result.usedFallback ? 'Auto-backup downloaded ✓' : 'Auto-backup saved to cloud ✓', 'success');
         } else if (!result.success && result.message) {
             window.showToast('Backup failed: ' + result.message, 'error');
         }
+        // Signal any open Backup UI to refresh data
+        if (typeof window.refreshBackupUI === 'function') window.refreshBackupUI({ status: 'idle' });
     });
 
     // --- Global: one-click re-auth if folder permission needs a user gesture ---

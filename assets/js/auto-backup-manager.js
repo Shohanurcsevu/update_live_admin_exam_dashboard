@@ -40,6 +40,7 @@
         folderName: null,            // display name of chosen folder
         lastRunAt: null,            // ISO string
         runCount: 0,
+        lastError: null,           // last error message if any
     };
 
     // ─── State ────────────────────────────────────────────────────────────────
@@ -250,9 +251,17 @@
     // ─── Core Backup Logic ────────────────────────────────────────────────────
 
     async function runBackupNow() {
-        if (_running) return { success: false, message: 'Backup already in progress.' };
-        _running = true;
         const result = { success: false, usedFallback: false, message: '' };
+        if (_running) {
+            result.message = 'Backup already in progress.';
+            return result;
+        }
+        _running = true;
+
+        // Notify UI that a backup has started (sync or periodic)
+        window.dispatchEvent(new CustomEvent('autoBackupStarted'));
+
+
 
         try {
             // 1. Fetch metadata (schema + row counts, no data)
@@ -287,8 +296,9 @@
             }
 
             // 3. Compute SHA-256 checksum of data section
-            const dataStr = JSON.stringify(backup.data);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
+            // Optimization: avoid another huge string copy by using a Blob/ArrayBuffer
+            const dataBlob = new Blob([JSON.stringify(backup.data)], { type: 'application/json' });
+            const hashBuffer = await crypto.subtle.digest('SHA-256', await dataBlob.arrayBuffer());
             backup.checksum = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
             // 4. Compress with CompressionStream (client-side gzip)
@@ -340,6 +350,7 @@
             // 5. Update metadata
             _settings.lastRunAt = now;
             _settings.runCount = (_settings.runCount || 0) + 1;
+            _settings.lastError = null; // Clear any previous error on success
             persistSettings();
 
             result.success = true;
@@ -348,6 +359,8 @@
         } catch (err) {
             result.success = false;
             result.message = err.message || 'Unknown error';
+            _settings.lastError = result.message;
+            persistSettings();
             console.error('[AutoBackup] Error:', err);
         } finally {
             _running = false; // always unlock, even if catch itself throws
@@ -508,6 +521,7 @@
     window.autoBackupManager = {
         initAutoBackup,
         runBackupNow,
+        isRunning: () => _running,
         pickFolder,
         getSettings,
         saveSettings,

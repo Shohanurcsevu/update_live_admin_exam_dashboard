@@ -649,23 +649,41 @@
             lastRunEl.textContent = fmtTime(settings.lastRunAt);
             runCountEl.textContent = settings.runCount || 0;
             // Countdown
-            updateCountdown(settings);
+            updateCountdown(settings, abm.isRunning());
         }
 
-        function updateCountdown(settings) {
+        function updateCountdown(settings, isRunning = false) {
             clearInterval(nextRunTimer);
             nextRunTarget = null;
-            if (!settings.enabled || !settings.lastRunAt) {
-                nextRunEl.textContent = settings.enabled ? 'Starting soon…' : '—';
+
+            if (isRunning) {
+                nextRunEl.textContent = 'Backing up...';
                 return;
             }
+
+            if (!settings.enabled || !settings.lastRunAt) {
+                if (settings.enabled && settings.lastError) {
+                    nextRunEl.innerHTML = `<span class="text-rose-500" title="${settings.lastError}">Error (check logs)</span>`;
+                    // Also show toast if it's the first time we see this error? No, toasts are handled by main.js
+                } else {
+                    nextRunEl.textContent = settings.enabled ? 'Starting soon…' : '—';
+                }
+                return;
+            }
+
             nextRunTarget = new Date(new Date(settings.lastRunAt).getTime() + settings.intervalMs);
-            nextRunTimer = setInterval(() => {
+
+            const tick = () => {
                 const remaining = nextRunTarget - Date.now();
                 nextRunEl.textContent = fmtCountdown(remaining);
-                if (remaining <= 0) clearInterval(nextRunTimer);
-            }, 1000);
-            nextRunEl.textContent = fmtCountdown(nextRunTarget - Date.now());
+                if (remaining <= 0) {
+                    clearInterval(nextRunTimer);
+                    nextRunEl.textContent = 'Backing up...';
+                }
+            };
+
+            nextRunTimer = setInterval(tick, 1000);
+            tick();
         }
 
         // ── Progress bar helpers ───────────────────────────────────────────────
@@ -829,18 +847,25 @@
             runNowBtn.innerHTML = '<span class="material-symbols-outlined text-sm">backup</span> Run Backup Now';
         });
 
-        // Listen for background auto-backup events to refresh UI only
-        // Named function to allow removal if needed, though with SPA navigation it might still accumulate
-        // Best approach: check if we already initialized or use a flag.
-        if (!window._backupUIListenerAdded) {
-            window.addEventListener('autoBackupComplete', async (e) => {
-                const result = e.detail;
-                // Toast is handled by main.js globally
-                applySettingsToUI(abm.getSettings());
-                await renderHistory();
-            });
-            window._backupUIListenerAdded = true;
-        }
+
+
+        /**
+         * GLOBAL UI REFRESH CALLBACK (SPA-Safe)
+         * Instead of keeping a stale window listener, main.js calls this 
+         * whenever a background update happens.
+         */
+        window.refreshBackupUI = (info = {}) => {
+            // Re-find elements just in case the DOM was replaced since init
+            const currentToggle = document.getElementById('ab-enabled-toggle');
+            if (!currentToggle) return; // Not on the backup page anymore
+
+            const settings = abm.getSettings();
+            applySettingsToUI(settings);
+            if (info.status === 'running' || abm.isRunning()) {
+                updateCountdown(settings, true);
+            }
+            renderHistory();
+        };
 
         // ── Initial render ────────────────────────────────────────────────────
         applySettingsToUI(abm.getSettings());
