@@ -325,7 +325,7 @@ function initializeExamPage() {
             document.getElementById('load-more-container').classList.add('hidden');
         }
 
-        let url = `${EXAM_API_URL}?action=list&limit=${itemsPerPage}&offset=${currentOffset}`;
+        let url = `${EXAM_API_URL}?action=list&limit=${itemsPerPage}&offset=${currentOffset}&exclude_custom=true`;
         const params = new URLSearchParams();
         if (subjectFilter.value > 0) params.append('subject_id', subjectFilter.value);
         if (lessonFilter.value > 0) params.append('lesson_id', lessonFilter.value);
