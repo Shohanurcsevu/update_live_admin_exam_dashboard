@@ -113,7 +113,7 @@ window.triviaGame = {
                 return;
             }
 
-            this.questions = qData.data;
+            this.questions = qData.data.map(q => this.shuffleOptions(q));
             this.totalFetched = qData.data.length;
 
             // If 'All' was selected, update the label with actual count

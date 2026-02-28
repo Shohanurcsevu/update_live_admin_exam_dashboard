@@ -3,7 +3,7 @@ header('Content-Type: application/json');
 require_once('../subject/db_connect.php');
 
 $type = $_GET['type'] ?? 'all';
-$subject_id = isset($_GET['subject_id']) ? (int)$_GET['subject_id'] : null;
+$subject_id = $_GET['subject_id'] ?? null;
 $lesson_id = isset($_GET['lesson_id']) ? (int)$_GET['lesson_id'] : null;
 $topic_id = isset($_GET['topic_id']) ? (int)$_GET['topic_id'] : null;
 
@@ -14,11 +14,16 @@ try {
         $res = $conn->query("SELECT id, subject_name as name FROM subjects WHERE is_deleted = 0 ORDER BY id ASC");
         $data['subjects'] = [];
         while($row = $res->fetch_assoc()) $data['subjects'][] = $row;
+        $data['subjects'][] = ['id' => 'custom', 'name' => 'Custom Exams'];
     }
 
     if ($type === 'all' || $type === 'lessons') {
         $where = "WHERE is_deleted = 0";
-        if ($subject_id) $where .= " AND subject_id = $subject_id";
+        if ($subject_id === 'custom') {
+            $where .= " AND 1=0"; // Custom exams don't have lessons
+        } else if ($subject_id) {
+            $where .= " AND subject_id = " . (int)$subject_id;
+        }
         $res = $conn->query("SELECT id, lesson_name as name FROM lessons $where ORDER BY lesson_name ASC");
         $data['lessons'] = [];
         while($row = $res->fetch_assoc()) $data['lessons'][] = $row;
@@ -26,7 +31,11 @@ try {
 
     if ($type === 'all' || $type === 'topics') {
         $where = "WHERE is_deleted = 0";
-        if ($subject_id) $where .= " AND subject_id = $subject_id";
+        if ($subject_id === 'custom') {
+            $where .= " AND 1=0"; // Custom exams don't have topics
+        } else if ($subject_id) {
+            $where .= " AND subject_id = " . (int)$subject_id;
+        }
         if ($lesson_id) $where .= " AND lesson_id = $lesson_id";
         $res = $conn->query("SELECT id, topic_name as name FROM topics $where ORDER BY topic_name ASC");
         $data['topics'] = [];
@@ -34,11 +43,20 @@ try {
     }
 
     if ($type === 'all' || $type === 'exams') {
-        $where = "WHERE is_deleted = 0";
-        if ($subject_id) $where .= " AND subject_id = $subject_id";
-        if ($lesson_id) $where .= " AND lesson_id = $lesson_id";
-        if ($topic_id) $where .= " AND topic_id = $topic_id";
-        $res = $conn->query("SELECT id, exam_title as name FROM exams $where AND subject_id IS NOT NULL AND is_revision = 0 ORDER BY created_at DESC LIMIT 100");
+        $where = "WHERE is_deleted = 0 AND is_revision = 0";
+        if ($subject_id === 'custom') {
+            $where .= " AND subject_id IS NULL";
+        } else {
+            if ($subject_id) $where .= " AND subject_id = " . (int)$subject_id;
+            if ($lesson_id) $where .= " AND lesson_id = $lesson_id";
+            if ($topic_id) $where .= " AND topic_id = $topic_id";
+            
+            // If No specific filter is selected, default to non-custom exams
+            if (!$subject_id && !$lesson_id && !$topic_id) {
+                $where .= " AND subject_id IS NOT NULL";
+            }
+        }
+        $res = $conn->query("SELECT id, exam_title as name FROM exams $where ORDER BY created_at DESC LIMIT 100");
         $data['exams'] = [];
         while($row = $res->fetch_assoc()) $data['exams'][] = $row;
     }
