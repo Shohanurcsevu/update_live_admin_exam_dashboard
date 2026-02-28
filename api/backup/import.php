@@ -24,23 +24,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// --- ENVIRONMENT DETECTION ---
+// Detects localhost, 127.0.0.1, or local network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+$host = $_SERVER['HTTP_HOST'] ?? '';
+$is_localhost = (
+    in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) || 
+    $host === 'localhost' || 
+    preg_match('/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host)
+);
 // ─── Fresh-Machine Bootstrap ──────────────────────────────────────────────────
-// Connect WITHOUT a database first so we can create the DB if it doesn't exist.
-// Credentials mirror those in db_connect.php.
-$_bhost = 'localhost';
-$_buser = 'root';
-$_bpass = '';
-$_bname = 'admin_examtaking';
-
-$_boot = @new mysqli($_bhost, $_buser, $_bpass);
-if (!$_boot->connect_error) {
-    $_boot->query(
-        "CREATE DATABASE IF NOT EXISTS `{$_bname}`
-         CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-    );
-    $_boot->close();
+// Only run this on localhost. On live servers, we rely on CPanel/Manual DB creation.
+if ($is_localhost) {
+    // FRESH-MACHINE BOOTSTRAP: Automate DB creation on new local setups
+    // Uses standard XAMPP credentials (root, no pass)
+    $_boot = @new mysqli('localhost', 'root', '');
+    if (!$_boot->connect_error) {
+        $_boot->query(
+            "CREATE DATABASE IF NOT EXISTS `admin_examtaking`
+             CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+        );
+        $_boot->close();
+    }
+    unset($_boot);
 }
-unset($_boot, $_bhost, $_buser, $_bpass, $_bname);
 
 // Now connect normally through db_connect.php (DB is guaranteed to exist above)
 require_once '../subject/db_connect.php';

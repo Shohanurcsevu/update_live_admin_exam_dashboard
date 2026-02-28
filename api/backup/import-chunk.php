@@ -26,21 +26,28 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// ─── Fresh-Machine Bootstrap ─────────────────────────────────────────────────
-$_bhost = 'localhost';
-$_buser = 'root';
-$_bpass = '';
-$_bname = 'admin_examtaking';
+// --- ENVIRONMENT DETECTION ---
+// Detects localhost, 127.0.0.1, or local network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+$host = $_SERVER['HTTP_HOST'] ?? '';
+$is_localhost = (
+    in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) || 
+    $host === 'localhost' || 
+    preg_match('/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host)
+);
 
-$_boot = @new mysqli($_bhost, $_buser, $_bpass);
-if (!$_boot->connect_error) {
-    $_boot->query(
-        "CREATE DATABASE IF NOT EXISTS `{$_bname}`
-         CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-    );
-    $_boot->close();
+if ($is_localhost) {
+    // Fresh-Machine Bootstrap: Only run this on localhost. 
+    // Uses standard XAMPP credentials (root, no pass)
+    $_boot = @new mysqli('localhost', 'root', '');
+    if (!$_boot->connect_error) {
+        $_boot->query(
+            "CREATE DATABASE IF NOT EXISTS `admin_examtaking`
+             CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+        );
+        $_boot->close();
+    }
+    unset($_boot);
 }
-unset($_boot, $_bhost, $_buser, $_bpass, $_bname);
 
 require_once '../subject/db_connect.php';
 
