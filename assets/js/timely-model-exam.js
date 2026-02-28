@@ -143,7 +143,7 @@
             console.log('Current date filter:', currentDateFilter);
 
             // Build URL with date filter - increased limit to 100
-            let url = `${API_EXAMS}&limit=100`;
+            let url = `${API_EXAMS}&limit=100&exclude_custom=true`;
             if (currentDateFilter.from && currentDateFilter.to) {
                 url += `&from=${currentDateFilter.from}&to=${currentDateFilter.to}`;
             }
