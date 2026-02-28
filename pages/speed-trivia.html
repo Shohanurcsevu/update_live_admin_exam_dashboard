@@ -327,8 +327,8 @@
             <span class="material-symbols-outlined text-white text-5xl">timer</span>
         </div>
         <h1 class="text-3xl font-bold text-slate-800 mb-2">Speed Trivia</h1>
-        <p class="text-slate-500 mb-6 max-w-sm mx-auto text-sm">15 questions. 20 seconds each. 10 lives. <br><span
-                class="font-bold text-indigo-600">Speed adds a bonus!</span></p>
+        <p class="text-slate-500 mb-6 max-w-sm mx-auto text-sm"><span id="question-count-label">15</span> questions. 20
+            seconds each. 10 lives. <br><span class="font-bold text-indigo-600">Speed adds a bonus!</span></p>
 
         <!-- Source Selection -->
         <div class="max-w-2xl mx-auto mb-10 space-y-6 bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100">
@@ -381,6 +381,35 @@
                         class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-slate-700 font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all disabled:cursor-not-allowed">
                         <option value="">All Exams</option>
                     </select>
+                </div>
+
+                <!-- Question Count Selector -->
+                <div class="md:col-span-2 space-y-2 mt-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Number of
+                        Questions</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="triviaGame.setQuestionCount(5)"
+                            class="question-count-btn px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all bg-slate-50 text-slate-500 hover:bg-slate-100"
+                            data-count="5">5</button>
+                        <button type="button" onclick="triviaGame.setQuestionCount(10)"
+                            class="question-count-btn px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all bg-slate-50 text-slate-500 hover:bg-slate-100"
+                            data-count="10">10</button>
+                        <button type="button" onclick="triviaGame.setQuestionCount(15)"
+                            class="question-count-btn active px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200"
+                            data-count="15">15</button>
+                        <button type="button" onclick="triviaGame.setQuestionCount(20)"
+                            class="question-count-btn px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all bg-slate-50 text-slate-500 hover:bg-slate-100"
+                            data-count="20">20</button>
+                        <button type="button" onclick="triviaGame.setQuestionCount(25)"
+                            class="question-count-btn px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all bg-slate-50 text-slate-500 hover:bg-slate-100"
+                            data-count="25">25</button>
+                        <button type="button" onclick="triviaGame.setQuestionCount(30)"
+                            class="question-count-btn px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all bg-slate-50 text-slate-500 hover:bg-slate-100"
+                            data-count="30">30</button>
+                        <button type="button" onclick="triviaGame.setQuestionCount('all')"
+                            class="question-count-btn px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all bg-slate-50 text-slate-500 hover:bg-slate-100"
+                            data-count="all">All</button>
+                    </div>
                 </div>
             </div>
         </div>

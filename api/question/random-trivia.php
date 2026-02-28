@@ -7,7 +7,8 @@ header('Content-Type: application/json');
  * Fetch 10 random questions for Speed Trivia
  */
 
-$limit = 15;
+$rawLimit = isset($_GET['limit']) ? (int)$_GET['limit'] : 15;
+$limit = ($rawLimit === 0) ? 0 : max(5, min(50, $rawLimit));
 
 // --- Filter Parameters ---
 $type = $_GET['source_type'] ?? 'random';
@@ -49,11 +50,13 @@ try {
     $sql = "SELECT id, question, options, answer, subject_id, topic_id 
             FROM questions 
             $where
-            ORDER BY RAND() 
-            LIMIT ?";
-            
-    $params[] = $limit;
-    $types .= "i";
+            ORDER BY RAND()";
+
+    if ($limit > 0) {
+        $sql .= " LIMIT ?";
+        $params[] = $limit;
+        $types .= "i";
+    }
 
     $stmt = $conn->prepare($sql);
     $stmt->bind_param($types, ...$params);

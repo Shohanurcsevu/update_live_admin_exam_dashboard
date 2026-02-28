@@ -27,6 +27,7 @@ window.triviaGame = {
         exam_id: null
     },
     categories: null,
+    questionCount: 15,
 
     init: async function () {
         this.resetState();
@@ -99,7 +100,8 @@ window.triviaGame = {
                 subject_id: this.currentSource.subject_id || '',
                 lesson_id: this.currentSource.lesson_id || '',
                 topic_id: this.currentSource.topic_id || '',
-                exam_id: this.currentSource.exam_id || ''
+                exam_id: this.currentSource.exam_id || '',
+                limit: this.questionCount
             });
 
             const qResp = await fetch(`api/question/random-trivia.php?${params}`);
@@ -112,6 +114,13 @@ window.triviaGame = {
             }
 
             this.questions = qData.data;
+            this.totalFetched = qData.data.length;
+
+            // If 'All' was selected, update the label with actual count
+            if (this.questionCount === 0) {
+                const label = document.getElementById('question-count-label');
+                if (label) label.textContent = this.totalFetched;
+            }
 
             // Fetch ghosts for this specific source
             await this.fetchGhosts();
@@ -153,7 +162,8 @@ window.triviaGame = {
 
         // Update UI
         const progressEl = document.getElementById('question-progress');
-        if (progressEl) progressEl.textContent = `SOLVED ${this.solvedIds.size} OF 15`;
+        const totalQ = this.questionCount || (this.solvedIds.size + this.questions.length);
+        if (progressEl) progressEl.textContent = `SOLVED ${this.solvedIds.size} OF ${totalQ}`;
 
         const textEl = document.getElementById('question-display-text');
         if (textEl) textEl.textContent = q.question_text;
@@ -440,9 +450,10 @@ window.triviaGame = {
 
     getNormalizedScore: function () {
         if (this.stats.totalAnswered === 0) return 0;
+        const effectiveCount = this.questionCount || this.totalFetched || 15;
 
         // 1. Accuracy (600 pts)
-        const accuracy = (this.solvedIds.size / 15) * 600;
+        const accuracy = (this.solvedIds.size / effectiveCount) * 600;
 
         // 2. Speed (250 pts) - Base on correct answers
         const correctCount = this.solvedIds.size;
@@ -450,7 +461,7 @@ window.triviaGame = {
         const speedBonus = (avgSpeed / 20) * 250;
 
         // 3. Streak (150 pts)
-        const streakBonus = (this.maxStreak / 15) * 150;
+        const streakBonus = (this.maxStreak / effectiveCount) * 150;
 
         return Math.round(accuracy + speedBonus + streakBonus);
     },
@@ -499,7 +510,7 @@ window.triviaGame = {
                     exam_id: this.currentSource.exam_id,
                     // Snapshot data
                     normalized_score: normalized,
-                    accuracy: (this.solvedIds.size / 15),
+                    accuracy: (this.solvedIds.size / (this.questionCount || this.totalFetched || 15)),
                     avg_speed: avgRemaining,
                     correct_count: this.solvedIds.size
                 })
@@ -586,6 +597,25 @@ window.triviaGame = {
             categorizedBtn.classList.add('active');
             filters.classList.remove('hidden');
         }
+    },
+
+    setQuestionCount: function (count) {
+        this.questionCount = count === 'all' ? 0 : count;
+        // Update the description label
+        const label = document.getElementById('question-count-label');
+        if (label) label.textContent = count === 'all' ? 'All' : count;
+        document.querySelectorAll('.question-count-btn').forEach(btn => {
+            const btnCount = btn.dataset.count;
+            const isActive = (count === 'all') ? btnCount === 'all' : parseInt(btnCount) === count;
+            btn.classList.toggle('active', isActive);
+            if (isActive) {
+                btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600', 'shadow-md', 'shadow-indigo-200');
+                btn.classList.remove('bg-slate-50', 'text-slate-500');
+            } else {
+                btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600', 'shadow-md', 'shadow-indigo-200');
+                btn.classList.add('bg-slate-50', 'text-slate-500');
+            }
+        });
     },
 
     onHierarchyChange: async function (level) {
