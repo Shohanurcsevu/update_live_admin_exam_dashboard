@@ -1,6 +1,39 @@
 let loadPage;
+window.needsBackup = false; // Global flag
+
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // --- Pre-Exit Backup Confirmation Logic ---
+    window.needsBackup = localStorage.getItem('needsBackup') === 'true';
+
+    // Global fetch hook to track data modifications
+    const originalFetch = window.fetch;
+    window.fetch = async function (...args) {
+        const response = await originalFetch(...args);
+        const url = args[0] instanceof Request ? args[0].url : args[0];
+        const options = args[1] || (args[0] instanceof Request ? args[0] : {});
+        const method = options.method ? options.method.toUpperCase() : 'GET';
+
+        // If it's a POST request to our API (excluding status/ping/backup itself)
+        if (method === 'POST' && url.includes('api/') &&
+            !url.includes('api/backup/') && !url.includes('api/pomodoro/status.php')) {
+            console.log(`[BackupProtection] Data modification detected: ${url}. Flagging needsBackup.`);
+            window.needsBackup = true;
+            localStorage.setItem('needsBackup', 'true');
+        }
+        return response;
+    };
+
+    // Browser-standard exit protection
+    window.addEventListener('beforeunload', (e) => {
+        if (window.needsBackup) {
+            // Standard browsers require returning a string or setting returnValue
+            const msg = "You have unsaved data. Do you want to back up before leaving?";
+            e.returnValue = msg;
+            return msg;
+        }
+    });
+
     const mainContent = document.getElementById('main-content');
     const headerContainer = document.getElementById('header-container');
     const sidebarContainer = document.getElementById('sidebar-container');
@@ -150,8 +183,114 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    // --- SPA Navigation Prevention (Custom Modal) ---
+    const originalLoadPage = loadPage;
+    window.loadPage = async (page, params = '') => {
+        if (window.needsBackup) {
+            const userChoice = await showBackupProtectionModal();
+            if (userChoice === 'cancel') return; // Stay on page
+            if (userChoice === 'backup') {
+                if (window.autoBackupManager) {
+                    window.showToast('Starting pre-exit backup...', 'info');
+                    const res = await window.autoBackupManager.runBackupNow();
+                    if (res.success) {
+                        window.needsBackup = false;
+                        localStorage.setItem('needsBackup', 'false');
+                    } else {
+                        const retry = confirm("Backup failed: " + res.message + "\n\nDo you want to retry or exit without backup?");
+                        if (retry) return window.loadPage(page, params);
+                    }
+                }
+            }
+            // else userChoice === 'exit-anyway' -> proceed
+            window.needsBackup = false; // reset flag temporarily for this navigation
+            localStorage.setItem('needsBackup', 'false');
+        }
+        return originalLoadPage(page, params);
+    };
+
+    function showBackupProtectionModal() {
+        return new Promise(resolve => {
+            let modal = document.getElementById('backup-protection-modal');
+            if (!modal) {
+                const modalHTML = `
+                <div id="backup-protection-modal" class="fixed inset-0 bg-slate-900/80 hidden items-center justify-center z-[9000] p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+                    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-auto overflow-hidden transform scale-95 transition-transform duration-300 border border-slate-100">
+                        <div class="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 text-center relative overflow-hidden">
+                            <div class="absolute top-0 right-0 -mr-12 -mt-12 w-32 h-32 rounded-full bg-white opacity-10"></div>
+                            <div class="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-white opacity-5"></div>
+                            
+                            <div class="relative z-10 w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md border border-white/30 rotate-3">
+                                <span class="material-symbols-outlined text-4xl text-white">cloud_upload</span>
+                            </div>
+                            
+                            <h3 class="text-2xl font-black text-white relative z-10 tracking-tight">Sync Pending</h3>
+                            <p class="text-indigo-100 text-sm font-medium mt-1 relative z-10">You have unsaved changes that haven't been backed up yet.</p>
+                        </div>
+                        
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <button id="bpm-backup-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-3">
+                                    <span class="material-symbols-outlined text-xl">backup</span>
+                                    Backup Now & Continue
+                                </button>
+                                
+                                <button id="bpm-exit-btn" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold py-3.5 px-6 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-slate-200">
+                                    <span class="material-symbols-outlined text-lg">logout</span>
+                                    Continue Without Backup
+                                </button>
+                                
+                                <button id="bpm-cancel-btn" class="w-full text-slate-400 font-bold py-3 hover:text-indigo-600 transition-colors text-sm">
+                                    Stay on Current Page
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                modal = document.getElementById('backup-protection-modal');
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.children[0].classList.remove('scale-95');
+            }, 10);
+
+            const hide = (choice) => {
+                modal.classList.add('opacity-0');
+                modal.children[0].classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    resolve(choice);
+                }, 300);
+            };
+
+            const backupBtn = document.getElementById('bpm-backup-btn');
+            const exitBtn = document.getElementById('bpm-exit-btn');
+            const cancelBtn = document.getElementById('bpm-cancel-btn');
+
+            const onBackup = () => { cleanup(); hide('backup'); };
+            const onExit = () => { cleanup(); hide('exit-anyway'); };
+            const onCancel = () => { cleanup(); hide('cancel'); };
+
+            const cleanup = () => {
+                backupBtn.removeEventListener('click', onBackup);
+                exitBtn.removeEventListener('click', onExit);
+                cancelBtn.removeEventListener('click', onCancel);
+            };
+
+            backupBtn.addEventListener('click', onBackup);
+            exitBtn.addEventListener('click', onExit);
+            cancelBtn.addEventListener('click', onCancel);
+        });
+    }
+
     loadPage = async (page, params = '') => {
         mainContent.innerHTML = '<div class="text-center p-10">Loading...</div>';
+
         const url = new URL(window.location);
         url.searchParams.set('page', page);
         for (let key of Array.from(url.searchParams.keys())) { if (key !== 'page') url.searchParams.delete(key); }

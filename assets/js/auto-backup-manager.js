@@ -356,6 +356,11 @@
             result.success = true;
             result.message = 'Backup saved successfully.';
 
+            // Reset pending changes flag
+            window.needsBackup = false;
+            localStorage.setItem('needsBackup', 'false');
+
+
         } catch (err) {
             result.success = false;
             result.message = err.message || 'Unknown error';
@@ -430,7 +435,17 @@
         // may have missed several ticks. Instead of relying on the interval alone,
         // compare elapsed time vs the configured period.
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState !== 'visible' || !_settings.enabled) return;
+            if (document.visibilityState !== 'visible') {
+                // Silent backup on hide if there are pending changes
+                if (window.needsBackup && _settings.enabled && !_running) {
+                    console.log('[AutoBackup] Tab hidden with pending changes — attempting silent backup.');
+                    runBackupNow();
+                }
+                return;
+            }
+
+            if (!_settings.enabled) return;
+
 
             const lastRun = _settings.lastRunAt ? new Date(_settings.lastRunAt).getTime() : 0;
             const elapsed = Date.now() - lastRun;
