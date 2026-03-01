@@ -20,6 +20,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log(`[BackupProtection] Data modification detected: ${url}. Flagging needsBackup.`);
             window.needsBackup = true;
             localStorage.setItem('needsBackup', 'true');
+
+            // Trigger immediate notification check if possible
+            if (typeof window.refreshNotifications === 'function') {
+                setTimeout(() => window.refreshNotifications(), 500); // Small delay to let DB update
+            }
         }
         return response;
     };
@@ -43,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const notificationBtn = document.getElementById('notification-btn');
         const notificationPanel = document.getElementById('notification-panel');
         const notificationList = document.getElementById('notification-list');
-        const notificationDot = document.getElementById('notification-dot');
+        const notificationCount = document.getElementById('notification-count');
 
         if (!notificationBtn || !notificationPanel || !notificationList) return;
 
@@ -96,7 +101,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const response = await fetch(`api/recent-activity.php?check_since=${lastSeenId}`);
                 const result = await response.json();
                 if (result.success && result.new_count > 0) {
-                    if (notificationDot) notificationDot.classList.remove('hidden');
+                    if (notificationCount) {
+                        notificationCount.textContent = result.new_count;
+                        notificationCount.classList.remove('hidden');
+                    }
                 }
             } catch (error) { console.error("Failed to check for new notifications:", error); }
         };
@@ -107,7 +115,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (currentlyHidden) {
                 notificationPanel.classList.remove('hidden');
                 isPanelOpen = true;
-                if (notificationDot) notificationDot.classList.add('hidden');
+                if (notificationCount) {
+                    notificationCount.classList.add('hidden');
+                    notificationCount.textContent = '0';
+                }
                 fetchAndRenderList();
             } else {
                 notificationPanel.classList.add('hidden');
@@ -122,8 +133,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        window.refreshNotifications = checkForNewNotifications;
+
         initializeLastSeenId().then(() => {
-            setInterval(checkForNewNotifications, 1800000); // Increased to 30 minutes (1800000ms)
+            setInterval(checkForNewNotifications, 30000); // 30 seconds
         });
     }
 
@@ -301,8 +314,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.history.pushState({ page, params }, '', url);
 
         if (page === 'mcq-generator') {
-            const headerTitleElement = document.querySelector('#header-container h1');
-            if (headerTitleElement) headerTitleElement.textContent = "MCQ Generator";
+            const pageNameEl = document.getElementById('header-page-name');
+            if (pageNameEl) pageNameEl.textContent = "MCQ Generator";
+
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.toggle('bg-gray-700', link.dataset.page === page);
             });
@@ -312,10 +326,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             await loadComponent(`pages/${page}.html`, mainContent);
-            const headerTitleElement = document.querySelector('#header-container h1');
-            if (headerTitleElement) {
-                headerTitleElement.textContent = page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+            // Update Dynamic Page Name in Header
+            const pageNameEl = document.getElementById('header-page-name');
+            if (pageNameEl) {
+                const nameMap = {
+                    'dashboard': 'Dashboard',
+                    'import-questions': 'Import',
+                    'questions-list': 'Questions',
+                    'take-exam-list': 'Exams',
+                    'check-performance': 'Performance',
+                    'mistake-bank': 'Mistakes',
+                    'discipline-tracker': 'Discipline',
+                    'flashcards': 'Flashcards',
+                    'analytics': 'Analytics',
+                    'custom-exams': 'Custom'
+                };
+                const displayName = nameMap[page] || page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                pageNameEl.textContent = displayName;
             }
+
             document.querySelectorAll('.nav-link').forEach(link => {
                 const navLinkPage = link.dataset.page;
                 const parentPages = { 'take-exam-interface': 'take-exam-list', 'performance-review': 'check-performance', 'questions-list': 'import-questions' };
@@ -440,6 +470,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadComponent('components/sidebar.html', sidebarContainer)
     ]);
     if (typeof initSidebarToggle === 'function') initSidebarToggle();
+
+    // Start Smart Header Engine
+    if (typeof SmartHeader !== 'undefined') {
+        SmartHeader.init();
+    }
 
     // Start notification polling
     initializeNotifications();

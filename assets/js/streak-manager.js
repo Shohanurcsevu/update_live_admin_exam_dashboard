@@ -103,15 +103,81 @@ class StreakManager {
         } else {
             this.stopEmberParticles();
         }
+
+        // Update Tooltip with Progression
+        this.updateTooltip(streak, counterEl);
+    }
+
+    updateTooltip(streak, counterEl) {
+        const nextTier = this.getNextTierInfo(streak);
+        const lastActivity = this.streakData.last_activity_date;
+        const today = new Date().toISOString().split('T')[0];
+        const isActiveToday = lastActivity === today;
+
+        let tooltip = `Streak: ${streak} days\n`;
+
+        if (!isActiveToday) {
+            tooltip += `🔥 COMPLETE A SESSION TO IGNITE TODAY!\n`;
+        } else {
+            tooltip += `✅ Streak secured for today!\n`;
+        }
+
+        if (nextTier) {
+            tooltip += `🎯 ${nextTier.daysLeft} days until ${nextTier.name} Tier`;
+        } else {
+            tooltip += `👑 ULTIMATE LEGEND STATUS REACHED!`;
+        }
+
+        counterEl.title = tooltip;
+    }
+
+    getTiers() {
+        return [
+            { threshold: 7, name: 'Yellow', color: '#facc15' },
+            { threshold: 14, name: 'Orange', color: '#f97316' },
+            { threshold: 21, name: 'Red', color: '#ef4444' },
+            { threshold: 28, name: 'Purple', color: '#a855f7' },
+            { threshold: 35, name: 'Blue', color: '#3b82f6' },
+            { threshold: 42, name: 'Emerald', color: '#10b981' },
+            { threshold: 49, name: 'Cyan', color: '#06b6d4' },
+            { threshold: 56, name: 'Rose', color: '#f43f5e' },
+            { threshold: 63, name: 'Indigo', color: '#6366f1' },
+            { threshold: 70, name: 'Violet', color: '#8b5cf6' },
+            { threshold: 77, name: 'Pink', color: '#ec4899' },
+            { threshold: 84, name: 'Sky', color: '#0ea5e9' },
+            { threshold: 91, name: 'Lime', color: '#84cc16' },
+            { threshold: 98, name: 'Amber', color: '#f59e0b' },
+            { threshold: 105, name: 'Teal', color: '#14b8a6' },
+            { threshold: 112, name: 'Fuchsia', color: '#d946ef' },
+            { threshold: 119, name: 'Slate', color: '#64748b' },
+            { threshold: 126, name: 'Lavender', color: '#a78bfa' },
+            { threshold: 133, name: 'Crimson', color: '#dc2626' },
+            { threshold: 140, name: 'Cobalt', color: '#2563eb' },
+            { threshold: 147, name: 'Forest', color: '#059669' },
+            { threshold: Infinity, name: 'Legendary Gold', color: '#facc15' }
+        ];
+    }
+
+    getNextTierInfo(streak) {
+        const tiers = this.getTiers();
+        for (const tier of tiers) {
+            if (streak < tier.threshold) {
+                return {
+                    daysLeft: tier.threshold - streak,
+                    name: tier.name
+                };
+            }
+        }
+        return null;
     }
 
     getFlameColor(streak) {
-        if (streak === 0) return '#9ca3af'; // Gray
-        if (streak <= 3) return '#fbbf24'; // Yellow
-        if (streak <= 7) return '#f97316'; // Orange
-        if (streak <= 14) return '#ef4444'; // Red
-        if (streak <= 30) return '#a855f7'; // Purple
-        return '#3b82f6'; // Blue (Diamond)
+        if (streak === 0) return '#9ca3af'; // Gray (Inactive)
+        const tiers = this.getTiers();
+        for (const tier of tiers) {
+            if (streak <= tier.threshold) return tier.color;
+        }
+        return '#facc15'; // Default to Gold
     }
 
     showSuccessEffects(streak) {

@@ -1,22 +1,90 @@
 <!-- Header -->
-<header class="main-header relative z-[100]">
-    <!-- Sidebar Toggle Button for Mobile -->
-    <button id="sidebar-toggle" class="text-gray-600 hover:text-gray-800 md:hidden">
-        <span class="material-symbols-outlined">menu</span>
-    </button>
+<header class="main-header relative z-[100] flex items-center px-4 py-2 bg-white border-b border-gray-100 h-14">
+    <!-- Left Section: Toggle & Page Name -->
+    <div class="flex items-center min-w-fit md:min-w-[140px] flex-shrink-0">
+        <button id="sidebar-toggle" class="text-gray-500 hover:text-indigo-600 transition-colors md:hidden mr-3">
+            <span class="material-symbols-outlined text-2xl">menu</span>
+        </button>
+        <h1 id="header-page-name"
+            class="text-[13px] font-black text-slate-800 tracking-tight whitespace-nowrap hidden lg:block">
+            Dashboard</h1>
+    </div>
 
-    <h1 class="hidden md:block text-xl font-bold text-gray-800">Dashboard</h1>
+    <!-- Smart Header Info Bar - Adaptive centering, Scrollable on tight space -->
+    <div id="smart-header-bar"
+        class="flex-1 flex justify-center items-center overflow-x-auto no-scrollbar gap-3 md:gap-4 font-['Inter'] px-2">
 
-    <!-- Central Status Indicator (Ambulance/Grind Mode) -->
-    <div id="global-header-status-indicator" class="flex-1 flex justify-center h-full"></div>
+        <!-- Date Group with Countdown Numbers -->
+        <div id="header-date-container" class="flex items-center gap-1.5 md:gap-3 flex-shrink-0">
+            <!-- Day Group -->
+            <div class="flex items-center gap-1">
+                <div id="header-day-text" class="text-[12px] font-black text-slate-500 whitespace-nowrap">---</div>
+                <span id="header-week-badge"
+                    class="bg-emerald-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-sm hidden tabular-nums">0</span>
+            </div>
 
-    <!-- User Profile Section -->
-    <div class="flex items-center space-x-4">
-        <!-- Daily Streak Counter -->
+            <div class="text-slate-200 hidden sm:block">/</div>
+
+            <!-- Month Group -->
+            <div class="flex items-center gap-1">
+                <div id="header-month-text" class="text-[12px] font-black text-slate-700 whitespace-nowrap">---</div>
+                <span id="header-month-badge"
+                    class="bg-indigo-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-sm hidden tabular-nums">0</span>
+            </div>
+        </div>
+
+        <div class="text-slate-200 hidden sm:block">•</div>
+
+        <!-- Clock -->
+        <div id="header-clock" class="text-sm font-black text-slate-800 tabular-nums whitespace-nowrap flex-shrink-0">
+            --:--:-- --</div>
+
+        <div class="text-slate-200 hidden sm:block">•</div>
+
+        <!-- Focus Timer Group -->
+        <div id="header-focus-container" class="flex items-center gap-1.5 flex-shrink-0">
+            <span class="material-symbols-outlined text-base text-slate-400">timer</span>
+            <span id="header-focus-timer"
+                class="text-[13px] font-black text-slate-600 uppercase tracking-tight tabular-nums">
+                <span class="hidden sm:inline">Focus:</span> --:--</span>
+        </div>
+
+        <div class="text-slate-200 hidden md:block">•</div>
+
+        <!-- Weather Snapshot -->
+        <div id="header-weather" class="flex items-center gap-1.5 flex-shrink-0 cursor-help group relative">
+            <span id="header-weather-icon" class="text-base">--</span>
+            <span id="header-weather-temp" class="text-[13px] font-bold text-slate-700">--°C</span>
+            <span id="header-weather-city" class="text-[11px] font-medium text-slate-400 hidden xl:block">---</span>
+
+            <!-- Weather Tooltip -->
+            <div
+                class="absolute top-full left-0 mt-2 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[120] whitespace-nowrap">
+                Weather updated recently
+            </div>
+        </div>
+
+        <div class="text-slate-200 hidden lg:block">•</div>
+
+        <!-- Target Goal Countdown -->
+        <div id="header-goal-container" class="flex items-center gap-2 flex-shrink-0">
+            <div id="header-goal-display" class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-base text-indigo-500">ads_click</span>
+                <span id="header-goal-countdown" class="text-[13px] font-bold text-indigo-600 tabular-nums">-- days
+                    left</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Side Actions (Notifications & Profile) -->
+    <div
+        class="flex items-center gap-2 md:gap-4 ml-auto border-l border-slate-100 pl-2 md:pl-4 flex-shrink-0 relative z-[110]">
+        <!-- Daily Streak Counter (Restored IDs for compatibility) -->
         <div id="streak-counter"
-            class="hidden items-center px-3 py-1 bg-white hover:bg-gray-50 rounded-full border border-gray-100 shadow-sm cursor-pointer transition-all mr-2 relative group"
-            title="Daily Streak: Complete an exam daily to increase your streak!">
-            <div class="streak-ring-container">
+            class="hidden items-center px-2 py-1 bg-white hover:bg-slate-50 rounded-full border border-slate-200 shadow-sm cursor-pointer transition-all relative group"
+            title="Daily Streak">
+            <div class="streak-ring-container scale-[0.85] origin-center -ml-1">
                 <svg class="streak-ring-svg" viewBox="0 0 36 36">
                     <circle class="streak-ring-bg" cx="18" cy="18" r="16"></circle>
                     <circle id="streak-ring-path" class="streak-ring-progress" cx="18" cy="18" r="16"
@@ -25,41 +93,44 @@
                 <canvas id="streak-ember-canvas" width="40" height="60"
                     style="position: absolute; top: -30px; left: -1px; pointer-events: none;"></canvas>
                 <span id="streak-flame-icon"
-                    class="material-symbols-outlined text-gray-400 text-xl relative z-10 transition-colors"
+                    class="material-symbols-outlined text-slate-400 text-2xl relative z-10 transition-colors"
                     style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
             </div>
-            <span id="streak-count" class="font-black text-sm text-gray-700 ml-1">0</span>
-
-            <!-- Tooltip -->
-            <div
-                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[110]">
-                Daily Activity Streak
-                <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800">
-                </div>
-            </div>
+            <span id="streak-count" class="font-black text-sm text-slate-700 ml-0.5 mr-1">0</span>
         </div>
 
-        <!-- Notification Bell with Dropdown -->
+        <!-- Notification Bell -->
         <div class="relative">
-            <button id="notification-btn" class="relative text-gray-600 hover:text-gray-800">
-                <span class="material-symbols-outlined">notifications</span>
-                <span id="notification-dot"
-                    class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-600 hidden"></span>
+            <button id="notification-btn" class="relative text-slate-400 hover:text-indigo-600 transition-colors p-1">
+                <span class="material-symbols-outlined text-xl">notifications</span>
+                <span id="notification-count"
+                    class="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center hidden border-2 border-white shadow-sm">0</span>
             </button>
+            <!-- Panel is handled by main.js logic -->
             <div id="notification-panel"
-                class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl overflow-hidden z-20 hidden">
-                <div class="py-2 px-4 text-sm font-semibold text-gray-700 border-b">
-                    Recent Activity
+                class="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-[200] hidden">
+                <div class="p-3 border-b border-slate-50 flex items-center justify-between">
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Activity</span>
                 </div>
-                <div id="notification-list" class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                    <p class="p-4 text-sm text-gray-500">No recent activity.</p>
+                <div id="notification-list" class="max-h-80 overflow-y-auto no-scrollbar">
+                    <p class="p-4 text-xs text-slate-400 text-center">No recent activity.</p>
                 </div>
             </div>
         </div>
 
-        <div class="relative">
-            <img class="w-10 h-10 rounded-full cursor-pointer" src="https://placehold.co/40x40/E2E8F0/4A5568?text=A"
-                alt="Admin Profile">
+        <!-- Sound Toggle (Syncs with StudyMentor) -->
+        <button id="header-sound-toggle" class="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+            title="Toggle Focus Sounds">
+            <span class="material-symbols-outlined text-xl">volume_up</span>
+        </button>
+
+        <!-- Profile Image -->
+        <div class="relative flex-shrink-0">
+            <div
+                class="w-8 h-8 rounded-full border-2 border-slate-50 overflow-hidden cursor-pointer hover:border-indigo-100 transition-all">
+                <img id="header-profile-img" src="https://placehold.co/32x32/6366f1/ffffff?text=S" alt="Profile"
+                    class="w-full h-full object-cover">
+            </div>
         </div>
     </div>
 </header>
