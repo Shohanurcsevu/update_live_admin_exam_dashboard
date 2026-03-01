@@ -288,8 +288,8 @@ const SmartHeader = {
                 // Icon animation
                 const icon = focusContainer.querySelector('.material-symbols-outlined');
                 if (icon) {
-                    icon.textContent = isFocus ? 'timer' : 'self_care';
-                    icon.className = `material-symbols-outlined text-[14px] ${isFocus ? 'text-emerald-500 animate-neural-glow' : 'text-sky-500'}`;
+                    icon.textContent = isFocus ? 'rocket_launch' : 'self_care';
+                    icon.className = `material-symbols-outlined text-[14px] ${isFocus ? 'animate-rocket' : 'text-sky-500 animate-neural-glow'}`;
                 }
             } else {
                 // Show Idle Time from StudyMentor
