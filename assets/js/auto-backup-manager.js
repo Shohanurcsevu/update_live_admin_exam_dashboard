@@ -38,7 +38,8 @@
         enabled: false,           // off until user opts-in
         intervalMs: 30 * 60 * 1000, // 30 minutes default
         folderName: null,            // display name of chosen folder
-        lastRunAt: null,            // ISO string
+        lastRunAt: null,            // ISO string of last SUCCESS
+        lastAttemptAt: null,        // ISO string of last TRY
         runCount: 0,
         lastError: null,           // last error message if any
     };
@@ -257,6 +258,9 @@
             return result;
         }
         _running = true;
+        _settings.lastAttemptAt = new Date().toISOString();
+        _settings.lastError = null; // Clear any previous error at start of attempt
+        persistSettings();
 
         // Notify UI that a backup has started (sync or periodic)
         window.dispatchEvent(new CustomEvent('autoBackupStarted'));

@@ -599,6 +599,10 @@
         let nextRunTimer = null;
         let nextRunTarget = null; // Date object for next run
 
+        if (window._abNextRunInterval) {
+            clearInterval(window._abNextRunInterval);
+        }
+
         // ── Helpers ────────────────────────────────────────────────────────────
 
         function fmtTime(isoStr) {
@@ -653,36 +657,43 @@
         }
 
         function updateCountdown(settings, isRunning = false) {
-            clearInterval(nextRunTimer);
-            nextRunTarget = null;
+            if (window._abNextRunInterval) clearInterval(window._abNextRunInterval);
 
             if (isRunning) {
                 nextRunEl.textContent = 'Backing up...';
                 return;
             }
 
-            if (!settings.enabled || !settings.lastRunAt) {
-                if (settings.enabled && settings.lastError) {
-                    nextRunEl.innerHTML = `<span class="text-rose-500" title="${settings.lastError}">Error (check logs)</span>`;
-                    // Also show toast if it's the first time we see this error? No, toasts are handled by main.js
-                } else {
-                    nextRunEl.textContent = settings.enabled ? 'Starting soon…' : '—';
-                }
+            if (!settings.enabled) {
+                nextRunEl.textContent = '—';
                 return;
             }
 
-            nextRunTarget = new Date(new Date(settings.lastRunAt).getTime() + settings.intervalMs);
+            // Always show error if one exists from the last attempt
+            if (settings.lastError) {
+                nextRunEl.innerHTML = `<span class="text-rose-500 flex items-center gap-1 justify-center" title="${settings.lastError}">
+                    <span class="material-symbols-outlined text-xs">error</span> Failed
+                </span>`;
+                return;
+            }
+
+            if (!settings.lastRunAt) {
+                nextRunEl.textContent = 'Starting soon…';
+                return;
+            }
+
+            const nextRunTarget = new Date(new Date(settings.lastRunAt).getTime() + settings.intervalMs);
 
             const tick = () => {
                 const remaining = nextRunTarget - Date.now();
-                nextRunEl.textContent = fmtCountdown(remaining);
                 if (remaining <= 0) {
-                    clearInterval(nextRunTimer);
-                    nextRunEl.textContent = 'Backing up...';
+                    nextRunEl.textContent = 'Starting soon…';
+                } else {
+                    nextRunEl.textContent = fmtCountdown(remaining);
                 }
             };
 
-            nextRunTimer = setInterval(tick, 1000);
+            window._abNextRunInterval = setInterval(tick, 1000);
             tick();
         }
 
@@ -861,9 +872,10 @@
 
             const settings = abm.getSettings();
             applySettingsToUI(settings);
-            if (info.status === 'running' || abm.isRunning()) {
-                updateCountdown(settings, true);
-            }
+
+            // Re-check countdown with actual running state
+            updateCountdown(settings, info.status === 'running' || abm.isRunning());
+
             renderHistory();
         };
 
