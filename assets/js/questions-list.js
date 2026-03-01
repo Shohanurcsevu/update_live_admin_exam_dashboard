@@ -291,8 +291,266 @@ function initializeQuestionsListPage() {
     document.getElementById('cancel-question-delete-btn').addEventListener('click', () => closeModal(deleteModal));
     document.getElementById('confirm-question-delete-btn').addEventListener('click', handleDeleteConfirm);
 
+    // --- Deduplication Feature ---
+
+    async function ensureSimilarityEngine() {
+        if (window.SimilarityEngine) return;
+        return new Promise((resolve) => {
+            const s = document.createElement('script');
+            s.src = 'assets/js/similarity-engine.js';
+            s.onload = resolve;
+            document.head.appendChild(s);
+        });
+    }
+
+    async function runSimilarityScan() {
+        await ensureSimilarityEngine();
+        const dedupeModal = document.getElementById('deduplication-modal');
+        const workbench = document.getElementById('dedupe-workbench-content');
+        const countBadge = document.getElementById('duplicate-count');
+
+        // Show Modal
+        dedupeModal.classList.remove('hidden');
+        dedupeModal.classList.add('flex');
+        setTimeout(() => {
+            dedupeModal.classList.remove('scale-95', 'opacity-0');
+        }, 10);
+
+        // Reset UI
+        workbench.innerHTML = `
+            <div id="dedupe-loading" class="flex flex-col items-center justify-center h-64 text-gray-400">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div>
+                <p class="font-medium">Comparing ${currentQuestions.length} questions...</p>
+            </div>
+        `;
+
+        // Small delay for UI smoothness
+        await new Promise(r => setTimeout(r, 800));
+
+        const groups = [];
+        const checked = new Set();
+        const similarityThreshold = 0.90; // 90% commonality
+
+        for (let i = 0; i < currentQuestions.length; i++) {
+            if (checked.has(currentQuestions[i].id)) continue;
+
+            const currentGroup = [currentQuestions[i]];
+            for (let j = i + 1; j < currentQuestions.length; j++) {
+                if (checked.has(currentQuestions[j].id)) continue;
+
+                const score = SimilarityEngine.calculateSimilarity(currentQuestions[i].question, currentQuestions[j].question);
+                if (score >= similarityThreshold) {
+                    currentGroup.push(currentQuestions[j]);
+                    checked.add(currentQuestions[j].id);
+                }
+            }
+
+            if (currentGroup.length > 1) {
+                groups.push({
+                    master: currentGroup[0],
+                    duplicates: currentGroup.slice(1),
+                    avgScore: similarityThreshold // Placeholder
+                });
+                checked.add(currentQuestions[i].id);
+            }
+        }
+
+        renderDedupeGroups(groups);
+    }
+
+    function renderDedupeGroups(groups) {
+        const workbench = document.getElementById('dedupe-workbench-content');
+        const countBadge = document.getElementById('duplicate-count');
+        const resolveAllBtn = document.getElementById('resolve-all-btn');
+
+        countBadge.textContent = groups.length;
+
+        if (groups.length === 0) {
+            if (resolveAllBtn) resolveAllBtn.classList.add('hidden');
+            workbench.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-64 text-gray-400">
+                    <span class="material-symbols-outlined text-6xl mb-4 text-green-200">check_circle</span>
+                    <p class="font-bold text-gray-600">Zero Duplicates Found!</p>
+                    <p class="text-sm">Your question pool is unique and healthy.</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (resolveAllBtn) resolveAllBtn.classList.remove('hidden');
+
+        workbench.innerHTML = groups.map((g, idx) => `
+            <div class="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden group-entry" data-group-id="${idx}" id="group-${idx}">
+                <div class="p-4 bg-indigo-50/50 border-b border-indigo-100 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded">MATCH GROUP #${idx + 1}</span>
+                        <span class="text-xs text-indigo-400 font-medium">Potential Duplicates (${g.duplicates.length + 1})</span>
+                    </div>
+                    <button class="btn-bulk-resolve px-3 py-1 bg-white hover:bg-indigo-600 hover:text-white text-indigo-600 text-[10px] font-black rounded-lg transition-all border border-indigo-200 shadow-sm" 
+                        data-group-idx="${idx}">
+                        KEEP MASTER & DELETE OTHERS
+                    </button>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    <!-- Master -->
+                    <div class="p-6 bg-green-50/30 border-l-4 border-l-green-500">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="text-[10px] font-black tracking-widest text-green-600 uppercase">Master Copy</span>
+                            <span class="text-xs font-mono text-gray-400">ID: ${g.master.id}</span>
+                        </div>
+                        <p class="text-gray-800 font-medium leading-relaxed">${g.master.question}</p>
+                    </div>
+
+                    <!-- Duplicates -->
+                    ${g.duplicates.map(d => `
+                        <div class="p-6 flex flex-col sm:flex-row gap-6 relative dedupe-row" id="dedupe-row-${d.id}" data-id="${d.id}">
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-start mb-2">
+                                    <span class="text-[10px] font-black tracking-widest text-orange-500 uppercase">Duplicate Match</span>
+                                    <span class="text-xs font-mono text-gray-400">ID: ${d.id}</span>
+                                </div>
+                                <p class="text-gray-600 text-sm italic line-clamp-3">${d.question}</p>
+                            </div>
+                            <div class="flex-shrink-0 flex sm:flex-col justify-end gap-2 border-l sm:pl-6 border-gray-100">
+                                <button class="btn-keep-master px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition-colors" data-id="${d.id}">IGNORE</button>
+                                <button class="btn-delete-duplicate px-4 py-1.5 bg-red-50 hover:bg-red-500 hover:text-white text-red-600 text-xs font-bold rounded-lg transition-all border border-red-100" data-id="${d.id}">DELETE</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+
+        // Bulk Resolve Action
+        workbench.querySelectorAll('.btn-bulk-resolve').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const idx = btn.dataset.groupIdx;
+                const group = groups[idx];
+                await resolveMatchGroup(group, btn, idx);
+            });
+        });
+
+        // Resolve All Groups logic
+        const resolveAllListener = async () => {
+            const totalDuplicates = groups.reduce((acc, g) => acc + g.duplicates.length, 0);
+            if (!confirm(`CAUTION: This will permanently DELETE all ${totalDuplicates} identified duplicate questions across all groups. Proceed?`)) return;
+
+            resolveAllBtn.disabled = true;
+            resolveAllBtn.innerHTML = '<span class="animate-spin text-sm mr-2">refresh</span> Processing all...';
+
+            let grandTotalDeleted = 0;
+            for (let i = 0; i < groups.length; i++) {
+                const groupBtn = workbench.querySelector(`.btn-bulk-resolve[data-group-idx="${i}"]`);
+                if (groupBtn && !groupBtn.disabled) {
+                    const deleted = await resolveMatchGroup(groups[i], groupBtn, i, true);
+                    grandTotalDeleted += deleted;
+                }
+            }
+
+            resolveAllBtn.innerHTML = `<span class="material-symbols-outlined text-sm mr-2">done_all</span> Finished (${grandTotalDeleted} Deleted)`;
+            showToast(`Master cleanup complete: ${grandTotalDeleted} duplicates removed.`, 'success');
+        };
+
+        resolveAllBtn.onclick = resolveAllListener;
+
+        async function resolveMatchGroup(group, btn, idx, isBatch = false) {
+            if (!isBatch) {
+                if (!confirm(`This will permanently DELETE ${group.duplicates.length} duplicate questions. Continue?`)) return 0;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="animate-pulse">DELETING...</span>';
+
+            let successCount = 0;
+            for (const d of group.duplicates) {
+                const row = document.getElementById(`dedupe-row-${d.id}`);
+                if (!row || row.classList.contains('hidden')) continue;
+
+                try {
+                    const response = await fetch(`${API_URL}delete.php`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: d.id })
+                    });
+                    const res = await response.json();
+                    if (res.success) {
+                        row.classList.add('hidden');
+                        successCount++;
+                    }
+                } catch (e) { console.error(e); }
+            }
+
+            if (successCount > 0) {
+                if (!isBatch) showToast(`Merged: Removed ${successCount} duplicates ✓`, 'success');
+                btn.parentElement.innerHTML = `<span class="text-[10px] font-bold text-green-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">task_alt</span> RESOLVED</span>`;
+                const groupEl = document.getElementById(`group-${idx}`);
+                if (groupEl) groupEl.classList.add('opacity-60', 'grayscale-[0.5]');
+                return successCount;
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'RETRY MERGE';
+                return 0;
+            }
+        }
+
+        // Individual Delete Action
+        workbench.querySelectorAll('.btn-delete-duplicate').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                if (!confirm('Delete this duplicate permanently?')) return;
+
+                const row = document.getElementById(`dedupe-row-${id}`);
+                row.style.opacity = '0.5';
+                row.style.pointerEvents = 'none';
+
+                try {
+                    const response = await fetch(`${API_URL}delete.php`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: id })
+                    });
+                    const res = await response.json();
+                    if (res.success) {
+                        row.classList.add('hidden');
+                        showToast('Duplicate removed ✓', 'success');
+                    }
+                } catch (e) {
+                    showToast('Delete failed', 'error');
+                    row.style.opacity = '1';
+                    row.style.pointerEvents = 'auto';
+                }
+            });
+        });
+
+        workbench.querySelectorAll('.btn-keep-master').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const row = document.getElementById(`dedupe-row-${btn.dataset.id}`);
+                row.style.opacity = '0.3';
+                row.querySelector('.flex-shrink-0').innerHTML = '<span class="text-[10px] text-gray-400 font-black uppercase">Ignored</span>';
+            });
+        });
+    }
+
+    // Initialize Dedupe Listeners
+    setTimeout(() => {
+        const scanBtn = document.getElementById('scan-duplicates-btn');
+        const closeModalBtn = document.getElementById('close-dedupe-modal-btn');
+        const finishBtn = document.getElementById('finish-dedupe-btn');
+        const dedupeModal = document.getElementById('deduplication-modal');
+
+        if (scanBtn) scanBtn.addEventListener('click', runSimilarityScan);
+        if (closeModalBtn) closeModalBtn.addEventListener('click', () => {
+            dedupeModal.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                dedupeModal.classList.add('hidden');
+                dedupeModal.classList.remove('flex');
+                fetchAndDisplayQuestions(); // Refresh main list
+            }, 300);
+        });
+        if (finishBtn) finishBtn.addEventListener('click', () => closeModalBtn.click());
+    }, 500);
+
     initialLoad();
 }
 
 initializeQuestionsListPage();
-

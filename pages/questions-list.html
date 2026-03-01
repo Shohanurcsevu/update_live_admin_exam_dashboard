@@ -7,11 +7,69 @@
             <h2 id="page-title" class="text-2xl font-bold text-gray-800">Manage Questions</h2>
             <p id="exam-subtitle" class="text-gray-500">Edit or delete questions for the selected exam.</p>
         </div>
-        <button id="back-to-import-btn"
-            class="mt-4 sm:mt-0 w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow">
-            <span class="material-symbols-outlined mr-2">arrow_back</span>
-            Back to Import
-        </button>
+        <div class="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0 w-full sm:w-auto">
+            <button id="scan-duplicates-btn"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow transition-all">
+                <span class="material-symbols-outlined mr-2">search_check</span>
+                Scan for Duplicates
+            </button>
+            <button id="back-to-import-btn"
+                class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow">
+                <span class="material-symbols-outlined mr-2">arrow_back</span>
+                Back to Import
+            </button>
+        </div>
+    </div>
+
+    <!-- Deduplication Workbench Modal (Full Screen) -->
+    <div id="deduplication-modal"
+        class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-[250] p-4 scale-95 opacity-0 transition-all duration-300">
+        <div
+            class="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden border border-white/20">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-6 bg-white border-b">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                        <span class="material-symbols-outlined text-3xl">content_copy</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800">Deduplication Workbench</h3>
+                        <p class="text-sm text-gray-500">Found <span id="duplicate-count"
+                                class="font-bold text-indigo-600">0</span> potential match groups.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="resolve-all-btn"
+                        class="hidden bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-4 rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">done_all</span>
+                        Resolve All Groups
+                    </button>
+                    <button id="close-dedupe-modal-btn" class="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <span class="material-symbols-outlined text-gray-500">close</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Content -->
+            <div id="dedupe-workbench-content" class="flex-grow overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                <!-- Groups will be injected here -->
+                <div id="dedupe-loading" class="flex flex-col items-center justify-center h-full text-gray-400">
+                    <div
+                        class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4">
+                    </div>
+                    <p class="font-medium">Analyzing question similarity...</p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 bg-white border-t flex justify-between items-center">
+                <p class="text-xs text-gray-400 font-medium italic">Accuracy: 90%+ Similarity (Local Scan)</p>
+                <button id="finish-dedupe-btn"
+                    class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-8 rounded-xl transition-all shadow-lg active:scale-95">
+                    Finish Review
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Questions List -->
