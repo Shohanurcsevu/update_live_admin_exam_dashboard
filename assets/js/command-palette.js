@@ -357,7 +357,7 @@ class CommandPalette {
         } else if (match.type === 'exam') {
             window.loadPage('take-exam-interface', `exam_id=${match.id}`);
         } else if (match.type === 'question') {
-            window.loadPage('take-exam-list', `exam_id=${match.exam_id}`);
+            window.loadPage('questions-list', `exam_id=${match.exam_id}&highlight_id=${match.id}`);
         }
     }
 }

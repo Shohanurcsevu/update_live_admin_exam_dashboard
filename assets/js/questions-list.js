@@ -47,7 +47,7 @@ function initializeQuestionsListPage() {
                 result.data.forEach((q, index) => {
                     const priorityInt = parseInt(q.priority) || 0;
                     const questionCard = `
-                        <div class="border rounded-lg p-4 bg-gray-50 flex flex-col">
+                        <div id="question-${q.id}" class="border rounded-lg p-4 bg-gray-50 flex flex-col transition-all duration-300">
                             <div class="flex justify-between items-start mb-2">
                                 <div class="flex-grow">
                                     <p class="text-gray-800 font-semibold">${index + 1}. ${q.question}</p>
@@ -208,13 +208,30 @@ function initializeQuestionsListPage() {
             const result = await response.json();
             if (result.success) {
                 currentQuestions = result.data;
-                fetchAndDisplayQuestions();
+                await fetchAndDisplayQuestions();
+                highlightTargetQuestion();
             } else {
                 questionsContainer.innerHTML = `<p class="text-center text-red-500 py-8">${result.message}</p>`;
             }
         } catch (error) {
             showToast('Failed to load initial question data.', 'error');
         }
+    }
+
+    function highlightTargetQuestion() {
+        const highlightId = params.get('highlight_id');
+        if (!highlightId) return;
+
+        setTimeout(() => {
+            const target = document.getElementById(`question-${highlightId}`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('highlight-pulse');
+
+                // Remove class after animation to allow re-highlighting
+                setTimeout(() => target.classList.remove('highlight-pulse'), 3000);
+            }
+        }, 500); // Wait for rendering to complete
     }
 
     function getPriorityBtnClass(priority, isActive) {
