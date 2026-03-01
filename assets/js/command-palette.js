@@ -238,9 +238,10 @@ class CommandPalette {
             ...this.data.exams.filter(e => (e.title + (e.subtext || '')).toLowerCase().includes(normalizedQuery)),
             ...(this.data.lessons || []).filter(l => (l.title + (l.subtext || '')).toLowerCase().includes(normalizedQuery)),
             ...(this.data.topics || []).filter(t => (t.title + (t.subtext || '')).toLowerCase().includes(normalizedQuery))
-        ].slice(0, 15);
+        ].slice(0, 50); // Get more raw matches to allow ranking to surface better ones
 
-        this.renderResults(localMatches);
+        const rankedMatches = this.rankResults(localMatches).slice(0, 15);
+        this.renderResults(rankedMatches);
 
         // API Deep Search for Questions (Debounced)
         if (query.length >= 2) {
@@ -274,10 +275,10 @@ class CommandPalette {
             <div class="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent & Popular</div>
             <div id="initial-matches" class="space-y-1"></div>
         `;
-        const initialMatches = [
-            ...this.data.pages.slice(0, 3),
-            ...this.data.subjects.slice(0, 3)
-        ];
+        const initialMatches = this.rankResults([
+            ...this.data.pages,
+            ...this.data.subjects
+        ]).slice(0, 6);
         this.appendResults(initialMatches, '', 'initial-matches');
     }
 
@@ -345,6 +346,7 @@ class CommandPalette {
     }
 
     handleSelection(match) {
+        this.trackSelection(match);
         this.toggle(false);
         if (match.type === 'page') {
             window.loadPage(match.id);
@@ -359,6 +361,23 @@ class CommandPalette {
         } else if (match.type === 'question') {
             window.loadPage('questions-list', `exam_id=${match.exam_id}&highlight_id=${match.id}`);
         }
+    }
+
+    trackSelection(match) {
+        if (!match.id || !match.type) return;
+        const key = `cmd_freq_${match.type}_${match.id}`;
+        const counts = JSON.parse(localStorage.getItem('cmd_palette_frequency') || '{}');
+        counts[key] = (counts[key] || 0) + 1;
+        localStorage.setItem('cmd_palette_frequency', JSON.stringify(counts));
+    }
+
+    rankResults(results) {
+        const counts = JSON.parse(localStorage.getItem('cmd_palette_frequency') || '{}');
+        return [...results].sort((a, b) => {
+            const countA = counts[`cmd_freq_${a.type}_${a.id}`] || 0;
+            const countB = counts[`cmd_freq_${b.type}_${b.id}`] || 0;
+            return countB - countA;
+        });
     }
 }
 
