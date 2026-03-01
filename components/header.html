@@ -35,9 +35,21 @@
 
         <div class="text-slate-200 hidden sm:block">•</div>
 
-        <!-- Clock -->
-        <div id="header-clock" class="text-sm font-black text-slate-800 tabular-nums whitespace-nowrap flex-shrink-0">
-            --:--:-- --</div>
+        <!-- Clock & Connectivity -->
+        <div class="flex items-center gap-2 flex-shrink-0 relative group">
+            <div id="header-clock" class="text-sm font-black text-slate-800 tabular-nums whitespace-nowrap">--:--:-- --
+            </div>
+            <div id="connectivity-pulse"
+                class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] cursor-help relative"
+                title="System Status: Online">
+                <span class="absolute inset-0 rounded-full bg-inherit animate-ping opacity-75"></span>
+            </div>
+            <!-- Status Tooltip -->
+            <div
+                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[120] whitespace-nowrap">
+                System: <span id="connectivity-status-text">Fully Live & Synced</span>
+            </div>
+        </div>
 
         <div class="text-slate-200 hidden sm:block">•</div>
 

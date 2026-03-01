@@ -19,6 +19,7 @@ class SyncManager {
         if (this.isSyncing || !navigator.onLine) return;
 
         this.isSyncing = true;
+        window.dispatchEvent(new CustomEvent('syncStarted'));
         console.log('Sync started...');
 
         try {
@@ -51,6 +52,7 @@ class SyncManager {
             if (this.onSyncError) this.onSyncError(error);
         } finally {
             this.isSyncing = false;
+            window.dispatchEvent(new CustomEvent('syncCompleted'));
         }
     }
 

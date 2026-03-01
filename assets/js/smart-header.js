@@ -18,6 +18,7 @@ const SmartHeader = {
         this.fetchGoal();
         this.startGlobalTimer();
         this.initEventListeners();
+        this.initConnectivityListeners();
 
         // Initial sync for focus timer if StudyMentor exists
         this.syncFocusTimer();
@@ -29,6 +30,8 @@ const SmartHeader = {
             requestAnimationFrame(() => {
                 this.updateClock();
                 this.syncFocusTimer();
+                this.updateSolarBorder();
+                this.updateConnectivityStatus();
 
                 // Check for midnight to update date and goal
                 const now = new Date();
@@ -77,14 +80,12 @@ const SmartHeader = {
         monthTextEl.textContent = `${dateNum} ${monthName}`;
 
         // 1. Week Countdown (Days until Friday)
-        // Saturday is 6, Sunday is 0, ... Friday is 5.
-        // We want days LEFT UNTIL Friday.
         const currentDay = now.getDay();
         let daysUntilFriday;
         if (currentDay <= 5) {
             daysUntilFriday = 5 - currentDay;
         } else {
-            daysUntilFriday = 6; // It is Saturday, so 6 days until next Friday
+            daysUntilFriday = 6;
         }
 
         if (weekBadge) {
@@ -104,6 +105,83 @@ const SmartHeader = {
             if (daysUntilMonthEnd <= 3) monthBadge.classList.replace('bg-indigo-500', 'bg-rose-500');
             else monthBadge.classList.replace('bg-rose-500', 'bg-indigo-500');
         }
+    },
+
+    updateSolarBorder() {
+        const header = document.querySelector('.main-header');
+        if (!header) return;
+
+        const now = new Date();
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        const timeDecimal = hour + minute / 60;
+
+        let color = '#f1f5f9'; // Fallback
+
+        // Solar Cycle Colors
+        // 5-8: Dawn (Gold/Amber)
+        // 8-16: Day (Sky/Indigo)
+        // 16-19: Sunset (Orange/Violet)
+        // 19-5: Night (Indigo/Slate)
+
+        if (timeDecimal >= 5 && timeDecimal < 9) {
+            // Morning Gold (Amber-400 to Orange-400)
+            color = '#fbbf24';
+        } else if (timeDecimal >= 9 && timeDecimal < 16) {
+            // Midday Blue (Sky-400 to Indigo-400)
+            color = '#38bdf8';
+        } else if (timeDecimal >= 16 && timeDecimal < 19) {
+            // Sunset Violet (Orange-500 to Purple-500)
+            color = '#8b5cf6';
+        } else {
+            // Night Indigo (Slate-800)
+            color = '#1e293b';
+        }
+
+        header.style.setProperty('--header-border-color', color);
+        header.classList.add('solar-active');
+    },
+
+    updateConnectivityStatus() {
+        const pulse = document.getElementById('connectivity-pulse');
+        const statusText = document.getElementById('connectivity-status-text');
+        if (!pulse || !statusText) return;
+
+        // Skip if currently syncing (handled by events)
+        if (pulse.classList.contains('status-syncing')) return;
+
+        const isOnline = navigator.onLine;
+
+        if (isOnline) {
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-online';
+            statusText.textContent = 'Fully Live & Synced';
+            pulse.title = 'System Status: Online';
+        } else {
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-offline';
+            statusText.textContent = 'Offline (Saving Locally)';
+            pulse.title = 'System Status: Offline';
+        }
+    },
+
+    initConnectivityListeners() {
+        window.addEventListener('online', () => this.updateConnectivityStatus());
+        window.addEventListener('offline', () => this.updateConnectivityStatus());
+
+        // Support for custom sync events
+        window.addEventListener('syncStarted', () => {
+            const pulse = document.getElementById('connectivity-pulse');
+            const statusText = document.getElementById('connectivity-status-text');
+            if (pulse && statusText) {
+                pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-syncing';
+                statusText.textContent = 'Syncing Data...';
+                pulse.title = 'System Status: Syncing';
+            }
+        });
+
+        window.addEventListener('syncCompleted', () => {
+            // Re-check base status
+            this.updateConnectivityStatus();
+        });
     },
 
     async fetchWeather() {

@@ -81,11 +81,15 @@ body {
     }
 }
 
-/* Glassmorphism subtle effect for header elements on hover */
-#smart-header-bar>div:hover {
-    background: rgba(241, 245, 249, 0.5);
-    border-radius: 6px;
-    transition: background 0.2s ease;
+.main-header {
+    --header-border-color: #f1f5f9;
+    /* Default slate-100 */
+    border-bottom: 2px solid var(--header-border-color) !important;
+    transition: border-color 2s ease-in-out;
+}
+
+.main-header.solar-active {
+    box-shadow: 0 4px 20px -10px var(--header-border-color);
 }
 
 /* Weather Icon Styling */
@@ -143,17 +147,22 @@ body {
 }
 
 @keyframes rocket-launch {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateY(0) rotate(-45deg);
         filter: drop-shadow(0 0 2px rgba(244, 63, 94, 0.4));
     }
+
     25% {
         transform: translateY(-1px) rotate(-47deg);
     }
+
     50% {
         transform: translateY(0) rotate(-45deg);
         filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.8));
     }
+
     75% {
         transform: translateY(-1px) rotate(-43deg);
     }
@@ -162,7 +171,50 @@ body {
 .animate-rocket {
     animation: rocket-launch 0.4s ease-in-out infinite;
     display: inline-block;
-    color: #f43f5e !important; /* Rose-500 */
+    color: #f43f5e !important;
+    /* Rose-500 */
+}
+
+/* Connectivity Pulse States */
+#connectivity-pulse.status-online {
+    background-color: #10b981;
+    /* Emerald-500 */
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+#connectivity-pulse.status-offline {
+    background-color: #f59e0b;
+    /* Amber-500 */
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+#connectivity-pulse.status-offline span {
+    animation: none;
+    /* No ping when offline to save energy/signal state */
+}
+
+#connectivity-pulse.status-syncing {
+    background-color: #3b82f6;
+    /* Blue-500 */
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+}
+
+#connectivity-pulse.status-syncing span {
+    animation-duration: 0.6s;
+    /* Faster ping for active sync */
+}
+
+#connectivity-pulse.status-online span {
+    animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping {
+
+    75%,
+    100% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
 }
 
 .animate-neural-glow {
