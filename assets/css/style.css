@@ -221,3 +221,33 @@ body {
     animation: neural-glow 1.5s ease-in-out infinite;
     display: inline-block;
 }
+
+/* Question Highlight Animation */
+.highlight-pulse {
+    animation: questionHighlight 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+    border-color: #4f46e5 !important;
+    box-shadow: 0 0 0 6px rgba(79, 70, 229, 0.2);
+    z-index: 50;
+    position: relative;
+}
+
+@keyframes questionHighlight {
+    0% {
+        background-color: #4f46e5 !important;
+        color: white;
+        transform: scale(1.02);
+    }
+
+    15% {
+        background-color: #4f46e5 !important;
+        color: white;
+        transform: scale(1.02);
+    }
+
+    100% {
+        background-color: #f8fafc !important;
+        /* bg-gray-50 */
+        color: inherit;
+        transform: scale(1);
+    }
+}

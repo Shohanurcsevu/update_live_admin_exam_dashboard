@@ -41,13 +41,14 @@ function initializeQuestionsListPage() {
         try {
             const response = await fetch(`${API_URL}list.php?exam_id=${examId}`);
             const result = await response.json();
-            questionsContainer.innerHTML = '';
+
             if (result.success && result.data.length > 0) {
                 currentQuestions = result.data;
+                let html = '';
                 result.data.forEach((q, index) => {
                     const priorityInt = parseInt(q.priority) || 0;
-                    const questionCard = `
-                        <div id="question-${q.id}" class="border rounded-lg p-4 bg-gray-50 flex flex-col transition-all duration-300">
+                    html += `
+                        <div id="question-${q.id}" class="border rounded-lg p-4 bg-gray-50 flex flex-col highlight-target">
                             <div class="flex justify-between items-start mb-2">
                                 <div class="flex-grow">
                                     <p class="text-gray-800 font-semibold">${index + 1}. ${q.question}</p>
@@ -73,8 +74,8 @@ function initializeQuestionsListPage() {
                             </div>
                         </div>
                     `;
-                    questionsContainer.innerHTML += questionCard;
                 });
+                questionsContainer.innerHTML = html;
             } else {
                 questionsContainer.innerHTML = `<p class="text-center text-gray-500 py-8">No questions found for this exam.</p>`;
             }
@@ -222,16 +223,23 @@ function initializeQuestionsListPage() {
         const highlightId = params.get('highlight_id');
         if (!highlightId) return;
 
-        setTimeout(() => {
+        // Use an interval to find the element if it's not immediately available
+        let attempts = 0;
+        const findAndHighlight = setInterval(() => {
+            attempts++;
             const target = document.getElementById(`question-${highlightId}`);
             if (target) {
+                clearInterval(findAndHighlight);
                 target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 target.classList.add('highlight-pulse');
 
                 // Remove class after animation to allow re-highlighting
-                setTimeout(() => target.classList.remove('highlight-pulse'), 3000);
+                setTimeout(() => {
+                    target.classList.remove('highlight-pulse');
+                }, 3000);
             }
-        }, 500); // Wait for rendering to complete
+            if (attempts > 20) clearInterval(findAndHighlight); // Stop after 4 seconds
+        }, 200);
     }
 
     function getPriorityBtnClass(priority, isActive) {
