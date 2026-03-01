@@ -31,7 +31,7 @@ const SmartHeader = {
                 this.updateClock();
                 this.syncFocusTimer();
                 this.updateSolarBorder();
-                this.updateConnectivityStatus();
+                this.updateBackupStatus();
 
                 // Check for midnight to update date and goal
                 const now = new Date();
@@ -142,45 +142,73 @@ const SmartHeader = {
         header.classList.add('solar-active');
     },
 
-    updateConnectivityStatus() {
-        const pulse = document.getElementById('connectivity-pulse');
-        const statusText = document.getElementById('connectivity-status-text');
+    updateBackupStatus() {
+        const pulse = document.getElementById('backup-pulse');
+        const statusText = document.getElementById('backup-status-text');
         if (!pulse || !statusText) return;
 
-        // Skip if currently syncing (handled by events)
-        if (pulse.classList.contains('status-syncing')) return;
+        const manager = window.autoBackupManager;
+        if (!manager) return;
 
-        const isOnline = navigator.onLine;
+        const settings = manager.getSettings();
+        const isRunning = manager.isRunning();
 
-        if (isOnline) {
-            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-online';
-            statusText.textContent = 'Fully Live & Synced';
-            pulse.title = 'System Status: Online';
+        // 🟢 Blinking Green: A backup is currently in progress
+        if (isRunning) {
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-syncing';
+            statusText.textContent = 'Syncing Backup...';
+            pulse.title = 'Backup: Actively Syncing';
+            return;
+        }
+
+        // 🟠 Amber: The last backup failed (hover for details)
+        if (settings.lastError) {
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-error';
+            statusText.textContent = `Error: ${settings.lastError}`;
+            pulse.title = `Last failure: ${new Date(settings.lastAttemptAt).toLocaleTimeString()}`;
+            return;
+        }
+
+        // 🔴 Solid Red: Backup is disabled or your folder needs permissions
+        if (!settings.enabled) {
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-warning';
+            statusText.textContent = 'Auto-Backup Disabled';
+            pulse.title = 'Enable in Settings for data safety';
+            return;
+        }
+
+        if (settings.enabled && !settings.folderName && manager.supportsFileSystemAccess()) {
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-warning';
+            statusText.textContent = 'Folder Required';
+            pulse.title = 'Select a backup folder';
+            return;
+        }
+
+        // 🔵 Rapid Blue Pulse: Your data is fully synced and healthy.
+        pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-healthy';
+        const lastRun = settings.lastRunAt ? new Date(settings.lastRunAt) : null;
+        if (lastRun) {
+            const timeStr = lastRun.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            statusText.textContent = `Live & Synced (Last: ${timeStr})`;
+            pulse.title = `Last backup: ${lastRun.toLocaleString()}`;
         } else {
-            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-offline';
-            statusText.textContent = 'Offline (Saving Locally)';
-            pulse.title = 'System Status: Offline';
+            statusText.textContent = 'Monitoring...';
+            pulse.title = 'Waiting for first backup';
         }
     },
 
     initConnectivityListeners() {
-        window.addEventListener('online', () => this.updateConnectivityStatus());
-        window.addEventListener('offline', () => this.updateConnectivityStatus());
+        // Listen for internal backup manager events
+        window.addEventListener('autoBackupStarted', () => this.updateBackupStatus());
+        window.addEventListener('autoBackupComplete', () => this.updateBackupStatus());
+        window.addEventListener('autoBackupNeedsFolderAuth', () => this.updateBackupStatus());
 
-        // Support for custom sync events
-        window.addEventListener('syncStarted', () => {
-            const pulse = document.getElementById('connectivity-pulse');
-            const statusText = document.getElementById('connectivity-status-text');
-            if (pulse && statusText) {
-                pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-syncing';
-                statusText.textContent = 'Syncing Data...';
-                pulse.title = 'System Status: Syncing';
-            }
-        });
-
-        window.addEventListener('syncCompleted', () => {
-            // Re-check base status
-            this.updateConnectivityStatus();
+        // Basic network fallback (still useful info for backup status)
+        window.addEventListener('online', () => this.updateBackupStatus());
+        window.addEventListener('offline', () => {
+            const statusText = document.getElementById('backup-status-text');
+            if (statusText) statusText.textContent = 'Offline (Sync Paused)';
+            this.updateBackupStatus();
         });
     },
 

@@ -176,36 +176,49 @@ body {
 }
 
 /* Connectivity Pulse States */
-#connectivity-pulse.status-online {
+/* Backup Status Pulse */
+#backup-pulse.status-syncing {
     background-color: #10b981;
-    /* Emerald-500 */
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    /* Green-500 */
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
 }
 
-#connectivity-pulse.status-offline {
+#backup-pulse.status-healthy {
+    background-color: #3b82f6;
+    /* Blue-500 */
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
+#backup-pulse.status-error {
     background-color: #f59e0b;
     /* Amber-500 */
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
 }
 
-#connectivity-pulse.status-offline span {
-    animation: none;
-    /* No ping when offline to save energy/signal state */
+#backup-pulse.status-warning {
+    background-color: #ef4444;
+    /* Red-500 */
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
-#connectivity-pulse.status-syncing {
-    background-color: #3b82f6;
-    /* Blue-500 */
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+/* Animations */
+#backup-pulse.status-syncing span {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-#connectivity-pulse.status-syncing span {
-    animation-duration: 0.6s;
-    /* Faster ping for active sync */
-}
-
-#connectivity-pulse.status-online span {
+#backup-pulse.status-healthy span {
     animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    animation-duration: 2.5s;
+}
+
+#backup-pulse.status-error span {
+    animation: none;
+    /* Solid Amber */
+}
+
+#backup-pulse.status-warning span {
+    animation: none;
+    /* Solid Red */
 }
 
 @keyframes ping {
