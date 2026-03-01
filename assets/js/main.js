@@ -314,9 +314,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.history.pushState({ page, params }, '', url);
 
         if (page === 'mcq-generator') {
-            const pageNameEl = document.getElementById('header-page-name');
-            if (pageNameEl) pageNameEl.textContent = "MCQ Generator";
-
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.toggle('bg-gray-700', link.dataset.page === page);
             });
@@ -327,24 +324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             await loadComponent(`pages/${page}.html`, mainContent);
 
-            // Update Dynamic Page Name in Header
-            const pageNameEl = document.getElementById('header-page-name');
-            if (pageNameEl) {
-                const nameMap = {
-                    'dashboard': 'Dashboard',
-                    'import-questions': 'Import',
-                    'questions-list': 'Questions',
-                    'take-exam-list': 'Exams',
-                    'check-performance': 'Performance',
-                    'mistake-bank': 'Mistakes',
-                    'discipline-tracker': 'Discipline',
-                    'flashcards': 'Flashcards',
-                    'analytics': 'Analytics',
-                    'custom-exams': 'Custom'
-                };
-                const displayName = nameMap[page] || page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                pageNameEl.textContent = displayName;
-            }
+            // Update Navigation Highlighting
 
             document.querySelectorAll('.nav-link').forEach(link => {
                 const navLinkPage = link.dataset.page;

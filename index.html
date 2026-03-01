@@ -535,6 +535,54 @@
     <!-- PRINT CONTAINER -->
     <div id="print-container"></div>
 
+    <!-- UNIVERSAL SMART SEARCH (COMMAND PALETTE) -->
+    <div id="command-palette"
+        class="fixed inset-0 z-[600] hidden items-start justify-center pt-[15vh] px-4 backdrop-blur-sm bg-slate-900/40 opacity-0 transition-opacity duration-200">
+        <div class="w-full max-w-2xl bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 overflow-hidden transform scale-95 transition-transform duration-200"
+            id="command-palette-content">
+            <!-- Search Input -->
+            <div class="p-5 border-b border-slate-100 flex items-center gap-4">
+                <span class="material-symbols-outlined text-slate-400 text-2xl">search</span>
+                <input type="text" id="command-search-input" placeholder="Search anything... (English or বাংলা)"
+                    class="w-full bg-transparent border-none outline-none text-lg font-medium text-slate-800 placeholder:text-slate-400"
+                    autocomplete="off">
+                <div
+                    class="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-tighter sm:flex hidden">
+                    <span>ESC</span>
+                </div>
+            </div>
+
+            <!-- Results Area -->
+            <div id="command-results" class="max-h-[50vh] overflow-y-auto no-scrollbar p-2 space-y-1">
+                <div class="p-8 text-center">
+                    <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <span class="material-symbols-outlined text-slate-300">manage_search</span>
+                    </div>
+                    <p class="text-sm text-slate-400">Type to search for pages, subjects, or questions...</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="p-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between px-6">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
+                        <span
+                            class="px-1.5 py-0.5 bg-white border border-slate-200 rounded shadow-sm text-slate-600">↑↓</span>
+                        <span>Navigate</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
+                        <span
+                            class="px-1.5 py-0.5 bg-white border border-slate-200 rounded shadow-sm text-slate-600">Enter</span>
+                        <span>Select</span>
+                    </div>
+                </div>
+                <div class="text-[10px] font-black text-indigo-500/50 tracking-widest uppercase">
+                    Smart Universal Search
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Core JavaScript -->
     <script src="assets/js/cache-manager.js"></script>
     <script src="assets/js/indexeddb-manager.js"></script>
@@ -546,6 +594,7 @@
     <script src="assets/js/question-utils.js"></script>
     <script src="assets/js/sidebar.js"></script>
     <script src="assets/js/smart-header.js"></script>
+    <script src="assets/js/command-palette.js"></script>
     <script src="assets/js/main.js"></script>
     <script src="assets/js/mentor.js"></script>
 </body>
