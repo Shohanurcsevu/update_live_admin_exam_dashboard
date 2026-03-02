@@ -85,8 +85,7 @@ function initializeQuestionsListPage() {
     function closeModal(modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
     function openModal(modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
 
-    async function handleEditFormSubmit(e) {
-        e.preventDefault();
+    async function handleEditFormSubmit() {
         const formData = new FormData(editForm);
         const data = {
             id: formData.get('id'),
@@ -284,7 +283,7 @@ function initializeQuestionsListPage() {
 
     // Event listeners
     backBtn.addEventListener('click', () => window.history.back()); // Simple back navigation
-    editForm.addEventListener('submit', handleEditFormSubmit);
+    document.getElementById('save-edit-btn').addEventListener('click', handleEditFormSubmit);
     questionsContainer.addEventListener('click', handleContainerClick);
     document.getElementById('close-edit-modal-btn').addEventListener('click', () => closeModal(editModal));
     document.getElementById('cancel-edit-modal-btn').addEventListener('click', () => closeModal(editModal));

@@ -19,6 +19,8 @@ const StudyTargetTracker = {
     estimatedFinishLabel: "Calculating...",
     paceTimer: null,
     initialized: false,
+    lastStudyChangeTime: null,
+    rhythmGhostPoints: [],
 
     async init() {
         // --- Per-page setup: always re-run to attach to fresh DOM elements ---
@@ -48,6 +50,7 @@ const StudyTargetTracker = {
             this.fetchYesterdayProgress();
             this.fetchSubjectEfficiency();
             this.fetchEstimatedFinish();
+            this.saveRhythmSnapshot(); // Feature: Rhythm Memory
         }, 30000);
     },
 
@@ -90,7 +93,18 @@ const StudyTargetTracker = {
         try {
             const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 1);
             if (result) {
-                this.studiedSeconds = result.total_today_seconds || 0;
+                const newSeconds = result.total_today_seconds || 0;
+
+                // Track last time study seconds changed (for flatline detection)
+                if (newSeconds !== this.studiedSeconds) {
+                    this.lastStudyChangeTime = Date.now();
+                }
+                // Set initial time on first activity
+                if (this.lastStudyChangeTime === null && newSeconds > 0) {
+                    this.lastStudyChangeTime = Date.now();
+                }
+
+                this.studiedSeconds = newSeconds;
                 const dailyData = result.subjects || [];
 
                 // Merge dailyData into allSubjects
@@ -556,6 +570,57 @@ const StudyTargetTracker = {
         return `${m}m`;
     },
 
+    // ─── Feature: Rhythm Memory ───────────────────────────────────────────────
+
+    saveRhythmSnapshot(points) {
+        if (!points || points.length < 10) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const key = `ecg_rhythm_${today}`;
+        const payload = {
+            date: today,
+            studiedSeconds: this.studiedSeconds,
+            points: points.slice(-150).map(p => Math.round(p.y * 10) / 10)
+        };
+        try {
+            localStorage.setItem(key, JSON.stringify(payload));
+        } catch (e) { /* localStorage full, ignore */ }
+    },
+
+    loadBestDayRhythm() {
+        const today = new Date().toISOString().slice(0, 10);
+        let bestKey = null;
+        let bestSeconds = 0;
+
+        for (let i = 1; i <= 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().slice(0, 10);
+            const key = `ecg_rhythm_${dateStr}`;
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    if (data.studiedSeconds > bestSeconds) {
+                        bestSeconds = data.studiedSeconds;
+                        bestKey = key;
+                    }
+                }
+            } catch (e) { /* ignore parse errors */ }
+        }
+
+        if (bestKey) {
+            try {
+                const data = JSON.parse(localStorage.getItem(bestKey));
+                this.rhythmGhostPoints = data.points || [];
+                console.log(`[ST-TRACKER] Rhythm Memory: loaded ghost from ${bestKey} (${Math.round(bestSeconds / 3600)}h)`);
+            } catch (e) {
+                this.rhythmGhostPoints = [];
+            }
+        }
+    },
+
+    // ─── ECG Canvas ──────────────────────────────────────────────────────────
+
     initECG() {
         const canvas = document.getElementById('ecg-canvas');
         const containerRoot = canvas ? canvas.closest('.bg-slate-900\\/5') : null;
@@ -569,66 +634,148 @@ const StudyTargetTracker = {
         };
 
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas(); // Initial set
+        resizeCanvas();
+
+        // Load best-day ghost waveform from localStorage
+        this.loadBestDayRhythm();
 
         let points = [];
         let particles = [];
         const maxPoints = 150;
         let frameCount = 0;
 
+        // Color palette for multi-subject waveforms
+        const subjectColors = [
+            { hex: '#3b82f6', rgb: '59, 130, 246' },  // Blue
+            { hex: '#10b981', rgb: '16, 185, 129' },   // Emerald
+            { hex: '#f59e0b', rgb: '245, 158, 11' },   // Amber
+            { hex: '#8b5cf6', rgb: '139, 92, 246' },   // Violet
+            { hex: '#ec4899', rgb: '236, 72, 153' },   // Pink
+            { hex: '#14b8a6', rgb: '20, 184, 166' },   // Teal
+        ];
+
+        // Per-subject point buffers for overlay waveforms
+        let subjectPointBuffers = [];
+
         const animate = () => {
-            // Check if context/canvas is still valid
             if (!ctx || !document.body.contains(canvas) || !this.initialized) return;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Pulse intensity based on study today
-            const studyBoost = (this.studiedSeconds / 3600);
-            const baseIntensity = 15;
-            // Clamped to 35 max intensity
-            const intensity = Math.min(35, baseIntensity + studyBoost * 4);
-            // Count active subjects (studied > 0 seconds)
-            const activeSubjects = this.subjects.filter(s => s.seconds > 0).length;
-            const beatCount = Math.max(1, activeSubjects);
+            const activeSubjects = this.subjects.filter(s => s.seconds > 0);
+            // Map active subjects → realistic BPM range (50 BPM rest → 95 BPM peak)
+            // At 60fps: pulseInterval (frames) = (60 / BPM) * 60
+            const bpm = Math.min(95, 50 + (activeSubjects.length - 1) * 5);
+            const pulseInterval = Math.round((60 / bpm) * 60); // e.g. 50bpm→72f, 75bpm→48f, 95bpm→38f
 
-            // Calculate interval to show exactly 'beatCount' beats in the window
-            // 150 frames / 1 beat = 150 frames/beat (Slow)
-            // 150 frames / 10 beats = 15 frames/beat (Fast)
-            // We add a tiny offset (0.1) to avoid perfect stroboscopic "standing wave" effects
-            const pulseInterval = Math.max(15, 150.1 / beatCount);
 
-            frameCount++;
-            let y = canvas.height / 2;
-            const phase = frameCount % Math.floor(pulseInterval);
+            // ── Feature 1: Flatline Detection ──────────────────────────────────
+            const FLATLINE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
+            const isFlatline = this.firstStartTime !== null
+                && this.studiedSeconds > 0
+                && this.lastStudyChangeTime !== null
+                && (Date.now() - this.lastStudyChangeTime) > FLATLINE_THRESHOLD_MS;
 
-            // Exotic Pulse Logic - Scaled for 80px Height (Canvas Center = 40px)
-            // Max safe amplitude = ~35px
-            let activeSpike = false;
-
-            // Dynamic Phase Logic based on interval
-            // P-Wave: 20-30% of interval
-            // QRS: 30-50% of interval
-            // T-Wave: 60-80% of interval
-
-            if (phase > (pulseInterval * 0.2) && phase < (pulseInterval * 0.3)) {
-                y -= intensity * 0.2; // P wave
-            } else if (phase >= (pulseInterval * 0.3) && phase < (pulseInterval * 0.35)) {
-                y += intensity * 0.9; // QRS Deep Spike
-                activeSpike = true;
-            } else if (phase >= (pulseInterval * 0.35) && phase < (pulseInterval * 0.45)) {
-                y -= intensity * 1.1; // QRS High Spike
-                activeSpike = true;
-            } else if (phase >= (pulseInterval * 0.6) && phase < (pulseInterval * 0.8)) {
-                y += intensity * 0.3; // Recovery
-            } else {
-                y += (Math.random() - 0.5) * 3; // Nervous baseline
+            // ── Momentum Label Update ───────────────────────────────────────────
+            const momentumLabel = document.getElementById('momentum-label');
+            if (momentumLabel) {
+                if (isFlatline) {
+                    momentumLabel.textContent = 'Signal Lost';
+                    momentumLabel.className = 'text-[8px] font-bold text-gray-400 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200/50 animate-pulse';
+                } else if (this.protocolActive) {
+                    momentumLabel.textContent = 'Stealth Mode';
+                    momentumLabel.className = 'text-[8px] font-bold text-cyan-500 px-2 py-0.5 rounded-full bg-cyan-50 border border-cyan-100/50';
+                } else {
+                    momentumLabel.textContent = 'Active Pulse';
+                    momentumLabel.className = 'text-[8px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-100/50';
+                }
             }
 
-            // Dynamic Accent Colors
-            const accentHex = this.protocolActive ? '#22d3ee' : '#ef4444';
-            const accentRgb = this.protocolActive ? '34, 211, 238' : '239, 68, 68';
+            frameCount++;
 
-            // Sync card pulse with big spikes
+            // ── Grid ────────────────────────────────────────────────────────────
+            const gridSize = 10;
+            const gridR = isFlatline ? 100 : 239;
+            const gridG = isFlatline ? 100 : 68;
+            const gridB = isFlatline ? 100 : 68;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.strokeStyle = x % (gridSize * 5) === 0
+                    ? `rgba(${gridR}, ${gridG}, ${gridB}, 0.2)`
+                    : `rgba(${gridR}, ${gridG}, ${gridB}, 0.05)`;
+                ctx.lineWidth = x % (gridSize * 5) === 0 ? 1 : 0.5;
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.strokeStyle = y % (gridSize * 5) === 0
+                    ? `rgba(${gridR}, ${gridG}, ${gridB}, 0.2)`
+                    : `rgba(${gridR}, ${gridG}, ${gridB}, 0.05)`;
+                ctx.lineWidth = y % (gridSize * 5) === 0 ? 1 : 0.5;
+                ctx.stroke();
+            }
+
+            // ── Feature 3: Ghost Waveform (behind everything) ───────────────────
+            if (this.rhythmGhostPoints.length > 1) {
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = '#94a3b8';
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+                ctx.lineWidth = 1.5;
+                ctx.lineJoin = 'round';
+                const ghostLen = this.rhythmGhostPoints.length;
+                for (let i = 0; i < ghostLen - 1; i++) {
+                    const px = (i / maxPoints) * canvas.width;
+                    const nextPx = ((i + 1) / maxPoints) * canvas.width;
+                    ctx.moveTo(px, this.rhythmGhostPoints[i]);
+                    ctx.lineTo(nextPx, this.rhythmGhostPoints[i + 1]);
+                }
+                ctx.stroke();
+
+                // Ghost label
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+                ctx.font = 'bold 7px monospace';
+                ctx.fillText('BEST DAY ◈', 4, 8);
+            }
+            ctx.shadowBlur = 0;
+
+            // ── Main ECG Point Calculation ──────────────────────────────────────
+            const studyBoost = (this.studiedSeconds / 3600);
+            const baseIntensity = 15;
+            const intensity = Math.min(35, baseIntensity + studyBoost * 4);
+
+            let mainY = canvas.height / 2;
+            let activeSpike = false;
+
+            if (isFlatline) {
+                // Flatline: slow wobbly baseline
+                mainY = canvas.height / 2 + Math.sin(frameCount * 0.05) * 2 + (Math.random() - 0.5) * 1.5;
+            } else {
+                const phase = frameCount % Math.floor(pulseInterval);
+                if (phase > (pulseInterval * 0.2) && phase < (pulseInterval * 0.3)) {
+                    mainY -= intensity * 0.2;
+                } else if (phase >= (pulseInterval * 0.3) && phase < (pulseInterval * 0.35)) {
+                    mainY += intensity * 0.9;
+                    activeSpike = true;
+                } else if (phase >= (pulseInterval * 0.35) && phase < (pulseInterval * 0.45)) {
+                    mainY -= intensity * 1.1;
+                    activeSpike = true;
+                } else if (phase >= (pulseInterval * 0.6) && phase < (pulseInterval * 0.8)) {
+                    mainY += intensity * 0.3;
+                } else {
+                    mainY += (Math.random() - 0.5) * 3;
+                }
+            }
+
+            // Sync card border on spike
+            const accentHex = isFlatline ? '#94a3b8' : (this.protocolActive ? '#22d3ee' : '#ef4444');
+            const accentRgb = isFlatline ? '148, 163, 184' : (this.protocolActive ? '34, 211, 238' : '239, 68, 68');
+
             if (activeSpike && containerRoot) {
                 containerRoot.style.transform = 'scale(1.005)';
                 containerRoot.style.borderColor = `rgba(${accentRgb}, 0.4)`;
@@ -637,93 +784,112 @@ const StudyTargetTracker = {
                 containerRoot.style.borderColor = 'rgba(15, 23, 42, 0.1)';
             }
 
-            points.push({ y, time: Date.now() });
+            points.push({ y: mainY, time: Date.now() });
             if (points.length > maxPoints) points.shift();
 
-
-
-
-            // Draw Classic Red ECG Grid (Graph Paper Effect)
-            const gridSize = 10;
-            ctx.lineWidth = 0.5;
-
-            // Draw Vertical Lines
-            for (let x = 0; x < canvas.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                // Every 5th line is thicker (Major Grid)
-                if (x % (gridSize * 5) === 0) {
-                    ctx.strokeStyle = `rgba(239, 68, 68, 0.2)`; // Red Major
-                    ctx.lineWidth = 1;
-                } else {
-                    ctx.strokeStyle = `rgba(239, 68, 68, 0.05)`; // Red Minor
-                    ctx.lineWidth = 0.5;
+            // ── Feature 2: Per-Subject Waveform Overlays ───────────────────────
+            if (!isFlatline && activeSubjects.length > 1) {
+                // Ensure we have one buffer per active subject
+                while (subjectPointBuffers.length < activeSubjects.length) {
+                    subjectPointBuffers.push([]);
                 }
-                ctx.stroke();
-            }
 
-            // Draw Horizontal Lines
-            for (let y = 0; y < canvas.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                // Every 5th line is thicker (Major Grid)
-                if (y % (gridSize * 5) === 0) {
-                    ctx.strokeStyle = `rgba(239, 68, 68, 0.2)`; // Red Major
-                    ctx.lineWidth = 1;
-                } else {
-                    ctx.strokeStyle = `rgba(239, 68, 68, 0.05)`; // Red Minor
-                    ctx.lineWidth = 0.5;
-                }
-                ctx.stroke();
-            }
+                activeSubjects.forEach((subj, idx) => {
+                    const color = subjectColors[idx % subjectColors.length];
+                    // Each subject gets a phase offset so their beats don't coincide
+                    const subjectPhaseOffset = Math.floor(pulseInterval * (idx / activeSubjects.length));
+                    const subjectPhase = (frameCount + subjectPhaseOffset) % Math.floor(pulseInterval);
 
-            // Create Blood Particles on spikes (Burst) and occasional baseline (Drip)
-            const burstCount = activeSpike ? Math.floor(Math.random() * 3) + 2 : (Math.random() > 0.9 ? 1 : 0);
+                    // Intensity scales to this subject's contribution
+                    const subjectIntensity = Math.min(20, 8 + (subj.seconds / 3600) * 3);
+                    // Vertical offset so overlays spread slightly around center
+                    const vertOffset = (idx - (activeSubjects.length - 1) / 2) * 3;
 
-            for (let i = 0; i < burstCount; i++) {
-                particles.push({
-                    x: ((points.length - 1) / maxPoints * canvas.width) + (Math.random() - 0.5) * 5,
-                    y: y + (Math.random() - 0.5) * 5,
-                    vx: -Math.random() * 2 - 0.5, // Move left with flow
-                    vy: (Math.random() - 0.5) * (activeSpike ? 6 : 2), // Violent spread on spike, gentle on baseline
-                    life: 1.0,
-                    size: Math.random() * 1.5 + 0.5 // Varied sizes for organic look
+                    let sy = (canvas.height / 2) + vertOffset;
+                    if (subjectPhase >= (pulseInterval * 0.3) && subjectPhase < (pulseInterval * 0.45)) {
+                        sy -= subjectIntensity * 1.0;
+                    } else if (subjectPhase >= (pulseInterval * 0.6) && subjectPhase < (pulseInterval * 0.8)) {
+                        sy += subjectIntensity * 0.25;
+                    } else {
+                        sy += (Math.random() - 0.5) * 1.5;
+                    }
+
+                    const buf = subjectPointBuffers[idx];
+                    buf.push(sy);
+                    if (buf.length > maxPoints) buf.shift();
+
+                    if (buf.length > 1) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(${color.rgb}, 0.3)`;
+                        ctx.lineWidth = 1;
+                        ctx.lineJoin = 'round';
+                        // No shadowBlur here — too GPU-expensive across multiple subjects
+                        for (let i = 0; i < buf.length - 1; i++) {
+                            ctx.moveTo((i / maxPoints) * canvas.width, buf[i]);
+                            ctx.lineTo(((i + 1) / maxPoints) * canvas.width, buf[i + 1]);
+                        }
+                        ctx.stroke();
+                    }
                 });
+
+                // Trim buffers if active subjects dropped
+                if (subjectPointBuffers.length > activeSubjects.length) {
+                    subjectPointBuffers = subjectPointBuffers.slice(0, activeSubjects.length);
+                }
+            } else {
+                subjectPointBuffers = [];
             }
 
-            // Draw Particles with Bloom (Backward iteration for safe removal)
+            // ── Particles ──────────────────────────────────────────────────────
+            if (!isFlatline) {
+                // Spike burst only — keep it lean for performance
+                const burstCount = activeSpike
+                    ? Math.floor(Math.random() * 3) + 3   // 3-5 on spike
+                    : (Math.random() > 0.75 ? 1 : 0);     // 1 ambient, rarely
+
+                const lxNow = (points.length - 1) / maxPoints * canvas.width;
+                for (let i = 0; i < burstCount; i++) {
+                    particles.push({
+                        x: lxNow + (Math.random() - 0.5) * 10,
+                        y: mainY + (Math.random() - 0.5) * 7,
+                        vx: (Math.random() - 0.5) * (activeSpike ? 3 : 1.2) - 0.3,
+                        vy: (Math.random() - 0.5) * (activeSpike ? 8 : 2.5),
+                        life: activeSpike ? 0.8 + Math.random() * 0.15 : 0.4 + Math.random() * 0.2,
+                        size: activeSpike ? Math.random() * 2 + 0.6 : Math.random() * 1 + 0.3
+                    });
+                }
+
+                // Hard cap — trim oldest if over limit
+                if (particles.length > 120) particles.splice(0, particles.length - 120);
+            }
+
+            // Pre-cache fillStyle prefix so we don't re-interpolate accentRgb every loop iteration
+            const particleColorPrefix = `rgba(${accentRgb}, `;
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
                 ctx.beginPath();
-                ctx.fillStyle = `rgba(${accentRgb}, ${p.life})`;
-                const size = p.size || 1;
-                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = particleColorPrefix + p.life + ')';
+                ctx.arc(p.x, p.y, p.size || 1, 0, Math.PI * 2);
 
+                ctx.fill();
                 p.x += p.vx;
                 p.y += p.vy;
-                p.life -= (activeSpike ? 0.03 : 0.015); // Longer trail for baseline drips
-
+                p.life -= (activeSpike ? 0.03 : 0.015);
                 if (p.life <= 0) particles.splice(i, 1);
             }
 
-            // Draw Main ECG Line with Glow
-            ctx.shadowBlur = 12;
+            // ── Main ECG Line with Glow ─────────────────────────────────────────
+            ctx.shadowBlur = isFlatline ? 6 : 12;
             ctx.shadowColor = accentHex;
             ctx.beginPath();
-
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
             gradient.addColorStop(0, `rgba(${accentRgb}, 0.1)`);
             gradient.addColorStop(0.8, `rgba(${accentRgb}, 0.8)`);
             gradient.addColorStop(1, accentHex);
-
             ctx.strokeStyle = gradient;
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = isFlatline ? 1.5 : 2.5;
             ctx.lineJoin = 'round';
-
-            for (let i = 0; i < (points.length - 1); i++) {
+            for (let i = 0; i < points.length - 1; i++) {
                 const px = (i / maxPoints) * canvas.width;
                 const nextPx = ((i + 1) / maxPoints) * canvas.width;
                 ctx.moveTo(px, points[i].y);
@@ -734,25 +900,48 @@ const StudyTargetTracker = {
             // Leading Eye
             const lastPoint = points[points.length - 1];
             const lx = (points.length - 1) / maxPoints * canvas.width;
-
             ctx.shadowBlur = 20;
             ctx.beginPath();
             ctx.fillStyle = accentHex;
             ctx.arc(lx, lastPoint.y, 3.5, 0, Math.PI * 2);
             ctx.fill();
-
-            // Outer Ring
             ctx.beginPath();
             ctx.strokeStyle = `rgba(${accentRgb}, 0.5)`;
             ctx.arc(lx, lastPoint.y, 7 + Math.sin(frameCount * 0.1) * 3, 0, Math.PI * 2);
             ctx.stroke();
-
             ctx.shadowBlur = 0;
+
+            // ── Feature 1: Flatline Overlay Text ───────────────────────────────
+            if (isFlatline) {
+                // Red pulsing glow overlay
+                const pulseAlpha = 0.04 + Math.sin(frameCount * 0.05) * 0.03;
+                ctx.fillStyle = `rgba(239, 68, 68, ${pulseAlpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // "SIGNAL LOST" text
+                const textAlpha = 0.5 + Math.sin(frameCount * 0.05) * 0.4;
+                ctx.fillStyle = `rgba(239, 68, 68, ${textAlpha})`;
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('▬ SIGNAL LOST — RECONNECT ▬', canvas.width / 2, canvas.height / 2 - 6);
+                ctx.font = '7px monospace';
+                ctx.fillStyle = `rgba(239, 68, 68, ${textAlpha * 0.6})`;
+                ctx.fillText('No activity detected for 2h+', canvas.width / 2, canvas.height / 2 + 8);
+                ctx.textAlign = 'left';
+            }
+
+            // Save rhythm snapshot into the points reference
+            if (frameCount % 1800 === 0) { // every ~30s at 60fps
+                this.saveRhythmSnapshot(points);
+            }
+
             if (this.initialized) requestAnimationFrame(animate);
         };
 
         requestAnimationFrame(animate);
     },
+
+
 
     updateFlowOrbState() {
         const container = document.querySelector('.orb-container');
