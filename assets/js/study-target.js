@@ -18,9 +18,16 @@ const StudyTargetTracker = {
     protocolTriggered: false,
     estimatedFinishLabel: "Calculating...",
     paceTimer: null,
+    initialized: false,
 
     async init() {
+        if (this.initialized) {
+            console.log("[ST-TRACKER] Already initialized, skipping.");
+            return;
+        }
         console.log("Initializing Study Target Tracker...");
+        this.initialized = true;
+
         await this.fetchAllSubjects(); // Fetch all subjects first
         this.fetchData(); // Then fetch daily data
         this.fetchYesterdayProgress(); // Fetch ghost runner data
@@ -567,7 +574,7 @@ const StudyTargetTracker = {
 
         const animate = () => {
             // Check if context/canvas is still valid
-            if (!ctx || !document.body.contains(canvas)) return;
+            if (!ctx || !document.body.contains(canvas) || !this.initialized) return;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -583,7 +590,8 @@ const StudyTargetTracker = {
             // Calculate interval to show exactly 'beatCount' beats in the window
             // 150 frames / 1 beat = 150 frames/beat (Slow)
             // 150 frames / 10 beats = 15 frames/beat (Fast)
-            const pulseInterval = Math.max(15, 150 / beatCount);
+            // We add a tiny offset (0.1) to avoid perfect stroboscopic "standing wave" effects
+            const pulseInterval = Math.max(15, 150.1 / beatCount);
 
             frameCount++;
             let y = canvas.height / 2;
@@ -681,8 +689,9 @@ const StudyTargetTracker = {
                 });
             }
 
-            // Draw Particles with Bloom
-            particles.forEach((p, idx) => {
+            // Draw Particles with Bloom (Backward iteration for safe removal)
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
                 ctx.beginPath();
                 ctx.fillStyle = `rgba(${accentRgb}, ${p.life})`;
                 const size = p.size || 1;
@@ -693,8 +702,8 @@ const StudyTargetTracker = {
                 p.y += p.vy;
                 p.life -= (activeSpike ? 0.03 : 0.015); // Longer trail for baseline drips
 
-                if (p.life <= 0) particles.splice(idx, 1);
-            });
+                if (p.life <= 0) particles.splice(i, 1);
+            }
 
             // Draw Main ECG Line with Glow
             ctx.shadowBlur = 12;
@@ -735,7 +744,7 @@ const StudyTargetTracker = {
             ctx.stroke();
 
             ctx.shadowBlur = 0;
-            requestAnimationFrame(animate);
+            if (this.initialized) requestAnimationFrame(animate);
         };
 
         requestAnimationFrame(animate);
