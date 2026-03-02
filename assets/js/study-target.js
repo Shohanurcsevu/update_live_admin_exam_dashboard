@@ -21,11 +21,19 @@ const StudyTargetTracker = {
     initialized: false,
 
     async init() {
+        // --- Per-page setup: always re-run to attach to fresh DOM elements ---
+        // These are destroyed and recreated on each SPA navigation.
+        this.initECG();
+        this.initFlowOrb();
+        this.initPaceSlider();
+        this.initMissionControl();
+
+        // --- One-time setup: guard with initialized flag to prevent duplicate intervals ---
         if (this.initialized) {
-            console.log("[ST-TRACKER] Already initialized, skipping.");
+            console.log("[ST-TRACKER] Re-attaching canvas on navigation. Intervals already running.");
             return;
         }
-        console.log("Initializing Study Target Tracker...");
+        console.log("[ST-TRACKER] First-time initialization...");
         this.initialized = true;
 
         await this.fetchAllSubjects(); // Fetch all subjects first
@@ -35,10 +43,6 @@ const StudyTargetTracker = {
         this.fetchSubjectEfficiency(); // Fetch efficiency patterns
         this.fetchEstimatedFinish(); // Fetch server-side finish time estimate
         this.startUpdateLoop();
-        this.initECG();
-        this.initFlowOrb();
-        this.initPaceSlider();
-        this.initMissionControl();
         setInterval(() => {
             this.fetchData();
             this.fetchYesterdayProgress();
