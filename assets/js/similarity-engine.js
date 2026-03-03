@@ -37,38 +37,51 @@ const SimilarityEngine = {
         const ans2 = opts2[q2.answer] ? this.normalize(opts2[q2.answer]) : '';
         const answersMatch = (ans1 === ans2 && ans1 !== '') ? 1.0 : (ans1 && ans2 ? this.diceCoefficient(ans1, ans2) : 0);
 
-        // 4. Quoted Term Check — extract terms inside quotes from ORIGINAL text
+        // 4. Explanation Similarity
+        const exp1 = this.normalize(q1.explanation || '');
+        const exp2 = this.normalize(q2.explanation || '');
+        let explanationScore = 0;
+        const hasExplanations = (exp1.length > 10 && exp2.length > 10);
+        if (hasExplanations) {
+            explanationScore = (exp1 === exp2) ? 1.0 : this.diceCoefficient(exp1, exp2);
+        }
+
+        // 5. Quoted Term Check — extract terms inside quotes from ORIGINAL text
         const sharedQuotedTerm = this.hasSharedQuotedTerm(text1, text2);
 
-        // 5. Final Balanced Score
+        // 6. Final Balanced Score (weights shift when explanations are available)
         let finalScore = 0;
+        if (hasExplanations) {
+            // 45% Text, 20% Options, 15% Answer, 20% Explanation
+            finalScore = (textScore * 0.45) + (optionsScore * 0.20) + (answersMatch * 0.15) + (explanationScore * 0.20);
+        } else {
+            // 50% Text, 35% Options, 15% Answer Match
+            finalScore = (textScore * 0.50) + (optionsScore * 0.35) + (answersMatch * 0.15);
+        }
 
-        // Refined Weighting: 50% Text, 35% Options, 15% Answer Match
-        finalScore = (textScore * 0.50) + (optionsScore * 0.35) + (answersMatch * 0.15);
-
-        // 6. Confidence Boost A: If options and answers match perfectly
+        // 7. Confidence Boost A: If options and answers match perfectly
         if (optionsScore > 0.95 && answersMatch > 0.95 && textScore > 0.65) {
             finalScore = Math.max(finalScore, 0.92);
         }
 
-        // 7. Confidence Boost B: If questions share a QUOTED TERM (e.g. book titles)
-        //    AND have at least some option overlap, it's very likely the same question.
-        //    Without option overlap, they may just be different questions from the same source.
+        // 8. Confidence Boost B: Shared quoted term with option evidence
         if (sharedQuotedTerm && textScore > 0.55 && optionsScore > 0.15) {
             finalScore = Math.max(finalScore, 0.88);
         }
 
-        // 8. Confidence Boost C: If text is highly similar on its own, don't let
-        //    mismatched options drag the score below detection threshold.
+        // 9. Confidence Boost C: High text similarity alone
         if (textScore > 0.85) {
             finalScore = Math.max(finalScore, textScore * 0.95);
         }
 
-        // 9. Answer Mismatch Penalty: If the correct answer TEXT is completely different,
-        //    these are intentionally different questions (same topic, different correct answers).
-        //    e.g. "বিভূতিভূষণের উপন্যাস কোনটি?" → আরণ্যক vs ইছামতী
+        // 10. Confidence Boost D: Identical explanations are a very strong signal
+        if (hasExplanations && explanationScore > 0.90 && textScore > 0.50) {
+            finalScore = Math.max(finalScore, 0.90);
+        }
+
+        // 11. Answer Mismatch Penalty: Different answer text = intentionally different question
         if (answersMatch < 0.3) {
-            finalScore = Math.min(finalScore, 0.80); // Cap below detection threshold
+            finalScore = Math.min(finalScore, 0.80);
         }
 
         return {
@@ -76,6 +89,7 @@ const SimilarityEngine = {
             textScore: textScore,
             optionsScore: optionsScore,
             answersMatch: answersMatch,
+            explanationScore: explanationScore,
             sharedQuotedTerm: sharedQuotedTerm
         };
     },

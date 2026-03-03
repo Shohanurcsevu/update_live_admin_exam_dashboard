@@ -13,6 +13,11 @@
                 <span class="material-symbols-outlined mr-2">search_check</span>
                 Scan for Duplicates
             </button>
+            <button id="scan-cross-exam-btn"
+                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow transition-all">
+                <span class="material-symbols-outlined mr-2">compare_arrows</span>
+                Cross-Exam Scan
+            </button>
             <button id="back-to-import-btn"
                 class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shadow">
                 <span class="material-symbols-outlined mr-2">arrow_back</span>
@@ -25,7 +30,7 @@
     <div id="deduplication-modal"
         class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-[250] p-4 scale-95 opacity-0 transition-all duration-300">
         <div
-            class="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden border border-white/20">
+            class="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden border border-white/20 relative">
             <!-- Modal Header -->
             <div class="flex justify-between items-center p-6 bg-white border-b">
                 <div class="flex items-center gap-3">
@@ -35,7 +40,8 @@
                     <div>
                         <h3 class="text-xl font-bold text-gray-800">Deduplication Workbench</h3>
                         <p class="text-sm text-gray-500">Found <span id="duplicate-count"
-                                class="font-bold text-indigo-600">0</span> potential match groups.</p>
+                                class="font-bold text-indigo-600">0</span> potential match groups<span
+                                id="similar-count-text"></span>.</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -50,6 +56,18 @@
                 </div>
             </div>
 
+            <!-- Sensitivity Slider -->
+            <div class="px-6 py-3 bg-gradient-to-r from-indigo-50/80 to-purple-50/80 border-b flex items-center gap-4">
+                <div class="flex items-center gap-2 min-w-fit">
+                    <span class="material-symbols-outlined text-indigo-500 text-lg">tune</span>
+                    <span class="text-xs font-bold text-gray-700">Sensitivity</span>
+                </div>
+                <input id="dedupe-sensitivity-slider" type="range" min="75" max="95" value="85" step="1"
+                    class="flex-grow h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-indigo-600">
+                <span id="dedupe-sensitivity-label"
+                    class="text-xs font-bold text-indigo-600 min-w-[40px] text-center bg-white px-2 py-1 rounded-lg border border-indigo-100 shadow-sm">85%</span>
+            </div>
+
             <!-- Modal Content -->
             <div id="dedupe-workbench-content" class="flex-grow overflow-y-auto p-6 space-y-8 custom-scrollbar">
                 <!-- Groups will be injected here -->
@@ -61,12 +79,75 @@
                 </div>
             </div>
 
+            <!-- History Panel (Slide-up Drawer) -->
+            <div id="dedupe-history-panel"
+                class="hidden absolute bottom-[60px] left-0 right-0 z-20 bg-white border-t-2 border-indigo-200 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] rounded-t-2xl transition-all duration-300"
+                style="max-height: 60vh;">
+                <div
+                    class="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between rounded-t-2xl z-10">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-slate-500 text-lg">history</span>
+                        <span class="text-sm font-bold text-slate-700">Deletion History</span>
+                        <span id="history-count"
+                            class="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[10px] font-bold rounded">0</span>
+                    </div>
+                    <button id="close-history-btn"
+                        class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+                <div id="dedupe-history-list" class="p-4 space-y-2 overflow-y-auto"
+                    style="max-height: calc(60vh - 52px);">
+                    <p class="text-xs text-gray-400 italic">No deletions yet in this session.</p>
+                </div>
+            </div>
+
             <!-- Modal Footer -->
             <div class="p-4 bg-white border-t flex justify-between items-center">
-                <p class="text-xs text-gray-400 font-medium italic">Accuracy: 90%+ Similarity (Local Scan)</p>
+                <div class="flex items-center gap-3">
+                    <p id="dedupe-footer-text" class="text-xs text-gray-400 font-medium italic">Accuracy: 85%+
+                        Similarity
+                        (Local Scan)</p>
+                    <button id="toggle-history-btn"
+                        class="hidden px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 border border-slate-200">
+                        <span class="material-symbols-outlined text-sm">history</span>
+                        History <span id="history-badge"
+                            class="px-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] text-center">0</span>
+                    </button>
+                </div>
                 <button id="finish-dedupe-btn"
                     class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-8 rounded-xl transition-all shadow-lg active:scale-95">
                     Finish Review
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resolve Confirmation Modal -->
+    <div id="resolve-confirm-modal"
+        class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden items-center justify-center z-[300] p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform scale-95 opacity-0 transition-all duration-200"
+            id="resolve-confirm-inner">
+            <div class="p-6 bg-gradient-to-r from-red-50 to-orange-50 border-b">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-red-100 rounded-full">
+                        <span class="material-symbols-outlined text-red-600 text-2xl">warning</span>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-800 text-lg">Confirm Deletion</h4>
+                        <p class="text-sm text-gray-500">This action cannot be undone.</p>
+                    </div>
+                </div>
+            </div>
+            <div id="resolve-confirm-body" class="p-6 space-y-3 text-sm text-gray-700"></div>
+            <div class="flex gap-3 p-4 bg-gray-50 border-t">
+                <button id="resolve-confirm-cancel"
+                    class="flex-1 py-2.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 transition-colors">
+                    Cancel
+                </button>
+                <button id="resolve-confirm-proceed"
+                    class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg">
+                    Delete Now
                 </button>
             </div>
         </div>

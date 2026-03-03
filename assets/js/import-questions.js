@@ -5,6 +5,22 @@ function initializeImportQuestionsPage() {
     const TOPIC_API_URL = 'api/exam/topics.php';
     const IMPORT_API_URL = 'api/question/import.php';
 
+    // Post-import scan prompt
+    function showPostImportScanPrompt(eId, eTitle) {
+        eTitle = eTitle || 'Imported Exam';
+        const existing = document.getElementById('post-import-scan-prompt');
+        if (existing) existing.remove();
+        const el = document.createElement('div');
+        el.id = 'post-import-scan-prompt';
+        el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-white rounded-2xl shadow-2xl border border-indigo-200 p-5 max-w-lg w-[90vw]';
+        el.innerHTML = `<div class="flex items-start gap-4"><div class="p-3 bg-indigo-100 rounded-xl flex-shrink-0"><span class="material-symbols-outlined text-indigo-600 text-2xl">search_check</span></div><div class="flex-grow"><p class="font-bold text-gray-800 mb-1">Import Successful!</p><p class="text-sm text-gray-500 mb-3">Run a duplicate scan on <strong>${eTitle}</strong> to catch repeated questions?</p><div class="flex flex-wrap gap-2"><button class="scan-dedup-btn px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors shadow-lg flex items-center gap-2"><span class="material-symbols-outlined text-sm">search_check</span>Scan for Duplicates</button><button class="view-q-btn px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-xl transition-colors">View Questions</button><button class="dismiss-btn px-3 py-2 text-gray-400 hover:text-gray-600 text-xs font-bold rounded-xl transition-colors">Dismiss</button></div></div></div>`;
+        document.body.appendChild(el);
+        el.querySelector('.scan-dedup-btn').onclick = () => { el.remove(); if (window.loadPage) window.loadPage('questions-list', `?exam_id=${eId}&exam_title=${encodeURIComponent(eTitle)}&auto_scan=1`); };
+        el.querySelector('.view-q-btn').onclick = () => { el.remove(); if (window.loadPage) window.loadPage('questions-list', `?exam_id=${eId}&exam_title=${encodeURIComponent(eTitle)}`); };
+        el.querySelector('.dismiss-btn').onclick = () => el.remove();
+        setTimeout(() => { if (el.parentNode) el.remove(); }, 15000);
+    }
+
     // DOM Elements
     const tableBody = document.getElementById('exams-table-body');
     const toastContainer = document.getElementById('toast-container');
@@ -223,6 +239,11 @@ function initializeImportQuestionsPage() {
             if (result.success) {
                 closeModal(importModal);
                 showToast(result.message, 'success');
+
+                // Show scan prompt for the imported exam
+                setTimeout(() => {
+                    showPostImportScanPrompt(examId);
+                }, 500);
             } else {
                 showToast(result.message, 'error');
             }
