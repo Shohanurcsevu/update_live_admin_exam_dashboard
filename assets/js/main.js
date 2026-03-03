@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!notificationBtn || !notificationPanel || !notificationList) return;
 
-        let lastSeenId = 0;
+        let isNotificationInitialized = false;
         let isPanelOpen = false;
 
         const initializeLastSeenId = async () => {
@@ -62,8 +62,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (result.success && result.data.length > 0) {
                     lastSeenId = result.data[0].id;
                 }
+                isNotificationInitialized = true;
             } catch (error) {
                 console.error("Failed to initialize last seen notification ID:", error);
+                // Still mark as initialized to allow fallback behavior
+                isNotificationInitialized = true;
             }
         };
 
@@ -96,14 +99,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         const checkForNewNotifications = async () => {
-            if (isPanelOpen) return;
+            if (isPanelOpen || !isNotificationInitialized) return;
             try {
                 const response = await fetch(`api/recent-activity.php?check_since=${lastSeenId}`);
                 const result = await response.json();
-                if (result.success && result.new_count > 0) {
-                    if (notificationCount) {
-                        notificationCount.textContent = result.new_count;
-                        notificationCount.classList.remove('hidden');
+                if (result.success) {
+                    if (result.new_count > 0) {
+                        if (notificationCount) {
+                            notificationCount.textContent = result.new_count;
+                            notificationCount.classList.remove('hidden');
+                        }
+                    } else if (notificationCount) {
+                        notificationCount.classList.add('hidden');
+                        notificationCount.textContent = '0';
                     }
                 }
             } catch (error) { console.error("Failed to check for new notifications:", error); }
@@ -136,7 +144,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.refreshNotifications = checkForNewNotifications;
 
         initializeLastSeenId().then(() => {
+            // Once initialized, start polling for new ones
             setInterval(checkForNewNotifications, 30000); // 30 seconds
+            // Also run once immediately to catch anything that happened during load
+            checkForNewNotifications();
         });
     }
 
