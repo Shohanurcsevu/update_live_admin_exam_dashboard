@@ -398,6 +398,14 @@ function initializeQuestionsListPage() {
                             <span class="text-xs font-mono text-gray-400">ID: ${g.master.id}</span>
                         </div>
                         <p class="text-gray-800 font-medium leading-relaxed">${g.master.question}</p>
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            ${Object.entries(g.master.options).map(([key, value]) => `
+                                <div class="flex items-center gap-2 ${key === g.master.answer ? 'text-green-700 font-bold bg-green-100/50 rounded px-2 py-1' : 'text-gray-600 px-2 py-1'}">
+                                    <span class="w-4 h-4 flex items-center justify-center rounded-full bg-white border border-current text-[10px]">${key}</span>
+                                    <span>${value}</span>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
 
                     <!-- Duplicates -->
@@ -408,7 +416,15 @@ function initializeQuestionsListPage() {
                                     <span class="text-[10px] font-black tracking-widest text-orange-500 uppercase">Duplicate Match</span>
                                     <span class="text-xs font-mono text-gray-400">ID: ${d.id}</span>
                                 </div>
-                                <p class="text-gray-600 text-sm italic line-clamp-3">${d.question}</p>
+                                <p class="text-gray-600 text-sm italic mb-3">${d.question}</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                                    ${Object.entries(d.options).map(([key, value]) => `
+                                        <div class="flex items-center gap-2 ${key === d.answer ? 'text-green-700 font-bold bg-green-100/50 rounded px-2 py-1' : 'text-gray-500 px-2 py-1'}">
+                                            <span class="w-4 h-4 flex items-center justify-center rounded-full bg-white border border-current text-[9px]">${key}</span>
+                                            <span>${value}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
                             <div class="flex-shrink-0 flex sm:flex-col justify-end gap-2 border-l sm:pl-6 border-gray-100">
                                 <button class="btn-keep-master px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition-colors" data-id="${d.id}">IGNORE</button>
