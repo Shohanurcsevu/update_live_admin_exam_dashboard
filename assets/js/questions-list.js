@@ -138,12 +138,25 @@ function initializeQuestionsListPage() {
         }
     }
 
+    function invalidateExamCaches() {
+        if (typeof CacheManager !== 'undefined') {
+            CacheManager.clearGroup('exam');
+            CacheManager.clearGroup('dashboard');
+            console.log('[QuestionsList] Exam caches invalidated due to deletion.');
+        }
+    }
+
     async function handleDeleteConfirm() {
         if (!questionIdToDelete) return;
         try {
             const response = await fetch(`${API_URL}delete.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: questionIdToDelete }) });
             const result = await response.json();
-            showToast(result.message, result.success ? 'error' : 'error');
+            if (result.success) {
+                invalidateExamCaches();
+                showToast(result.message, 'error');
+            } else {
+                showToast(result.message, 'error');
+            }
         } catch (error) { showToast('Network error.', 'error'); }
         finally { closeModal(deleteModal); fetchAndDisplayQuestions(); }
     }
@@ -491,6 +504,7 @@ function initializeQuestionsListPage() {
                         });
                         const res = await response.json();
                         if (res.success) {
+                            invalidateExamCaches();
                             row.classList.add('hidden');
                             showToast('Duplicate removed ✓', 'success');
                         }
@@ -562,6 +576,7 @@ function initializeQuestionsListPage() {
             }
 
             if (successCount > 0) {
+                invalidateExamCaches();
                 if (!isBatch) showToast(`Merged: Removed ${successCount} duplicates ✓`, 'success');
                 btn.parentElement.innerHTML = `<span class="text-[10px] font-bold text-green-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">task_alt</span> RESOLVED</span>`;
                 const groupEl = document.getElementById(`group-${idx}`);
