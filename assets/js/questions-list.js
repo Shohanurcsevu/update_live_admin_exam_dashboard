@@ -341,27 +341,32 @@ function initializeQuestionsListPage() {
 
         const groups = [];
         const checked = new Set();
-        const similarityThreshold = 0.90; // 90% commonality
+        const similarityThreshold = 0.85; // 85% commonality (Refined for phrased variations)
 
         for (let i = 0; i < currentQuestions.length; i++) {
             if (checked.has(currentQuestions[i].id)) continue;
 
             const currentGroup = [currentQuestions[i]];
+            let groupScores = [];
+
             for (let j = i + 1; j < currentQuestions.length; j++) {
                 if (checked.has(currentQuestions[j].id)) continue;
 
-                const score = SimilarityEngine.calculateSimilarity(currentQuestions[i].question, currentQuestions[j].question);
-                if (score >= similarityThreshold) {
+                const result = SimilarityEngine.calculateFullSimilarity(currentQuestions[i], currentQuestions[j]);
+                if (result.score >= similarityThreshold) {
+                    currentQuestions[j].matchScore = result.score; // Attach for UI
                     currentGroup.push(currentQuestions[j]);
+                    groupScores.push(result.score);
                     checked.add(currentQuestions[j].id);
                 }
             }
 
             if (currentGroup.length > 1) {
+                const avgScore = groupScores.length > 0 ? (groupScores.reduce((a, b) => a + b, 0) / groupScores.length) : similarityThreshold;
                 groups.push({
                     master: currentGroup[0],
                     duplicates: currentGroup.slice(1),
-                    avgScore: similarityThreshold // Placeholder
+                    avgScore: avgScore
                 });
                 checked.add(currentQuestions[i].id);
             }
@@ -399,6 +404,7 @@ function initializeQuestionsListPage() {
                         <div class="flex items-center gap-2">
                             <span class="px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded">MATCH GROUP #${idx + 1}</span>
                             <span class="text-xs text-indigo-400 font-medium">Potential Duplicates (${g.duplicates.length + 1})</span>
+                            <span class="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded shadow-sm border border-green-200">AVG: ${Math.round(g.avgScore * 100)}% Match</span>
                         </div>
                         <button class="btn-bulk-resolve px-3 py-1 bg-white hover:bg-indigo-600 hover:text-white text-indigo-600 text-[10px] font-black rounded-lg transition-all border border-indigo-200 shadow-sm" 
                             data-group-idx="${idx}">
@@ -428,7 +434,10 @@ function initializeQuestionsListPage() {
                             <div class="p-6 flex flex-col sm:flex-row gap-6 relative dedupe-row" id="dedupe-row-${d.id}" data-id="${d.id}">
                                 <div class="flex-grow">
                                     <div class="flex justify-between items-start mb-2">
-                                        <span class="text-[10px] font-black tracking-widest text-orange-500 uppercase">Duplicate Match</span>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] font-black tracking-widest text-orange-500 uppercase">Duplicate Match</span>
+                                            <span class="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-bold rounded border border-orange-100">${Math.round(d.matchScore * 100)}% Similarity</span>
+                                        </div>
                                         <span class="text-xs font-mono text-gray-400">ID: ${d.id}</span>
                                     </div>
                                     <p class="text-gray-600 text-sm italic mb-3">${d.question}</p>
