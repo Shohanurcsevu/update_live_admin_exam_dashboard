@@ -6,6 +6,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Pre-Exit Backup Confirmation Logic ---
     window.needsBackup = localStorage.getItem('needsBackup') === 'true';
 
+    // Visibility indicator for unsaved changes (amber dot in header)
+    window.updateUnsavedIndicator = function () {
+        if (typeof SmartHeader !== 'undefined' && typeof SmartHeader.updateBackupStatus === 'function') {
+            SmartHeader.updateBackupStatus();
+            return;
+        }
+
+        // Fallback for basic functionality if SmartHeader isn't ready
+        const dot = document.getElementById('unsaved-indicator');
+        if (!dot) return;
+        if (window.needsBackup) {
+            dot.classList.remove('hidden');
+        } else {
+            dot.classList.add('hidden');
+        }
+    };
+
     // Global fetch hook to track data modifications
     const originalFetch = window.fetch;
     window.fetch = async function (...args) {
@@ -19,25 +36,164 @@ document.addEventListener('DOMContentLoaded', async () => {
             !url.includes('api/backup/') && !url.includes('api/pomodoro/status.php')) {
             console.log(`[BackupProtection] Data modification detected: ${url}. Flagging needsBackup.`);
             window.needsBackup = true;
+            window._lastDataChangeTime = Date.now();
             localStorage.setItem('needsBackup', 'true');
+            window.updateUnsavedIndicator();
 
             // Trigger immediate notification check if possible
             if (typeof window.refreshNotifications === 'function') {
-                setTimeout(() => window.refreshNotifications(), 500); // Small delay to let DB update
+                setTimeout(() => window.refreshNotifications(), 500);
             }
         }
         return response;
     };
 
-    // Browser-standard exit protection
-    window.addEventListener('beforeunload', (e) => {
-        if (window.needsBackup) {
-            // Standard browsers require returning a string or setting returnValue
-            const msg = "You have unsaved data. Do you want to back up before leaving?";
-            e.returnValue = msg;
-            return msg;
+    // --- Auto-Clear needsBackup on Idle + Successful Backup ---
+    // If 5+ minutes have passed since the last data change and a backup succeeds, clear the flag.
+    window._lastDataChangeTime = Date.now();
+
+    window.addEventListener('autoBackupComplete', (e) => {
+        const result = e.detail;
+        if (result.success && window.needsBackup) {
+            const idleMs = Date.now() - (window._lastDataChangeTime || 0);
+            if (idleMs >= 5 * 60 * 1000) { // 5 minutes idle
+                console.log('[BackupProtection] Idle 5+ min + backup success → auto-clearing needsBackup.');
+                window.needsBackup = false;
+                localStorage.setItem('needsBackup', 'false');
+                window.updateUnsavedIndicator();
+            }
         }
     });
+
+    // Clear stale needsBackup from a previous session after a short grace period
+    if (window.needsBackup) {
+        setTimeout(() => {
+            // If no new data changes happened since page load, it's stale
+            const timeSinceLoad = Date.now() - window._lastDataChangeTime;
+            if (timeSinceLoad >= 25000 && window.needsBackup) {
+                console.log('[BackupProtection] Stale needsBackup from previous session — clearing.');
+                window.needsBackup = false;
+                localStorage.setItem('needsBackup', 'false');
+                window.updateUnsavedIndicator();
+            }
+        }, 30000); // 30 seconds after page load
+    }
+
+    // --- Exit Intent Detection (Custom Modal) ---
+    // Shows a custom modal when the user moves their mouse toward the top of the
+    // browser (near the URL bar / close button), indicating they might leave.
+    let exitIntentShown = false;
+    let exitIntentCooldown = false;
+
+    document.addEventListener('mouseleave', async (e) => {
+        // Only trigger when mouse leaves from the TOP of the viewport
+        if (e.clientY > 0) return;
+
+        // Only show if there's unsaved data
+        if (!window.needsBackup) return;
+
+        // Don't show if already visible or in cooldown
+        if (exitIntentShown || exitIntentCooldown) return;
+
+        exitIntentShown = true;
+
+        const userChoice = await showExitIntentModal();
+
+        if (userChoice === 'backup') {
+            if (window.autoBackupManager) {
+                window.showToast('Starting backup...', 'info');
+                const res = await window.autoBackupManager.runBackupNow();
+                if (res.success) {
+                    window.needsBackup = false;
+                    localStorage.setItem('needsBackup', 'false');
+                    window.updateUnsavedIndicator();
+                    window.showToast('Backup complete! Safe to close.', 'success');
+                } else {
+                    window.showToast('Backup failed: ' + res.message, 'error');
+                }
+            }
+        }
+        // 'dismiss' — user acknowledged, don't pester again for 60 seconds
+        exitIntentShown = false;
+        exitIntentCooldown = true;
+        setTimeout(() => { exitIntentCooldown = false; }, 60000);
+    });
+
+    // --- Ctrl+S Quick Backup Shortcut ---
+    document.addEventListener('keydown', async (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault(); // Block browser's "Save Page As" dialog
+
+            if (!window.needsBackup) {
+                window.showToast('Nothing to backup — all synced ✓', 'success');
+                return;
+            }
+
+            if (window.autoBackupManager) {
+                window.showToast('Quick backup starting...', 'info');
+                const res = await window.autoBackupManager.runBackupNow();
+                if (res.success) {
+                    window.needsBackup = false;
+                    localStorage.setItem('needsBackup', 'false');
+                    window.updateUnsavedIndicator();
+                    window.showToast('Backup saved ✓', 'success');
+                } else {
+                    window.showToast('Backup failed: ' + res.message, 'error');
+                }
+            } else {
+                window.showToast('Auto-backup not configured. Go to Backup & Restore to set up.', 'warning');
+            }
+        }
+    });
+
+    function showExitIntentModal() {
+        return new Promise(resolve => {
+            let modal = document.getElementById('backup-protection-modal');
+            if (!modal) {
+                console.error("Backup protection modal not found in DOM.");
+                resolve('dismiss');
+                return;
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.children[0].classList.remove('scale-95');
+            }, 10);
+
+            const hide = (choice) => {
+                modal.classList.add('opacity-0');
+                modal.children[0].classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    resolve(choice);
+                }, 300);
+            };
+
+            const backupBtn = document.getElementById('backup-now-btn');
+            const reviewBtn = document.getElementById('review-changes-btn');
+            const exitBtn = document.getElementById('continue-anyway-btn');
+            const cancelBtn = document.getElementById('cancel-navigation-btn');
+
+            const onBackup = () => { cleanup(); hide('backup'); };
+            const onReview = () => { cleanup(); hide('dismiss'); window.loadPage('review-changes'); };
+            const onDismiss = () => { cleanup(); hide('dismiss'); };
+
+            const cleanup = () => {
+                if (backupBtn) backupBtn.removeEventListener('click', onBackup);
+                if (reviewBtn) reviewBtn.removeEventListener('click', onReview);
+                if (exitBtn) exitBtn.removeEventListener('click', onDismiss);
+                if (cancelBtn) cancelBtn.removeEventListener('click', onDismiss);
+            };
+
+            if (backupBtn) backupBtn.addEventListener('click', onBackup);
+            if (reviewBtn) reviewBtn.addEventListener('click', onReview);
+            if (exitBtn) exitBtn.addEventListener('click', onDismiss);
+            if (cancelBtn) cancelBtn.addEventListener('click', onDismiss);
+        });
+    }
 
     const mainContent = document.getElementById('main-content');
     const headerContainer = document.getElementById('header-container');
@@ -187,7 +343,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             'study-materials': 'assets/js/study-materials.js',
             'question-creator': 'assets/js/question-creator.js',
             'backup-restore': 'assets/js/backup-restore.js',
-            'speed-trivia': 'assets/js/speed-trivia.js'
+            'speed-trivia': 'assets/js/speed-trivia.js',
+            'review-changes': 'assets/js/review-changes.js'
         };
 
 
@@ -208,111 +365,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- SPA Navigation Prevention (Custom Modal) ---
-    const originalLoadPage = loadPage;
+    // --- SPA Navigation (Direct) ---
     window.loadPage = async (page, params = '') => {
-        if (window.needsBackup) {
-            const userChoice = await showBackupProtectionModal();
-            if (userChoice === 'cancel') return; // Stay on page
-            if (userChoice === 'backup') {
-                if (window.autoBackupManager) {
-                    window.showToast('Starting pre-exit backup...', 'info');
-                    const res = await window.autoBackupManager.runBackupNow();
-                    if (res.success) {
-                        window.needsBackup = false;
-                        localStorage.setItem('needsBackup', 'false');
-                    } else {
-                        const retry = confirm("Backup failed: " + res.message + "\n\nDo you want to retry or exit without backup?");
-                        if (retry) return window.loadPage(page, params);
-                    }
-                }
-            }
-            // else userChoice === 'exit-anyway' -> proceed
-            window.needsBackup = false; // reset flag temporarily for this navigation
-            localStorage.setItem('needsBackup', 'false');
-        }
-        return originalLoadPage(page, params);
-    };
+        const mainContent = document.getElementById('main-content');
+        if (!mainContent) return;
 
-    function showBackupProtectionModal() {
-        return new Promise(resolve => {
-            let modal = document.getElementById('backup-protection-modal');
-            if (!modal) {
-                const modalHTML = `
-                <div id="backup-protection-modal" class="fixed inset-0 bg-slate-900/80 hidden items-center justify-center z-[9000] p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
-                    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-auto overflow-hidden transform scale-95 transition-transform duration-300 border border-slate-100">
-                        <div class="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 text-center relative overflow-hidden">
-                            <div class="absolute top-0 right-0 -mr-12 -mt-12 w-32 h-32 rounded-full bg-white opacity-10"></div>
-                            <div class="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-white opacity-5"></div>
-                            
-                            <div class="relative z-10 w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md border border-white/30 rotate-3">
-                                <span class="material-symbols-outlined text-4xl text-white">cloud_upload</span>
-                            </div>
-                            
-                            <h3 class="text-2xl font-black text-white relative z-10 tracking-tight">Sync Pending</h3>
-                            <p class="text-indigo-100 text-sm font-medium mt-1 relative z-10">You have unsaved changes that haven't been backed up yet.</p>
-                        </div>
-                        
-                        <div class="p-6">
-                            <div class="space-y-3">
-                                <button id="bpm-backup-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-3">
-                                    <span class="material-symbols-outlined text-xl">backup</span>
-                                    Backup Now & Continue
-                                </button>
-                                
-                                <button id="bpm-exit-btn" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold py-3.5 px-6 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-slate-200">
-                                    <span class="material-symbols-outlined text-lg">logout</span>
-                                    Continue Without Backup
-                                </button>
-                                
-                                <button id="bpm-cancel-btn" class="w-full text-slate-400 font-bold py-3 hover:text-indigo-600 transition-colors text-sm">
-                                    Stay on Current Page
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-                document.body.insertAdjacentHTML('beforeend', modalHTML);
-                modal = document.getElementById('backup-protection-modal');
-            }
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modal.children[0].classList.remove('scale-95');
-            }, 10);
-
-            const hide = (choice) => {
-                modal.classList.add('opacity-0');
-                modal.children[0].classList.add('scale-95');
-                setTimeout(() => {
-                    modal.classList.add('hidden');
-                    modal.classList.remove('flex');
-                    resolve(choice);
-                }, 300);
-            };
-
-            const backupBtn = document.getElementById('bpm-backup-btn');
-            const exitBtn = document.getElementById('bpm-exit-btn');
-            const cancelBtn = document.getElementById('bpm-cancel-btn');
-
-            const onBackup = () => { cleanup(); hide('backup'); };
-            const onExit = () => { cleanup(); hide('exit-anyway'); };
-            const onCancel = () => { cleanup(); hide('cancel'); };
-
-            const cleanup = () => {
-                backupBtn.removeEventListener('click', onBackup);
-                exitBtn.removeEventListener('click', onExit);
-                cancelBtn.removeEventListener('click', onCancel);
-            };
-
-            backupBtn.addEventListener('click', onBackup);
-            exitBtn.addEventListener('click', onExit);
-            cancelBtn.addEventListener('click', onCancel);
-        });
-    }
-
-    loadPage = async (page, params = '') => {
         mainContent.innerHTML = '<div class="text-center p-10">Loading...</div>';
 
         const url = new URL(window.location);
@@ -336,7 +393,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await loadComponent(`pages/${page}.html`, mainContent);
 
             // Update Navigation Highlighting
-
             document.querySelectorAll('.nav-link').forEach(link => {
                 const navLinkPage = link.dataset.page;
                 const parentPages = { 'take-exam-interface': 'take-exam-list', 'performance-review': 'check-performance', 'questions-list': 'import-questions' };
@@ -349,7 +405,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    window.loadPage = loadPage;
+    // Assign to internal variable for compatibility
+    loadPage = window.loadPage;
+
+
+
 
     // --- Global Toast Notification System ---
     window.showToast = function (message, type = 'info') {
@@ -466,6 +526,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof SmartHeader !== 'undefined') {
         SmartHeader.init();
     }
+
+    // Update unsaved indicator after header is loaded
+    window.updateUnsavedIndicator();
+
+    // --- Cross-Device Backup Awareness ---
+    // Server compares last DB change vs last backup time — works across all devices
+    async function syncBackupStatus() {
+        try {
+            const resp = await fetch('api/backup/last-change.php');
+            const data = await resp.json();
+            if (data.success && data.needs_backup && !window.needsBackup) {
+                console.log(`[CrossDevice] Server says backup needed (last change: ${data.last_change}, last backup: ${data.last_backup || 'never'}).`);
+                window.needsBackup = true;
+                localStorage.setItem('needsBackup', 'true');
+                window.updateUnsavedIndicator();
+            } else if (data.success && !data.needs_backup && window.needsBackup) {
+                console.log('[CrossDevice] Server says backup is up-to-date. Clearing local flag.');
+                window.needsBackup = false;
+                localStorage.setItem('needsBackup', 'false');
+                window.updateUnsavedIndicator();
+            }
+        } catch (err) {
+            // Silent fail — network hiccup shouldn't break the app
+        }
+    }
+
+    // Initial check + poll every 10 seconds
+    syncBackupStatus();
+    setInterval(syncBackupStatus, 10000);
 
     // Start notification polling
     initializeNotifications();

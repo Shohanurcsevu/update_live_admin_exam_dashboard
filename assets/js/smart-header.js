@@ -144,14 +144,28 @@ const SmartHeader = {
 
     updateBackupStatus() {
         const pulse = document.getElementById('backup-pulse');
+        const unsavedDot = document.getElementById('unsaved-indicator');
         const statusText = document.getElementById('backup-status-text');
         if (!pulse || !statusText) return;
 
         const manager = window.autoBackupManager;
+        const needsBackup = window.needsBackup;
         if (!manager) return;
 
         const settings = manager.getSettings();
         const isRunning = manager.isRunning();
+
+        // 🟡 AMBER DOT: Show/Hide based on unsaved data
+        if (unsavedDot) {
+            if (needsBackup) {
+                unsavedDot.classList.remove('hidden');
+                unsavedDot.title = 'You have unsaved changes';
+            } else {
+                unsavedDot.classList.add('hidden');
+            }
+        }
+
+        // --- Standard Backup Pulse Logic ---
 
         // 🟢 Blinking Green: A backup is currently in progress
         if (isRunning) {
@@ -161,30 +175,23 @@ const SmartHeader = {
             return;
         }
 
-        // 🟠 Amber: The last backup failed (hover for details)
+        // 🔴 Solid Red: The last backup failed
         if (settings.lastError) {
-            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-error';
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-warning';
             statusText.textContent = `Error: ${settings.lastError}`;
             pulse.title = `Last failure: ${new Date(settings.lastAttemptAt).toLocaleTimeString()}`;
             return;
         }
 
-        // 🔴 Solid Red: Backup is disabled or your folder needs permissions
-        if (!settings.enabled) {
-            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-warning';
-            statusText.textContent = 'Auto-Backup Disabled';
-            pulse.title = 'Enable in Settings for data safety';
+        // ⚫ Solid Slate: Backup is disabled or folder missing
+        if (!settings.enabled || (settings.enabled && !settings.folderName && manager.supportsFileSystemAccess())) {
+            pulse.className = 'w-2 h-2 rounded-full cursor-help relative bg-slate-400 shadow-none';
+            statusText.textContent = !settings.enabled ? 'Auto-Backup Disabled' : 'Folder Required';
+            pulse.title = !settings.enabled ? 'Enable in Settings' : 'Select a backup folder';
             return;
         }
 
-        if (settings.enabled && !settings.folderName && manager.supportsFileSystemAccess()) {
-            pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-warning';
-            statusText.textContent = 'Folder Required';
-            pulse.title = 'Select a backup folder';
-            return;
-        }
-
-        // 🔵 Rapid Blue Pulse: Your data is fully synced and healthy.
+        // 🔵 Healthy: Data is fully synced
         pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-healthy';
         const lastRun = settings.lastRunAt ? new Date(settings.lastRunAt) : null;
         if (lastRun) {

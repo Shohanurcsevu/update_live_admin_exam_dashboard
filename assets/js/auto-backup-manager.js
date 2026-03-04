@@ -360,9 +360,18 @@
             result.success = true;
             result.message = 'Backup saved successfully.';
 
-            // Reset pending changes flag
+            // Reset pending changes flag (local + server)
             window.needsBackup = false;
             localStorage.setItem('needsBackup', 'false');
+            localStorage.setItem('lastBackupTime', String(Math.floor(Date.now() / 1000)));
+
+            // Update UI immediately on this device
+            if (typeof window.updateUnsavedIndicator === 'function') {
+                window.updateUnsavedIndicator();
+            }
+
+            // Notify server so all devices see the backup is done
+            try { fetch('api/backup/last-change.php', { method: 'POST' }); } catch (_) { }
 
 
         } catch (err) {
@@ -494,7 +503,12 @@
         // Restart interval if enabled changed or interval changed
         if (_settings.enabled !== wasEnabled || _settings.intervalMs !== wasInterval) {
             if (_settings.enabled) startInterval();
-            else stopInterval();
+            else {
+                stopInterval();
+                // If disabling, clear the pending change flag to prevent stale confirm prompts
+                window.needsBackup = false;
+                localStorage.setItem('needsBackup', 'false');
+            }
             registerPeriodicSync(); // re-register with new interval or unregister
         }
     }

@@ -39,49 +39,97 @@ function initializeSubjectPage() {
 
     // --- Main Data Fetching ---
     async function fetchAndDisplaySubjects() {
+        const subjectsCardsContainer = document.getElementById('subjects-cards-container');
         try {
             const response = await fetch(`${SUBJECT_API_URL}?action=list`);
             const result = await response.json();
             subjectsTableBody.innerHTML = '';
+            if (subjectsCardsContainer) subjectsCardsContainer.innerHTML = '';
+
             if (result.success && result.data.length > 0) {
                 result.data.forEach(subject => {
-                    // --- NEW: Lesson progress calculation ---
                     const createdLessons = parseInt(subject.created_lessons) || 0;
                     const totalLessons = parseInt(subject.total_lessons) || 0;
                     const lessonsLeft = Math.max(0, totalLessons - createdLessons);
                     const progressPercent = totalLessons > 0 ? (createdLessons / totalLessons) * 100 : 0;
                     const progressBarColor = progressPercent >= 100 ? 'bg-green-600' : 'bg-blue-600';
 
+                    // Table Row for Desktop
                     const row = `
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
                             <td class="py-3 px-6 text-left font-semibold">${subject.id}</td>
-                            <td class="py-3 px-6 text-left">${subject.subject_name}</td>
+                            <td class="py-3 px-6 text-left font-bold text-gray-800">${subject.subject_name}</td>
                             <td class="py-3 px-6 text-left">${subject.book_name}</td>
                             <td class="py-3 px-6 text-center">
-                                <div class="w-full">
-                                    <div class="flex justify-between text-xs text-gray-600 mb-1">
-                                        <span>${createdLessons} / ${totalLessons}</span>
-                                        <span>${progressPercent.toFixed(0)}%</span>
+                                <div class="w-full min-w-[120px]">
+                                    <div class="flex justify-between text-[10px] text-gray-600 mb-1">
+                                        <span>${createdLessons}/${totalLessons} Lessons</span>
+                                        <span class="font-bold">${progressPercent.toFixed(0)}%</span>
                                     </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="${progressBarColor} h-2.5 rounded-full" style="width: ${progressPercent}%"></div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div class="${progressBarColor} h-1.5 rounded-full" style="width: ${progressPercent}%"></div>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">${lessonsLeft} lessons left</div>
                                 </div>
                             </td>
-                            <td class="py-3 px-6 text-center">${subject.total_pages}</td>
+                            <td class="py-3 px-6 text-center font-medium">${subject.total_pages}</td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex item-center justify-center">
-                                    <button class="analytics-btn w-8 h-8 rounded-full bg-blue-200 text-blue-700 hover:bg-blue-300 mr-2" data-id="${subject.id}"><span class="material-symbols-outlined text-lg">analytics</span></button>
-                                    <button class="edit-btn w-8 h-8 rounded-full bg-green-200 text-green-700 hover:bg-green-300 mr-2" data-id="${subject.id}"><span class="material-symbols-outlined text-lg">edit</span></button>
-                                    <button class="delete-btn w-8 h-8 rounded-full bg-red-200 text-red-700 hover:bg-red-300" data-id="${subject.id}"><span class="material-symbols-outlined text-lg">delete</span></button>
+                                <div class="flex item-center justify-center gap-2">
+                                    <button class="analytics-btn w-9 h-9 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition shadow-sm" data-id="${subject.id}" title="Analytics"><span class="material-symbols-outlined text-xl">analytics</span></button>
+                                    <button class="edit-btn w-9 h-9 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 flex items-center justify-center transition shadow-sm" data-id="${subject.id}" title="Edit"><span class="material-symbols-outlined text-xl">edit</span></button>
+                                    <button class="delete-btn w-9 h-9 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition shadow-sm" data-id="${subject.id}" title="Delete"><span class="material-symbols-outlined text-xl">delete</span></button>
                                 </div>
                             </td>
                         </tr>`;
                     subjectsTableBody.innerHTML += row;
+
+                    // Card for Mobile
+                    if (subjectsCardsContainer) {
+                        const card = `
+                            <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-800 leading-tight">${subject.subject_name}</h3>
+                                        <p class="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                            <span class="material-symbols-outlined text-xs">import_contacts</span> ${subject.book_name}
+                                        </p>
+                                    </div>
+                                    <div class="bg-white px-2 py-1 rounded-lg border text-[10px] font-bold text-gray-400">ID: ${subject.id}</div>
+                                </div>
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-xs font-bold text-gray-600 mb-2">
+                                        <span>Progress (${createdLessons}/${totalLessons})</span>
+                                        <span class="text-blue-600">${progressPercent.toFixed(1)}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                        <div class="${progressBarColor} h-2.5 rounded-full transition-all duration-700" style="width: ${progressPercent}%"></div>
+                                    </div>
+                                    <div class="flex justify-between mt-2 text-[10px] font-medium text-gray-400">
+                                        <span>${lessonsLeft} lessons left</span>
+                                        <span>Total ${subject.total_pages} pages</span>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2 border-t pt-3">
+                                    <button class="analytics-btn flex flex-col items-center justify-center p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition active:scale-95" data-id="${subject.id}">
+                                        <span class="material-symbols-outlined text-lg">analytics</span>
+                                        <span class="text-[9px] font-bold uppercase mt-1">Stats</span>
+                                    </button>
+                                    <button class="edit-btn flex flex-col items-center justify-center p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition active:scale-95" data-id="${subject.id}">
+                                        <span class="material-symbols-outlined text-lg">edit</span>
+                                        <span class="text-[9px] font-bold uppercase mt-1">Edit</span>
+                                    </button>
+                                    <button class="delete-btn flex flex-col items-center justify-center p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition active:scale-95" data-id="${subject.id}">
+                                        <span class="material-symbols-outlined text-lg">delete</span>
+                                        <span class="text-[9px] font-bold uppercase mt-1">Delete</span>
+                                    </button>
+                                </div>
+                            </div>`;
+                        subjectsCardsContainer.innerHTML += card;
+                    }
                 });
             } else {
-                subjectsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">No subjects found.</td></tr>`;
+                const emptyMsg = `<tr><td colspan="6" class="text-center py-4">No subjects found.</td></tr>`;
+                subjectsTableBody.innerHTML = emptyMsg;
+                if (subjectsCardsContainer) subjectsCardsContainer.innerHTML = '<div class="text-center py-10 text-gray-400">No subjects found.</div>';
             }
         } catch (error) { showToast('An error occurred while fetching subjects.', 'error'); }
     }
@@ -188,6 +236,9 @@ function initializeSubjectPage() {
         document.getElementById('calendar-grid').addEventListener('click', handleCalendarDayClick);
         document.getElementById('log-entry-form').addEventListener('submit', handleLogEntrySubmit);
         subjectsTableBody.addEventListener('click', handleTableActions);
+        if (document.getElementById('subjects-cards-container')) {
+            document.getElementById('subjects-cards-container').addEventListener('click', handleTableActions);
+        }
     }
 
     async function handleTableActions(e) {

@@ -179,6 +179,7 @@ $table_order = [
     'user_streaks',
     'job_countdown',
     'trivia_snapshots',
+    'app_settings',
 ];
 
 // ─── Schema Bootstrap (v1.1+): Create Tables If They Don't Exist ─────────────

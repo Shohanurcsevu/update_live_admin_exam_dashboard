@@ -25,6 +25,7 @@ $tables = [
     'user_streaks',
     'job_countdown',
     'trivia_snapshots',
+    'app_settings',
 ];
 
 $counts = [];

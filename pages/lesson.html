@@ -29,7 +29,8 @@
             class="mt-1 block w-full md:w-1/3 px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></select>
     </div>
 
-    <div class="overflow-x-auto">
+    <!-- MODIFIED: Added responsive wrapper for table - Hidden on mobile, cards shown instead -->
+    <div class="hidden md:block overflow-x-auto">
         <table class="min-w-full bg-white">
             <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
                 <tr>
@@ -44,6 +45,9 @@
             <tbody id="lessons-table-body" class="text-gray-600 text-sm font-light"></tbody>
         </table>
     </div>
+
+    <!-- Card View for Mobile -->
+    <div id="lessons-cards-container" class="md:hidden grid grid-cols-1 gap-4"></div>
     <div id="load-more-container" class="mt-6 flex justify-center hidden">
         <button id="load-more-btn"
             class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2">

@@ -11,22 +11,25 @@
             Create Subject
         </button>
     </div>
-    <!-- MODIFIED: Added responsive wrapper for table -->
-    <div class="overflow-x-auto">
+    <!-- MODIFIED: Added responsive wrapper for table - Hidden on mobile, cards shown instead -->
+    <div class="hidden md:block overflow-x-auto">
         <table class="min-w-full bg-white">
             <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
                 <tr>
                     <th class="py-3 px-6 text-left">ID</th>
-                    <th class="py-3 px-6 text-left">Subject Name</th>
+                    <th class="py-3 px-6 text-left">Subject</th>
                     <th class="py-3 px-6 text-left">Book Name</th>
-                    <th class="py-3 px-6 text-center">Lesson Progress</th>
-                    <th class="py-3 px-6 text-center">Total Pages</th>
+                    <th class="py-3 px-6 text-center">Progress</th>
+                    <th class="py-3 px-6 text-center">Pages</th>
                     <th class="py-3 px-6 text-center">Actions</th>
                 </tr>
             </thead>
             <tbody id="subjects-table-body" class="text-gray-600 text-sm font-light"></tbody>
         </table>
     </div>
+
+    <!-- Card View for Mobile -->
+    <div id="subjects-cards-container" class="md:hidden grid grid-cols-1 gap-4"></div>
 </div>
 
 <!-- Add/Edit Subject Modal -->
@@ -136,7 +139,7 @@
                         <button id="next-month-btn" class="p-1 rounded-full hover:bg-gray-100"><span
                                 class="material-symbols-outlined">chevron_right</span></button>
                     </div>
-                    <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center text-sm"></div>
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-xs"></div>
                 </div>
                 <div class="bg-white p-4 rounded-lg border">
                     <h4 class="font-semibold mb-2">Log Pages Read</h4>

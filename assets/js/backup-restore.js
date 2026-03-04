@@ -70,6 +70,7 @@
         { name: 'user_streaks', icon: 'local_fire_department', label: 'Streaks' },
         { name: 'job_countdown', icon: 'timer', label: 'Job Countdown' },
         { name: 'trivia_snapshots', icon: 'emoji_events', label: 'Trivia Scores' },
+        { name: 'app_settings', icon: 'settings', label: 'App Settings' },
     ];
 
     // ─── Init ─────────────────────────────────────────────────────────────────────

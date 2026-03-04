@@ -1,0 +1,48 @@
+<div class="p-4 sm:p-8 max-w-4xl mx-auto">
+    <!-- Header Section -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800 tracking-tight">Review Changes</h1>
+            <p class="text-slate-500 mt-1 font-medium">Data modified since your last backup</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="window.loadPage('backup')"
+                class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold transition-all flex items-center gap-2 text-sm">
+                <span class="material-symbols-outlined text-xl">history</span>
+                History
+            </button>
+            <button onclick="triggerQuickBackup()"
+                class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 text-sm active:scale-95">
+                <span class="material-symbols-outlined text-xl">backup</span>
+                Backup Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Status Card -->
+    <div id="diff-status-card"
+        class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-8 flex items-center gap-5 transition-all">
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-3xl text-amber-500">pending_actions</span>
+        </div>
+        <div>
+            <div id="diff-count-text" class="text-lg font-bold text-slate-800 italic">Checking for changes...</div>
+            <div id="last-backup-text" class="text-sm text-slate-400 font-medium">Last sync: --</div>
+        </div>
+    </div>
+
+    <!-- Changes Timeline -->
+    <div class="space-y-4 relative">
+        <!-- Connecting Line -->
+        <div id="timeline-line" class="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-100 z-0"></div>
+
+        <div id="changes-list" class="space-y-6 relative z-10">
+            <!-- Items injected by JS -->
+            <div class="flex justify-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Logic moved to assets/js/review-changes.js -->
