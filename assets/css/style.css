@@ -230,6 +230,38 @@ body {
     }
 }
 
+/* Premium Unsaved Glow (LED style) */
+.unsaved-glow {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background-color: #fbbf24;
+    /* Amber-400 */
+    box-shadow:
+        0 0 5px rgba(245, 158, 11, 0.4),
+        0 0 10px rgba(245, 158, 11, 0.2);
+    animation: breathing-glow 2.5s ease-in-out infinite;
+    position: relative;
+}
+
+@keyframes breathing-glow {
+
+    0%,
+    100% {
+        box-shadow:
+            0 0 5px rgba(245, 158, 11, 0.4),
+            0 0 10px rgba(245, 158, 11, 0.1);
+        opacity: 0.6;
+    }
+
+    50% {
+        box-shadow:
+            0 0 12px rgba(245, 158, 11, 0.8),
+            0 0 20px rgba(245, 158, 11, 0.4);
+        opacity: 1;
+    }
+}
+
 .animate-neural-glow {
     animation: neural-glow 1.5s ease-in-out infinite;
     display: inline-block;
