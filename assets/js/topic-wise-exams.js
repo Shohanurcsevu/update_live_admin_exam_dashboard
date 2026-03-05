@@ -11,6 +11,20 @@
         // Using global CacheManager instead of local state.cache
     };
 
+    // === SUBJECT COLOR CONFIG ===
+    const SUBJECT_COLORS = {
+        emerald: { bg: 'rgba(16,185,129,0.10)', border: '#10b981', text: '#065f46', shadow: 'rgba(16,185,129,0.2)', badge: '#d1fae5' },
+        indigo: { bg: 'rgba(99,102,241,0.10)', border: '#6366f1', text: '#3730a3', shadow: 'rgba(99,102,241,0.2)', badge: '#e0e7ff' },
+        amber: { bg: 'rgba(245,158,11,0.10)', border: '#f59e0b', text: '#78350f', shadow: 'rgba(245,158,11,0.2)', badge: '#fef3c7' },
+        cyan: { bg: 'rgba(6,182,212,0.10)', border: '#06b6d4', text: '#155e75', shadow: 'rgba(6,182,212,0.2)', badge: '#cffafe' },
+        violet: { bg: 'rgba(139,92,246,0.10)', border: '#8b5cf6', text: '#5b21b6', shadow: 'rgba(139,92,246,0.2)', badge: '#ede9fe' },
+        rose: { bg: 'rgba(244,63,94,0.10)', border: '#f43f5e', text: '#881337', shadow: 'rgba(244,63,94,0.2)', badge: '#ffe4e6' },
+        teal: { bg: 'rgba(20,184,166,0.10)', border: '#14b8a6', text: '#115e59', shadow: 'rgba(20,184,166,0.2)', badge: '#ccfbf1' },
+        orange: { bg: 'rgba(249,115,22,0.10)', border: '#f97316', text: '#7c2d12', shadow: 'rgba(249,115,22,0.2)', badge: '#ffedd5' },
+        sky: { bg: 'rgba(14,165,233,0.10)', border: '#0ea5e9', text: '#0c4a6e', shadow: 'rgba(14,165,233,0.2)', badge: '#e0f2fe' },
+        fuchsia: { bg: 'rgba(217,70,239,0.10)', border: '#d946ef', text: '#701a75', shadow: 'rgba(217,70,239,0.2)', badge: '#fae8ff' },
+    };
+
     // DOM Elements
     const elements = {
         hierarchyLoading: document.getElementById('hierarchy-loading'),
@@ -113,19 +127,25 @@
         const div = document.createElement('div');
         div.className = 'border rounded-lg p-3 bg-gray-50';
 
+        const colorClass = subject.color_class || 'violet';
+        const colors = SUBJECT_COLORS[colorClass] || SUBJECT_COLORS.violet;
+
         const header = document.createElement('div');
-        header.className = 'hierarchy-header';
+        header.className = 'hierarchy-header transition-all duration-300 rounded-lg p-2';
+        header.style.color = colors.text;
         header.innerHTML = `
-            <span class="material-symbols-outlined expand-icon text-gray-600 mr-2">chevron_right</span>
-            <span class="font-bold text-gray-800">${subject.subject_name}</span>
-            <span class="ml-2 text-sm text-gray-500">(${subject.lessons.length} lessons)</span>
+            <span class="material-symbols-outlined expand-icon mr-2" style="color: ${colors.border}">chevron_right</span>
+            <span class="font-black uppercase tracking-tight">${subject.subject_name}</span>
+            <span class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style="background-color: ${colors.border}; color: white">
+                ${subject.lessons.length} LESSONS
+            </span>
         `;
 
         const lessonsContainer = document.createElement('div');
         lessonsContainer.className = 'hierarchy-item hidden mt-2 space-y-2';
 
         subject.lessons.forEach(lesson => {
-            const lessonDiv = createLessonElement(lesson, subject.subject_id);
+            const lessonDiv = createLessonElement(lesson, subject.subject_id, colorClass);
             lessonsContainer.appendChild(lessonDiv);
         });
 
@@ -142,16 +162,33 @@
     }
 
     // Create lesson element
-    function createLessonElement(lesson, subjectId) {
+    function createLessonElement(lesson, subjectId, colorClass) {
         const div = document.createElement('div');
-        div.className = 'border rounded-lg p-2 bg-white';
+        const isComplete = parseInt(lesson.is_complete) || 0;
+        const colors = SUBJECT_COLORS[colorClass] || SUBJECT_COLORS.violet;
+
+        div.className = 'border rounded-xl p-2.5 transition-all duration-300';
+        if (isComplete) {
+            div.style.backgroundColor = colors.bg;
+            div.style.borderLeft = `4px solid ${colors.border}`;
+        } else {
+            div.className += ' bg-white';
+        }
 
         const header = document.createElement('div');
-        header.className = 'hierarchy-header';
+        header.className = 'hierarchy-header flex items-center group cursor-pointer';
+
+        const completionBadge = isComplete
+            ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-0.5" style="background-color: ${colors.border}; color: white">
+                <span class="material-symbols-outlined text-[10px]">check_circle</span> Complete
+               </span>`
+            : '';
+
         header.innerHTML = `
-            <span class="material-symbols-outlined expand-icon text-gray-600 mr-2">chevron_right</span>
-            <span class="font-semibold text-gray-700">${lesson.lesson_name}</span>
-            <span class="ml-2 text-sm text-gray-500 lessons-count">... topics</span>
+            <span class="material-symbols-outlined expand-icon text-gray-400 mr-2 transition-transform group-hover:scale-110">chevron_right</span>
+            <span class="font-extrabold text-sm ${isComplete ? '' : 'text-gray-700'}" style="color: ${isComplete ? colors.text : ''}">${lesson.lesson_name}</span>
+            ${completionBadge}
+            <span class="ml-auto text-[10px] font-bold text-gray-400 lessons-count">... topics</span>
         `;
 
         const topicsContainer = document.createElement('div');
@@ -175,7 +212,7 @@
                 }
 
                 lesson.topics.forEach(topic => {
-                    const topicDiv = createTopicElement(topic, subjectId, lesson.lesson_id);
+                    const topicDiv = createTopicElement(topic, subjectId, lesson.lesson_id, colorClass);
                     topicsContainer.appendChild(topicDiv);
                 });
             } catch (error) {
@@ -199,9 +236,18 @@
     }
 
     // Create topic element (selectable)
-    function createTopicElement(topic, subjectId, lessonId) {
+    function createTopicElement(topic, subjectId, lessonId, colorClass) {
         const div = document.createElement('div');
-        div.className = 'flex items-center gap-3 p-2 bg-gray-50 rounded';
+        const isComplete = parseInt(topic.lesson_is_complete) || 0;
+        const colors = SUBJECT_COLORS[colorClass] || SUBJECT_COLORS.violet;
+
+        div.className = 'flex items-center gap-3 p-3 rounded-lg transition-all duration-300 mb-1';
+        if (isComplete) {
+            div.style.backgroundColor = colors.bg;
+            div.style.borderLeft = `3px solid ${colors.border}`;
+        } else {
+            div.className += ' bg-gray-50';
+        }
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -213,8 +259,17 @@
         checkbox.dataset.maxQuestions = topic.total_questions;
 
         const label = document.createElement('label');
-        label.className = 'flex-1 text-sm text-gray-700 cursor-pointer';
-        label.innerHTML = `${topic.topic_name} <span class="text-gray-500">(${topic.total_questions} questions available)</span>`;
+        label.className = 'flex-1 text-sm cursor-pointer font-bold';
+        label.style.color = isComplete ? colors.text : '#4b5563';
+        label.innerHTML = `
+            <div class="flex items-center gap-2">
+                ${topic.topic_name}
+                ${isComplete ? `<span class="material-symbols-outlined text-xs" style="color: ${colors.border}">check_circle</span>` : ''}
+            </div>
+            <div class="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-0.5">
+                ${topic.total_questions} Questions Available
+            </div>
+        `;
 
         const inputContainer = document.createElement('div');
         inputContainer.className = 'flex items-center gap-2';

@@ -4,7 +4,7 @@ require_once '../subject/db_connect.php';
 // --- MODIFIED: Replaced the single complex query with a more robust, multi-step approach ---
 
 // 1. Get all subjects first
-$subjects_result = $conn->query("SELECT id as subject_id, subject_name FROM subjects WHERE is_deleted = 0 ORDER BY subject_name ASC");
+$subjects_result = $conn->query("SELECT id as subject_id, subject_name, color_class FROM subjects WHERE is_deleted = 0 ORDER BY subject_name ASC");
 $response_data = [];
 
 if ($subjects_result) {
@@ -15,6 +15,7 @@ if ($subjects_result) {
         $current_subject = [
             'subject_id' => $subject_id,
             'subject_name' => $subject_row['subject_name'],
+            'color_class' => $subject_row['color_class'] ?? 'violet',
             'lessons' => []
         ];
 
@@ -24,6 +25,7 @@ if ($subjects_result) {
                 l.id as lesson_id, 
                 l.lesson_name, 
                 l.py_bcs_ques, 
+                l.is_complete,
                 COUNT(q.id) as total_questions
             FROM lessons l
             LEFT JOIN questions q ON l.id = q.lesson_id AND q.is_deleted = 0

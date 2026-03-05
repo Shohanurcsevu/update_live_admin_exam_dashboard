@@ -23,7 +23,9 @@ $sqle = "SELECT
     e.exam_title, 
     e.duration, 
     s.subject_name, 
+    s.color_class,
     l.lesson_name, 
+    l.is_complete as lesson_is_complete,
     t.topic_name,
     (
         SELECT COUNT(*) 

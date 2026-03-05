@@ -8,6 +8,20 @@
     const API_EXAMS = 'api/exam/exam.php?action=list';
     const API_CREATE_EXAM = 'api/custom-exam/create.php';
 
+    // === SUBJECT COLOR CONFIG ===
+    const SUBJECT_COLORS = {
+        emerald: { bg: 'rgba(16,185,129,0.10)', border: '#10b981', text: '#065f46', badge: '#d1fae5', badgeText: '#065f46' },
+        indigo: { bg: 'rgba(99,102,241,0.10)', border: '#6366f1', text: '#3730a3', badge: '#e0e7ff', badgeText: '#3730a3' },
+        amber: { bg: 'rgba(245,158,11,0.10)', border: '#f59e0b', text: '#78350f', badge: '#fef3c7', badgeText: '#78350f' },
+        cyan: { bg: 'rgba(6,182,212,0.10)', border: '#06b6d4', text: '#155e75', badge: '#cffafe', badgeText: '#155e75' },
+        violet: { bg: 'rgba(139,92,246,0.10)', border: '#8b5cf6', text: '#5b21b6', badge: '#ede9fe', badgeText: '#5b21b6' },
+        rose: { bg: 'rgba(244,63,94,0.10)', border: '#f43f5e', text: '#881337', badge: '#ffe4e6', badgeText: '#881337' },
+        teal: { bg: 'rgba(20,184,166,0.10)', border: '#14b8a6', text: '#115e59', badge: '#ccfbf1', badgeText: '#115e59' },
+        orange: { bg: 'rgba(249,115,22,0.10)', border: '#f97316', text: '#7c2d12', badge: '#ffedd5', badgeText: '#7c2d12' },
+        sky: { bg: 'rgba(14,165,233,0.10)', border: '#0ea5e9', text: '#0c4a6e', badge: '#e0f2fe', badgeText: '#0c4a6e' },
+        fuchsia: { bg: 'rgba(217,70,239,0.10)', border: '#d946ef', text: '#701a75', badge: '#fae8ff', badgeText: '#701a75' },
+    };
+
     // DOM Elements
     const hierarchyLoading = document.getElementById('hierarchy-loading');
     const hierarchyTree = document.getElementById('hierarchy-tree');
@@ -108,7 +122,8 @@
                 subject.subject_name,
                 'subject',
                 `subject-${subject.id}`,
-                () => renderLessons(subject, subjectDiv)
+                () => renderLessons(subject, subjectDiv),
+                subject.color_class
             );
             hierarchyTree.appendChild(subjectDiv);
         });
@@ -135,7 +150,9 @@
                     lesson.lesson_name,
                     'lesson',
                     `lesson-${lesson.id}`,
-                    () => renderTopics(lesson, lessonDiv)
+                    () => renderTopics(lesson, lessonDiv),
+                    subject.color_class,
+                    lesson.is_complete
                 );
                 container.appendChild(lessonDiv);
             });
@@ -165,7 +182,9 @@
                     topic.topic_name,
                     'topic',
                     `topic-${topic.id}`,
-                    () => renderExams(topic, topicDiv)
+                    () => renderExams(topic, topicDiv),
+                    topic.color_class,
+                    topic.is_complete
                 );
                 container.appendChild(topicDiv);
             });
@@ -195,14 +214,33 @@
         }
     }
 
-    function createHierarchyItem(name, type, id, onExpand) {
+    function createHierarchyItem(name, type, id, onExpand, colorClass = null, isComplete = 0) {
         const div = document.createElement('div');
         div.className = 'hierarchy-item';
+
+        let headerColorStyle = '';
+        let badgeHtml = '';
+
+        if (colorClass && SUBJECT_COLORS[colorClass]) {
+            const colors = SUBJECT_COLORS[colorClass];
+            if (isComplete == 1 || type === 'subject') {
+                headerColorStyle = `style="color: ${colors.text}; font-weight: 800;"`;
+            }
+        }
+
+        if (isComplete == 1 && (type === 'lesson' || type === 'topic')) {
+            const colors = SUBJECT_COLORS[colorClass] || SUBJECT_COLORS.violet;
+            badgeHtml = `<span class="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-0.5" style="background-color: ${colors.badge}; color: ${colors.border}">
+                <span class="material-symbols-outlined text-[10px]">check_circle</span> Complete
+            </span>`;
+        }
+
         div.innerHTML = `
-            <div class="hierarchy-header" data-id="${id}">
+            <div class="hierarchy-header" data-id="${id}" ${headerColorStyle}>
                 <span class="material-symbols-outlined expand-icon text-gray-600 mr-2">chevron_right</span>
                 <span class="material-symbols-outlined mr-2 text-blue-600">${getIcon(type)}</span>
-                <span class="font-semibold text-gray-800">${name}</span>
+                <span class="flex-1">${name}</span>
+                ${badgeHtml}
             </div>
             <div class="children-container ml-6 hidden"></div>
         `;
@@ -224,8 +262,24 @@
 
     function createExamItem(exam) {
         const isChecked = !!selectedExams[exam.id];
+        const isComplete = parseInt(exam.is_complete) || 0;
+        const colorClass = exam.color_class || 'violet';
+        const colors = SUBJECT_COLORS[colorClass] || SUBJECT_COLORS.violet;
+
         const div = document.createElement('div');
-        div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2';
+        div.className = 'flex items-center justify-between p-3 rounded-lg mb-2 transition-all duration-300';
+
+        if (isComplete == 1) {
+            div.style.backgroundColor = colors.bg;
+            div.style.borderLeft = `4px solid ${colors.border}`;
+        } else {
+            div.className += ' bg-gray-50';
+        }
+
+        const completeBadge = isComplete == 1
+            ? `<span class="ml-2 px-1 py-0.5 rounded text-[10px] font-bold" style="background-color:${colors.badge};color:${colors.border}">✓ COMPLETE</span>`
+            : '';
+
         div.innerHTML = `
             <div class="flex items-center gap-3 flex-1">
                 <input type="checkbox" 
@@ -233,7 +287,10 @@
                        data-exam-id="${exam.id}"
                        ${isChecked ? 'checked' : ''}>
                 <div class="flex-1 cursor-pointer" onclick="this.previousElementSibling.click()">
-                    <div class="font-semibold text-gray-800">${exam.exam_title}</div>
+                    <div class="flex items-center">
+                        <span class="font-semibold" style="color: ${isComplete == 1 ? colors.text : '#1f2937'}">${exam.exam_title}</span>
+                        ${completeBadge}
+                    </div>
                     <div class="text-sm text-gray-600">Available Questions: ${exam.total_questions}</div>
                 </div>
             </div>

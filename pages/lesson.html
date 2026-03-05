@@ -39,6 +39,7 @@
                     <th class="py-3 px-6 text-center">Topic Progress</th>
                     <th class="py-3 px-6 text-center">Page Range</th>
                     <th class="py-3 px-6 text-center">BCS Ques.</th>
+                    <th class="py-3 px-4 text-center">Status</th>
                     <th class="py-3 px-6 text-center">Actions</th>
                 </tr>
             </thead>
@@ -101,6 +102,43 @@
                     class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save Lesson</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Completion Confirmation Modal -->
+<div id="complete-confirm-modal"
+    class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-[200] p-4">
+    <div
+        class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-8 overflow-hidden transform transition-all scale-100">
+        <div class="flex flex-col items-center text-center">
+            <div id="modal-status-icon" class="bg-amber-100 p-4 rounded-3xl mb-4">
+                <span class="material-symbols-outlined text-5xl text-amber-600">reviews</span>
+            </div>
+            <h3 class="text-2xl font-black text-gray-900 leading-tight">Review Progress</h3>
+            <p class="text-gray-500 mt-2 text-sm">Please verify the lesson status before marking as complete.</p>
+        </div>
+
+        <div id="modal-stats-container" class="mt-6 space-y-3 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+            <div class="flex justify-between items-center px-1">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Topic Stats</span>
+                <span id="modal-topic-count" class="text-sm font-black text-gray-700">0/0</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div id="modal-topic-progress" class="bg-blue-500 h-1.5 rounded-full transition-all duration-700"
+                    style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between items-center px-1 pt-1">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Exams Ready</span>
+                <span id="modal-exam-count" class="text-sm font-black text-amber-600">0 Topics</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mt-8">
+            <button type="button" id="cancel-confirm-btn"
+                class="py-3.5 px-6 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition-all active:scale-95 text-sm">Cancel</button>
+            <button type="button" id="confirm-complete-btn"
+                class="py-3.5 px-6 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 text-sm">Confirm</button>
+        </div>
     </div>
 </div>
 

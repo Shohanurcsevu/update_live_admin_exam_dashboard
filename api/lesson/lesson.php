@@ -61,7 +61,7 @@ function list_lessons($conn) {
     $count_stmt->close();
 
     // --- Get Lessons ---
-    $sql = "SELECT l.*, s.subject_name, COUNT(t.id) as created_topics 
+    $sql = "SELECT l.*, s.subject_name, s.color_class, COUNT(t.id) as created_topics 
             FROM lessons l 
             JOIN subjects s ON l.subject_id = s.id
             LEFT JOIN topics t ON l.id = t.lesson_id AND t.is_deleted = 0";

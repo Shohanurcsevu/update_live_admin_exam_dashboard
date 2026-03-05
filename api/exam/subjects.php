@@ -8,7 +8,7 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 require_once '../subject/db_connect.php';
 
 // MODIFIED: Changed ORDER BY clause to sort by subject_name
-$sql = "SELECT id, subject_name FROM subjects WHERE is_deleted = 0 ORDER BY id ASC";
+$sql = "SELECT id, subject_name, color_class FROM subjects WHERE is_deleted = 0 ORDER BY id ASC";
 $result = $conn->query($sql);
 
 $subjects = [];

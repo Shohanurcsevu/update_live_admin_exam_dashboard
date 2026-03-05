@@ -35,6 +35,24 @@ function initializeTopicPage() {
     let topicQueue = [];
     let subjectsList = [];
 
+    // Subject color config for completion styling (matches lesson.js)
+    const SUBJECT_COLORS = window.SUBJECT_COLORS || {
+        emerald: { bg: 'rgba(16,185,129,0.10)', border: '#10b981', text: '#065f46', badge: '#d1fae5', badgeText: '#065f46' },
+        indigo: { bg: 'rgba(99,102,241,0.10)', border: '#6366f1', text: '#3730a3', badge: '#e0e7ff', badgeText: '#3730a3' },
+        amber: { bg: 'rgba(245,158,11,0.10)', border: '#f59e0b', text: '#78350f', badge: '#fef3c7', badgeText: '#78350f' },
+        cyan: { bg: 'rgba(6,182,212,0.10)', border: '#06b6d4', text: '#155e75', badge: '#cffafe', badgeText: '#155e75' },
+        violet: { bg: 'rgba(139,92,246,0.10)', border: '#8b5cf6', text: '#5b21b6', badge: '#ede9fe', badgeText: '#5b21b6' },
+        rose: { bg: 'rgba(244,63,94,0.10)', border: '#f43f5e', text: '#881337', badge: '#ffe4e6', badgeText: '#881337' },
+        teal: { bg: 'rgba(20,184,166,0.10)', border: '#14b8a6', text: '#115e59', badge: '#ccfbf1', badgeText: '#115e59' },
+        orange: { bg: 'rgba(249,115,22,0.10)', border: '#f97316', text: '#7c2d12', badge: '#ffedd5', badgeText: '#7c2d12' },
+        sky: { bg: 'rgba(14,165,233,0.10)', border: '#0ea5e9', text: '#0c4a6e', badge: '#e0f2fe', badgeText: '#0c4a6e' },
+        fuchsia: { bg: 'rgba(217,70,239,0.10)', border: '#d946ef', text: '#701a75', badge: '#fae8ff', badgeText: '#701a75' },
+    };
+
+    function getCompletionStyle(colorClass) {
+        return SUBJECT_COLORS[colorClass] || SUBJECT_COLORS.violet;
+    }
+
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
         let bgColor, icon;
@@ -141,9 +159,15 @@ function initializeTopicPage() {
                     const progressPercent = expectedExams > 0 ? (createdExams / expectedExams) * 100 : 0;
                     const progressBarColor = progressPercent >= 100 ? 'bg-green-600' : 'bg-blue-600';
 
+                    // Completion styling from parent lesson
+                    const isLessonComplete = parseInt(topic.is_complete) || 0;
+                    const colorClass = topic.color_class || 'violet';
+                    const completionStyle = isLessonComplete ? `style="background-color:${getCompletionStyle(colorClass).bg};border-left:4px solid ${getCompletionStyle(colorClass).border}"` : '';
+                    const completeBadge = isLessonComplete ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold" style="background-color:${getCompletionStyle(colorClass).badge};color:${getCompletionStyle(colorClass).badgeText}">✓</span>` : '';
+
                     const row = `
-                        <tr class="border-b border-gray-200 hover:bg-gray-100 transition-colors text-xs sm:text-sm">
-                            <td class="py-3 px-4 sm:px-6 text-left font-medium text-gray-900">${topic.topic_name}</td>
+                        <tr class="border-b border-gray-200 hover:bg-gray-100 transition-colors text-xs sm:text-sm" ${completionStyle}>
+                            <td class="py-3 px-4 sm:px-6 text-left font-medium text-gray-900">${topic.topic_name} ${completeBadge}</td>
                             <td class="py-3 px-4 sm:px-6 text-left hidden sm:table-cell">${topic.lesson_name}</td>
                             <td class="py-3 px-4 sm:px-6 text-left hidden sm:table-cell">${topic.subject_name}</td>
                             <td class="py-3 px-4 text-center whitespace-nowrap">${topic.start_page} - ${topic.end_page}</td>

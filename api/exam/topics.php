@@ -12,7 +12,14 @@ if ($lesson_id === 0) {
     exit;
 }
 
-$stmt = $conn->prepare("SELECT id, topic_name FROM topics WHERE lesson_id = ? AND is_deleted = 0 ORDER BY id ASC");
+$stmt = $conn->prepare("
+    SELECT t.id, t.topic_name, l.is_complete, s.color_class 
+    FROM topics t 
+    JOIN lessons l ON t.lesson_id = l.id 
+    JOIN subjects s ON t.subject_id = s.id 
+    WHERE t.lesson_id = ? AND t.is_deleted = 0 
+    ORDER BY t.id ASC
+");
 $stmt->bind_param("i", $lesson_id);
 $stmt->execute();
 $result = $stmt->get_result();

@@ -21,6 +21,8 @@ const StudyTargetTracker = {
     initialized: false,
     lastStudyChangeTime: null,
     rhythmGhostPoints: [],
+    recoveryStartTime: null,
+    wasFlatline: false,
 
     async init() {
         // --- Per-page setup: always re-run to attach to fresh DOM elements ---
@@ -39,7 +41,7 @@ const StudyTargetTracker = {
         this.initialized = true;
 
         await this.fetchAllSubjects(); // Fetch all subjects first
-        this.fetchData(); // Then fetch daily data
+        this.fetchData(true); // Then fetch daily data (force refresh to ensure new fields)
         this.fetchYesterdayProgress(); // Fetch ghost runner data
         this.fetchAIInsights(); // Fetch AI recommendations
         this.fetchSubjectEfficiency(); // Fetch efficiency patterns
@@ -89,19 +91,35 @@ const StudyTargetTracker = {
         }
     },
 
-    async fetchData() {
+    async fetchData(forceRefresh = false) {
         try {
-            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 1);
+            const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 1, forceRefresh);
             if (result) {
                 const newSeconds = result.total_today_seconds || 0;
 
-                // Track last time study seconds changed (for flatline detection)
-                if (newSeconds !== this.studiedSeconds) {
-                    this.lastStudyChangeTime = Date.now();
+                // --- Initial load: Sync state with DB ---
+                if (this.lastStudyChangeTime === null && result.last_active_timestamp) {
+                    this.lastStudyChangeTime = result.last_active_timestamp;
+                    console.log("[ST-TRACKER] Initialized activity time from server:", new Date(this.lastStudyChangeTime).toLocaleTimeString());
                 }
-                // Set initial time on first activity
-                if (this.lastStudyChangeTime === null && newSeconds > 0) {
-                    this.lastStudyChangeTime = Date.now();
+
+                // Track study activity changes
+                // Skip the "Date.now()" reset if this is the very first time we are loading non-zero seconds
+                if (newSeconds !== this.studiedSeconds) {
+                    if (this.studiedSeconds > 0) {
+                        // Trigger Defibrillator Surge if coming back from Flatline (20m+ gap)
+                        const gapMs = (this.lastStudyChangeTime === null) ? 0 : (Date.now() - this.lastStudyChangeTime);
+                        if (gapMs > 20 * 60 * 1000) {
+                            this.recoveryStartTime = Date.now();
+                            console.log("[ST-TRACKER] Defibrillator Surge Triggered!");
+                        }
+                        this.lastStudyChangeTime = Date.now();
+                    } else {
+                        // On first load, if we already have a timestamp from above, don't overwrite it with Date.now()
+                        if (this.lastStudyChangeTime === null) {
+                            this.lastStudyChangeTime = Date.now();
+                        }
+                    }
                 }
 
                 this.studiedSeconds = newSeconds;
@@ -663,31 +681,74 @@ const StudyTargetTracker = {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const activeSubjects = this.subjects.filter(s => s.seconds > 0);
+
+            // ── Feature 1: Fatigue/Flatline Detection ──────────────────────────
+            const gapMs = (this.lastStudyChangeTime === null) ? 0 : (Date.now() - this.lastStudyChangeTime);
+
+            // Degradation timings (User requested): 3m (peak), 10m (fading), 15m (critical), 20m (dead)
+            let fatigueFactor = 1.0;
+            let statusLabel = 'Active Pulse';
+            let statusColorClass = 'text-rose-500 bg-rose-50 border-rose-100/50';
+
+            if (gapMs > 20 * 60 * 1000) {
+                fatigueFactor = 0;
+                statusLabel = 'Signal Lost';
+                statusColorClass = 'text-gray-400 bg-gray-100 border-gray-200/50 animate-pulse';
+            } else if (gapMs > 15 * 60 * 1000) {
+                // 15m to 20m transition (Near dead)
+                const p = (gapMs - 15 * 60 * 1000) / (5 * 60 * 1000);
+                fatigueFactor = 0.2 * (1 - p);
+                statusLabel = 'Failing Sync';
+                statusColorClass = 'text-slate-500 bg-slate-100 border-slate-200/50 animate-pulse';
+            } else if (gapMs > 10 * 60 * 1000) {
+                // 10m to 15m transition (Critical)
+                const p = (gapMs - 10 * 60 * 1000) / (5 * 60 * 1000);
+                fatigueFactor = 0.5 - (p * 0.3);
+                statusLabel = 'Critical Drift';
+                statusColorClass = 'text-amber-600 bg-amber-50 border-amber-100/50 animate-pulse';
+            } else if (gapMs > 3 * 60 * 1000) {
+                // 3m to 10m transition (Fading)
+                const p = (gapMs - 3 * 60 * 1000) / (7 * 60 * 1000);
+                fatigueFactor = 1.0 - (p * 0.5);
+                statusLabel = 'Fading Rhythm';
+                statusColorClass = 'text-rose-400 bg-rose-50 border-rose-100/50';
+            }
+
+            const isFlatline = (this.firstStartTime !== null && this.studiedSeconds > 0 && fatigueFactor === 0);
+
+            // ── Feature 4: Defibrillator Surge Logic ──────────────────────────
+            const isRecovering = this.recoveryStartTime && (Date.now() - this.recoveryStartTime < 10000);
+
+            if (isRecovering) {
+                const elapsed = Date.now() - this.recoveryStartTime;
+                // Flicker effect: stronger at start, stabilizes toward end
+                const flicker = Math.sin(elapsed * 0.1) > 0;
+                statusLabel = flicker ? 'SYNCING...' : 'SURGE DETECTED';
+                statusColorClass = 'text-cyan-600 bg-cyan-50 border-cyan-100/50 animate-pulse font-black';
+                fatigueFactor = 1.0 + Math.random() * 0.5; // Over-clocked
+            }
+
             // Map active subjects → realistic BPM range (50 BPM rest → 95 BPM peak)
-            // At 60fps: pulseInterval (frames) = (60 / BPM) * 60
-            const bpm = Math.min(95, 50 + (activeSubjects.length - 1) * 5);
-            const pulseInterval = Math.round((60 / bpm) * 60); // e.g. 50bpm→72f, 75bpm→48f, 95bpm→38f
+            // Then apply fatigueFactor to slow it down (minimum 20 BPM)
+            const baseBpm = Math.min(95, 50 + (activeSubjects.length - 1) * 5);
+            let bpm = isFlatline ? 0 : Math.max(20, baseBpm * fatigueFactor);
 
+            // Add arrhythmia/jitter during recovery
+            if (isRecovering) {
+                bpm += (Math.random() - 0.5) * 40; // High jitter
+            }
 
-            // ── Feature 1: Flatline Detection ──────────────────────────────────
-            const FLATLINE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
-            const isFlatline = this.firstStartTime !== null
-                && this.studiedSeconds > 0
-                && this.lastStudyChangeTime !== null
-                && (Date.now() - this.lastStudyChangeTime) > FLATLINE_THRESHOLD_MS;
+            const pulseInterval = isFlatline ? 99999 : Math.round((60 / Math.max(1, bpm)) * 60);
 
             // ── Momentum Label Update ───────────────────────────────────────────
             const momentumLabel = document.getElementById('momentum-label');
             if (momentumLabel) {
-                if (isFlatline) {
-                    momentumLabel.textContent = 'Signal Lost';
-                    momentumLabel.className = 'text-[8px] font-bold text-gray-400 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200/50 animate-pulse';
-                } else if (this.protocolActive) {
+                if (this.protocolActive && !isFlatline && !isRecovering) {
                     momentumLabel.textContent = 'Stealth Mode';
                     momentumLabel.className = 'text-[8px] font-bold text-cyan-500 px-2 py-0.5 rounded-full bg-cyan-50 border border-cyan-100/50';
                 } else {
-                    momentumLabel.textContent = 'Active Pulse';
-                    momentumLabel.className = 'text-[8px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-100/50';
+                    momentumLabel.textContent = statusLabel;
+                    momentumLabel.className = `text-[8px] font-bold px-2 py-0.5 rounded-full border ${statusColorClass}`;
                 }
             }
 
@@ -747,7 +808,14 @@ const StudyTargetTracker = {
             // ── Main ECG Point Calculation ──────────────────────────────────────
             const studyBoost = (this.studiedSeconds / 3600);
             const baseIntensity = 15;
-            const intensity = Math.min(35, baseIntensity + studyBoost * 4);
+            const targetIntensity = Math.min(35, baseIntensity + studyBoost * 4);
+            // Apply fatigue to intensity (minimum 4px spike)
+            let intensity = isFlatline ? 0 : Math.max(4, targetIntensity * fatigueFactor);
+
+            // Recovery Voltage Surge
+            if (isRecovering) {
+                intensity *= (1.5 + Math.random() * 1.0); // 1.5x to 2.5x voltage
+            }
 
             let mainY = canvas.height / 2;
             let activeSpike = false;
@@ -773,8 +841,13 @@ const StudyTargetTracker = {
             }
 
             // Sync card border on spike
-            const accentHex = isFlatline ? '#94a3b8' : (this.protocolActive ? '#22d3ee' : '#ef4444');
-            const accentRgb = isFlatline ? '148, 163, 184' : (this.protocolActive ? '34, 211, 238' : '239, 68, 68');
+            let accentHex = isFlatline ? '#94a3b8' : (this.protocolActive ? '#22d3ee' : '#ef4444');
+            let accentRgb = isFlatline ? '148, 163, 184' : (this.protocolActive ? '34, 211, 238' : '239, 68, 68');
+
+            if (isRecovering) {
+                accentHex = (Math.sin(frameCount * 0.5) > 0) ? '#06b6d4' : '#ffffff'; // Flickering Cyan/White
+                accentRgb = (Math.sin(frameCount * 0.5) > 0) ? '6, 182, 212' : '255, 255, 255';
+            }
 
             if (activeSpike && containerRoot) {
                 containerRoot.style.transform = 'scale(1.005)';
@@ -926,7 +999,8 @@ const StudyTargetTracker = {
                 ctx.fillText('▬ SIGNAL LOST — RECONNECT ▬', canvas.width / 2, canvas.height / 2 - 6);
                 ctx.font = '7px monospace';
                 ctx.fillStyle = `rgba(239, 68, 68, ${textAlpha * 0.6})`;
-                ctx.fillText('No activity detected for 2h+', canvas.width / 2, canvas.height / 2 + 8);
+                const gapFormatted = gapMs > 3600000 ? (gapMs / 3600000).toFixed(1) + 'h' : Math.floor(gapMs / 60000) + 'm';
+                ctx.fillText(`No activity detected for ${gapFormatted}`, canvas.width / 2, canvas.height / 2 + 8);
                 ctx.textAlign = 'left';
             }
 

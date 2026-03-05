@@ -189,6 +189,21 @@ try {
     $now = time();
     $calc_idle_seconds = ($last_pomodoro_end > 0) ? max(0, $now - $last_pomodoro_end - $break_seconds) : 0;
 
+    // --- Added: Fetch Absolute Last Activity Timestamp for Tracker Persistence ---
+    $last_activity_sql = "
+        SELECT MAX(last_time) as absolute_last_active
+        FROM (
+            SELECT MAX(attempt_time) as last_time FROM performance WHERE DATE(attempt_time) = CURRENT_DATE
+            UNION ALL
+            SELECT MAX(timestamp) as last_time FROM activity_log 
+            WHERE DATE(timestamp) = CURRENT_DATE 
+            AND (activity_type LIKE '%Exam%' OR activity_type LIKE '%pomodoro%' OR activity_type LIKE '%Subject%')
+        ) combined_last
+    ";
+    $last_activity_res = $conn->query($last_activity_sql);
+    $last_activity_row = $last_activity_res->fetch_assoc();
+    $last_active_timestamp = $last_activity_row['absolute_last_active'] ? strtotime($last_activity_row['absolute_last_active']) * 1000 : null;
+
     echo json_encode([
         'success' => true,
         'total_today_seconds' => $total_today_seconds,
@@ -199,6 +214,7 @@ try {
         'improvement_type' => $improvement_type,
         'subjects' => $subjects,
         'calc_idle_seconds' => $calc_idle_seconds,
+        'last_active_timestamp' => $last_active_timestamp,
         'server_time' => $now
     ]);
     

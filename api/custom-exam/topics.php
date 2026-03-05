@@ -10,8 +10,9 @@ if ($lesson_id === 0) {
 
 // Select topics and count how many questions each one has, only returning topics with at least 1 question.
 $stmt = $conn->prepare("
-    SELECT t.id, t.topic_name, COUNT(q.id) as total_questions 
+    SELECT t.id, t.topic_name, l.is_complete as lesson_is_complete, COUNT(q.id) as total_questions 
     FROM topics t
+    JOIN lessons l ON t.lesson_id = l.id
     JOIN questions q ON t.id = q.topic_id
     JOIN exams e ON q.exam_id = e.id
     WHERE t.lesson_id = ? AND q.is_deleted = 0 AND e.is_deleted = 0 AND e.topic_id IS NOT NULL

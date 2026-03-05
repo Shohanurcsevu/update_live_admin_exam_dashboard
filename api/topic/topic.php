@@ -70,7 +70,7 @@ function list_topics($conn) {
     $count_stmt->close();
 
     // --- Get Topics ---
-    $sql = "SELECT t.*, s.subject_name, l.lesson_name, COUNT(e.id) as created_exams
+    $sql = "SELECT t.*, s.subject_name, s.color_class, l.lesson_name, l.is_complete, COUNT(e.id) as created_exams
             FROM topics t 
             JOIN subjects s ON t.subject_id = s.id 
             JOIN lessons l ON t.lesson_id = l.id

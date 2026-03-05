@@ -123,7 +123,7 @@ function list_exams($conn) {
 
     $where_sql = !empty($where_clauses) ? " WHERE " . implode(' AND ', $where_clauses) : "";
 
-    $sql = "SELECT e.*, s.subject_name, l.lesson_name, t.topic_name,
+    $sql = "SELECT e.*, s.subject_name, s.color_class, l.lesson_name, l.is_complete as lesson_is_complete, t.topic_name,
                    q_count.total_questions,
                    IFNULL(perf.total_attempts, 0) as total_attempts,
                    IFNULL(perf.pass_count, 0) as pass_count,

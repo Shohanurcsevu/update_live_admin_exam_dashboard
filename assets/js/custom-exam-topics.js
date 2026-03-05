@@ -12,6 +12,21 @@ function initializeCustomExamTopicsPage() {
     const customExamForm = document.getElementById('custom-exam-form');
     const toastContainer = document.getElementById('toast-container');
 
+    // Subject color config for completion styling
+    const SUBJECT_COLORS = window.SUBJECT_COLORS || {
+        emerald: { bg: 'rgba(16,185,129,0.10)', border: '#10b981', text: '#065f46', badge: '#d1fae5', badgeText: '#065f46' },
+        indigo: { bg: 'rgba(99,102,241,0.10)', border: '#6366f1', text: '#3730a3', badge: '#e0e7ff', badgeText: '#3730a3' },
+        amber: { bg: 'rgba(245,158,11,0.10)', border: '#f59e0b', text: '#78350f', badge: '#fef3c7', badgeText: '#78350f' },
+        cyan: { bg: 'rgba(6,182,212,0.10)', border: '#06b6d4', text: '#155e75', badge: '#cffafe', badgeText: '#155e75' },
+        violet: { bg: 'rgba(139,92,246,0.10)', border: '#8b5cf6', text: '#5b21b6', badge: '#ede9fe', badgeText: '#5b21b6' },
+        rose: { bg: 'rgba(244,63,94,0.10)', border: '#f43f5e', text: '#881337', badge: '#ffe4e6', badgeText: '#881337' },
+        teal: { bg: 'rgba(20,184,166,0.10)', border: '#14b8a6', text: '#115e59', badge: '#ccfbf1', badgeText: '#115e59' },
+        orange: { bg: 'rgba(249,115,22,0.10)', border: '#f97316', text: '#7c2d12', badge: '#ffedd5', badgeText: '#7c2d12' },
+        sky: { bg: 'rgba(14,165,233,0.10)', border: '#0ea5e9', text: '#0c4a6e', badge: '#e0f2fe', badgeText: '#0c4a6e' },
+        fuchsia: { bg: 'rgba(217,70,239,0.10)', border: '#d946ef', text: '#701a75', badge: '#fae8ff', badgeText: '#701a75' },
+    };
+    function getCS(c) { return SUBJECT_COLORS[c] || SUBJECT_COLORS.violet; }
+
     function showToast(message, type = 'success') {
         if (!toastContainer) return;
         const toast = document.createElement('div');
@@ -77,9 +92,18 @@ function initializeCustomExamTopicsPage() {
             sourceTopicsTableBody.innerHTML = '';
             if (result && result.length > 0) {
                 result.forEach(topic => {
+                    const isComplete = parseInt(topic.lesson_is_complete) || 0;
+                    // Get color from the subject filter's selected option
+                    const selectedSubjectOpt = subjectFilter.options[subjectFilter.selectedIndex];
+                    const cc = selectedSubjectOpt?.dataset?.color || 'violet';
+                    const cs = getCS(cc);
+                    const rowStyle = isComplete ? `style="background-color:${cs.bg};border-left:4px solid ${cs.border}"` : '';
+                    const completeBadge = isComplete ? ` <span class="inline-flex items-center px-1 py-0.5 rounded text-[7px] font-bold" style="background-color:${cs.badge};color:${cs.badgeText}">✓</span>` : '';
+                    const nameStyle = isComplete ? `style="color:${cs.text}"` : '';
+
                     const row = `
-                        <tr class="border-b border-gray-200" data-topic-id="${topic.id}">
-                            <td class="py-3 px-6 text-left font-medium">${topic.topic_name}</td>
+                        <tr class="border-b border-gray-200" data-topic-id="${topic.id}" ${rowStyle}>
+                            <td class="py-3 px-6 text-left font-medium" ${nameStyle}>${topic.topic_name}${completeBadge}</td>
                             <td class="py-3 px-6 text-center">${topic.total_questions}</td>
                             <td class="py-3 px-6 text-center">
                                 <input type="number" class="question-count-input w-24 text-center border border-gray-300 rounded-md" min="0" max="${topic.total_questions}" placeholder="0">
