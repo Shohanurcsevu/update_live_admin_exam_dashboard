@@ -27,7 +27,7 @@ if ($method === 'GET') {
         ]);
     } else {
         // Fetch all personalization settings
-        $result = $conn->query("SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('user_avatar', 'app_font')");
+        $result = $conn->query("SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('user_avatar', 'app_font', 'user_name')");
         $settings = [];
         while ($row = $result->fetch_assoc()) {
             $settings[$row['setting_key']] = $row['setting_value'];
@@ -52,7 +52,7 @@ if ($method === 'GET') {
     $value = $input['value'];
     
     // Whitelist keys to prevent arbitrary data being stored (security)
-    $allowed_keys = ['user_avatar', 'app_font'];
+    $allowed_keys = ['user_avatar', 'app_font', 'user_name'];
     if (!in_array($key, $allowed_keys)) {
         http_response_code(403);
         echo json_encode(["success" => false, "message" => "Unauthorized key"]);

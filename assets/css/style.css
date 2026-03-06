@@ -45,6 +45,81 @@ body {
     margin: 0.5rem 0.25rem;
 }
 
+/* User Name Header & Editing */
+.fp-header-editable {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.fp-user-name {
+    font-size: 15px;
+    font-weight: 900;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 170px;
+    display: block;
+    text-transform: none; /* Prevent inheritance from old styles */
+}
+
+.fp-name-input {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 900;
+    padding: 0.4rem 0.6rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 0.5rem;
+    outline: none;
+    color: #0f172a;
+    background: #f8fafc;
+    transition: all 0.2s ease;
+    width: auto;
+}
+
+.fp-name-input:focus {
+    border-color: #6366f1;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.fp-edit-btn, .fp-save-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 0.5rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #94a3b8;
+    transition: all 0.2s ease;
+}
+
+.fp-edit-btn:hover {
+    background: #f1f5f9;
+    color: #6366f1;
+}
+
+.fp-save-btn {
+    background: #6366f1;
+    color: white;
+}
+
+.fp-save-btn:hover {
+    background: #4f46e5;
+    transform: scale(1.05);
+}
+
+.fp-edit-btn .material-symbols-outlined,
+.fp-save-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
 /* Action Items (Change Photo etc) */
 .fp-action-item {
     width: 100%;

@@ -35,8 +35,9 @@
             // 1. Initial Quick Load from LocalStorage
             let f = localStorage.getItem('app-font');
             let a = localStorage.getItem('user_avatar');
+            let n = localStorage.getItem('user_name');
 
-            // 2. Apply immediate styles if found
+            // 2. Apply immediate styles & data if found
             if (f) document.documentElement.style.setProperty('--app-font', "'" + f + "'");
             if (a) {
                 const style = document.createElement('style');
@@ -44,9 +45,10 @@
                 style.innerHTML = `#header-profile-img, .profile-avatar-img { content: url("${a}"); }`;
                 document.head.appendChild(style);
             }
+            // Note: user_name is applied later by FontPicker but we cache it here
 
-            // 3. Fallback: If cache is empty, fetch from Database
-            if (!f || !a) {
+            // 3. Fallback: If cache is incomplete, fetch from Database
+            if (!f || !a || !n) {
                 try {
                     const response = await fetch('api/profile/settings.php');
                     const result = await response.json();
@@ -62,6 +64,9 @@
                             style.innerHTML = `#header-profile-img, .profile-avatar-img { content: url("${settings.user_avatar}"); }`;
                             document.head.appendChild(style);
                             localStorage.setItem('user_avatar', settings.user_avatar);
+                        }
+                        if (!n && settings.user_name) {
+                            localStorage.setItem('user_name', settings.user_name);
                         }
                     }
                 } catch (e) {

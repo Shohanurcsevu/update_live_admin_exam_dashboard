@@ -1,17 +1,10 @@
-/**
- * FontPicker — Global Font Switcher Module
- * 
- * Provides a premium dropdown on the profile avatar to switch
- * the app's typeface. Selection persists via localStorage.
- * 
- * Uses CSS variable `--app-font` on <html> so every element
- * inherits the chosen font automatically.
- */
 const FontPicker = {
 
     // ── Configuration ──────────────────────────────────────────
     STORAGE_KEY: 'app-font',
+    USER_NAME_KEY: 'user_name',
     DEFAULT_FONT: 'Space Grotesk',
+    DEFAULT_NAME: 'User Name',
 
     /** Available fonts — label, family (Google Fonts), and a preview weight */
     fonts: [
@@ -25,6 +18,7 @@ const FontPicker = {
     ],
 
     isOpen: false,
+    _currentName: '',
 
     // ── Public API ─────────────────────────────────────────────
 
@@ -35,13 +29,16 @@ const FontPicker = {
         // 2. Restore the user's saved font (Preference: DB > LocalStorage > Default)
         await this._loadSavedFont();
 
-        // 3. Build dropdown UI once the profile image is in the DOM
+        // 3. Restore User Name
+        await this._loadSavedName();
+
+        // 4. Build dropdown UI once the profile image is in the DOM
         this._buildDropdown();
 
-        // 4. Bind events
+        // 5. Bind events
         this._bindEvents();
 
-        console.log(`[FontPicker] Initialized with font: "${this._currentFont}"`);
+        console.log(`[FontPicker] Initialized with font: "${this._currentFont}" and name: "${this._currentName}"`);
     },
 
     /**
@@ -61,12 +58,34 @@ const FontPicker = {
                 return;
             }
         } catch (error) {
-            console.warn("[FontPicker] Failed to fetch from DB, using fallback.");
+            console.warn("[FontPicker] Failed to fetch font from DB, using fallback.");
         }
 
         // Fallback
         const font = cached || this.DEFAULT_FONT;
         this._applyFont(font, false);
+    },
+
+    /**
+     * Load User Name from Database
+     */
+    async _loadSavedName() {
+        const cached = localStorage.getItem(this.USER_NAME_KEY);
+        
+        try {
+            const response = await fetch(`api/profile/settings.php?key=user_name`);
+            const result = await response.json();
+            
+            if (result.success && result.data.user_name) {
+                this._currentName = result.data.user_name;
+                localStorage.setItem(this.USER_NAME_KEY, this._currentName);
+                return;
+            }
+        } catch (error) {
+            console.warn("[FontPicker] Failed to fetch name from DB.");
+        }
+
+        this._currentName = cached || this.DEFAULT_NAME;
     },
 
     // ── Private Methods ────────────────────────────────────────
@@ -80,7 +99,7 @@ const FontPicker = {
         if (document.getElementById('font-picker-gfonts')) return;
 
         const families = this.fonts
-            .map(f => `family=${f.family.replace(/ /g, '+')}:wght@300;400;500;600;700`)
+            .map(f => `family=${f.family.replace(/ /g, '+')}:wght@300;400;500;600;700;800;900`)
             .join('&');
 
         const link = document.createElement('link');
@@ -102,26 +121,23 @@ const FontPicker = {
 
         // 3. Persist to Database (MySQL Sync)
         if (saveToDB) {
-            this._saveToDatabase(fontFamily);
+            this._saveToDatabase('app_font', fontFamily);
         }
         this._currentFont = fontFamily;
     },
 
     /**
-     * Save font selection to MySQL database
+     * Save any setting to MySQL database
      */
-    async _saveToDatabase(fontFamily) {
+    async _saveToDatabase(key, value) {
         try {
             await fetch('api/profile/settings.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    key: 'app_font',
-                    value: fontFamily
-                })
+                body: JSON.stringify({ key, value })
             });
         } catch (error) {
-            console.error("FontPicker: Database sync failed", error);
+            console.error(`FontPicker: Database sync failed for ${key}`, error);
         }
     },
 
@@ -145,11 +161,17 @@ const FontPicker = {
         dropdown.className = 'font-picker-dropdown';
         dropdown.setAttribute('role', 'menu');
         dropdown.innerHTML = `
-            <!-- Personalization Section -->
+            <!-- User Header Section -->
             <div class="fp-section">
-                <div class="fp-header">
-                    <span class="material-symbols-outlined fp-header-icon">person</span>
-                    <span class="fp-header-text">Personalization</span>
+                <div class="fp-header-editable" id="fp-name-container">
+                    <span class="fp-user-name" id="fp-display-name">${this._currentName}</span>
+                    <input type="text" id="fp-name-input" class="fp-name-input" value="${this._currentName}" maxlength="20" style="display:none">
+                    <button class="fp-edit-btn" id="fp-edit-name-btn" title="Edit Name">
+                        <span class="material-symbols-outlined">edit</span>
+                    </button>
+                    <button class="fp-save-btn" id="fp-save-name-btn" title="Save Name" style="display:none">
+                        <span class="material-symbols-outlined">check</span>
+                    </button>
                 </div>
                 <button class="fp-action-item" id="fp-change-photo" role="menuitem">
                     <span class="material-symbols-outlined">photo_camera</span>
@@ -188,21 +210,20 @@ const FontPicker = {
      * Bind click events for toggle and outside-click dismiss.
      */
     _bindEvents() {
-        // Toggle dropdown when profile image is clicked
         document.addEventListener('click', (e) => {
             const profileImg = document.getElementById('header-profile-img');
             const profileBtn = profileImg?.closest('.relative');
             const dropdown = this._dropdown;
             if (!profileImg || !dropdown) return;
 
-            // Click on profile image → toggle
+            // 1. Toggle dropdown when profile image is clicked
             if (profileBtn && (profileBtn.contains(e.target)) && !dropdown.contains(e.target)) {
                 e.stopPropagation();
                 this._toggle();
                 return;
             }
 
-            // Click on "Change Profile Picture"
+            // 2. Click on "Change Profile Picture"
             const changePhotoBtn = e.target.closest('#fp-change-photo');
             if (changePhotoBtn && dropdown.contains(changePhotoBtn)) {
                 const fileInput = document.getElementById('avatar-upload-input');
@@ -211,7 +232,7 @@ const FontPicker = {
                 return;
             }
 
-            // Click on a font option
+            // 3. Click on a font option
             const option = e.target.closest('.fp-option');
             if (option && dropdown.contains(option)) {
                 const font = option.dataset.font;
@@ -221,16 +242,99 @@ const FontPicker = {
                 return;
             }
 
-            // Click outside → close
+            // 4. Click on Edit Name
+            const editBtn = e.target.closest('#fp-edit-name-btn');
+            if (editBtn && dropdown.contains(editBtn)) {
+                e.stopPropagation();
+                this._enterEditMode();
+                return;
+            }
+
+            // 5. Click on Save Name
+            const saveBtn = e.target.closest('#fp-save-name-btn');
+            if (saveBtn && dropdown.contains(saveBtn)) {
+                e.stopPropagation();
+                this._saveNewName();
+                return;
+            }
+
+            // 6. Click outside → close (only if not editing)
             if (!dropdown.contains(e.target)) {
-                this._close();
+                const input = document.getElementById('fp-name-input');
+                if (input && input.style.display === 'none') {
+                    this._close();
+                }
             }
         });
 
         // Close on Escape key
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.isOpen) this._close();
+            if (e.key === 'Escape') {
+                const input = document.getElementById('fp-name-input');
+                if (input && input.style.display !== 'none') {
+                    this._cancelEdit();
+                } else if (this.isOpen) {
+                    this._close();
+                }
+            }
+            if (e.key === 'Enter') {
+                const input = document.getElementById('fp-name-input');
+                if (input && input.style.display !== 'none' && document.activeElement === input) {
+                    this._saveNewName();
+                }
+            }
         });
+    },
+
+    _enterEditMode() {
+        const display = document.getElementById('fp-display-name');
+        const input = document.getElementById('fp-name-input');
+        const editBtn = document.getElementById('fp-edit-name-btn');
+        const saveBtn = document.getElementById('fp-save-name-btn');
+
+        if (!display || !input || !editBtn || !saveBtn) return;
+
+        display.style.display = 'none';
+        editBtn.style.display = 'none';
+        input.style.display = 'block';
+        saveBtn.style.display = 'flex';
+        input.focus();
+        input.select();
+    },
+
+    _cancelEdit() {
+        const display = document.getElementById('fp-display-name');
+        const input = document.getElementById('fp-name-input');
+        const editBtn = document.getElementById('fp-edit-name-btn');
+        const saveBtn = document.getElementById('fp-save-name-btn');
+
+        if (!display || !input || !editBtn || !saveBtn) return;
+
+        display.style.display = 'block';
+        editBtn.style.display = 'flex';
+        input.style.display = 'none';
+        saveBtn.style.display = 'none';
+        input.value = this._currentName;
+    },
+
+    async _saveNewName() {
+        const input = document.getElementById('fp-name-input');
+        if (!input) return;
+
+        const newName = input.value.trim() || this.DEFAULT_NAME;
+        
+        // Update Local State
+        this._currentName = newName;
+        localStorage.setItem(this.USER_NAME_KEY, newName);
+
+        // Update UI
+        const display = document.getElementById('fp-display-name');
+        if (display) display.textContent = newName;
+
+        this._cancelEdit();
+
+        // Save to DB
+        await this._saveToDatabase('user_name', newName);
     },
 
     _toggle() {
