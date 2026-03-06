@@ -486,6 +486,9 @@ class StudyMentor {
             await this.stopFocusSession();
         }
 
+        // Stop heartbeat audio immediately when starting a session
+        this.stopHeartbeatAudio();
+
         this.focusSession.isActive = true;
         this.focusSession.subject = subjectName;
         this.focusSession.subjectId = subjectId;
@@ -971,6 +974,9 @@ class StudyMentor {
             { text: "Look at something <strong>20 feet away</strong> for 20 seconds. Save your eyes!", emoji: "👀" },
             { text: "Take <strong>5 deep breaths</strong>. Inhale the dream, exhale the stress.", emoji: "🌬️" }
         ];
+
+        // Stop heartbeat audio immediately when starting a break
+        this.stopHeartbeatAudio();
 
         this.breakSession.isActive = true;
         this.breakSession.subject = finalSubjectName;
@@ -1666,9 +1672,11 @@ class StudyMentor {
         localStorage.setItem('study_mentor_sound_enabled', this.isSoundEnabled);
         this.updateStatusIndicator();
 
-        // Resume AudioContext if we just enabled sound and it's suspended
-        if (this.isSoundEnabled && this.audioCtx && this.audioCtx.state === 'suspended') {
-            this.audioCtx.resume();
+        // Stop the heartbeat audio if sound is disabled
+        if (!this.isSoundEnabled && this.heartbeatAudio) {
+            this.heartbeatAudio.pause();
+            this.heartbeatAudio.currentTime = 0;
+            this.heartbeatPlaying = false;
         }
     }
 
@@ -1892,55 +1900,43 @@ class StudyMentor {
 
     playHeartbeat() {
         try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContext) return;
+            // If the sound is already playing, don't restart it
+            if (this.heartbeatPlaying) return;
 
-            // Shared context to bypass autoplay restrictions after first click
-            if (!this.audioCtx) {
-                this.audioCtx = new AudioContext();
+            // Create the audio element once and reuse it
+            if (!this.heartbeatAudio) {
+                this.heartbeatAudio = new Audio('assets/audio/r.mp3');
+                this.heartbeatAudio.volume = 0.5;
 
-                // Resume on first click to bypass browser block
-                window.addEventListener('click', () => {
-                    if (this.audioCtx.state === 'suspended') {
-                        this.audioCtx.resume();
-                    }
-                }, { once: true });
+                this.heartbeatAudio.addEventListener('ended', () => {
+                    this.heartbeatPlaying = false;
+                });
+
+                this.heartbeatAudio.addEventListener('error', (e) => {
+                    console.warn("Heartbeat Audio Error:", e);
+                    this.heartbeatPlaying = false;
+                });
             }
 
-            if (this.audioCtx.state === 'suspended') return;
-
-            const playPulse = (delay, freq, vol) => {
-                const osc = this.audioCtx.createOscillator();
-                const gain = this.audioCtx.createGain();
-
-                // Square wave for much more "piercing" and audible sound
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime + delay);
-
-                gain.gain.setValueAtTime(0, this.audioCtx.currentTime + delay);
-                gain.gain.linearRampToValueAtTime(vol, this.audioCtx.currentTime + delay + 0.02);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + delay + 0.15);
-
-                osc.connect(gain);
-                gain.connect(this.audioCtx.destination);
-
-                osc.start(this.audioCtx.currentTime + delay);
-                osc.stop(this.audioCtx.currentTime + delay + 0.2);
-            };
-
-            // High-pitched "Medical Alert" Beep (Much more audible)
-            // Pulse 1: High freq
-            playPulse(0, 2500, 0.2);
-            // Pulse 2: Slightly offset for "Double Beep" effect
-            setTimeout(() => {
-                if (this.audioCtx && this.audioCtx.state !== 'closed') {
-                    playPulse(0, 2200, 0.15);
-                }
-            }, 100);
+            this.heartbeatPlaying = true;
+            this.heartbeatAudio.currentTime = 0;
+            this.heartbeatAudio.play().catch(e => {
+                // Autoplay blocked by browser — will work after user interaction
+                this.heartbeatPlaying = false;
+            });
 
         } catch (e) {
             console.warn("Heartbeat Audio Error:", e);
+            this.heartbeatPlaying = false;
         }
+    }
+
+    stopHeartbeatAudio() {
+        if (this.heartbeatAudio) {
+            this.heartbeatAudio.pause();
+            this.heartbeatAudio.currentTime = 0;
+        }
+        this.heartbeatPlaying = false;
     }
 
     updateStatusIndicator(computedSeconds = null) {
