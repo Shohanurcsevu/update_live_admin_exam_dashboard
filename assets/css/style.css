@@ -7,7 +7,157 @@ body {
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font, 'Space Grotesk'), sans-serif;
+}
+
+/* ── Font Picker Dropdown ──────────────────────────────────/* Font Options Dropdown Styles */
+.font-picker-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 240px;
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+    border: 1px solid #f1f5f9;
+    padding: 0.75rem;
+    display: none;
+    z-index: 500;
+    transform: translateY(-8px);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 0;
+}
+
+.font-picker-dropdown.fp-open {
+    display: block;
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* Sections & Dividers */
+.fp-section {
+    padding: 0.25rem 0;
+}
+
+.fp-divider {
+    height: 1px;
+    background: #f1f5f9;
+    margin: 0.5rem 0.25rem;
+}
+
+/* Action Items (Change Photo etc) */
+.fp-action-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.75rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.fp-action-item:hover {
+    background: #f8fafc;
+    color: #4f46e5;
+}
+
+.fp-action-item span.material-symbols-outlined {
+    font-size: 18px;
+}
+
+.fp-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    margin-bottom: 0.25rem;
+}
+.fp-header-icon {
+    font-size: 14px;
+    color: #6366f1;
+}
+
+.fp-header-text {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #94a3b8;
+}
+
+.fp-list {
+    padding: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.fp-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+}
+
+.fp-option:hover {
+    background: #f1f5f9;
+}
+
+.fp-option-preview {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.fp-option-tag {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    background: #f8fafc;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.fp-check {
+    font-size: 16px;
+    color: #6366f1;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.2s ease;
+}
+
+.fp-option.fp-active .fp-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.fp-option.fp-active {
+    background: #eef2ff;
+}
+
+.fp-option.fp-active .fp-option-preview {
+    color: #4f46e5;
+}
+
+.fp-option.fp-active .fp-option-tag {
+    background: #e0e7ff;
+    color: #6366f1;
 }
 
 /* MODIFIED: Updated scrollbar to match dashboard dark theme */
@@ -41,6 +191,43 @@ body {
         'opsz' 24
 }
 
+/* Avatar & Custom Modal Styles */
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-up {
+    animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Ensure cropper container is clear */
+.cropper-container {
+    width: 100% !important;
+}
+
+.cropper-view-box,
+.cropper-face {
+    border-radius: 50%;
+}
+
+/* Custom scrollbar for dropdowns */
+.font-dropdown-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.font-dropdown-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.font-dropdown-list::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+.font-dropdown-list::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+}
 /* --- Smart Header Styles --- */
 .no-scrollbar::-webkit-scrollbar {
     display: none;

@@ -527,6 +527,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         SmartHeader.init();
     }
 
+    // Initialize Font Picker (dropdown on profile image)
+    if (typeof FontPicker !== 'undefined') {
+        FontPicker.init();
+    }
+
+    // Initialize Profile Manager (Avatar sync)
+    if (typeof ProfileManager !== 'undefined') {
+        ProfileManager.init();
+    }
+
     // Update unsaved indicator after header is loaded
     window.updateUnsavedIndicator();
 

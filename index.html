@@ -20,18 +20,61 @@
     <link rel="stylesheet" href="assets/css/sidebar-premium.css">
     <link rel="stylesheet" href="assets/css/streak-effects.css">
     <link rel="stylesheet" href="assets/css/study-target.css">
-    <!-- Google Fonts & Icons -->
+    <!-- Google Fonts & Icons (All font-picker options pre-loaded) -->
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Nunito:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
     <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <!-- Early font & avatar restore from DB/LocalStorage to prevent FOUC -->
+    <script>
+        (async () => {
+            // 1. Initial Quick Load from LocalStorage
+            let f = localStorage.getItem('app-font');
+            let a = localStorage.getItem('user_avatar');
+
+            // 2. Apply immediate styles if found
+            if (f) document.documentElement.style.setProperty('--app-font', "'" + f + "'");
+            if (a) {
+                const style = document.createElement('style');
+                style.id = 'early-avatar-style';
+                style.innerHTML = `#header-profile-img, .profile-avatar-img { content: url("${a}"); }`;
+                document.head.appendChild(style);
+            }
+
+            // 3. Fallback: If cache is empty, fetch from Database
+            if (!f || !a) {
+                try {
+                    const response = await fetch('api/profile/settings.php');
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        const settings = result.data;
+                        if (!f && settings.app_font) {
+                            document.documentElement.style.setProperty('--app-font', "'" + settings.app_font + "'");
+                            localStorage.setItem('app-font', settings.app_font);
+                        }
+                        if (!a && settings.user_avatar) {
+                            const style = document.createElement('style');
+                            style.id = 'early-avatar-style';
+                            style.innerHTML = `#header-profile-img, .profile-avatar-img { content: url("${settings.user_avatar}"); }`;
+                            document.head.appendChild(style);
+                            localStorage.setItem('user_avatar', settings.user_avatar);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Early restore from DB failed:", e);
+                }
+            }
+        })();
+    </script>
 </head>
 
-<body class="bg-slate-100 font-[Inter] h-screen overflow-hidden">
+<body class="bg-slate-100 h-screen overflow-hidden">
+    <!-- Hidden File Input for Avatar -->
+    <input type="file" id="avatar-upload-input" accept="image/*" class="hidden">
 
     <div id="app-frame" class="md:p-3 flex h-full w-full md:gap-3 box-border">
         <!-- Sidebar container -->
@@ -625,7 +668,31 @@
         </div>
     </div>
 
+    <!-- Avatar Crop Modal -->
+    <div id="avatar-crop-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-[700] p-4">
+        <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden animate-scale-up">
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-800">Crop your Avatar</h3>
+                <button type="button" id="cancel-avatar-btn" class="text-slate-400 hover:text-slate-600">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="aspect-square w-full bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center">
+                    <img id="crop-target-img" src="" class="max-w-full">
+                </div>
+            </div>
+            <div class="p-6 bg-slate-50 flex gap-3">
+                <button type="button" id="save-avatar-btn" class="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700 transition-all active:scale-95">
+                    Save & Apply
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Core JavaScript -->
+    <script src="assets/js/font-picker.js"></script>
+    <script src="assets/js/profile-manager.js"></script>
     <script src="assets/js/cache-manager.js"></script>
     <script src="assets/js/indexeddb-manager.js"></script>
     <script src="assets/js/sync-manager.js"></script>

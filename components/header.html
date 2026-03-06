@@ -9,7 +9,7 @@
 
     <!-- Smart Header Info Bar - Adaptive centering, Scrollable on tight space -->
     <div id="smart-header-bar"
-        class="flex-1 flex justify-center items-center overflow-x-auto no-scrollbar gap-3 md:gap-4 font-['Inter'] px-2">
+        class="flex-1 flex justify-center items-center overflow-x-auto no-scrollbar gap-3 md:gap-4 px-2">
 
         <!-- Date Group with Countdown Numbers -->
         <div id="header-date-container" class="flex items-center gap-1.5 md:gap-3 flex-shrink-0">
@@ -146,10 +146,10 @@
 
         <!-- Profile Image -->
         <div class="relative flex-shrink-0">
-            <div
-                class="w-8 h-8 rounded-full border-2 border-slate-50 overflow-hidden cursor-pointer hover:border-indigo-100 transition-all">
-                <img id="header-profile-img" src="https://placehold.co/32x32/6366f1/ffffff?text=S" alt="Profile"
-                    class="w-full h-full object-cover">
+            <!-- Profile Avatar with Camera Overlay (Toggle Dropdown) -->
+            <div class="relative cursor-pointer">
+                <img id="header-profile-img" src="assets/img/profile.png" alt="Profile"
+                    class="w-8 h-8 rounded-full border border-slate-200 transition-all hover:border-indigo-300">
             </div>
         </div>
     </div>
