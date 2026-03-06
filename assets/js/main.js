@@ -579,6 +579,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         syncManager.initAutoSync();
     }
 
+    // Initialize Study Target Tracker (Global)
+    if (typeof StudyTargetTracker !== 'undefined') {
+        StudyTargetTracker.init();
+    }
+
     const initialParams = new URLSearchParams(window.location.search);
     const initialPage = initialParams.get('page') || 'dashboard';
     initialParams.delete('page');

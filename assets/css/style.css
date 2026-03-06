@@ -120,6 +120,73 @@ body {
     font-size: 18px;
 }
 
+/* Progress Ring Styles */
+#font-picker-anchor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 42px;
+    height: 42px;
+}
+
+#header-profile-img {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50%;
+    z-index: 2;
+}
+
+.fp-progress-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 42px;
+    height: 42px;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+
+.fp-ring-bg {
+    stroke: #f1f5f9;
+}
+
+.fp-ring-indicator {
+    stroke: #6366f1;
+    stroke-dasharray: 0, 100;
+    transition: stroke-dasharray 1s ease-in-out;
+}
+
+/* Mini Progress Stats in Dropdown */
+.fp-progress-stats {
+    padding: 0.25rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.fp-stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid #f1f5f9;
+}
+
+.fp-stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.fp-stat-value {
+    font-size: 12px;
+    font-weight: 900;
+    color: #6366f1;
+}
+
 /* Action Items (Change Photo etc) */
 .fp-action-item {
     width: 100%;

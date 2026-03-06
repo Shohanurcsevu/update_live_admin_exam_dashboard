@@ -96,13 +96,6 @@ function initializeDashboardPage() {
             fetchAndRenderMasteryTrends(); // NEW: Mastery Trends
             fetchAndDisplayRecommendations(); // NEW: Smart Recommendations
             fetchSRSStats(); // NEW: SRS Stats
-
-            // Initialize Study Target Tracker (NEW)
-            if (window.StudyTargetTracker && typeof window.StudyTargetTracker.init === 'function') {
-                window.StudyTargetTracker.init();
-            } else {
-                console.warn("[Dashboard] StudyTargetTracker not found or init is not a function");
-            }
         } catch (error) {
             console.error("[Dashboard] Error fetching metrics:", error);
             showToast('Failed to load some dashboard metrics.', 'error');

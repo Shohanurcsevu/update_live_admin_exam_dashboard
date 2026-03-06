@@ -222,6 +222,11 @@ const StudyTargetTracker = {
         // --- NEW: Flow Orb Pace State ---
         this.updateFlowOrbState();
 
+        // --- NEW: Sync Profile Progress Ring ---
+        if (window.FontPicker && typeof window.FontPicker.updateProgressRing === 'function') {
+            window.FontPicker.updateProgressRing();
+        }
+
         // --- NEW: Ghost Runner & Pace Logic ---
         const mainBar = document.getElementById('main-progress-bar');
         const ghostBar = document.getElementById('ghost-progress-bar');

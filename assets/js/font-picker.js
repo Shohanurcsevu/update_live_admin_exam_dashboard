@@ -145,15 +145,32 @@ const FontPicker = {
      * Build the dropdown HTML and inject it next to the profile image.
      */
     _buildDropdown() {
-        const profileWrapper = document.querySelector('#header-profile-img')?.closest('.relative');
-        if (!profileWrapper) {
-            console.warn('[FontPicker] Profile wrapper not found — retrying in 500ms');
+        const profileImg = document.getElementById('header-profile-img');
+        const profileWrapper = profileImg?.closest('.relative');
+        if (!profileWrapper || !profileImg) {
+            console.warn('[FontPicker] Profile wrapper or image not found — retrying in 500ms');
             setTimeout(() => this._buildDropdown(), 500);
             return;
         }
 
         // Give the wrapper an ID for easier reference
         profileWrapper.id = 'font-picker-anchor';
+
+        // 1. Add SVG Progress Ring around the image
+        if (!document.getElementById('fp-progress-ring')) {
+            const svgNamespace = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNamespace, "svg");
+            svg.setAttribute("id", "fp-progress-ring");
+            svg.setAttribute("class", "fp-progress-ring");
+            svg.setAttribute("viewBox", "0 0 36 36");
+
+            svg.innerHTML = `
+                <circle class="fp-ring-bg" cx="18" cy="18" r="16" fill="none" stroke-width="2"></circle>
+                <circle class="fp-ring-indicator" id="fp-progress-indicator" cx="18" cy="18" r="16" fill="none" stroke-width="2" 
+                        stroke-dasharray="100, 100" stroke-linecap="round" transform="rotate(-90 18 18)"></circle>
+            `;
+            profileWrapper.insertBefore(svg, profileImg);
+        }
 
         // Create dropdown container
         const dropdown = document.createElement('div');
@@ -172,6 +189,13 @@ const FontPicker = {
                     <button class="fp-save-btn" id="fp-save-name-btn" title="Save Name" style="display:none">
                         <span class="material-symbols-outlined">check</span>
                     </button>
+                </div>
+                <!-- Mini Progress Stats inside Dropdown -->
+                <div class="fp-progress-stats" id="fp-mini-stats">
+                    <div class="fp-stat-item">
+                        <span class="fp-stat-label">Daily Goal</span>
+                        <span class="fp-stat-value" id="fp-stat-percent">0%</span>
+                    </div>
                 </div>
                 <button class="fp-action-item" id="fp-change-photo" role="menuitem">
                     <span class="material-symbols-outlined">photo_camera</span>
@@ -204,6 +228,39 @@ const FontPicker = {
 
         // Highlight saved font
         this._updateActiveState();
+
+        // Start progress ring sync
+        this._startProgressSync();
+    },
+
+    /**
+     * Start syncing progress with StudyTargetTracker
+     */
+    _startProgressSync() {
+        // Sync every 2 seconds
+        setInterval(() => this.updateProgressRing(), 2000);
+    },
+
+    /**
+     * Update the SVG ring and mini-stats based on StudyTargetTracker data
+     */
+    updateProgressRing() {
+        const indicator = document.getElementById('fp-progress-indicator');
+        const percentLabel = document.getElementById('fp-stat-percent');
+        
+        if (typeof StudyTargetTracker === 'undefined' || !StudyTargetTracker.studiedSeconds) return;
+
+        const total = StudyTargetTracker.DAILY_TARGET_SECONDS || (12 * 3600);
+        const current = StudyTargetTracker.studiedSeconds;
+        const percent = Math.min(100, Math.round((current / total) * 100));
+
+        if (indicator) {
+            // SVG stroke-dasharray logic
+            indicator.style.strokeDasharray = `${percent}, 100`;
+        }
+        if (percentLabel) {
+            percentLabel.textContent = `${percent}%`;
+        }
     },
 
     /**
