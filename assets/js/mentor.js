@@ -423,6 +423,11 @@ class StudyMentor {
             // Force local verification poll immediately after save
             setTimeout(() => this.restoreSession(), 100);
 
+            // Sync StudyTargetTracker if it exists
+            if (window.StudyTargetTracker && typeof window.StudyTargetTracker.fetchData === 'function') {
+                window.StudyTargetTracker.fetchData(true);
+            }
+
             return result;
         } catch (e) {
             console.error('Failed to save session state:', e);

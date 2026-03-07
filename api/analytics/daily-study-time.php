@@ -84,7 +84,7 @@ try {
         $seconds = floatval($row['total_seconds'] ?? 0);
         $total_today_seconds += $seconds;
         
-        $subjects[] = [
+        $subjects[$row['subject_name']] = [
             'subject_name' => $row['subject_name'],
             'subject_id' => $row['subject_id'] ? intval($row['subject_id']) : null,
             'seconds' => $seconds,
@@ -92,6 +92,38 @@ try {
             'session_count' => intval($row['session_count'])
         ];
     }
+
+    // --- Added: Merge Currently Active Focus Session ---
+    $active_focus_sql = "
+        SELECT 
+            subject_name,
+            subject_id,
+            (duration_minutes * 60 - remaining_seconds) + (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_heartbeat)) as active_seconds
+        FROM study_sessions
+        WHERE status = 'active' AND session_type = 'focus'
+        LIMIT 1
+    ";
+    $active_focus_res = $conn->query($active_focus_sql);
+    if ($active_focus_res && $active_row = $active_focus_res->fetch_assoc()) {
+        $name = $active_row['subject_name'];
+        $active_sec = max(0, intval($active_row['active_seconds']));
+        
+        if (isset($subjects[$name])) {
+            $subjects[$name]['seconds'] += $active_sec;
+            $subjects[$name]['formatted'] = format_seconds($subjects[$name]['seconds']);
+        } else {
+            $subjects[$name] = [
+                'subject_name' => $name,
+                'subject_id' => $active_row['subject_id'] ? intval($active_row['subject_id']) : null,
+                'seconds' => $active_sec,
+                'formatted' => format_seconds($active_sec),
+                'session_count' => 0 // Ongoing
+            ];
+        }
+        $total_today_seconds += $active_sec;
+    }
+
+    $subjects = array_values($subjects);
     
     // Get yesterday's total for comparison (including Pomodoro sessions)
     $yesterday_sql = "
@@ -198,6 +230,9 @@ try {
             SELECT MAX(timestamp) as last_time FROM activity_log 
             WHERE DATE(timestamp) = CURRENT_DATE 
             AND (activity_type LIKE '%Exam%' OR activity_type LIKE '%pomodoro%' OR activity_type LIKE '%Subject%')
+            UNION ALL
+            SELECT MAX(last_heartbeat) as last_time FROM study_sessions 
+            WHERE status = 'active' AND session_type = 'focus'
         ) combined_last
     ";
     $last_activity_res = $conn->query($last_activity_sql);

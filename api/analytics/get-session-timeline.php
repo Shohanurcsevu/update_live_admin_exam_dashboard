@@ -58,6 +58,19 @@ try {
             LEFT JOIN subjects s ON al.activity_message = s.subject_name
             WHERE al.activity_type = 'pomodoro_session'
             AND DATE(al.timestamp) = CURRENT_DATE
+
+            UNION ALL
+
+            -- Active Pomodoro/Break sessions: Ongoing right now
+            SELECT 
+                (HOUR(start_time) + MINUTE(start_time)/60.0) as start_hour,
+                (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(start_time)) / 3600.0 as duration_hours,
+                subject_name,
+                CASE WHEN session_type = 'break' THEN 'break' ELSE 'pomodoro_active' END as session_type,
+                subject_id
+            FROM study_sessions
+            WHERE status = 'active'
+            AND DATE(start_time) = CURRENT_DATE
         ) timeline
         ORDER BY start_hour ASC
     ";

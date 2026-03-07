@@ -31,6 +31,7 @@ const StudyTargetTracker = {
     smoothedBpm: 0,
     sessionTimeline: [],
     momentumScore: 0,
+    serverClockOffset: 0,
 
     async init() {
         // --- Per-page setup: always re-run to attach to fresh DOM elements ---
@@ -110,14 +111,24 @@ const StudyTargetTracker = {
             if (result) {
                 const newSeconds = result.total_today_seconds || 0;
 
-                // --- Initial load: Sync state with DB ---
-                if (this.lastStudyChangeTime === null && result.last_active_timestamp) {
-                    this.lastStudyChangeTime = result.last_active_timestamp;
-                    console.log("[ST-TRACKER] Initialized activity time from server:", new Date(this.lastStudyChangeTime).toLocaleTimeString());
+                // --- NEW: Sync Server Clock Offset ---
+                if (result.server_time) {
+                    this.serverClockOffset = (result.server_time * 1000) - Date.now();
                 }
 
-                // Track study activity changes
-                // Skip the "Date.now()" reset if this is the very first time we are loading non-zero seconds
+                // --- Sync activity state with DB ---
+                if (result.last_active_timestamp) {
+                    const serverActivityTime = result.last_active_timestamp;
+                    
+                    // Always trust server timestamp if it's newer than our local tracker
+                    // or if it's the very first time we are loading.
+                    if (this.lastStudyChangeTime === null || serverActivityTime > this.lastStudyChangeTime) {
+                        this.lastStudyChangeTime = serverActivityTime;
+                        console.log("[ST-TRACKER] Synced activity time from server:", new Date(this.lastStudyChangeTime).toLocaleTimeString());
+                    }
+                }
+
+                // Track study activity changes locally
                 if (newSeconds !== this.studiedSeconds) {
                     if (this.studiedSeconds > 0) {
                         // Trigger Defibrillator Surge if coming back from Flatline (20m+ gap)
@@ -126,13 +137,8 @@ const StudyTargetTracker = {
                             this.recoveryStartTime = Date.now();
                             console.log("[ST-TRACKER] Defibrillator Surge Triggered!");
                         }
-                        this.lastStudyChangeTime = Date.now();
-                    } else {
-                        // On first load, if we already have a timestamp from above, don't overwrite it with Date.now()
-                        if (this.lastStudyChangeTime === null) {
-                            this.lastStudyChangeTime = Date.now();
-                        }
                     }
+                    this.lastStudyChangeTime = Date.now();
                 }
 
                 this.studiedSeconds = newSeconds;
@@ -838,11 +844,28 @@ const StudyTargetTracker = {
         if (frameCount % 1800 === 0) {
             this.saveRhythmSnapshot(this.ecgPoints);
         }
+
+        // --- NEW: Sync Active Session Block on Timeline ---
+        if (frameCount % 60 === 0) { 
+            // Every second (at 60fps), slightly update the width of any active block 
+            // This makes the timeline feel alive as you study.
+            const activeBlock = document.querySelector('.timeline-block-active');
+            if (activeBlock) {
+                const now = new Date();
+                const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+                const startHour = parseFloat(activeBlock.dataset.startHour);
+                if (!isNaN(startHour)) {
+                    const widthPercent = Math.max(0.3, ((currentHour - startHour) / 24) * 100);
+                    activeBlock.style.width = `${widthPercent}%`;
+                }
+            }
+        }
     },
 
     // ─── State Calculation ──────────────────────────────────────────────────
     calculateECGState(activeSubjects) {
-        const gapMs = (this.lastStudyChangeTime === null) ? 0 : (Date.now() - this.lastStudyChangeTime);
+        const now = Date.now() + this.serverClockOffset;
+        const gapMs = (this.lastStudyChangeTime === null) ? 0 : (now - this.lastStudyChangeTime);
 
         let fatigueFactor = 1.0;
         let statusLabel = 'Active Pulse';
@@ -1234,22 +1257,27 @@ const StudyTargetTracker = {
         const nowMarker = document.getElementById('timeline-now-marker');
         if (!bar) return;
 
-        // Color palette for sessions
+        // Expanded high-contrast vibrant color palette
         const colors = [
-            'rgba(59, 130, 246, 0.7)',   // Blue
-            'rgba(16, 185, 129, 0.7)',    // Emerald
-            'rgba(245, 158, 11, 0.7)',    // Amber
-            'rgba(139, 92, 246, 0.7)',    // Violet
-            'rgba(236, 72, 153, 0.7)',    // Pink
-            'rgba(20, 184, 166, 0.7)',    // Teal
+            { main: 'rgba(59, 130, 246, 0.85)', grad: 'rgba(37, 99, 235, 0.9)' },   // Blue
+            { main: 'rgba(16, 185, 129, 0.85)', grad: 'rgba(5, 150, 105, 0.9)' },   // Emerald
+            { main: 'rgba(245, 158, 11, 0.85)', grad: 'rgba(217, 119, 6, 0.9)' },   // Amber
+            { main: 'rgba(139, 92, 246, 0.85)', grad: 'rgba(124, 58, 237, 0.9)' },  // Violet
+            { main: 'rgba(236, 72, 153, 0.85)', grad: 'rgba(219, 39, 119, 0.9)' },  // Pink
+            { main: 'rgba(20, 184, 166, 0.85)', grad: 'rgba(13, 148, 136, 0.9)' },  // Teal
+            { main: 'rgba(244, 63, 94, 0.85)',  grad: 'rgba(225, 29, 72, 0.9)' },   // Rose
+            { main: 'rgba(14, 165, 233, 0.85)', grad: 'rgba(2, 132, 199, 0.9)' },   // Sky
+            { main: 'rgba(168, 85, 247, 0.85)', grad: 'rgba(147, 51, 234, 0.9)' },  // Purple
+            { main: 'rgba(132, 204, 22, 0.85)', grad: 'rgba(101, 163, 13, 0.9)' },  // Lime
         ];
 
         // Build a subject → color index map
         const subjectColorMap = {};
         let colorIdx = 0;
         this.sessionTimeline.forEach(s => {
-            if (!(s.subject in subjectColorMap)) {
-                subjectColorMap[s.subject] = colorIdx++ % colors.length;
+            const subjectKey = (s.subject || 'Session').trim();
+            if (!(subjectKey in subjectColorMap)) {
+                subjectColorMap[subjectKey] = colorIdx++ % colors.length;
             }
         });
 
@@ -1261,19 +1289,31 @@ const StudyTargetTracker = {
         this.sessionTimeline.forEach(session => {
             const leftPercent = (session.start_hour / 24) * 100;
             const widthPercent = Math.max(0.3, (session.duration_hours / 24) * 100);
-            const ci = subjectColorMap[session.subject] || 0;
+            const ci = subjectColorMap[(session.subject || 'Session').trim()] || 0;
+            const palette = colors[ci];
 
             const block = document.createElement('div');
-            block.className = 'timeline-block absolute top-0 h-full rounded-sm transition-opacity hover:opacity-100 cursor-default';
+            const isActive = session.type === 'pomodoro_active';
+            const isBreak = session.type === 'break';
+            
+            block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-0'}`;
             block.style.left = `${leftPercent}%`;
             block.style.width = `${widthPercent}%`;
-            block.style.backgroundColor = colors[ci];
-            block.style.opacity = session.type === 'exam' ? '0.9' : '0.6';
-            block.style.zIndex = '1';
+            block.dataset.startHour = session.start_hour;
+            
+            if (isBreak) {
+                block.style.background = 'linear-gradient(to bottom, rgba(148, 163, 184, 0.4), rgba(100, 116, 139, 0.5))';
+                block.style.borderBottom = '1px dashed rgba(255,255,255,0.4)';
+            } else {
+                block.style.background = `linear-gradient(to bottom, ${palette.main}, ${palette.grad})`;
+                block.style.opacity = (session.type === 'exam' || isActive) ? '1.0' : '0.8';
+            }
 
-            // Exam sessions get a top accent stripe
+            // Exam/Active sessions get accents
             if (session.type === 'exam') {
                 block.style.borderTop = '2px solid rgba(255,255,255,0.6)';
+            } else if (isActive) {
+                block.style.boxShadow = `0 0 10px ${palette.main}`;
             }
 
             // Tooltip
@@ -1282,10 +1322,55 @@ const StudyTargetTracker = {
             const startM = Math.round((session.start_hour % 1) * 60);
             const ampm = startH >= 12 ? 'PM' : 'AM';
             const displayH = startH % 12 || 12;
-            block.title = `${session.subject}\n${session.type === 'exam' ? '📝 Exam' : '🍅 Pomodoro'} · ${durationMin}m\n${displayH}:${String(startM).padStart(2, '0')} ${ampm}`;
+            
+            let label = '🍅 Pomodoro';
+            if (session.type === 'exam') label = '📝 Exam';
+            if (isActive) label = '🔥 ACTIVE FOCUS';
+            if (isBreak) label = '☕ Break';
+
+            block.title = `${session.subject || 'Session'}\n${label} · ${isActive ? 'Ongoing' : durationMin + 'm'}\nStarted: ${displayH}:${String(startM).padStart(2, '0')} ${ampm}`;
 
             bar.appendChild(block);
         });
+
+        // Ensure we have the pulse animation CSS
+        if (!document.getElementById('timeline-active-css')) {
+            const style = document.createElement('style');
+            style.id = 'timeline-active-css';
+            style.innerHTML = `
+                @keyframes timeline-pulse {
+                    0% { opacity: 0.7; }
+                    50% { opacity: 1.0; }
+                    100% { opacity: 0.7; }
+                }
+                @keyframes timeline-radar {
+                    0% { transform: scale(1); opacity: 0.8; }
+                    100% { transform: scale(3.5); opacity: 0; }
+                }
+                @keyframes timeline-shimmer {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                }
+                .timeline-block-active {
+                    animation: timeline-pulse 2s infinite ease-in-out;
+                    background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                    background-size: 200% 100%;
+                    animation: timeline-pulse 2s infinite ease-in-out, timeline-shimmer 3s infinite linear;
+                }
+                .timeline-radar-ring {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 7px;
+                    height: 7px;
+                    border-radius: 50%;
+                    animation: timeline-radar 2s infinite;
+                    pointer-events: none;
+                }
+            `;
+            document.head.appendChild(style);
+        }
 
         // Update now marker + clock (use client time for accuracy)
         if (nowMarker) {
@@ -1295,12 +1380,36 @@ const StudyTargetTracker = {
             nowMarker.style.left = `${nowPercent}%`;
 
             const clockEl = document.getElementById('timeline-now-clock');
+            const dotEl = document.getElementById('timeline-now-dot');
             if (clockEl) {
                 const h = now.getHours();
                 const m = now.getMinutes();
-                const ampm = h >= 12 ? 'p' : 'a';
+                const ampm = h >= 12 ? 'pm' : 'am';
                 const displayH = h % 12 || 12;
-                clockEl.textContent = `${displayH}:${String(m).padStart(2, '0')}${ampm}`;
+                clockEl.textContent = `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
+
+                // Dynamic coloring every hour (cycles through HSL)
+                const hue = (h * 15) % 360; 
+                const accentColor = `hsl(${hue}, 80%, 45%)`;
+                const bgColor = `hsla(${hue}, 80%, 98%, 0.95)`;
+                
+                clockEl.style.color = accentColor;
+                clockEl.style.backgroundColor = bgColor;
+                clockEl.style.borderColor = `hsla(${hue}, 80%, 45%, 0.3)`;
+                
+                if (dotEl) {
+                    dotEl.style.backgroundColor = accentColor;
+                    dotEl.style.boxShadow = `0 0 8px ${accentColor}`;
+                    
+                    // Add radar ring if missing
+                    if (!dotEl.querySelector('.timeline-radar-ring')) {
+                        const ring = document.createElement('div');
+                        ring.className = 'timeline-radar-ring';
+                        dotEl.appendChild(ring);
+                    }
+                    const ring = dotEl.querySelector('.timeline-radar-ring');
+                    if (ring) ring.style.backgroundColor = accentColor;
+                }
             }
         }
 
