@@ -278,6 +278,10 @@
                         <span id="ab-folder-name" class="truncate flex-1 text-left">Choose folder…</span>
                         <span class="material-symbols-outlined text-xs text-gray-400">chevron_right</span>
                     </button>
+                    <p class="mt-1.5 text-[10px] text-gray-400">
+                        <span class="material-symbols-outlined text-[10px] align-middle">info</span>
+                        Browsers only provide the folder <strong>name</strong> for privacy.
+                    </p>
                     <p id="ab-no-fsa-warning" class="hidden mt-1.5 text-[10px] text-amber-600 font-semibold">
                         ⚠ Your browser doesn't support silent folder writes. Each backup triggers a download instead.
                     </p>
@@ -289,13 +293,11 @@
                 <span
                     class="material-symbols-outlined text-violet-400 text-lg flex-shrink-0 mt-0.5">tips_and_updates</span>
                 <div class="text-xs text-violet-700 space-y-0.5">
-                    <p class="font-bold">For crash protection, choose a cloud-synced folder:</p>
-                    <p class="text-violet-600">📁 <strong>OneDrive</strong> — <code>C:\Users\YourName\OneDrive\</code>
-                    </p>
-                    <p class="text-violet-600">📁 <strong>Google Drive</strong> — <code>G:\My Drive\</code></p>
-                    <p class="text-violet-600">📁 <strong>Dropbox</strong> — <code>C:\Users\YourName\Dropbox\</code></p>
-                    <p class="mt-1 text-violet-500">Each auto-backup <strong>replaces</strong> the previous file — only
-                        one file ever exists in your folder.</p>
+                    <p class="font-bold">Recommendation: Use a cloud-synced folder</p>
+                    <p class="text-violet-500 mb-2">To keep your backups safe across devices, select a folder inside your cloud drive:</p>
+                    <p class="text-violet-600 font-medium">Example (OneDrive): <code>C:\Users\YourName\OneDrive\Backup\</code></p>
+                    <p class="text-violet-600 font-medium">Example (Google Drive): <code>G:\My Drive\Rethink\</code></p>
+                    <p class="mt-2 text-violet-500 italic">Note: The full system path is hidden by the browser for security; only the folder name will be displayed.</p>
                 </div>
             </div>
 

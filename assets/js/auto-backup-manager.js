@@ -67,6 +67,21 @@
         } catch (_) { /* ignore */ }
     }
 
+    /**
+     * Helper to save a single setting to the database
+     */
+    async function saveToDb(key, value) {
+        try {
+            await fetch('api/profile/settings.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value: String(value) })
+            });
+        } catch (e) {
+            console.warn(`[AutoBackup] Failed to save ${key} to DB:`, e);
+        }
+    }
+
     // ─── IndexedDB ────────────────────────────────────────────────────────────
 
     function openIdb() {
@@ -123,6 +138,7 @@
                 _dirHandle = handle;
                 _settings.folderName = handle.name;
                 persistSettings();
+                saveToDb('ab_folder_name', handle.name);
                 console.log('[AutoBackup] Folder handle restored silently:', handle.name);
                 return true;
             }
@@ -212,8 +228,7 @@
         }
         try {
             _dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'documents' });
-            _settings.folderName = _dirHandle.name;
-            persistSettings();
+            saveSettings({ folderName: _dirHandle.name });
             await persistHandle(_dirHandle); // save for next session
             return { success: true, folderName: _dirHandle.name };
         } catch (err) {
@@ -437,6 +452,42 @@
 
     async function initAutoBackup() {
         loadSettings();
+
+        // ─── Sync with Database ───────────────────────────────────────────────
+        try {
+            const res = await fetch('api/profile/settings.php');
+            const result = await res.json();
+            if (result.success && result.data) {
+                const db = result.data;
+                let changed = false;
+
+                if (db.ab_enabled !== undefined && db.ab_enabled !== null) {
+                    const enabled = db.ab_enabled === 'true';
+                    if (_settings.enabled !== enabled) {
+                        _settings.enabled = enabled;
+                        changed = true;
+                    }
+                }
+                if (db.ab_interval_ms !== undefined && db.ab_interval_ms !== null) {
+                    const interval = parseInt(db.ab_interval_ms, 10);
+                    if (!isNaN(interval) && _settings.intervalMs !== interval) {
+                        _settings.intervalMs = interval;
+                        changed = true;
+                    }
+                }
+                if (db.ab_folder_name !== undefined && db.ab_folder_name !== null) {
+                    if (_settings.folderName !== db.ab_folder_name) {
+                        _settings.folderName = db.ab_folder_name;
+                        changed = true;
+                    }
+                }
+
+                if (changed) persistSettings();
+            }
+        } catch (e) {
+            console.warn('[AutoBackup] Could not sync settings with DB:', e);
+        }
+
         // Try to silently restore the saved folder handle from IndexedDB
         if (supportsFileSystemAccess()) {
             await restoreHandle();
@@ -497,8 +548,15 @@
     function saveSettings(patch) {
         const wasEnabled = _settings.enabled;
         const wasInterval = _settings.intervalMs;
+        const wasFolderName = _settings.folderName;
+
         Object.assign(_settings, patch);
         persistSettings();
+
+        // Persist to database
+        if (patch.enabled !== undefined) saveToDb('ab_enabled', patch.enabled);
+        if (patch.intervalMs !== undefined) saveToDb('ab_interval_ms', patch.intervalMs);
+        if (patch.folderName !== undefined) saveToDb('ab_folder_name', patch.folderName);
 
         // Restart interval if enabled changed or interval changed
         if (_settings.enabled !== wasEnabled || _settings.intervalMs !== wasInterval) {
@@ -539,8 +597,7 @@
      */
     function _restoreHandleFromEvent(handle) {
         _dirHandle = handle;
-        _settings.folderName = handle.name;
-        persistSettings();
+        saveSettings({ folderName: handle.name });
         persistHandle(handle); // keep it saved for next session too
         console.log('[AutoBackup] Handle re-authorized and restored:', handle.name);
         // Dispatch update so any open Backup UI refreshes
@@ -555,6 +612,7 @@
         initAutoBackup,
         runBackupNow,
         isRunning: () => _running,
+        getActiveHandle: () => _dirHandle,
         pickFolder,
         getSettings,
         saveSettings,

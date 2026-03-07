@@ -639,7 +639,11 @@
             if (opt) opt.selected = true;
             // Folder name
             if (settings.folderName) {
+                const isAuthorized = !!abm.getActiveHandle();
                 folderNameEl.textContent = '📁 ' + settings.folderName;
+                if (!isAuthorized && abm.supportsFileSystemAccess()) {
+                    folderNameEl.innerHTML = `📁 ${settings.folderName} <span class="ml-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded cursor-help" title="Browser requires one-click permission to write to this folder again.">Requires Auth</span>`;
+                }
                 folderTip.classList.add('hidden');
             } else {
                 folderNameEl.textContent = 'Choose folder…';
