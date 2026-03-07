@@ -40,6 +40,7 @@ class StudyMentor {
         this.expandedMissionSubjects = new Set(); // Track expanded mission subject cards
         this.expandedRevisionSubjects = new Set(); // Track expanded revision subject cards
         this.inactiveNudgeIntervalId = null; // Track the inactive nudge interval
+        this.pomodoroNudgeExpanded = true; // Expand/shrink toggle for pomodoro nudge
         this.lastProcessedSessionId = null; // Track session IDs to avoid redundant sync events
         this.lastProcessedSessionStatus = null; // Track session status to detect active→completed transitions
         this.isRestoringSession = false; // Guard for parallel sync calls
@@ -595,6 +596,35 @@ class StudyMentor {
         }, 1000);
     }
 
+    togglePomodoroNudgeSize() {
+        this.pomodoroNudgeExpanded = !this.pomodoroNudgeExpanded;
+        // Apply/remove circular shape on teaser container
+        const teaser = document.getElementById('mentor-teaser');
+        const border = document.getElementById('teaser-border');
+        const content = document.getElementById('teaser-content');
+        if (!this.pomodoroNudgeExpanded) {
+            teaser?.classList.add('pomo-compact-mode');
+            border?.classList.add('pomo-compact-mode');
+            content?.classList.add('pomo-compact-mode');
+        } else {
+            teaser?.classList.remove('pomo-compact-mode');
+            border?.classList.remove('pomo-compact-mode');
+            content?.classList.remove('pomo-compact-mode');
+        }
+        if (this.focusSession.isActive) {
+            this.updateFocusUI(this.focusSession.intervalId === null);
+        } else if (this.breakSession.isActive) {
+            this.updateBreakUI(this.breakSession.intervalId === null);
+        }
+    }
+
+    ensureNudgeExpanded() {
+        if (!this.pomodoroNudgeExpanded) {
+            this.togglePomodoroNudgeSize();
+        }
+    }
+
+
     updateFocusUI() {
         const teaserText = document.getElementById('teaser-text');
         const badge = document.getElementById('mentor-badge');
@@ -628,22 +658,36 @@ class StudyMentor {
             this.applyTimerTheme();
 
             const isPaused = arguments[0] === true;
+            const toggleIcon = this.pomodoroNudgeExpanded ? '▼' : '▲';
+            const toggleTitle = this.pomodoroNudgeExpanded ? 'Shrink' : 'Expand';
 
-            teaserText.innerHTML = `
-                <div class="flex flex-col items-center">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">
-                        ${isPaused ? '⏸️ PAUSED' : `Focusing: ${this.focusSession.subject} (Session ${this.sessionChain.completedSessions + 1})`}
-                    </span>
-                    <span class="text-3xl font-black ${isPaused ? 'opacity-50' : ''}">${timeStr}</span>
-                    <div class="flex gap-2 mt-2">
-                        ${isPaused
-                    ? `<button onclick="studyMentor.resumeFocusSession()" class="text-[8px] font-bold text-white bg-emerald-600 px-2 py-1 rounded uppercase tracking-tighter">Resume</button>`
-                    : `<button onclick="studyMentor.pauseFocusSession()" class="text-[8px] font-bold text-white bg-amber-600 px-2 py-1 rounded uppercase tracking-tighter">Pause</button>`
-                }
-                        <button onclick="studyMentor.stopFocusSession()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Stop</button>
+            if (this.pomodoroNudgeExpanded) {
+                // --- EXPANDED VIEW (full, as before) ---
+                teaserText.innerHTML = `
+                    <div class="flex flex-col items-center pomo-nudge-expanded">
+                        <button onclick="studyMentor.togglePomodoroNudgeSize()" title="${toggleTitle}" class="pomo-nudge-toggle">${toggleIcon}</button>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">
+                            ${isPaused ? '⏸️ PAUSED' : `Focusing: ${this.focusSession.subject} (Session ${this.sessionChain.completedSessions + 1})`}
+                        </span>
+                        <span class="text-3xl font-black ${isPaused ? 'opacity-50' : ''}">${timeStr}</span>
+                        <div class="flex gap-2 mt-2">
+                            ${isPaused
+                        ? `<button onclick="studyMentor.resumeFocusSession()" class="text-[8px] font-bold text-white bg-emerald-600 px-2 py-1 rounded uppercase tracking-tighter">Resume</button>`
+                        : `<button onclick="studyMentor.pauseFocusSession()" class="text-[8px] font-bold text-white bg-amber-600 px-2 py-1 rounded uppercase tracking-tighter">Pause</button>`
+                    }
+                            <button onclick="studyMentor.stopFocusSession()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Stop</button>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // --- COMPACT VIEW (circular bubble, timer only) ---
+                teaserText.innerHTML = `
+                    <div onclick="studyMentor.togglePomodoroNudgeSize()" class="flex flex-col items-center justify-center pomo-nudge-compact cursor-pointer" title="Click to expand">
+                        <span class="text-[10px] font-black uppercase text-red-400 opacity-80 leading-none mb-1">S${this.sessionChain.completedSessions + 1}</span>
+                        <span class="text-xl font-black ${isPaused ? 'opacity-50' : ''}" style="letter-spacing:1px;">${timeStr}</span>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -653,8 +697,10 @@ class StudyMentor {
         const teaserDecor = document.getElementById('teaser-decor');
         const teaserEmoji = document.getElementById('teaser-emoji');
 
-        if (teaserBorder) teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-boss-border boss-heartbeat`;
-        if (teaserContent) teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-boss-bg`;
+        const compactClass = !this.pomodoroNudgeExpanded ? ' pomo-compact-mode' : '';
+
+        if (teaserBorder) teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-boss-border boss-heartbeat${compactClass}`;
+        if (teaserContent) teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-boss-bg${compactClass}`;
         if (teaserDecor) teaserDecor.innerHTML = '<div class="boss-heartbeat"></div>';
         if (teaserEmoji) teaserEmoji.innerText = '⏱️';
     }
@@ -681,8 +727,9 @@ class StudyMentor {
             this.isMotivationalNudgeActive = true;
 
             // Apply theme
-            teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${theme}-border`;
-            teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-${theme}-bg`;
+            const compactClass = !this.pomodoroNudgeExpanded ? ' pomo-compact-mode' : '';
+            teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-${theme}-border${compactClass}`;
+            teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-${theme}-bg${compactClass}`;
             teaser.classList.add('animate-float');
 
             // Apply Decorations
@@ -771,6 +818,7 @@ class StudyMentor {
     }
 
     showContinuationPrompt() {
+        this.ensureNudgeExpanded();
         this.isContinuationPromptActive = true;
         const subject = this.focusSession.subject;
         const sessionCount = this.sessionChain.completedSessions;
@@ -893,6 +941,7 @@ class StudyMentor {
     }
 
     showResumePrompt() {
+        this.ensureNudgeExpanded();
         this.isContinuationPromptActive = true;
         const subject = this.sessionChain.subjectName || this.breakSession.subject || this.focusSession.subject || "your subject";
         const nextSession = (this.sessionChain.completedSessions || 0) + 1; // Fallback correctly to 1 if missing
@@ -929,6 +978,7 @@ class StudyMentor {
     }
 
     stopFocusSession(keepTeaser = false) {
+        if (!keepTeaser) this.ensureNudgeExpanded();
         // Signal "STOP" and Log Duration if active
         if (this.focusSession.isActive && !this.breakSession.isActive) {
             const elapsedSeconds = this.focusSession.totalDuration - this.focusSession.timeRemaining;
@@ -1072,6 +1122,7 @@ class StudyMentor {
     }
 
     skipBreak() {
+        this.ensureNudgeExpanded();
         if (this.sessionChain.isActive) {
             this.saveSession('complete', { status: 'skipped', remaining_seconds: 0 });
             this.stopFocusSession(true); // Clear break session state
@@ -1119,25 +1170,39 @@ class StudyMentor {
             this.applyBreakTheme();
 
             const isPaused = arguments[0] === true;
+            const toggleIcon = this.pomodoroNudgeExpanded ? '▼' : '▲';
+            const toggleTitle = this.pomodoroNudgeExpanded ? 'Shrink' : 'Expand';
 
-            teaserText.innerHTML = `
-                <div class="flex flex-col items-center">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-1">
-                        ${isPaused ? '⏸️ PAUSED' : `Break Time (Session ${this.sessionChain.completedSessions} Complete)`}
-                    </span>
-                    <span class="text-xs font-bold leading-tight mb-2 ${isPaused ? 'opacity-50' : ''}">
-                        ${this.breakSession.currentActivity.text}
-                    </span>
-                    <span class="text-2xl font-black text-white ${isPaused ? 'opacity-50' : ''}">${timeStr}</span>
-                    <div class="flex gap-2 mt-2">
-                        ${isPaused
-                    ? `<button onclick="studyMentor.resumeBreakSession()" class="text-[8px] font-bold text-white bg-emerald-600 px-2 py-1 rounded uppercase tracking-tighter">Resume</button>`
-                    : `<button onclick="studyMentor.pauseBreakSession()" class="text-[8px] font-bold text-white bg-amber-600 px-2 py-1 rounded uppercase tracking-tighter">Pause</button>`
-                }
-                        <button onclick="studyMentor.skipBreak()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Skip Break</button>
+            if (this.pomodoroNudgeExpanded) {
+                // --- EXPANDED VIEW (full, as before) ---
+                teaserText.innerHTML = `
+                    <div class="flex flex-col items-center pomo-nudge-expanded">
+                        <button onclick="studyMentor.togglePomodoroNudgeSize()" title="${toggleTitle}" class="pomo-nudge-toggle">${toggleIcon}</button>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-1">
+                            ${isPaused ? '⏸️ PAUSED' : `Break Time (Session ${this.sessionChain.completedSessions} Complete)`}
+                        </span>
+                        <span class="text-xs font-bold leading-tight mb-2 ${isPaused ? 'opacity-50' : ''}">
+                            ${this.breakSession.currentActivity.text}
+                        </span>
+                        <span class="text-2xl font-black text-white ${isPaused ? 'opacity-50' : ''}">${timeStr}</span>
+                        <div class="flex gap-2 mt-2">
+                            ${isPaused
+                        ? `<button onclick="studyMentor.resumeBreakSession()" class="text-[8px] font-bold text-white bg-emerald-600 px-2 py-1 rounded uppercase tracking-tighter">Resume</button>`
+                        : `<button onclick="studyMentor.pauseBreakSession()" class="text-[8px] font-bold text-white bg-amber-600 px-2 py-1 rounded uppercase tracking-tighter">Pause</button>`
+                    }
+                            <button onclick="studyMentor.skipBreak()" class="text-[8px] font-bold text-gray-400 hover:text-white uppercase tracking-tighter self-center">Skip Break</button>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // --- COMPACT VIEW (circular bubble, timer only) ---
+                teaserText.innerHTML = `
+                    <div onclick="studyMentor.togglePomodoroNudgeSize()" class="flex flex-col items-center justify-center pomo-nudge-compact cursor-pointer" title="Click to expand">
+                        <span class="text-[10px] font-black uppercase text-cyan-400 opacity-80 leading-none mb-1">B${this.sessionChain.completedSessions}</span>
+                        <span class="text-xl font-black text-white ${isPaused ? 'opacity-50' : ''}" style="letter-spacing:1px;">${timeStr}</span>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -1147,8 +1212,10 @@ class StudyMentor {
         const teaserDecor = document.getElementById('teaser-decor');
         const teaserEmoji = document.getElementById('teaser-emoji');
 
-        if (teaserBorder) teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-focus-border`;
-        if (teaserContent) teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-focus-bg`;
+        const compactClass = !this.pomodoroNudgeExpanded ? ' pomo-compact-mode' : '';
+
+        if (teaserBorder) teaserBorder.className = `relative p-[3px] rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 theme-focus-border${compactClass}`;
+        if (teaserContent) teaserContent.className = `rounded-[13px] p-5 text-center relative z-10 border border-white/10 transition-colors duration-500 theme-focus-bg${compactClass}`;
         if (teaserDecor) teaserDecor.innerHTML = '<div class="focus-pulse"></div>';
         if (teaserEmoji) teaserEmoji.innerText = this.breakSession.currentActivity.emoji;
     }
@@ -1296,6 +1363,118 @@ class StudyMentor {
                     word-wrap: break-word;
                     white-space: normal;
                     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                }
+
+                /* Pomodoro nudge expand/shrink toggle */
+                .pomo-nudge-toggle {
+                    position: absolute;
+                    bottom: -18px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 24px;
+                    height: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 8px;
+                    color: rgba(255,255,255,0.5);
+                    cursor: pointer;
+                    border: none;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 0 0 8px 8px;
+                    padding: 0;
+                    line-height: 1;
+                    transition: all 0.2s;
+                    z-index: 20;
+                }
+                .pomo-nudge-toggle:hover {
+                    color: #fff;
+                    background: rgba(255,255,255,0.22);
+                }
+                .pomo-nudge-expanded { position: relative; padding-bottom: 6px; }
+                .pomo-nudge-compact {
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0;
+                }
+                /* Make the whole teaser circular in compact mode */
+                .pomo-compact-mode#mentor-teaser {
+                    min-width: 0 !important;
+                    max-width: none !important;
+                    width: 88px !important;
+                    height: 88px !important;
+                    border-radius: 50% !important;
+                    overflow: hidden !important;
+                }
+                .pomo-compact-mode#teaser-border {
+                    border-radius: 50% !important;
+                    padding: 0 !important;
+                    width: 88px !important;
+                    height: 88px !important;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    background: none !important; /* Hide theme border background to prevent leakage */
+                    border: none !important;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+                }
+                .pomo-compact-mode#teaser-content {
+                    border-radius: 50% !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    width: 88px !important;
+                    height: 88px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    box-sizing: border-box !important;
+                    border: none !important;
+                }
+                /* Interactive scale for the compact bubble */
+                .pomo-compact-mode#mentor-teaser:hover {
+                    transform: scale(1.05) translateY(-5px);
+                    transition: transform 0.2s ease-out;
+                }
+                .pomo-compact-mode #teaser-emoji,
+                .pomo-compact-mode #teaser-decor {
+                    display: none !important;
+                }
+                .pomo-compact-mode #teaser-text {
+                    width: 100% !important;
+                    height: 100% !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    position: relative;
+                    text-shadow: none !important;
+                }
+                /* Compact circular action buttons */
+                .pomo-compact-btn {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 9px;
+                    font-weight: 700;
+                    color: #fff;
+                    border: none;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                    padding: 0;
+                    line-height: 1;
+                }
+                .pomo-compact-btn:hover {
+                    transform: scale(1.15);
+                    filter: brightness(1.2);
                 }
 
                 .custom-scrollbar::-webkit-scrollbar {

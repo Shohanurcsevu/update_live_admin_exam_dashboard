@@ -1018,22 +1018,16 @@ const StudyTargetTracker = {
         // Draw the ghost trail
         if (this.ghostPoints.length <= 1) return;
 
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)'; // Faint grey
-        ctx.lineWidth = 1.5;
-        ctx.lineJoin = 'round';
-        
-        const firstPoint = this.ghostPoints[0];
-        ctx.moveTo(0, firstPoint.y);
-        
-        for (let i = 1; i < this.ghostPoints.length; i++) {
-            const x = (i / this.ECG_MAX_POINTS) * canvas.width;
-            ctx.lineTo(x, this.ghostPoints[i].y);
-        }
+        // Draw the ghost trail with smoothing (High Visibility Sync)
+        if (this.ghostPoints.length <= 1) return;
+
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)'; // Increased visibility pulse
+        ctx.lineWidth = 1.8;
+        this.drawSmoothedPath(ctx, canvas, this.ghostPoints);
         ctx.stroke();
 
         // Ghost label indicator
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
         ctx.font = 'bold 7px monospace';
         ctx.fillText('PAST SYNC ◈', 4, 8);
     },
@@ -1068,7 +1062,7 @@ const StudyTargetTracker = {
             } else if (phase >= (state.pulseInterval * 0.6) && phase < (state.pulseInterval * 0.8)) {
                 mainY += intensity * 0.3;
             } else {
-                mainY += (Math.random() - 0.5) * 3;
+                mainY += (Math.random() - 0.5) * 1.5; // Reduced jitter from 3 to 1.5
             }
         }
 
@@ -1092,7 +1086,7 @@ const StudyTargetTracker = {
                 const p = (ghostCycle - 25) / 15;
                 ghostY = centerX - Math.sin(p * Math.PI) * (ghostIntensity * 0.3);
             }
-            ghostY += (Math.random() - 0.5) * 1.0;
+            ghostY += (Math.random() - 0.5) * 0.5; // Reduced jitter from 1.0 to 0.5
         } else {
             // Faint flatline for past inactivity
             ghostY = centerX + Math.sin(frameCount * 0.03) * 0.5;
@@ -1156,7 +1150,7 @@ const StudyTargetTracker = {
             } else if (subjectPhase >= (state.pulseInterval * 0.6) && subjectPhase < (state.pulseInterval * 0.8)) {
                 sy += subjectIntensity * 0.25;
             } else {
-                sy += (Math.random() - 0.5) * 1.5;
+                sy += (Math.random() - 0.5) * 0.8; // Reduced jitter from 1.5 to 0.8
             }
 
             const buf = this.subjectPointBuffers[idx];
@@ -1164,14 +1158,9 @@ const StudyTargetTracker = {
             if (buf.length > this.ECG_MAX_POINTS) buf.shift();
 
             if (buf.length > 1) {
-                ctx.beginPath();
                 ctx.strokeStyle = `rgba(${color.rgb}, 0.3)`;
                 ctx.lineWidth = 1;
-                ctx.lineJoin = 'round';
-                ctx.moveTo(0, buf[0]);
-                for (let i = 1; i < buf.length; i++) {
-                    ctx.lineTo((i / this.ECG_MAX_POINTS) * canvas.width, buf[i]);
-                }
+                this.drawSmoothedPath(ctx, canvas, buf.map(y => ({ y })));
                 ctx.stroke();
             }
         });
@@ -1235,28 +1224,17 @@ const StudyTargetTracker = {
         gradient.addColorStop(0.8, `rgba(${accent.rgb}, 0.8)`);
         gradient.addColorStop(1, accent.hex);
 
-        // Build one continuous path (reused for both passes)
-        const buildPath = () => {
-            ctx.beginPath();
-            ctx.moveTo(0, this.ecgPoints[0].y);
-            for (let i = 1; i < this.ecgPoints.length; i++) {
-                ctx.lineTo((i / this.ECG_MAX_POINTS) * canvas.width, this.ecgPoints[i].y);
-            }
-        };
-
-        // Glow pass: thicker translucent line (replaces expensive shadowBlur)
+        // Glow pass: thicker translucent line
         const glowWidth = state.isFlatline ? 6 : 10;
-        buildPath();
         ctx.strokeStyle = `rgba(${accent.rgb}, ${state.isFlatline ? 0.15 : 0.2})`;
         ctx.lineWidth = glowWidth;
-        ctx.lineJoin = 'round';
+        this.drawSmoothedPath(ctx, canvas, this.ecgPoints);
         ctx.stroke();
 
         // Sharp line pass
-        buildPath();
         ctx.strokeStyle = gradient;
         ctx.lineWidth = state.isFlatline ? 1.5 : 2.5;
-        ctx.lineJoin = 'round';
+        this.drawSmoothedPath(ctx, canvas, this.ecgPoints);
         ctx.stroke();
 
         // Leading Eye (still uses shadowBlur — only 2 arcs, negligible cost)
@@ -1273,6 +1251,33 @@ const StudyTargetTracker = {
         ctx.arc(lx, lastPoint.y, 7 + Math.sin(frameCount * 0.1) * 3, 0, Math.PI * 2);
         ctx.stroke();
         ctx.shadowBlur = 0;
+    },
+
+    // Helper: Draw a series of points as a smooth quadratic curve
+    drawSmoothedPath(ctx, canvas, points) {
+        if (!points || points.length < 2) return;
+
+        ctx.beginPath();
+        ctx.lineJoin = 'round';
+        
+        // Move to first point
+        ctx.moveTo(0, points[0].y);
+
+        for (let i = 1; i < points.length - 1; i++) {
+            const x = (i / this.ECG_MAX_POINTS) * canvas.width;
+            const nextX = ((i + 1) / this.ECG_MAX_POINTS) * canvas.width;
+            
+            // Midpoint for quadratic bezier
+            const cx = (x + nextX) / 2;
+            const cy = (points[i].y + points[i+1].y) / 2;
+            
+            ctx.quadraticCurveTo(x, points[i].y, cx, cy);
+        }
+
+        // Draw last segment
+        const lastIdx = points.length - 1;
+        const lx = (lastIdx / this.ECG_MAX_POINTS) * canvas.width;
+        ctx.lineTo(lx, points[lastIdx].y);
     },
 
     // ─── Flatline Overlay ───────────────────────────────────────────────────
