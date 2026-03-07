@@ -175,11 +175,14 @@ const SmartHeader = {
             return;
         }
 
-        // 🔴 Solid Red: The last backup failed
-        if (settings.lastError) {
+        // 🔴 Solid Red: The last backup failed or requires authentication
+        const isAuthorized = manager.getActiveHandle();
+        if (settings.lastError || (settings.enabled && settings.folderName && !isAuthorized && manager.supportsFileSystemAccess())) {
             pulse.className = 'w-2 h-2 rounded-full cursor-help relative status-warning';
-            statusText.textContent = `Error: ${settings.lastError}`;
-            pulse.title = `Last failure: ${new Date(settings.lastAttemptAt).toLocaleTimeString()}`;
+            statusText.textContent = settings.lastError ? `Error: ${settings.lastError}` : 'Auth Required';
+            pulse.title = settings.lastError 
+                ? `Last failure: ${new Date(settings.lastAttemptAt).toLocaleTimeString()}` 
+                : 'Click to re-authorize backup folder';
             return;
         }
 
