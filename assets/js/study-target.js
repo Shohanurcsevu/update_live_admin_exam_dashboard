@@ -30,6 +30,7 @@ const StudyTargetTracker = {
     flowOrbFrameCount: 0,
     smoothedBpm: 0,
     sessionTimeline: [],
+    yesterdaySessions: [],
     momentumScore: 0,
     serverClockOffset: 0,
 
@@ -57,6 +58,7 @@ const StudyTargetTracker = {
         this.fetchSubjectEfficiency(); // Fetch efficiency patterns
         this.fetchEstimatedFinish(); // Fetch server-side finish time estimate
         this.fetchSessionTimeline(); // Fetch session streak timeline
+        this.fetchYesterdayGhost(); // Fetch yesterday's sessions for Bio-Sync Ghost
         this.fetchFocusHeatmap(); // Fetch 7-day focus heatmap
         this.startUpdateLoop();
         setInterval(() => {
@@ -395,6 +397,30 @@ const StudyTargetTracker = {
         } catch (e) {
             console.error("Ghost Runner Error:", e);
         }
+    },
+
+    async fetchYesterdayGhost() {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const dateStr = yesterday.toISOString().split('T')[0];
+        try {
+            const result = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${dateStr}`, 60);
+            if (result && result.success) {
+                this.yesterdaySessions = result.sessions || [];
+                console.log(`[ST-TRACKER] Bio-Sync: Loaded ${this.yesterdaySessions.length} sessions from yesterday`);
+            }
+        } catch (e) {
+            console.error("Bio-Sync Ghost Error:", e);
+        }
+    },
+
+    isTimeActiveInSessions(hourDecimal, sessionList) {
+        if (!sessionList || sessionList.length === 0) return false;
+        return sessionList.some(s => {
+            const start = s.start_hour;
+            const end = s.start_hour + s.duration_hours;
+            return hourDecimal >= start && hourDecimal <= end && s.type !== 'break';
+        });
     },
 
     async fetchSubjectEfficiency() {
@@ -813,8 +839,8 @@ const StudyTargetTracker = {
         // Layer 1: Grid
         this.drawECGGrid(ctx, canvas, state.isFlatline);
 
-        // Layer 2: Ghost waveform (behind main line)
-        this.drawGhostWaveform(ctx, canvas);
+        // Layer 2: Bio-Sync Ghost waveform (Yesterday's activity sync)
+        this.drawBioSyncGhost(ctx, canvas, frameCount, state);
 
         // Layer 3: Calculate the new ECG point
         const pointResult = this.calculateECGPoint(canvas, frameCount, state);
@@ -822,9 +848,13 @@ const StudyTargetTracker = {
         // Sync card border on spike
         this.syncCardBorder(state, pointResult, frameCount);
 
-        // Push new point
+        // Push new points
         this.ecgPoints.push({ y: pointResult.mainY, time: Date.now() });
         if (this.ecgPoints.length > this.ECG_MAX_POINTS) this.ecgPoints.shift();
+
+        if (!this.ghostPoints) this.ghostPoints = [];
+        this.ghostPoints.push({ y: pointResult.ghostY, time: Date.now() });
+        if (this.ghostPoints.length > this.ECG_MAX_POINTS) this.ghostPoints.shift();
 
         // Layer 4: Per-subject waveform overlays
         this.drawSubjectOverlays(ctx, canvas, activeSubjects, state, frameCount);
@@ -979,39 +1009,38 @@ const StudyTargetTracker = {
         }
     },
 
-    // ─── Ghost Waveform ─────────────────────────────────────────────────────
-    drawGhostWaveform(ctx, canvas) {
-        if (this.rhythmGhostPoints.length <= 1) return;
+    // ─── Bio-Sync Ghost Waveform ───────────────────────────────────────────
+    drawBioSyncGhost(ctx, canvas, frameCount, state) {
+        if (!this.yesterdaySessions || this.yesterdaySessions.length === 0) return;
 
-        // Soft glow pass (cheaper than shadowBlur)
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
-        ctx.lineWidth = 5;
-        ctx.lineJoin = 'round';
-        ctx.moveTo(0, this.rhythmGhostPoints[0]);
-        for (let i = 1; i < this.rhythmGhostPoints.length; i++) {
-            ctx.lineTo((i / this.ECG_MAX_POINTS) * canvas.width, this.rhythmGhostPoints[i]);
-        }
-        ctx.stroke();
+        if (!this.ghostPoints) this.ghostPoints = [];
+        
+        // Draw the ghost trail
+        if (this.ghostPoints.length <= 1) return;
 
-        // Sharp line pass
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)'; // Faint grey
         ctx.lineWidth = 1.5;
-        ctx.moveTo(0, this.rhythmGhostPoints[0]);
-        for (let i = 1; i < this.rhythmGhostPoints.length; i++) {
-            ctx.lineTo((i / this.ECG_MAX_POINTS) * canvas.width, this.rhythmGhostPoints[i]);
+        ctx.lineJoin = 'round';
+        
+        const firstPoint = this.ghostPoints[0];
+        ctx.moveTo(0, firstPoint.y);
+        
+        for (let i = 1; i < this.ghostPoints.length; i++) {
+            const x = (i / this.ECG_MAX_POINTS) * canvas.width;
+            ctx.lineTo(x, this.ghostPoints[i].y);
         }
         ctx.stroke();
 
-        // Ghost label
+        // Ghost label indicator
         ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
         ctx.font = 'bold 7px monospace';
-        ctx.fillText('BEST DAY ◈', 4, 8);
+        ctx.fillText('PAST SYNC ◈', 4, 8);
     },
 
     // ─── ECG Point Calculation ──────────────────────────────────────────────
     calculateECGPoint(canvas, frameCount, state) {
+        const centerX = canvas.height / 2;
         const studyBoost = this.studiedSeconds / 3600;
         const baseIntensity = 15;
         const targetIntensity = Math.min(35, baseIntensity + studyBoost * 4);
@@ -1021,11 +1050,11 @@ const StudyTargetTracker = {
             intensity *= (1.5 + Math.random() * 1.0);
         }
 
-        let mainY = canvas.height / 2;
+        let mainY = centerX;
         let activeSpike = false;
 
         if (state.isFlatline) {
-            mainY = canvas.height / 2 + Math.sin(frameCount * 0.05) * 2 + (Math.random() - 0.5) * 1.5;
+            mainY = centerX + Math.sin(frameCount * 0.05) * 2 + (Math.random() - 0.5) * 1.5;
         } else {
             const phase = frameCount % Math.floor(state.pulseInterval);
             if (phase > (state.pulseInterval * 0.2) && phase < (state.pulseInterval * 0.3)) {
@@ -1043,7 +1072,33 @@ const StudyTargetTracker = {
             }
         }
 
-        return { mainY, activeSpike, intensity };
+        // --- Bio-Sync Ghost Wave Calculation ---
+        const now = new Date();
+        const currentHour = now.getHours() + now.getMinutes() / 60;
+        const wasActiveYesterday = this.isTimeActiveInSessions(currentHour, this.yesterdaySessions);
+        
+        // Ghost follows a steady "Past" rhythm if active yesterday
+        const yesterdayBpm = 65; 
+        const ghostInterval = Math.round((60 / yesterdayBpm) * 60);
+        const ghostCycle = frameCount % ghostInterval;
+        let ghostY = centerX;
+
+        if (wasActiveYesterday) {
+            const ghostIntensity = 18; 
+            if (ghostCycle < 15) {
+                const p = ghostCycle / 15;
+                ghostY = centerX + Math.sin(p * Math.PI * 2) * (ghostIntensity * 1.1);
+            } else if (ghostCycle > 25 && ghostCycle < 40) {
+                const p = (ghostCycle - 25) / 15;
+                ghostY = centerX - Math.sin(p * Math.PI) * (ghostIntensity * 0.3);
+            }
+            ghostY += (Math.random() - 0.5) * 1.0;
+        } else {
+            // Faint flatline for past inactivity
+            ghostY = centerX + Math.sin(frameCount * 0.03) * 0.5;
+        }
+
+        return { mainY, ghostY, activeSpike, intensity };
     },
 
     // ─── Accent Color Helper ────────────────────────────────────────────────

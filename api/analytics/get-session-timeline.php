@@ -8,8 +8,11 @@ require_once '../subject/db_connect.php';
 
 date_default_timezone_set('Asia/Dhaka');
 
+// Get date from query parameter, default to today
+$target_date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+
 try {
-    // Get individual session blocks for today's 24h timeline
+    // Get individual session blocks for requested day's 24h timeline
     // Each block has: start_time (hour decimal), duration_hours, subject, type
     $sql = "
         SELECT 
@@ -33,7 +36,7 @@ try {
             FROM performance p
             JOIN exams e ON p.exam_id = e.id
             JOIN subjects s ON e.subject_id = s.id
-            WHERE DATE(p.attempt_time) = CURRENT_DATE
+            WHERE DATE(p.attempt_time) = ?
             AND p.time_used_seconds > 0
 
             UNION ALL
@@ -57,11 +60,11 @@ try {
             FROM activity_log al
             LEFT JOIN subjects s ON al.activity_message = s.subject_name
             WHERE al.activity_type = 'pomodoro_session'
-            AND DATE(al.timestamp) = CURRENT_DATE
+            AND DATE(al.timestamp) = ?
 
             UNION ALL
 
-            -- Active Pomodoro/Break sessions: Ongoing right now
+            -- Active Pomodoro/Break sessions: Ongoing right now (only for today)
             SELECT 
                 (HOUR(start_time) + MINUTE(start_time)/60.0) as start_hour,
                 (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(start_time)) / 3600.0 as duration_hours,
@@ -70,12 +73,17 @@ try {
                 subject_id
             FROM study_sessions
             WHERE status = 'active'
-            AND DATE(start_time) = CURRENT_DATE
+            AND DATE(start_time) = ?
+            AND ? = CURRENT_DATE
         ) timeline
         ORDER BY start_hour ASC
     ";
 
-    $result = $conn->query($sql);
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ssss", $target_date, $target_date, $target_date, $target_date);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
     if (!$result) {
         throw new Exception("Timeline query failed: " . $conn->error);
     }
@@ -83,7 +91,7 @@ try {
     $sessions = [];
     while ($row = $result->fetch_assoc()) {
         $start = max(0, floatval($row['start_hour']));
-        $duration = max(0.01, floatval($row['duration_hours'])); // Min 0.01h to be visible
+        $duration = max(0.01, floatval($row['duration_hours'])); 
 
         $sessions[] = [
             'start_hour' => round($start, 3),
@@ -94,10 +102,13 @@ try {
         ];
     }
 
+    $is_today = ($target_date === date('Y-m-d'));
+    
     echo json_encode([
         'success' => true,
         'sessions' => $sessions,
-        'current_hour' => round(date('G') + date('i')/60.0, 3)
+        'is_today' => $is_today,
+        'current_hour' => $is_today ? round(date('G') + date('i')/60.0, 3) : 24
     ]);
 
 } catch (Throwable $e) {
