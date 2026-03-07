@@ -71,6 +71,7 @@
         { name: 'job_countdown', icon: 'timer', label: 'Job Countdown' },
         { name: 'trivia_snapshots', icon: 'emoji_events', label: 'Trivia Scores' },
         { name: 'app_settings', icon: 'settings', label: 'App Settings' },
+        { name: 'bpm_logs', icon: 'favorite', label: 'BPM History' },
     ];
 
     // ─── Init ─────────────────────────────────────────────────────────────────────

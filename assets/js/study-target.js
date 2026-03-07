@@ -33,6 +33,26 @@ const StudyTargetTracker = {
     yesterdaySessions: [],
     momentumScore: 0,
     serverClockOffset: 0,
+    lastLogTime: 0, // NEW: For client-side rate limiting
+    yesterdayBpmLogs: [], // NEW: Persistent ghost logs
+    ecgLoopSequence: 0, // NEW: Prevent duplicate loops
+    lastStoredBpm: 0,   // NEW: Smart trigger state
+    lastStoredStatus: null,
+    lastStoredTime: 0,
+    MILESTONE_TITLES: {
+        1: "First Spark",
+        2: "Steady Pulse",
+        3: "Flow State",
+        4: "Deep Drive",
+        5: "Momentum Core",
+        6: "Endurance Peak",
+        7: "Unstoppable",
+        8: "Limitless",
+        9: "Prime Focus",
+        10: "Elite Focus",
+        11: "Zen Master",
+        12: "Legacy Session"
+    },
 
     async init() {
         // --- Per-page setup: always re-run to attach to fresh DOM elements ---
@@ -54,6 +74,7 @@ const StudyTargetTracker = {
         await this.fetchAllSubjects(); // Fetch all subjects first
         this.fetchData(true); // Then fetch daily data (force refresh to ensure new fields)
         this.fetchYesterdayProgress(); // Fetch ghost runner data
+        this.fetchYesterdayGhost(); // NEW: Fetch yesterday's BPM history for Ghost Wave
         this.fetchAIInsights(); // Fetch AI recommendations
         this.fetchSubjectEfficiency(); // Fetch efficiency patterns
         this.fetchEstimatedFinish(); // Fetch server-side finish time estimate
@@ -68,7 +89,6 @@ const StudyTargetTracker = {
             this.fetchEstimatedFinish();
             this.fetchSessionTimeline();
             this.fetchFocusHeatmap();
-            this.saveRhythmSnapshot(this.ecgPoints); // Feature: Rhythm Memory
         }, 30000);
     },
 
@@ -131,19 +151,21 @@ const StudyTargetTracker = {
                 }
 
                 // Track study activity changes locally
-                if (newSeconds !== this.studiedSeconds) {
-                    if (this.studiedSeconds > 0) {
-                        // Trigger Defibrillator Surge if coming back from Flatline (20m+ gap)
-                        const gapMs = (this.lastStudyChangeTime === null) ? 0 : (Date.now() - this.lastStudyChangeTime);
-                        if (gapMs > 20 * 60 * 1000) {
-                            this.recoveryStartTime = Date.now();
-                            console.log("[ST-TRACKER] Defibrillator Surge Triggered!");
-                        }
+                if (newSeconds > this.studiedSeconds && this.studiedSeconds > 0) {
+                    // Trigger Defibrillator Surge if coming back from Flatline (20m+ gap)
+                    const gapMs = (this.lastStudyChangeTime === null) ? 0 : (Date.now() - this.lastStudyChangeTime);
+                    if (gapMs > 20 * 60 * 1000) {
+                        this.recoveryStartTime = Date.now();
+                        console.log("[ST-TRACKER] Defibrillator Surge Triggered!");
                     }
                     this.lastStudyChangeTime = Date.now();
+                } else if (this.studiedSeconds === 0 && newSeconds > 0 && this.lastStudyChangeTime === null) {
+                    // Initialization case: trust server time
+                    // (already handled by last_active_timestamp sync above, but good to be explicit here)
                 }
 
                 this.studiedSeconds = newSeconds;
+
                 const dailyData = result.subjects || [];
 
                 // Merge dailyData into allSubjects
@@ -400,17 +422,19 @@ const StudyTargetTracker = {
     },
 
     async fetchYesterdayGhost() {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const dateStr = yesterday.toISOString().split('T')[0];
         try {
-            const result = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${dateStr}`, 60);
+            const date = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            const res = await fetch(`api/analytics/get-ghost-bpm.php?date=${date}`);
+            const result = await res.json();
+            
             if (result && result.success) {
-                this.yesterdaySessions = result.sessions || [];
-                console.log(`[ST-TRACKER] Bio-Sync: Loaded ${this.yesterdaySessions.length} sessions from yesterday`);
+                this.yesterdayBpmLogs = result.logs || [];
+                console.log(`[ST-TRACKER] Ghost Rhythm Synced: ${this.yesterdayBpmLogs.length} points from database.`);
+            } else {
+                this.yesterdayBpmLogs = [];
             }
         } catch (e) {
-            console.error("Bio-Sync Ghost Error:", e);
+            console.error("[ST-TRACKER] Ghost Sync Error:", e);
         }
     },
 
@@ -698,52 +722,68 @@ const StudyTargetTracker = {
         return `${m}m`;
     },
 
-    // ─── Feature: Rhythm Memory ───────────────────────────────────────────────
+    // ─── Feature: Rhythm Memory (Upgraded to Cloud Sync) ─────────────────────
 
-    saveRhythmSnapshot(points) {
-        if (!points || points.length < 10) return;
-        const today = new Date().toISOString().slice(0, 10);
-        const key = `ecg_rhythm_${today}`;
-        const payload = {
-            date: today,
-            studiedSeconds: this.studiedSeconds,
-            points: points.slice(-150).map(p => Math.round(p.y * 10) / 10)
-        };
-        try {
-            localStorage.setItem(key, JSON.stringify(payload));
-        } catch (e) { /* localStorage full, ignore */ }
-    },
+    async logBPMToDatabase() {
+        // Allow low BPM if active (starting up from flatline)
+        const currentBpm = Math.round(this.smoothedBpm || 0);
+        if (currentBpm <= 0 && !this.lastStoredStatus) return; // Still flatline
+        
+        const now = Date.now();
+        const activeSubjects = this.subjects.filter(s => s.seconds > 0);
+        const state = this.calculateECGState(activeSubjects);
+        const currentStatus = (state.isFlatline || activeSubjects.length === 0) ? 0 : 1;
 
-    loadBestDayRhythm() {
-        const today = new Date().toISOString().slice(0, 10);
-        let bestKey = null;
-        let bestSeconds = 0;
+        // --- SMART TRIGGER LOGIC ---
+        let shouldSave = false;
+        const timeSinceLastSave = now - this.lastStoredTime;
 
-        for (let i = 1; i <= 7; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            const dateStr = d.toISOString().slice(0, 10);
-            const key = `ecg_rhythm_${dateStr}`;
-            try {
-                const raw = localStorage.getItem(key);
-                if (raw) {
-                    const data = JSON.parse(raw);
-                    if (data.studiedSeconds > bestSeconds) {
-                        bestSeconds = data.studiedSeconds;
-                        bestKey = key;
-                    }
-                }
-            } catch (e) { /* ignore parse errors */ }
+        // 1. Status Toggle: Always save if you started/stopped studying (BYPASS THROTTLE)
+        if (currentStatus !== this.lastStoredStatus) {
+            shouldSave = true;
+            console.log("[ST-TRACKER] Smart Trigger: Status Flip Detected. Saving Instantly.");
+        }
+        else {
+            // 2. Throttle: For normal rhythm shifts, wait at least 10 seconds
+            if (timeSinceLastSave < 10000) return;
+
+            // 3. Significant Shift: Save if BPM changed by +/- 2
+            if (Math.abs(currentBpm - this.lastStoredBpm) >= 2) {
+                shouldSave = true;
+                console.log("[ST-TRACKER] Smart Trigger: Significant Rhythm Shift (+/- 2 BPM).");
+            }
+            // 4. Keepalive: Save at least every 5 minutes
+            else if (timeSinceLastSave > 5 * 60 * 1000) {
+                shouldSave = true;
+                console.log("[ST-TRACKER] Smart Trigger: 5m Keepalive Handshake.");
+            }
         }
 
-        if (bestKey) {
-            try {
-                const data = JSON.parse(localStorage.getItem(bestKey));
-                this.rhythmGhostPoints = data.points || [];
-                console.log(`[ST-TRACKER] Rhythm Memory: loaded ghost from ${bestKey} (${Math.round(bestSeconds / 3600)}h)`);
-            } catch (e) {
-                this.rhythmGhostPoints = [];
+        if (!shouldSave) return;
+
+        try {
+            const payload = {
+                bpm: currentBpm,
+                is_active: currentStatus
+            };
+            
+            this.lastStoredBpm = currentBpm;
+            this.lastStoredStatus = currentStatus;
+            this.lastStoredTime = now;
+
+            const response = await fetch('api/analytics/save-bpm-log.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (result && result.success) {
+                console.log(`[ST-TRACKER] BPM Persisted: ${currentBpm} BPM (Sync Success)`);
+            } else {
+                console.warn("[ST-TRACKER] BPM Sync Failed:", result.error);
             }
+        } catch (e) { 
+            console.error("[ST-TRACKER] Save Error:", e);
         }
     },
 
@@ -788,6 +828,9 @@ const StudyTargetTracker = {
 
         this.ecgCanvas = canvas;
         this.ecgCtx = canvas.getContext('2d');
+        this.ecgLoopSequence++; // Increment sequence to kill previous loops
+        const currentSeq = this.ecgLoopSequence;
+
         this.ecgContainer = canvas.parentElement;
         this.ecgContainerRoot = canvas.closest('[data-ecg-root]') || canvas.closest('.bg-slate-900\\/5');
         if (!this.ecgPoints) this.ecgPoints = [];
@@ -807,14 +850,21 @@ const StudyTargetTracker = {
         resizeCanvas();
 
         const animate = () => {
-            if (!this.ecgCtx || !document.body.contains(this.ecgCanvas)) return;
+            // Kill loop if sequence changed or element detached
+            if (this.ecgLoopSequence !== currentSeq || !this.ecgCtx || !document.body.contains(this.ecgCanvas)) {
+                return;
+            }
 
             // Fallback for initial zero-width container
             if (this.ecgCanvas.width === 0 && this.ecgContainer.clientWidth > 0) {
                 resizeCanvas();
             }
 
-            this.drawECGFrame();
+            try {
+                this.drawECGFrame();
+            } catch (frameErr) {
+                console.error("[ST-TRACKER] ECG Loop Crash Avoided:", frameErr);
+            }
             requestAnimationFrame(animate);
         };
 
@@ -836,6 +886,11 @@ const StudyTargetTracker = {
         this.ecgFrameCount++;
         const frameCount = this.ecgFrameCount;
 
+        // Smart Trigger BPM Logging: Check every 60 frames (approx 1s)
+        if (frameCount % 60 === 0) {
+            this.logBPMToDatabase();
+        }
+
         // Layer 1: Grid
         this.drawECGGrid(ctx, canvas, state.isFlatline);
 
@@ -849,11 +904,13 @@ const StudyTargetTracker = {
         this.syncCardBorder(state, pointResult, frameCount);
 
         // Push new points
-        this.ecgPoints.push({ y: pointResult.mainY, time: Date.now() });
+        const mainY = isNaN(pointResult.mainY) ? canvas.height / 2 : pointResult.mainY;
+        this.ecgPoints.push({ y: mainY, time: Date.now() });
         if (this.ecgPoints.length > this.ECG_MAX_POINTS) this.ecgPoints.shift();
 
         if (!this.ghostPoints) this.ghostPoints = [];
-        this.ghostPoints.push({ y: pointResult.ghostY, time: Date.now() });
+        const ghostY = isNaN(pointResult.ghostY) ? canvas.height / 2 : pointResult.ghostY;
+        this.ghostPoints.push({ y: ghostY, time: Date.now() });
         if (this.ghostPoints.length > this.ECG_MAX_POINTS) this.ghostPoints.shift();
 
         // Layer 4: Per-subject waveform overlays
@@ -870,10 +927,6 @@ const StudyTargetTracker = {
             this.drawFlatlineOverlay(ctx, canvas, frameCount, state.gapMs);
         }
 
-        // Periodic rhythm snapshot
-        if (frameCount % 1800 === 0) {
-            this.saveRhythmSnapshot(this.ecgPoints);
-        }
 
         // --- NEW: Sync Active Session Block on Timeline ---
         if (frameCount % 60 === 0) { 
@@ -895,7 +948,11 @@ const StudyTargetTracker = {
     // ─── State Calculation ──────────────────────────────────────────────────
     calculateECGState(activeSubjects) {
         const now = Date.now() + this.serverClockOffset;
-        const gapMs = (this.lastStudyChangeTime === null) ? 0 : (now - this.lastStudyChangeTime);
+        
+        // --- NEW: Fix Initial Flatline Bug ---
+        // If lastStudyChangeTime is null, we haven't synced yet. 
+        // Force a large gapMs to trigger "Signal Lost" instead of defaulting to 50 BPM.
+        const gapMs = (this.lastStudyChangeTime === null) ? 21 * 60 * 1000 : (now - this.lastStudyChangeTime);
 
         let fatigueFactor = 1.0;
         let statusLabel = 'Active Pulse';
@@ -921,8 +978,9 @@ const StudyTargetTracker = {
             statusLabel = 'Fading Rhythm';
             statusColorClass = 'text-rose-400 bg-rose-50 border-rose-100/50';
         }
-
-        const isFlatline = (this.firstStartTime !== null && this.studiedSeconds > 0 && fatigueFactor === 0);
+ 
+        // Simplified Flatline Detection: Purely based on fatigue factor
+        const isFlatline = (fatigueFactor === 0);
 
         // Defibrillator Surge
         const isRecovering = this.recoveryStartTime && (Date.now() - this.recoveryStartTime < this.ECG_RECOVERY_DURATION_MS);
@@ -936,11 +994,13 @@ const StudyTargetTracker = {
         }
 
         // BPM calculation
-        const baseBpm = Math.min(95, 50 + (activeSubjects.length - 1) * 5);
-        let bpm = isFlatline ? 0 : Math.max(20, baseBpm * fatigueFactor);
-        if (isRecovering) bpm += (Math.random() - 0.5) * 40;
+        // If NO active subjects and NOT recovering, force 0 BPM (Flatline/Sleep)
+        const baseBpm = activeSubjects.length > 0 ? Math.max(50, 50 + (activeSubjects.length - 1) * 5) : 0;
+        let bpm = (isFlatline || baseBpm === 0) ? 0 : Math.max(20, baseBpm * fatigueFactor);
+        if (isRecovering) bpm = Math.max(bpm, 20) + (Math.random() - 0.5) * 40;
 
-        const pulseInterval = isFlatline ? 99999 : Math.round((60 / Math.max(1, bpm)) * 60);
+        // Sanitize pulse interval (min 60fps / 16ms)
+        const pulseInterval = isFlatline ? 99999 : Math.max(16, Math.round((60 / Math.max(1, bpm)) * 60));
 
         return { gapMs, fatigueFactor, statusLabel, statusColorClass, isFlatline, isRecovering, bpm, pulseInterval };
     },
@@ -968,8 +1028,9 @@ const StudyTargetTracker = {
 
         // Smooth the BPM to prevent jittery numbers (lerp 5% toward actual)
         const targetBpm = Math.round(state.bpm);
+        if (this.smoothedBpm === 0 && targetBpm > 0) this.smoothedBpm = targetBpm; // Fast init
         this.smoothedBpm += (targetBpm - this.smoothedBpm) * 0.05;
-        const displayBpm = Math.round(this.smoothedBpm);
+        const displayBpm = Math.round(this.smoothedBpm || 0);
 
         // Find matching zone
         const zone = this.HEART_RATE_ZONES.find(z => displayBpm >= z.min && displayBpm <= z.max)
@@ -984,14 +1045,17 @@ const StudyTargetTracker = {
         // --- Ghost Delta Indicator ---
         const deltaEl = document.getElementById('ghost-delta-badge');
         if (deltaEl) {
-            if (state.isFlatline || !this.yesterdaySessions || this.yesterdaySessions.length === 0) {
+            if (state.isFlatline || !this.yesterdayBpmLogs || this.yesterdayBpmLogs.length === 0) {
                 deltaEl.classList.add('hidden');
             } else {
                 const now = new Date();
                 const currentHour = now.getHours() + now.getMinutes() / 60;
-                const wasActiveYesterday = this.isTimeActiveInSessions(currentHour, this.yesterdaySessions);
                 
-                const ghostBpm = wasActiveYesterday ? 65 : 0;
+                // Find nearest ghost log
+                const ghostLog = this.yesterdayBpmLogs.find(l => Math.abs(l.hour - currentHour) < 0.05);
+                const ghostBpm = ghostLog ? ghostLog.bpm : 0;
+                const wasActiveYesterday = ghostLog ? ghostLog.isActive : false;
+                
                 const delta = displayBpm - ghostBpm;
                 
                 deltaEl.classList.remove('hidden');
@@ -1036,7 +1100,7 @@ const StudyTargetTracker = {
 
     // ─── Bio-Sync Ghost Waveform ───────────────────────────────────────────
     drawBioSyncGhost(ctx, canvas, frameCount, state) {
-        if (!this.yesterdaySessions || this.yesterdaySessions.length === 0) return;
+        if (!this.yesterdayBpmLogs || this.yesterdayBpmLogs.length === 0) return;
 
         if (!this.ghostPoints) this.ghostPoints = [];
         
@@ -1091,18 +1155,20 @@ const StudyTargetTracker = {
             }
         }
 
-        // --- Bio-Sync Ghost Wave Calculation ---
+        // --- Bio-Sync Ghost Wave Calculation (Using REAL History) ---
         const now = new Date();
         const currentHour = now.getHours() + now.getMinutes() / 60;
-        const wasActiveYesterday = this.isTimeActiveInSessions(currentHour, this.yesterdaySessions);
         
-        // Ghost follows a steady "Past" rhythm if active yesterday
-        const yesterdayBpm = 65; 
-        const ghostInterval = Math.round((60 / yesterdayBpm) * 60);
+        // Find nearest ghost log
+        const ghostLog = this.yesterdayBpmLogs.find(l => Math.abs(l.hour - currentHour) < 0.05);
+        const wasActiveYesterday = ghostLog ? ghostLog.isActive : false;
+        const yesterdayBpm = ghostLog ? Math.max(20, ghostLog.bpm) : 0;
+
+        const ghostInterval = yesterdayBpm > 0 ? Math.max(16, Math.round((60 / yesterdayBpm) * 60)) : 9999;
         const ghostCycle = frameCount % ghostInterval;
         let ghostY = centerX;
 
-        if (wasActiveYesterday) {
+        if (wasActiveYesterday && yesterdayBpm > 0) {
             const ghostIntensity = 18; 
             if (ghostCycle < 15) {
                 const p = ghostCycle / 15;
@@ -1111,7 +1177,7 @@ const StudyTargetTracker = {
                 const p = (ghostCycle - 25) / 15;
                 ghostY = centerX - Math.sin(p * Math.PI) * (ghostIntensity * 0.3);
             }
-            ghostY += (Math.random() - 0.5) * 0.5; // Reduced jitter from 1.0 to 0.5
+            ghostY += (Math.random() - 0.5) * 0.5;
         } else {
             // Faint flatline for past inactivity
             ghostY = centerX + Math.sin(frameCount * 0.03) * 0.5;
@@ -1282,21 +1348,25 @@ const StudyTargetTracker = {
     drawSmoothedPath(ctx, canvas, points) {
         if (!points || points.length < 2) return;
 
+        // SANITY CHECK: Remove any NaN points that could crash the canvas context
+        const validPoints = points.filter(p => p && !isNaN(p.y));
+        if (validPoints.length < 2) return;
+
         ctx.beginPath();
         ctx.lineJoin = 'round';
         
         // Move to first point
-        ctx.moveTo(0, points[0].y);
+        ctx.moveTo(0, validPoints[0].y);
 
-        for (let i = 1; i < points.length - 1; i++) {
+        for (let i = 1; i < validPoints.length - 1; i++) {
             const x = (i / this.ECG_MAX_POINTS) * canvas.width;
             const nextX = ((i + 1) / this.ECG_MAX_POINTS) * canvas.width;
             
             // Midpoint for quadratic bezier
             const cx = (x + nextX) / 2;
-            const cy = (points[i].y + points[i+1].y) / 2;
+            const cy = (validPoints[i].y + validPoints[i+1].y) / 2;
             
-            ctx.quadraticCurveTo(x, points[i].y, cx, cy);
+            ctx.quadraticCurveTo(x, validPoints[i].y, cx, cy);
         }
 
         // Draw last segment
@@ -1326,11 +1396,20 @@ const StudyTargetTracker = {
     // ─── Session Streak Timeline ─────────────────────────────────────────────
     async fetchSessionTimeline() {
         try {
-            const result = await CacheManager.fetchWithCache('api/analytics/get-session-timeline.php', 10);
-            if (result && result.success) {
-                this.sessionTimeline = result.sessions || [];
-                this.renderSessionTimeline(result.current_hour);
+            // Fetch Today's Sessions
+            const todayResult = await CacheManager.fetchWithCache('api/analytics/get-session-timeline.php', 10);
+            if (todayResult && todayResult.success) {
+                this.sessionTimeline = todayResult.sessions || [];
             }
+
+            // Fetch Yesterday's Sessions (Ghost Trace)
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+            const ghostResult = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${yesterday}`, 60);
+            if (ghostResult && ghostResult.success) {
+                this.yesterdaySessions = ghostResult.sessions || [];
+            }
+
+            this.renderSessionTimeline(todayResult.current_hour);
         } catch (e) {
             console.error('[ST-TRACKER] Timeline fetch error:', e);
         }
@@ -1368,11 +1447,27 @@ const StudyTargetTracker = {
             }
         });
 
-        // Clear old blocks (keep the now marker)
-        const oldBlocks = bar.querySelectorAll('.timeline-block');
+        // Clear old blocks and milestones (keep the now marker)
+        const oldBlocks = bar.querySelectorAll('.timeline-block, .timeline-ghost-block');
         oldBlocks.forEach(b => b.remove());
+        const oldMilestones = bar.parentElement.querySelectorAll('.timeline-milestone');
+        oldMilestones.forEach(m => m.remove());
 
-        // Render each session as a positioned block
+        // 1. Render Yesterday's Shadow (Background Layer)
+        this.yesterdaySessions.forEach(session => {
+            const leftPercent = (session.start_hour / 24) * 100;
+            const widthPercent = (session.duration_hours / 24) * 100;
+            if (widthPercent <= 0) return;
+
+            const ghost = document.createElement('div');
+            ghost.className = 'timeline-ghost-block absolute top-0 h-full bg-slate-400/10 border-t border-dashed border-slate-400/20 z-0 pointer-events-none rounded-sm';
+            ghost.style.left = `${leftPercent}%`;
+            ghost.style.width = `${widthPercent}%`;
+            ghost.title = `Yesterday: ${session.subject || 'Session'}\n${Math.round(session.duration_hours * 60)}m`;
+            bar.appendChild(ghost);
+        });
+
+        // 2. Render Today's Sessions (Foreground Layer)
         this.sessionTimeline.forEach(session => {
             const leftPercent = (session.start_hour / 24) * 100;
             const widthPercent = Math.max(0.3, (session.duration_hours / 24) * 100);
@@ -1387,7 +1482,7 @@ const StudyTargetTracker = {
                 this.activeSubjectPalette = palette;
             }
             
-            block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-0'}`;
+            block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-10'}`;
             block.style.left = `${leftPercent}%`;
             block.style.width = `${widthPercent}%`;
             block.dataset.startHour = session.start_hour;
@@ -1424,6 +1519,76 @@ const StudyTargetTracker = {
             bar.appendChild(block);
         });
 
+        // --- NEW: Render Milestones (Hourly Achievements) ---
+        let cumulativeHours = 0;
+        const sortedSessions = [...this.sessionTimeline].sort((a, b) => a.start_hour - b.start_hour);
+        
+        sortedSessions.forEach(session => {
+            const startHours = cumulativeHours;
+            const endHours = cumulativeHours + session.duration_hours;
+            
+            // Check if we passed any whole hour marks (1.0, 2.0, etc.)
+            for (let m = Math.floor(startHours) + 1; m <= Math.floor(endHours); m++) {
+                if (m > 0) {
+                    // Exact hour of day when this milestone was reached
+                    const hourOfDay = session.start_hour + (m - startHours);
+                    const leftPercent = (hourOfDay / 24) * 100;
+                    
+                    const marker = document.createElement('div');
+                    marker.className = 'timeline-milestone group absolute z-20 flex flex-col items-center cursor-pointer';
+                    marker.style.left = `${leftPercent}%`;
+                    marker.style.top = '0'; // Stay perfectly aligned with bar top
+                    
+                    const title = this.MILESTONE_TITLES[m] || `${m}h Milestone`;
+                    
+                    // Granular Evolution: Unique Icon + Color per hour (1-12)
+                    const evolution = {
+                        1: { icon: '🌱', hue: 100 }, // Light Green
+                        2: { icon: '🌿', hue: 120 }, // Green
+                        3: { icon: '🚩', hue: 210 }, // Blue
+                        4: { icon: '🕯️', hue: 45 },  // Yellow
+                        5: { icon: '✨', hue: 180 }, // Cyan
+                        6: { icon: '🔥', hue: 25 },  // Orange
+                        7: { icon: '🧨', hue: 0 },   // Red
+                        8: { icon: '⚡', hue: 280 }, // Purple
+                        9: { icon: '🌀', hue: 320 }, // Pink
+                        10: { icon: '💠', hue: 195 }, // Sky
+                        11: { icon: '🌌', hue: 240 }, // Deep Blue
+                        12: { icon: '🏆', hue: 45 }   // Gold (Mastery)
+                    };
+                    
+                    const tier = evolution[m] || { icon: '🏆', hue: 45 };
+                    const accent = m >= 12 ? `hsl(${tier.hue}, 100%, 50%)` : `hsl(${tier.hue}, 80%, 55%)`;
+
+                    marker.innerHTML = `
+                        <div class="timeline-milestone-flag absolute bottom-full mb-1 px-2 py-1 rounded-sm bg-white shadow-lg border-l-2 text-[10px] font-black uppercase tracking-normal whitespace-nowrap transition-all duration-300" 
+                             style="color: ${accent}; border-left-color: ${accent};">
+                           ${tier.icon} ${m}<span class="milestone-label hidden ml-1.5 font-bold">· ${title}</span>
+                        </div>
+                        <div class="timeline-milestone-bar w-[1.5px] h-5 shadow-md" style="background: ${accent};"></div>
+                    `;
+
+                    // Click to toggle label (Single open mode)
+                    marker.onclick = (e) => {
+                        e.stopPropagation();
+                        const myLabel = marker.querySelector('.milestone-label');
+                        const isHidden = myLabel.classList.contains('hidden');
+                        
+                        // Close ALL others first
+                        document.querySelectorAll('.milestone-label').forEach(el => el.classList.add('hidden'));
+                        
+                        // Toggle this one
+                        if (isHidden) {
+                            myLabel.classList.remove('hidden');
+                        }
+                    };
+                    
+                    bar.parentElement.appendChild(marker);
+                }
+            }
+            cumulativeHours = endHours;
+        });
+
         // Ensure we have the pulse animation CSS
         if (!document.getElementById('timeline-active-css')) {
             const style = document.createElement('style');
@@ -1447,6 +1612,28 @@ const StudyTargetTracker = {
                     background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
                     background-size: 200% 100%;
                     animation: timeline-pulse 2s infinite ease-in-out, timeline-shimmer 3s infinite linear;
+                }
+                .timeline-milestone-flag {
+                    z-index: 40;
+                }
+                .timeline-milestone-bar {
+                    position: relative;
+                }
+                /* Vibrant Milestone Aesthetic */
+                .timeline-vibrant-gaps {
+                    background: linear-gradient(90deg, 
+                        rgba(99, 102, 241, 0.08), 
+                        rgba(236, 72, 153, 0.05), 
+                        rgba(59, 130, 246, 0.08), 
+                        rgba(236, 72, 153, 0.05),
+                        rgba(99, 102, 241, 0.08)
+                    ) !important;
+                    background-size: 400% 100% !important;
+                    animation: timeline-gap-shimmer 15s infinite linear !important;
+                }
+                @keyframes timeline-gap-shimmer {
+                    0% { background-position: 0% 50%; }
+                    100% { background-position: 400% 50%; }
                 }
                 .timeline-radar-ring {
                     position: absolute;
@@ -1478,8 +1665,7 @@ const StudyTargetTracker = {
                 const ampm = h >= 12 ? 'pm' : 'am';
                 const displayH = h % 12 || 12;
                 clockEl.textContent = `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
-
-                // Dynamic coloring every hour (cycles through HSL)
+      // Dynamic coloring every hour (cycles through HSL)
                 const hue = (h * 15) % 360; 
                 const accentColor = `hsl(${hue}, 80%, 45%)`;
                 const bgColor = `hsla(${hue}, 80%, 98%, 0.95)`;

@@ -45,7 +45,7 @@ $tables = [
     'performance', 'question_attempts', 'question_srs',
     'offline_exam_attempts', 'study_sessions', 'activity_log',
     'mistake_bank', 'flashcards', 'reading_logs', 'user_streaks',
-    'job_countdown', 'trivia_snapshots',
+    'job_countdown', 'trivia_snapshots', 'bpm_logs',
 ];
 
 $backup = [
