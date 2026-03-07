@@ -980,6 +980,31 @@ const StudyTargetTracker = {
 
         zoneEl.textContent = state.isFlatline ? 'Offline' : zone.name;
         zoneEl.className = `text-[7px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-tighter leading-none mt-0.5 ${zone.bgClass} ${zone.textClass}`;
+
+        // --- Ghost Delta Indicator ---
+        const deltaEl = document.getElementById('ghost-delta-badge');
+        if (deltaEl) {
+            if (state.isFlatline || !this.yesterdaySessions || this.yesterdaySessions.length === 0) {
+                deltaEl.classList.add('hidden');
+            } else {
+                const now = new Date();
+                const currentHour = now.getHours() + now.getMinutes() / 60;
+                const wasActiveYesterday = this.isTimeActiveInSessions(currentHour, this.yesterdaySessions);
+                
+                const ghostBpm = wasActiveYesterday ? 65 : 0;
+                const delta = displayBpm - ghostBpm;
+                
+                deltaEl.classList.remove('hidden');
+                if (wasActiveYesterday) {
+                    const isFaster = delta >= 0;
+                    deltaEl.textContent = `${isFaster ? '+' : ''}${delta} vs ${ghostBpm} BPM`;
+                    deltaEl.className = `text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-normal leading-none mt-0.5 ${isFaster ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`;
+                } else {
+                    deltaEl.textContent = `+${displayBpm} vs 0 BPM ◈ NEW PEAK`;
+                    deltaEl.className = `text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-normal leading-none mt-0.5 bg-indigo-100 text-indigo-600`;
+                }
+            }
+        }
     },
 
     // ─── Grid Drawing ───────────────────────────────────────────────────────
@@ -1334,6 +1359,8 @@ const StudyTargetTracker = {
         // Build a subject → color index map
         const subjectColorMap = {};
         let colorIdx = 0;
+        this.activeSubjectPalette = null; // Reset every render
+
         this.sessionTimeline.forEach(s => {
             const subjectKey = (s.subject || 'Session').trim();
             if (!(subjectKey in subjectColorMap)) {
@@ -1355,6 +1382,10 @@ const StudyTargetTracker = {
             const block = document.createElement('div');
             const isActive = session.type === 'pomodoro_active';
             const isBreak = session.type === 'break';
+
+            if (isActive) {
+                this.activeSubjectPalette = palette;
+            }
             
             block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-0'}`;
             block.style.left = `${leftPercent}%`;
@@ -1650,10 +1681,17 @@ const StudyTargetTracker = {
 
             // Set properties based on state
             let speed = 0.02;
-            let color = this.protocolActive ? '#22d3ee' : '#ef4444'; // Use Cyan in Stealth Mode
+            let color = this.protocolActive ? '#22d3ee' : '#ef4444'; 
             let viscosity = 0.5;
 
-            if (this.protocolActive) {
+            // Priority 1: Active Subject Sync (Override)
+            if (this.activeSubjectPalette && !this.protocolActive) {
+                color = this.activeSubjectPalette.main;
+                speed = 0.06;
+                viscosity = 0.75;
+            } 
+            // Priority 2: Standard States
+            else if (this.protocolActive) {
                 speed = 0.1; // Maximum overdrive
                 viscosity = 0.9;
                 color = '#a855f7'; // Shift to Violet in Overdrive
