@@ -400,6 +400,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 link.classList.toggle('bg-gray-700', !!navLinkPage && (navLinkPage === page || navLinkPage === parentPage));
             });
             await loadPageScript(page);
+
+            // Re-initialize StudyTargetTracker if it exists (handles re-binding to new DOM)
+            if (typeof StudyTargetTracker !== 'undefined') {
+                StudyTargetTracker.init();
+            }
         } catch (e) {
             mainContent.innerHTML = `<p class="text-red-500 p-6 text-center"><b>404 Not Found:</b><br>Could not load page content for <b>'${page}'</b>.</p>`;
         }
@@ -579,10 +584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         syncManager.initAutoSync();
     }
 
-    // Initialize Study Target Tracker (Global)
-    if (typeof StudyTargetTracker !== 'undefined') {
-        StudyTargetTracker.init();
-    }
+    // StudyTargetTracker will be initialized within loadPage
 
     const initialParams = new URLSearchParams(window.location.search);
     const initialPage = initialParams.get('page') || 'dashboard';

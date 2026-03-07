@@ -8,6 +8,36 @@ body {
 
 body {
     font-family: var(--app-font, 'Space Grotesk'), sans-serif;
+    /* Default (Indigo) Palette */
+    --brand-50: #eef2ff;
+    --brand-100: #e0e7ff;
+    --brand-200: #c7d2fe;
+    --brand-300: #a5b4fc;
+    --brand-400: #818cf8;
+    --brand-500: #6366f1;
+    --brand-600: #4f46e5;
+    --brand-700: #4338ca;
+    --brand-800: #3730a3;
+    --brand-900: #312e81;
+    --app-accent: var(--brand-500);
+}
+
+/* Theme Presets */
+body[data-theme="emerald"] {
+    --brand-50: #ecfdf5; --brand-100: #d1fae5; --brand-200: #a7f3d0; --brand-300: #6ee7b7; --brand-400: #34d399; 
+    --brand-500: #10b981; --brand-600: #059669; --brand-700: #047857; --brand-800: #065f46; --brand-900: #064e3b;
+}
+body[data-theme="rose"] {
+    --brand-50: #fff1f2; --brand-100: #ffe4e6; --brand-200: #fecdd3; --brand-300: #fda4af; --brand-400: #fb7185;
+    --brand-500: #f43f5e; --brand-600: #e11d48; --brand-700: #be123c; --brand-800: #9f1239; --brand-900: #881337;
+}
+body[data-theme="amber"] {
+    --brand-50: #fffbeb; --brand-100: #fef3c7; --brand-200: #fde68a; --brand-300: #fcd34d; --brand-400: #fbbf24;
+    --brand-500: #f59e0b; --brand-600: #d97706; --brand-700: #b45309; --brand-800: #92400e; --brand-900: #78350f;
+}
+body[data-theme="violet"] {
+    --brand-50: #f5f3ff; --brand-100: #ede9fe; --brand-200: #ddd6fe; --brand-300: #c4b5fd; --brand-400: #a78bfa;
+    --brand-500: #8b5cf6; --brand-600: #7c3aed; --brand-700: #6d28d9; --brand-800: #5b21b6; --brand-900: #4c1d95;
 }
 
 /* ── Font Picker Dropdown ──────────────────────────────────/* Font Options Dropdown Styles */
@@ -81,7 +111,7 @@ body {
 }
 
 .fp-name-input:focus {
-    border-color: #6366f1;
+    border-color: var(--app-accent);
     background: white;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
@@ -152,7 +182,7 @@ body {
 }
 
 .fp-ring-indicator {
-    stroke: #6366f1;
+    stroke: var(--brand-600);
     stroke-dasharray: 0, 100;
     transition: stroke-dasharray 1s ease-in-out;
 }
@@ -184,7 +214,7 @@ body {
 .fp-stat-value {
     font-size: 12px;
     font-weight: 900;
-    color: #6366f1;
+    color: var(--brand-600);
 }
 
 /* Action Items (Change Photo etc) */
@@ -234,6 +264,52 @@ body {
     color: #94a3b8;
 }
 
+/* Branding & Colors */
+.fp-color-list {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    justify-content: space-between;
+}
+
+.fp-color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 0;
+    position: relative;
+}
+
+.fp-color-swatch:hover {
+    transform: scale(1.15);
+}
+
+.fp-color-swatch.active {
+    border-color: #e2e8f0;
+    box-shadow: 0 0 0 2px white, 0 0 0 4px var(--app-accent);
+}
+
+.fp-color-check {
+    font-size: 14px !important;
+    color: white;
+    font-weight: 900;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.2s ease;
+}
+
+.fp-color-swatch.active .fp-color-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Typography Section */
 .fp-list {
     padding: 6px;
     max-height: 280px;
@@ -285,21 +361,25 @@ body {
 }
 
 .fp-option.fp-active .fp-check {
+    color: var(--app-accent);
+    color: var(--brand-600);
     opacity: 1;
     transform: scale(1);
 }
 
 .fp-option.fp-active {
-    background: #eef2ff;
+    background: var(--brand-50);
+    border-color: var(--brand-600);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .fp-option.fp-active .fp-option-preview {
-    color: #4f46e5;
+    color: var(--brand-600);
 }
 
 .fp-option.fp-active .fp-option-tag {
-    background: #e0e7ff;
-    color: #6366f1;
+    background: var(--brand-100);
+    color: var(--brand-700);
 }
 
 /* MODIFIED: Updated scrollbar to match dashboard dark theme */

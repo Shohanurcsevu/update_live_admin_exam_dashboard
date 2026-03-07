@@ -7,6 +7,28 @@
     <title>Admin Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: {
+                            50: 'var(--brand-50, #eef2ff)',
+                            100: 'var(--brand-100, #e0e7ff)',
+                            200: 'var(--brand-200, #c7d2fe)',
+                            300: 'var(--brand-300, #a5b4fc)',
+                            400: 'var(--brand-400, #818cf8)',
+                            500: 'var(--brand-500, #6366f1)',
+                            600: 'var(--brand-600, #4f46e5)',
+                            700: 'var(--brand-700, #4338ca)',
+                            800: 'var(--brand-800, #3730a3)',
+                            900: 'var(--brand-900, #312e81)',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
     <!-- Chart.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- MODIFIED: Added Cropper.js and Confetti Library -->
@@ -36,9 +58,17 @@
             let f = localStorage.getItem('app-font');
             let a = localStorage.getItem('user_avatar');
             let n = localStorage.getItem('user_name');
+            let ac = localStorage.getItem('app_accent');
 
             // 2. Apply immediate styles & data if found
             if (f) document.documentElement.style.setProperty('--app-font', "'" + f + "'");
+            if (ac) {
+                // Map hex to theme name (Simple early mapping)
+                const themeMap = { '#6366f1': 'indigo', '#10b981': 'emerald', '#f43f5e': 'rose', '#f59e0b': 'amber', '#8b5cf6': 'violet' };
+                const theme = themeMap[ac] || 'indigo';
+                document.documentElement.style.setProperty('--app-accent', ac);
+                document.addEventListener("DOMContentLoaded", () => document.body.setAttribute('data-theme', theme));
+            }
             if (a) {
                 const style = document.createElement('style');
                 style.id = 'early-avatar-style';
@@ -48,7 +78,7 @@
             // Note: user_name is applied later by FontPicker but we cache it here
 
             // 3. Fallback: If cache is incomplete, fetch from Database
-            if (!f || !a || !n) {
+            if (!f || !a || !n || !ac) {
                 try {
                     const response = await fetch('api/profile/settings.php');
                     const result = await response.json();
@@ -57,6 +87,13 @@
                         if (!f && settings.app_font) {
                             document.documentElement.style.setProperty('--app-font', "'" + settings.app_font + "'");
                             localStorage.setItem('app-font', settings.app_font);
+                        }
+                        if (!ac && settings.app_accent) {
+                            const themeMap = { '#6366f1': 'indigo', '#10b981': 'emerald', '#f43f5e': 'rose', '#f59e0b': 'amber', '#8b5cf6': 'violet' };
+                            const theme = themeMap[settings.app_accent] || 'indigo';
+                            document.documentElement.style.setProperty('--app-accent', settings.app_accent);
+                            document.addEventListener("DOMContentLoaded", () => document.body.setAttribute('data-theme', theme));
+                            localStorage.setItem('app_accent', settings.app_accent);
                         }
                         if (!a && settings.user_avatar) {
                             const style = document.createElement('style');

@@ -3,8 +3,10 @@ const FontPicker = {
     // ── Configuration ──────────────────────────────────────────
     STORAGE_KEY: 'app-font',
     USER_NAME_KEY: 'user_name',
+    ACCENT_KEY: 'app_accent',
     DEFAULT_FONT: 'Space Grotesk',
     DEFAULT_NAME: 'User Name',
+    DEFAULT_ACCENT: '#6366f1',
 
     /** Available fonts — label, family (Google Fonts), and a preview weight */
     fonts: [
@@ -15,6 +17,34 @@ const FontPicker = {
         { label: 'Outfit', family: 'Outfit', icon: '🟢', tag: 'Modern' },
         { label: 'Nunito', family: 'Nunito', icon: '🟠', tag: 'Rounded' },
         { label: 'Plus Jakarta Sans', family: 'Plus Jakarta Sans', icon: '💎', tag: 'Premium' },
+    ],
+
+    accents: [
+        { 
+            name: 'Indigo', 
+            color: '#6366f1',
+            shades: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' }
+        },
+        { 
+            name: 'Emerald', 
+            color: '#10b981',
+            shades: { 50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46', 900: '#064e3b' }
+        },
+        { 
+            name: 'Rose', 
+            color: '#f43f5e',
+            shades: { 50: '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 300: '#fda4af', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c', 800: '#9f1239', 900: '#881337' }
+        },
+        { 
+            name: 'Amber', 
+            color: '#f59e0b',
+            shades: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' }
+        },
+        { 
+            name: 'Violet', 
+            color: '#8b5cf6',
+            shades: { 50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 800: '#5b21b6', 900: '#4c1d95' }
+        },
     ],
 
     isOpen: false,
@@ -32,7 +62,10 @@ const FontPicker = {
         // 3. Restore User Name
         await this._loadSavedName();
 
-        // 4. Build dropdown UI once the profile image is in the DOM
+        // 4. Restore Accent Color
+        await this._loadSavedAccent();
+
+        // 5. Build dropdown UI once the profile image is in the DOM
         this._buildDropdown();
 
         // 5. Bind events
@@ -88,6 +121,27 @@ const FontPicker = {
         this._currentName = cached || this.DEFAULT_NAME;
     },
 
+    /**
+     * Load Accent Color from Database
+     */
+    async _loadSavedAccent() {
+        const cached = localStorage.getItem(this.ACCENT_KEY);
+        
+        try {
+            const response = await fetch(`api/profile/settings.php?key=app_accent`);
+            const result = await response.json();
+            
+            if (result.success && result.data.app_accent) {
+                this._applyAccent(result.data.app_accent, false);
+                return;
+            }
+        } catch (error) {
+            console.warn("[FontPicker] Failed to fetch accent from DB.");
+        }
+
+        this._applyAccent(cached || this.DEFAULT_ACCENT, false);
+    },
+
     // ── Private Methods ────────────────────────────────────────
 
     /**
@@ -124,6 +178,27 @@ const FontPicker = {
             this._saveToDatabase('app_font', fontFamily);
         }
         this._currentFont = fontFamily;
+    },
+
+    /**
+     * Apply an accent color globally via data-theme attribute.
+     */
+    _applyAccent(color, saveToDB = true) {
+        // Find the full accent object
+        const accent = this.accents.find(a => a.color === color) || this.accents[0];
+        
+        // 1. Set Primary Variable (Fallback)
+        document.documentElement.style.setProperty('--app-accent', color);
+        
+        // 2. Set Theme Attribute on Body
+        document.body.setAttribute('data-theme', accent.name.toLowerCase());
+
+        // 3. Persist
+        localStorage.setItem(this.ACCENT_KEY, color);
+        if (saveToDB) {
+            this._saveToDatabase('app_accent', color);
+        }
+        this._currentAccent = color;
     },
 
     /**
@@ -196,11 +271,33 @@ const FontPicker = {
                         <span class="fp-stat-label">Daily Goal</span>
                         <span class="fp-stat-value" id="fp-stat-percent">0%</span>
                     </div>
+                    <div class="fp-stat-item">
+                        <span class="fp-stat-label">Momentum</span>
+                        <span class="fp-stat-value" id="fp-momentum-status" style="font-size: 10px; opacity: 0.8;">Active Pulse</span>
+                    </div>
                 </div>
                 <button class="fp-action-item" id="fp-change-photo" role="menuitem">
                     <span class="material-symbols-outlined">photo_camera</span>
                     <span>Change Profile Picture</span>
                 </button>
+            </div>
+
+            <div class="fp-divider"></div>
+
+            <!-- Branding Section -->
+            <div class="fp-section">
+                <div class="fp-header">
+                    <span class="material-symbols-outlined fp-header-icon">palette</span>
+                    <span class="fp-header-text">Branding</span>
+                </div>
+                <div class="fp-color-list" role="group">
+                    ${this.accents.map(a => `
+                        <button class="fp-color-swatch" data-accent="${a.color}" title="${a.name}" 
+                                style="background-color:${a.color}">
+                            <span class="fp-color-check material-symbols-outlined">check</span>
+                        </button>
+                    `).join('')}
+                </div>
             </div>
 
             <div class="fp-divider"></div>
@@ -261,6 +358,17 @@ const FontPicker = {
         if (percentLabel) {
             percentLabel.textContent = `${percent}%`;
         }
+
+        // Sync Momentum Status
+        const statusLabel = document.getElementById('fp-momentum-status');
+        if (statusLabel && StudyTargetTracker.currentStatus) {
+            statusLabel.textContent = StudyTargetTracker.currentStatus;
+            
+            // Optional: Dynamic color coding for the status text
+            if (StudyTargetTracker.currentStatus === 'Signal Lost') statusLabel.style.color = '#94a3b8';
+            else if (StudyTargetTracker.currentStatus.includes('Critical')) statusLabel.style.color = '#f43f5e';
+            else statusLabel.style.color = 'var(--brand-600)';
+        }
     },
 
     /**
@@ -299,7 +407,16 @@ const FontPicker = {
                 return;
             }
 
-            // 4. Click on Edit Name
+            // 4. Click on an accent color
+            const swatch = e.target.closest('.fp-color-swatch');
+            if (swatch && dropdown.contains(swatch)) {
+                const color = swatch.dataset.accent;
+                this._applyAccent(color);
+                this._updateActiveState();
+                return;
+            }
+
+            // 5. Click on Edit Name
             const editBtn = e.target.closest('#fp-edit-name-btn');
             if (editBtn && dropdown.contains(editBtn)) {
                 e.stopPropagation();
@@ -418,6 +535,12 @@ const FontPicker = {
         this._dropdown.querySelectorAll('.fp-option').forEach(btn => {
             const isActive = btn.dataset.font === this._currentFont;
             btn.classList.toggle('fp-active', isActive);
+        });
+
+        // Update accent color active state
+        this._dropdown.querySelectorAll('.fp-color-swatch').forEach(btn => {
+            const isActive = btn.dataset.accent === this._currentAccent;
+            btn.classList.toggle('active', isActive);
         });
     }
 };

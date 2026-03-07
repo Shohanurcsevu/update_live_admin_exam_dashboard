@@ -3,7 +3,7 @@
     --sidebar-bg-base: #ffffff;
     --sidebar-mesh-1: rgba(99, 102, 241, 0.05);
     /* Very subtle Indigo mesh */
-    --accent-indigo: #4f46e5;
+    --accent-indigo: var(--brand-600, #4f46e5);
     --accent-emerald: #10b981;
     --accent-rose: #f43f5e;
     --accent-orange: #f59e0b;
@@ -39,8 +39,8 @@
 #sidebar {
     background-color: var(--sidebar-bg-base);
     background-image:
-        radial-gradient(at 0% 0%, var(--sidebar-mesh-1) 0, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.03) 0, transparent 50%);
+        radial-gradient(at 0% 0%, var(--brand-50, rgba(99, 102, 241, 0.05)) 0, transparent 50%),
+        radial-gradient(at 100% 100%, var(--brand-50, rgba(99, 102, 241, 0.03)) 0, transparent 50%);
     border-right: 1px solid var(--glass-border);
     color: var(--nav-text-primary);
     position: relative;
@@ -543,16 +543,16 @@
 
 /* Active State */
 .nav-link.bg-gray-700 {
-    background: rgba(79, 70, 229, 0.05) !important;
-    color: var(--accent-indigo) !important;
+    background: var(--brand-50, rgba(79, 70, 229, 0.05)) !important;
+    color: var(--brand-600, var(--accent-indigo)) !important;
     font-weight: 800;
-    border: 1px solid rgba(79, 70, 229, 0.1);
+    border: 1px solid var(--brand-100, rgba(79, 70, 229, 0.1));
 }
 
 .nav-link.bg-gray-700 .nav-icon-wrapper {
-    background-color: var(--accent-indigo) !important;
+    background-color: var(--brand-600, var(--accent-indigo)) !important;
     color: white !important;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 4px 12px var(--brand-200, rgba(79, 70, 229, 0.3));
 }
 
 /* Collapse State Polish */

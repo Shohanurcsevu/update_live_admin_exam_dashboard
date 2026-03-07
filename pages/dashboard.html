@@ -142,9 +142,61 @@
                                 <div class="ecg-container flex-1 h-12 overflow-hidden rounded-lg bg-black/5">
                                     <canvas id="ecg-canvas" class="w-full h-full"></canvas>
                                 </div>
+                                <!-- Heart Rate Zone Display -->
+                                <div class="flex flex-col items-center justify-center gap-0.5 flex-shrink-0 w-14">
+                                    <span id="ecg-bpm-value" class="text-lg font-black text-rose-500 leading-none tabular-nums">--</span>
+                                    <span class="text-[7px] font-black text-gray-300 uppercase tracking-widest leading-none">BPM</span>
+                                    <span id="ecg-zone-label" class="text-[7px] font-black px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-400 uppercase tracking-tighter leading-none mt-0.5">--</span>
+                                </div>
                                 <div class="orb-container w-12 h-12 flex-shrink-0 relative">
                                     <canvas id="flow-orb-canvas" width="48" height="48"></canvas>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Session Streak Timeline -->
+                        <div class="col-span-2 lg:col-span-7">
+                            <div class="flex justify-between items-center mb-1">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Session Timeline</p>
+                                <span id="timeline-session-count" class="text-[8px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">0 sessions</span>
+                            </div>
+                            <div class="relative">
+                                <!-- Timeline bar -->
+                                <div id="session-timeline-bar" class="relative w-full h-5 bg-gray-100/60 rounded-md overflow-hidden border border-gray-200/50">
+                                    <!-- Session blocks injected by JS -->
+                                </div>
+                                <!-- Now indicator (outside bar to avoid overflow clip) -->
+                                <div id="timeline-now-marker" class="absolute top-0 w-px h-5 bg-slate-900/60 z-10" style="left:0%">
+                                    <span id="timeline-now-clock" class="absolute bottom-full mb-0.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-slate-600 bg-white/90 px-1 rounded shadow-sm whitespace-nowrap leading-tight">--</span>
+                                    <div class="absolute -bottom-0.5 -left-[3px] w-[7px] h-[7px] rounded-full bg-slate-900/80 border border-white"></div>
+                                </div>
+                                <!-- Hour labels -->
+                                <div class="flex justify-between mt-0.5 px-0">
+                                    <span class="text-[7px] font-bold text-gray-300">12a</span>
+                                    <span class="text-[7px] font-bold text-gray-300">2a</span>
+                                    <span class="text-[7px] font-bold text-gray-300">4a</span>
+                                    <span class="text-[7px] font-bold text-gray-300">6a</span>
+                                    <span class="text-[7px] font-bold text-gray-300">8a</span>
+                                    <span class="text-[7px] font-bold text-gray-300">10a</span>
+                                    <span class="text-[7px] font-bold text-gray-300">12p</span>
+                                    <span class="text-[7px] font-bold text-gray-300">2p</span>
+                                    <span class="text-[7px] font-bold text-gray-300">4p</span>
+                                    <span class="text-[7px] font-bold text-gray-300">6p</span>
+                                    <span class="text-[7px] font-bold text-gray-300">8p</span>
+                                    <span class="text-[7px] font-bold text-gray-300">10p</span>
+                                    <span class="text-[7px] font-bold text-gray-300">12a</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Focus Heatmap Grid -->
+                        <div class="col-span-2 lg:col-span-7">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">7-Day Focus Heatmap</p>
+                                <span id="heatmap-peak-badge" class="text-[8px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">Loading...</span>
+                            </div>
+                            <div id="focus-heatmap-grid" class="overflow-x-auto">
+                                <!-- Grid rendered by JS -->
                             </div>
                         </div>
 
@@ -171,6 +223,18 @@
                                 <div id="main-progress-bar"
                                     class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-600 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out"
                                     style="width: 0%"></div>
+                            </div>
+
+                            <!-- Auto Pace Indicator -->
+                            <div class="mt-2 flex items-center justify-between px-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[12px] text-gray-400">speed</span>
+                                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Required Pace</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span id="required-pace-value" class="text-[11px] font-black text-emerald-600 tabular-nums">1.0x</span>
+                                    <span id="required-pace-remaining" class="text-[8px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">--h left</span>
+                                </div>
                             </div>
 
                             <!-- Pace Simulation Slider -->

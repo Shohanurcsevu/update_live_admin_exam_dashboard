@@ -30,7 +30,7 @@ try {
     // 2. Study time from Pomodoro yesterday (up to this time)
     // We check activity_log for sessions started yesterday before the current time cutoff
     $pomodoro_sql = "
-        SELECT activity_message 
+        SELECT activity_details 
         FROM activity_log 
         WHERE activity_type = 'pomodoro_session' 
         AND timestamp BETWEEN '$yesterday_start' AND '$yesterday_current_cutoff'";
@@ -41,8 +41,7 @@ try {
     if ($pomodoro_res) {
         while ($row = $pomodoro_res->fetch_assoc()) {
             // Attempt to extract duration from JSON or default to 25 mins
-            // Logic matches daily-study-time.php
-            $details = json_decode($row['activity_message'], true);
+            $details = json_decode($row['activity_details'], true);
             $duration_mins = isset($details['duration']) ? (int)$details['duration'] : 25;
             $pomodoro_seconds += ($duration_mins * 60);
         }
@@ -52,11 +51,9 @@ try {
 
     echo json_encode([
         'success' => true,
-        'data' => [
-            'yesterday_total_seconds' => $total_yesterday_seconds,
-            'yesterday_formatted' => floor($total_yesterday_seconds / 3600) . 'h ' . floor(($total_yesterday_seconds % 3600) / 60) . 'm',
-            'cutoff_time' => $current_time
-        ]
+        'yesterday_total_seconds' => $total_yesterday_seconds,
+        'yesterday_formatted' => floor($total_yesterday_seconds / 3600) . 'h ' . floor(($total_yesterday_seconds % 3600) / 60) . 'm',
+        'cutoff_time' => $current_time
     ]);
 
 } catch (Exception $e) {
