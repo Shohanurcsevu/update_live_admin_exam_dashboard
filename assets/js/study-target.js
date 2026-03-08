@@ -1799,15 +1799,10 @@ const StudyTargetTracker = {
                     /* Shimmer moved to inline multiple-background to preserve subject colors */
                 }
                 .timeline-block-paused {
-                    background-image: repeating-linear-gradient(
-                        -45deg,
-                        transparent,
-                        transparent 5px,
-                        rgba(255, 255, 255, 0.2) 5px,
-                        rgba(255, 255, 255, 0.2) 10px
-                    ) !important;
-                    animation: timeline-pulse 3s infinite ease-in-out;
-                    opacity: 0.9 !important;
+                    /* Don't override background — keep the subject color */
+                    opacity: 0.6 !important;
+                    border-top: 2px dashed rgba(255,255,255,0.5);
+                    animation: none;
                 }
                 #timeline-now-marker {
                     z-index: 50 !important; /* Ensure Now marker is ALWAYS on top */
