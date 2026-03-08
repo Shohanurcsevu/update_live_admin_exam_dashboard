@@ -33,9 +33,20 @@ const SimilarityEngine = {
         const optionsScore = this.calculateOptionsSimilarity(opts1, opts2);
 
         // 3. Answer Similarity (Check if the correct answer text matches)
-        const ans1 = opts1[q1.answer] ? this.normalize(opts1[q1.answer]) : '';
-        const ans2 = opts2[q2.answer] ? this.normalize(opts2[q2.answer]) : '';
-        const answersMatch = (ans1 === ans2 && ans1 !== '') ? 1.0 : (ans1 && ans2 ? this.diceCoefficient(ans1, ans2) : 0);
+        const getAnswerText = (q, opts) => {
+            if (!q.answer) return '';
+            // Try direct key (A, B, C, D)
+            if (opts[q.answer]) return opts[q.answer];
+            // Try opposite case
+            const altKey = q.answer === q.answer.toUpperCase() ? q.answer.toLowerCase() : q.answer.toUpperCase();
+            if (opts[altKey]) return opts[altKey];
+            return '';
+        };
+
+        const ansText1 = this.normalize(getAnswerText(q1, opts1));
+        const ansText2 = this.normalize(getAnswerText(q2, opts2));
+        
+        const answersMatch = (ansText1 === ansText2 && ansText1 !== '') ? 1.0 : (ansText1 && ansText2 ? this.diceCoefficient(ansText1, ansText2) : 0);
 
         // 4. Explanation Similarity
         const exp1 = this.normalize(q1.explanation || '');
@@ -175,10 +186,14 @@ const SimilarityEngine = {
         if (!str) return '';
         return str
             .toLowerCase()
-            // Strip leading question numbers (e.g., "1.", "6.", "12)")
-            .replace(/^\s*\d+[\.\)\-\u0964]\s*/, '')
+            // Strip leading question numbers (supports Latin and Bengali digits)
+            // Range \u09e6-\u09ef are Bengali digits 0-9
+            .replace(/^\s*[\d\u09e6-\u09ef]+[\.\)\-\u0964]\s*/, '')
+            // Strip again in case there are double markers
+            .replace(/^\s*[\d\u09e6-\u09ef]+[\.\)\-\u0964]\s*/, '')
             // Remove common punctuation that varies between editors
             .replace(/[।,;:\-\?\!\(\)\"\'\u2018\u2019\u201c\u201d\[\]\{\}]/g, ' ')
+            // Keep word characters, spaces, and Bengali/Indic scripts
             .replace(/[^\w\s\u0980-\u09ff]/g, '')
             .replace(/\s+/g, ' ')
             .trim();

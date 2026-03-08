@@ -316,24 +316,28 @@ function initializeQuestionsListPage() {
 
     // --- Deduplication Feature ---
 
+    // Store all pair scores for re-filtering without re-computing (Session Persistent)
+    if (!window._dedupeState) {
+        window._dedupeState = {
+            allPairScores: [],
+            dedupeHistory: [],
+            lastThreshold: 90
+        };
+    }
+
     async function ensureSimilarityEngine() {
         if (window.SimilarityEngine) return;
         return new Promise((resolve) => {
             const s = document.createElement('script');
-            s.src = 'assets/js/similarity-engine.js';
+            // Cache busting for development/debugging
+            s.src = 'assets/js/similarity-engine.js?v=' + Date.now();
             s.onload = resolve;
             document.head.appendChild(s);
         });
     }
 
-    // Store all pair scores for re-filtering without re-computing
-    let allPairScores = [];
-
-    // --- Dedup History Log ---
-    let dedupeHistory = [];
-
     function addToHistory(questionData, masterId) {
-        dedupeHistory.unshift({
+        window._dedupeState.dedupeHistory.unshift({
             id: questionData.id,
             question: questionData.question,
             examId: examId,
@@ -352,19 +356,19 @@ function initializeQuestionsListPage() {
 
         if (!list) return;
 
-        const activeCount = dedupeHistory.filter(h => !h.restored).length;
-        if (count) count.textContent = dedupeHistory.length;
+        const activeCount = window._dedupeState.dedupeHistory.filter(h => !h.restored).length;
+        if (count) count.textContent = window._dedupeState.dedupeHistory.length;
         if (badge) badge.textContent = activeCount;
         if (toggleBtn) {
-            dedupeHistory.length > 0 ? toggleBtn.classList.remove('hidden') : toggleBtn.classList.add('hidden');
+            window._dedupeState.dedupeHistory.length > 0 ? toggleBtn.classList.remove('hidden') : toggleBtn.classList.add('hidden');
         }
 
-        if (dedupeHistory.length === 0) {
+        if (window._dedupeState.dedupeHistory.length === 0) {
             list.innerHTML = '<p class="text-xs text-gray-400 italic">No deletions yet in this session.</p>';
             return;
         }
 
-        list.innerHTML = dedupeHistory.map((h, idx) => `
+        list.innerHTML = window._dedupeState.dedupeHistory.map((h, idx) => `
             <div class="flex items-center gap-3 p-3 rounded-lg border ${h.restored ? 'bg-green-50/50 border-green-100' : 'bg-white border-gray-100'} transition-all" id="history-entry-${idx}">
                 <div class="flex-shrink-0">
                     <span class="material-symbols-outlined text-lg ${h.restored ? 'text-green-500' : 'text-red-400'}">${h.restored ? 'undo' : 'delete'}</span>
@@ -403,7 +407,7 @@ function initializeQuestionsListPage() {
                     });
                     const res = await resp.json();
                     if (res.success) {
-                        dedupeHistory[histIdx].restored = true;
+                        window._dedupeState.dedupeHistory[histIdx].restored = true;
                         invalidateExamCaches();
                         renderHistory();
                         showToast(`Question #${qId} has been restored ✓`, 'success');
@@ -438,8 +442,8 @@ function initializeQuestionsListPage() {
             }, 10);
         }
 
-        // Compute all pair scores only on first scan
-        if (allPairScores.length === 0) {
+        // Compute all pair scores only on first scan OR if questions changed
+        if (window._dedupeState.allPairScores.length === 0) {
             workbench.innerHTML = `
                 <div id="dedupe-loading" class="flex flex-col items-center justify-center h-64 text-gray-400">
                     <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div>
@@ -453,7 +457,7 @@ function initializeQuestionsListPage() {
                 for (let j = i + 1; j < currentQuestions.length; j++) {
                     const result = SimilarityEngine.calculateFullSimilarity(currentQuestions[i], currentQuestions[j]);
                     if (result.score >= 0.70) { // Store anything ≥ 70% for Similar tier
-                        allPairScores.push({
+                        window._dedupeState.allPairScores.push({
                             i: i, j: j,
                             idI: currentQuestions[i].id, idJ: currentQuestions[j].id,
                             score: result.score
@@ -480,10 +484,31 @@ function initializeQuestionsListPage() {
             });
             let debounceTimer;
             slider.addEventListener('change', () => {
+                window._dedupeState.lastThreshold = parseInt(slider.value);
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => runSimilarityScan(true), 100);
             });
             slider._wired = true;
+        }
+
+        // Set slider to last used value
+        if (slider.value != window._dedupeState.lastThreshold) {
+            slider.value = window._dedupeState.lastThreshold;
+            sliderLabel.textContent = slider.value + '%';
+        }
+    }
+
+    async function bulkDeleteQuestions(ids, reason = 'Cleanup') {
+        try {
+            const resp = await fetch(`api/question/bulk_delete.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids, reason: reason })
+            });
+            return await resp.json();
+        } catch (e) {
+            console.error('[BulkDelete] Error:', e);
+            return { success: false, message: 'Network error' };
         }
     }
 
@@ -492,8 +517,8 @@ function initializeQuestionsListPage() {
         const checked = new Set();
 
         // Sort pair scores descending for greedy grouping
-        const relevantPairs = allPairScores
-            .filter(p => p.score >= minScore && p.score < maxScore)
+        const relevantPairs = window._dedupeState.allPairScores
+            .filter(p => p.score >= minScore && p.score <= maxScore)
             .sort((a, b) => b.score - a.score);
 
         for (const pair of relevantPairs) {
@@ -909,17 +934,37 @@ function initializeQuestionsListPage() {
             resolveAllBtn.disabled = true;
             resolveAllBtn.innerHTML = '<span class="animate-spin text-sm mr-2">refresh</span> Processing all...';
 
-            let grandTotalDeleted = 0;
-            for (let i = 0; i < scanGroups.length; i++) {
-                const groupBtn = workbench.querySelector(`.btn-bulk-resolve[data-group-idx="${i}"]`);
-                if (groupBtn && !groupBtn.disabled) {
-                    const deleted = await resolveMatchGroup(scanGroups[i], groupBtn, i, true);
-                    grandTotalDeleted += deleted;
+            // Collect all IDs to delete across all groups
+            const allIdsToDelete = [];
+            const historyMetadata = [];
+
+            for (const g of scanGroups) {
+                for (const d of g.duplicates) {
+                    const row = document.getElementById(`dedupe-row-${d.id}`);
+                    if (row && !row.classList.contains('hidden') && row.getAttribute('data-ignored') !== 'true') {
+                        allIdsToDelete.push(d.id);
+                        historyMetadata.push({ d: d, masterId: g.master.id });
+                    }
                 }
             }
 
-            resolveAllBtn.innerHTML = `<span class="material-symbols-outlined text-sm mr-2">done_all</span> Finished (${grandTotalDeleted} Deleted)`;
-            showToast(`Master cleanup complete: ${grandTotalDeleted} duplicates removed.`, 'success');
+            if (allIdsToDelete.length > 0) {
+                const res = await bulkDeleteQuestions(allIdsToDelete);
+                if (res.success) {
+                    invalidateExamCaches();
+                    historyMetadata.forEach(m => {
+                        const row = document.getElementById(`dedupe-row-${m.d.id}`);
+                        if (row) row.classList.add('hidden');
+                        addToHistory(m.d, m.masterId);
+                    });
+                    showToast(`Master cleanup complete: ${allIdsToDelete.length} duplicates removed.`, 'success');
+                } else {
+                    showToast(`Bulk delete failed: ${res.message}`, 'error');
+                }
+            }
+
+            resolveAllBtn.disabled = false;
+            resolveAllBtn.innerHTML = `<span class="material-symbols-outlined text-sm mr-2">done_all</span> Finished (${allIdsToDelete.length} Deleted)`;
         };
 
         resolveAllBtn.onclick = resolveAllListener;
@@ -952,37 +997,38 @@ function initializeQuestionsListPage() {
             btn.disabled = true;
             btn.innerHTML = '<span class="animate-pulse">DELETING...</span>';
 
-            let successCount = 0;
-            for (const d of group.duplicates) {
-                const row = document.getElementById(`dedupe-row-${d.id}`);
-                // Reliable ignore check using data attribute
-                if (!row || row.classList.contains('hidden') || row.getAttribute('data-ignored') === 'true') continue;
+            const ids = group.duplicates
+                .filter(d => {
+                    const row = document.getElementById(`dedupe-row-${d.id}`);
+                    return row && !row.classList.contains('hidden') && row.getAttribute('data-ignored') !== 'true';
+                })
+                .map(d => d.id);
 
-                try {
-                    const response = await fetch(`${API_URL}delete.php`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: d.id })
-                    });
-                    const res = await response.json();
-                    if (res.success) {
-                        row.classList.add('hidden');
-                        addToHistory(d, group.master.id);
-                        successCount++;
-                    }
-                } catch (e) { console.error(e); }
+            if (ids.length === 0) {
+                btn.disabled = false;
+                btn.textContent = 'RETRY MERGE';
+                return 0;
             }
 
-            if (successCount > 0) {
+            const res = await bulkDeleteQuestions(ids);
+            if (res.success) {
                 invalidateExamCaches();
-                if (!isBatch) showToast(`Merged: Removed ${successCount} duplicates ✓`, 'success');
+                ids.forEach(id => {
+                    const row = document.getElementById(`dedupe-row-${id}`);
+                    if (row) row.classList.add('hidden');
+                    const dupObj = group.duplicates.find(d => d.id == id);
+                    if (dupObj) addToHistory(dupObj, group.master.id);
+                });
+
+                if (!isBatch) showToast(`Merged: Removed ${ids.length} duplicates ✓`, 'success');
                 btn.parentElement.innerHTML = `<span class="text-[10px] font-bold text-green-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">task_alt</span> RESOLVED</span>`;
                 const groupEl = document.getElementById(`group-${idx}`);
                 if (groupEl) groupEl.classList.add('opacity-60', 'grayscale-[0.5]');
-                return successCount;
+                return ids.length;
             } else {
                 btn.disabled = false;
                 btn.textContent = 'RETRY MERGE';
+                showToast(`Merge failed: ${res.message}`, 'error');
                 return 0;
             }
         }
@@ -1128,17 +1174,14 @@ function initializeQuestionsListPage() {
         const toggleHistoryBtn = document.getElementById('toggle-history-btn');
         const historyPanel = document.getElementById('dedupe-history-panel');
 
-        if (scanBtn) scanBtn.addEventListener('click', () => { allPairScores = []; dedupeHistory = []; renderHistory(); runSimilarityScan(); });
-        if (crossExamBtn) crossExamBtn.addEventListener('click', () => { allPairScores = []; dedupeHistory = []; renderHistory(); runCrossExamScan(); });
+        if (scanBtn) scanBtn.addEventListener('click', () => { window._dedupeState.allPairScores = []; runSimilarityScan(); });
+        if (crossExamBtn) crossExamBtn.addEventListener('click', () => { window._dedupeState.allPairScores = []; runCrossExamScan(); });
         if (closeModalBtn) closeModalBtn.addEventListener('click', () => {
             dedupeModal.classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
                 dedupeModal.classList.add('hidden');
                 dedupeModal.classList.remove('flex');
-                allPairScores = [];
-                dedupeHistory = [];
                 if (historyPanel) historyPanel.classList.add('hidden');
-                renderHistory();
                 fetchAndDisplayQuestions();
             }, 300);
         });

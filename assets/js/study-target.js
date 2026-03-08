@@ -6,6 +6,7 @@
 const StudyTargetTracker = {
     DAILY_TARGET_HOURS: 12,
     DAILY_TARGET_SECONDS: 12 * 3600,
+    TIMELINE_START_HOUR: 5, // Timeline cycle: 5 AM to 5 AM
     updateInterval: null,
     ecgInterval: null,
     firstStartTime: null,
@@ -223,6 +224,12 @@ const StudyTargetTracker = {
         }
     },
 
+    // Helper to convert real hour (0-23) to relative timeline percentage (start at 5 AM)
+    getRelativeTimelinePercent(h) {
+        const relativeHour = (h - this.TIMELINE_START_HOUR + 24) % 24;
+        return (relativeHour / 24) * 100;
+    },
+
     startUpdateLoop() {
         if (this.updateInterval) clearInterval(this.updateInterval);
         this.updateInterval = setInterval(() => this.updateUI(), 1000);
@@ -262,10 +269,46 @@ const StudyTargetTracker = {
         // --- NEW: Predicted Finish Clock ---
         this.renderPredictedFinish();
 
-        // --- NEW: Flow Orb Pace State ---
-        this.updateFlowOrbState();
+        // --- NEW: Update Session Timeline "Now" Marker (Real-time) ---
+        const nowMarker = document.getElementById('timeline-now-marker');
+        if (nowMarker) {
+            const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+            const nowPercent = this.getRelativeTimelinePercent(clientHour);
+            nowMarker.style.left = `${nowPercent}%`;
+            nowMarker.classList.remove('hidden');
 
-        // --- NEW: Sync Profile Progress Ring ---
+            const clockEl = document.getElementById('timeline-now-clock');
+            const dotEl = document.getElementById('timeline-now-dot');
+            if (clockEl) {
+                const h = now.getHours();
+                const m = now.getMinutes();
+                const ampm = h >= 12 ? 'pm' : 'am';
+                const displayH = h % 12 || 12;
+                clockEl.textContent = `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
+                
+                // Dynamic coloring every hour (cycles through HSL)
+                const hue = (h * 15) % 360; 
+                const accentColor = `hsl(${hue}, 80%, 45%)`;
+                clockEl.style.color = accentColor;
+                clockEl.style.backgroundColor = `hsla(${hue}, 80%, 98%, 0.95)`;
+                clockEl.style.borderColor = `hsla(${hue}, 80%, 45%, 0.3)`;
+                
+                if (dotEl) {
+                    dotEl.style.backgroundColor = accentColor;
+                    dotEl.style.boxShadow = `0 0 8px ${accentColor}`;
+                    
+                    // Add radar ring if missing (Moving Expanding Ring)
+                    if (!dotEl.querySelector('.timeline-radar-ring')) {
+                        const ring = document.createElement('div');
+                        ring.className = 'timeline-radar-ring';
+                        dotEl.appendChild(ring);
+                    }
+                    const ring = dotEl.querySelector('.timeline-radar-ring');
+                    if (ring) ring.style.backgroundColor = accentColor;
+                }
+            }
+        }
+
         if (window.FontPicker && typeof window.FontPicker.updateProgressRing === 'function') {
             window.FontPicker.updateProgressRing();
         }
@@ -1419,6 +1462,7 @@ const StudyTargetTracker = {
         const bar = document.getElementById('session-timeline-bar');
         const countEl = document.getElementById('timeline-session-count');
         const nowMarker = document.getElementById('timeline-now-marker');
+        const labelsContainer = document.getElementById('timeline-labels-container');
         if (!bar) return;
 
         // Expanded high-contrast vibrant color palette
@@ -1435,12 +1479,12 @@ const StudyTargetTracker = {
             { main: 'rgba(132, 204, 22, 0.85)', grad: 'rgba(101, 163, 13, 0.9)' },  // Lime
         ];
 
-        // Build a subject → color index map
+        // Build a subject → color index map from BOTH today and yesterday
         const subjectColorMap = {};
         let colorIdx = 0;
         this.activeSubjectPalette = null; // Reset every render
 
-        this.sessionTimeline.forEach(s => {
+        [...this.sessionTimeline, ...this.yesterdaySessions].forEach(s => {
             const subjectKey = (s.subject || 'Session').trim();
             if (!(subjectKey in subjectColorMap)) {
                 subjectColorMap[subjectKey] = colorIdx++ % colors.length;
@@ -1453,23 +1497,50 @@ const StudyTargetTracker = {
         const oldMilestones = bar.parentElement.querySelectorAll('.timeline-milestone');
         oldMilestones.forEach(m => m.remove());
 
+        // --- NEW: Programmatic Label Sync ---
+        if (labelsContainer) {
+            labelsContainer.innerHTML = '';
+            for (let i = 0; i <= 24; i++) {
+                const hour = (this.TIMELINE_START_HOUR + i) % 24;
+                const ampm = hour >= 12 ? 'p' : 'a';
+                const displayH = hour % 12 || 12;
+                
+                const span = document.createElement('span');
+                span.className = `text-[9px] font-black text-slate-900 uppercase`;
+                span.textContent = `${displayH}${ampm}`;
+                labelsContainer.appendChild(span);
+            }
+        }
+
         // 1. Render Yesterday's Shadow (Background Layer)
         this.yesterdaySessions.forEach(session => {
-            const leftPercent = (session.start_hour / 24) * 100;
+            const leftPercent = this.getRelativeTimelinePercent(session.start_hour);
             const widthPercent = (session.duration_hours / 24) * 100;
             if (widthPercent <= 0) return;
 
+            const ci = subjectColorMap[(session.subject || 'Session').trim()] || 0;
+            const palette = colors[ci];
+
             const ghost = document.createElement('div');
-            ghost.className = 'timeline-ghost-block absolute top-0 h-full bg-slate-400/10 border-t border-dashed border-slate-400/20 z-0 pointer-events-none rounded-sm';
+            // Improved Ghost Aesthetic: Color-coded but translucent
+            ghost.className = 'timeline-ghost-block absolute top-0 h-full z-0 pointer-events-none rounded-sm border-t border-dashed';
             ghost.style.left = `${leftPercent}%`;
             ghost.style.width = `${widthPercent}%`;
+            
+            // Use a faint version of the main color
+            const ghostColor = palette.main.replace('0.85', '0.15');
+            const borderColor = palette.main.replace('0.85', '0.3');
+            
+            ghost.style.backgroundColor = ghostColor;
+            ghost.style.borderTopColor = borderColor;
+            
             ghost.title = `Yesterday: ${session.subject || 'Session'}\n${Math.round(session.duration_hours * 60)}m`;
             bar.appendChild(ghost);
         });
 
         // 2. Render Today's Sessions (Foreground Layer)
         this.sessionTimeline.forEach(session => {
-            const leftPercent = (session.start_hour / 24) * 100;
+            const leftPercent = this.getRelativeTimelinePercent(session.start_hour);
             const widthPercent = Math.max(0.3, (session.duration_hours / 24) * 100);
             const ci = subjectColorMap[(session.subject || 'Session').trim()] || 0;
             const palette = colors[ci];
@@ -1531,8 +1602,8 @@ const StudyTargetTracker = {
             for (let m = Math.floor(startHours) + 1; m <= Math.floor(endHours); m++) {
                 if (m > 0) {
                     // Exact hour of day when this milestone was reached
-                    const hourOfDay = session.start_hour + (m - startHours);
-                    const leftPercent = (hourOfDay / 24) * 100;
+                    const hourOfDay = (session.start_hour + (m - startHours)) % 24;
+                    const leftPercent = this.getRelativeTimelinePercent(hourOfDay);
                     
                     const marker = document.createElement('div');
                     marker.className = 'timeline-milestone group absolute z-20 flex flex-col items-center cursor-pointer';
@@ -1608,10 +1679,9 @@ const StudyTargetTracker = {
                     100% { background-position: 200% 0; }
                 }
                 .timeline-block-active {
-                    animation: timeline-pulse 2s infinite ease-in-out;
+                    animation: timeline-pulse 2s infinite ease-in-out, timeline-shimmer 3s infinite linear;
                     background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
                     background-size: 200% 100%;
-                    animation: timeline-pulse 2s infinite ease-in-out, timeline-shimmer 3s infinite linear;
                 }
                 .timeline-milestone-flag {
                     z-index: 40;
@@ -1648,52 +1718,6 @@ const StudyTargetTracker = {
                 }
             `;
             document.head.appendChild(style);
-        }
-
-        // Update now marker + clock (use client time for accuracy)
-        if (nowMarker) {
-            const now = new Date();
-            const clientHour = now.getHours() + now.getMinutes() / 60;
-            const nowPercent = (clientHour / 24) * 100;
-            nowMarker.style.left = `${nowPercent}%`;
-
-            const clockEl = document.getElementById('timeline-now-clock');
-            const dotEl = document.getElementById('timeline-now-dot');
-            if (clockEl) {
-                const h = now.getHours();
-                const m = now.getMinutes();
-                const ampm = h >= 12 ? 'pm' : 'am';
-                const displayH = h % 12 || 12;
-                clockEl.textContent = `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
-      // Dynamic coloring every hour (cycles through HSL)
-                const hue = (h * 15) % 360; 
-                const accentColor = `hsl(${hue}, 80%, 45%)`;
-                const bgColor = `hsla(${hue}, 80%, 98%, 0.95)`;
-                
-                clockEl.style.color = accentColor;
-                clockEl.style.backgroundColor = bgColor;
-                clockEl.style.borderColor = `hsla(${hue}, 80%, 45%, 0.3)`;
-                
-                if (dotEl) {
-                    dotEl.style.backgroundColor = accentColor;
-                    dotEl.style.boxShadow = `0 0 8px ${accentColor}`;
-                    
-                    // Add radar ring if missing
-                    if (!dotEl.querySelector('.timeline-radar-ring')) {
-                        const ring = document.createElement('div');
-                        ring.className = 'timeline-radar-ring';
-                        dotEl.appendChild(ring);
-                    }
-                    const ring = dotEl.querySelector('.timeline-radar-ring');
-                    if (ring) ring.style.backgroundColor = accentColor;
-                }
-            }
-        }
-
-        // Update session count
-        if (countEl) {
-            const count = this.sessionTimeline.length;
-            countEl.textContent = `${count} session${count !== 1 ? 's' : ''}`;
         }
     },
 
