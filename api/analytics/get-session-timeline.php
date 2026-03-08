@@ -79,21 +79,46 @@ try {
             UNION ALL
 
             -- Active/Paused Pomodoro/Break sessions: Ongoing right now (only for today)
+            -- For ACTIVE sessions: one block from start_time to NOW()
             SELECT 
                 (HOUR(start_time) + MINUTE(start_time)/60.0) as start_hour,
-                CASE 
-                    WHEN status = 'paused' THEN (UNIX_TIMESTAMP(last_heartbeat) - UNIX_TIMESTAMP(start_time)) / 3600.0
-                    ELSE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(start_time)) / 3600.0
-                END as duration_hours,
+                (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(start_time)) / 3600.0 as duration_hours,
                 subject_name,
                 CASE 
-                    WHEN status = 'paused' THEN 'pomodoro_paused'
                     WHEN session_type = 'break' THEN 'break' 
                     ELSE 'pomodoro_active' 
                 END as session_type,
                 subject_id
             FROM study_sessions
-            WHERE status IN ('active', 'paused')
+            WHERE status = 'active'
+            AND start_time BETWEEN ? AND ?
+            AND ? = ?
+
+            UNION ALL
+
+            -- For PAUSED sessions: the STUDY portion (start_time to last_heartbeat)
+            SELECT 
+                (HOUR(start_time) + MINUTE(start_time)/60.0) as start_hour,
+                (UNIX_TIMESTAMP(last_heartbeat) - UNIX_TIMESTAMP(start_time)) / 3600.0 as duration_hours,
+                subject_name,
+                'pomodoro_paused' as session_type,
+                subject_id
+            FROM study_sessions
+            WHERE status = 'paused'
+            AND start_time BETWEEN ? AND ?
+            AND ? = ?
+
+            UNION ALL
+
+            -- For PAUSED sessions: the GAP portion (last_heartbeat to NOW)
+            SELECT 
+                (HOUR(last_heartbeat) + MINUTE(last_heartbeat)/60.0) as start_hour,
+                (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_heartbeat)) / 3600.0 as duration_hours,
+                subject_name,
+                'paused_gap' as session_type,
+                subject_id
+            FROM study_sessions
+            WHERE status = 'paused'
             AND start_time BETWEEN ? AND ?
             AND ? = ?
         ) timeline
@@ -102,11 +127,12 @@ try {
 
     $stmt = $conn->prepare($sql);
     $current_study_date = get_study_date();
-    $stmt->bind_param("ssssssss", 
-        $start_ts, $end_ts, // Exams
-        $start_ts, $end_ts, // activity_log
-        $start_ts, $end_ts, // study_sessions
-        $target_date, $current_study_date // today filter
+    $stmt->bind_param("ssssssssssssssss", 
+        $start_ts, $end_ts,                    // Exams
+        $start_ts, $end_ts,                    // activity_log
+        $start_ts, $end_ts, $target_date, $current_study_date, // active study_sessions
+        $start_ts, $end_ts, $target_date, $current_study_date, // paused study portion
+        $start_ts, $end_ts, $target_date, $current_study_date  // paused gap
     );
     $stmt->execute();
     $result = $stmt->get_result();

@@ -427,12 +427,12 @@ const StudyTargetTracker = {
         this.checkFeasibility(secondsUntilRollover, remainingStudySeconds);
 
         // --- Smooth Timeline Growth ---
-        // Only grow if there's an ACTUALLY running session in our data (not just a stale DOM element)
-        const hasActiveSession = this.sessionTimeline && this.sessionTimeline.some(s =>
-            s.type === 'pomodoro_active' || s.type === 'break' || s.type === 'pomodoro_paused'
+        // Only grow ACTIVE (not paused) sessions
+        const hasRunningSession = this.sessionTimeline && this.sessionTimeline.some(s =>
+            s.type === 'pomodoro_active' || s.type === 'break'
         );
         const activeBlock = document.querySelector('.timeline-block-active');
-        if (hasActiveSession && activeBlock && activeBlock.dataset.startHour) {
+        if (hasRunningSession && activeBlock && activeBlock.dataset.startHour) {
             const startHour = parseFloat(activeBlock.dataset.startHour);
             const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
             const serverHour = clientHour + (this.serverClockOffset / 3600000);
@@ -443,6 +443,21 @@ const StudyTargetTracker = {
 
             const newWidth = (durationHours / 24) * 100;
             activeBlock.style.width = `${Math.max(0.5, newWidth)}%`;
+        }
+
+        // Grow the paused GAP block (dashed bar) in real-time
+        const pausedGapBlock = document.querySelector('.timeline-paused-gap');
+        if (pausedGapBlock && pausedGapBlock.dataset.startHour) {
+            const gapStart = parseFloat(pausedGapBlock.dataset.startHour);
+            const clientHr = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+            const serverHr = clientHr + (this.serverClockOffset / 3600000);
+            let gapDuration = serverHr - gapStart;
+            if (gapDuration < 0) gapDuration += 24;
+            if (gapDuration > 18) gapDuration = 0.01;
+            pausedGapBlock.style.width = `${Math.max(0.3, (gapDuration / 24) * 100)}%`;
+            // Update tooltip
+            const gapMin = Math.round(gapDuration * 60);
+            pausedGapBlock.title = `⏸ Paused · ${gapMin}m`;
         }
     },
 
@@ -1614,13 +1629,33 @@ const StudyTargetTracker = {
             const palette = colors[ci];
 
             const block = document.createElement('div');
+            const isPausedGap = session.type === 'paused_gap';
             // BREAKS are also "active" blocks that need to grow while running
-            const isActive = session.type === 'pomodoro_active' || session.type === 'pomodoro_paused' || session.type === 'break';
+            // pomodoro_paused should NOT get timeline-block-active class (it shouldn't grow)
+            const isActive = session.type === 'pomodoro_active' || session.type === 'break';
+            const isLiveSession = isActive || session.type === 'pomodoro_paused';
             const isBreak = session.type === 'break';
             const isPaused = session.type === 'pomodoro_paused';
 
-            if (isActive) {
+            if (isLiveSession) {
                 this.activeSubjectPalette = palette;
+            }
+
+            // --- Paused Gap: Dashed bar (grows in real-time) ---
+            if (isPausedGap) {
+                block.className = 'timeline-block timeline-paused-gap absolute top-0 h-full z-10 cursor-default';
+                block.style.left = `${leftPercent}%`;
+                block.style.width = `${widthPercent}%`;
+                block.dataset.startHour = startHour;
+                block.style.background = 'repeating-linear-gradient(90deg, rgba(148,163,184,0.4) 0px, rgba(148,163,184,0.4) 6px, transparent 6px, transparent 10px)';
+                block.style.borderTop = '1px dashed rgba(148,163,184,0.5)';
+                block.style.borderBottom = '1px dashed rgba(148,163,184,0.5)';
+                block.style.opacity = '0.7';
+                
+                const gapMin = Math.round(duration * 60);
+                block.title = `⏸ Paused · ${gapMin}m`;
+                bar.appendChild(block);
+                return; // Skip the rest of the styling
             }
             
             block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-10'} ${isPaused ? 'timeline-block-paused' : ''}`;
@@ -1638,7 +1673,6 @@ const StudyTargetTracker = {
                 
                 block.style.background = subjectGrad + shimmerGrad;
                 block.style.backgroundSize = isActive && !isPaused ? `100% 100%, 200% 100%` : '100% 100%';
-                // Completed pomodoros should also be reasonably visible
                 const isPomodoroType = session.type === 'pomodoro' || session.type === 'pomodoro_active' || session.type === 'pomodoro_paused';
                 block.style.opacity = (session.type === 'exam' || isActive || isPomodoroType) ? '1.0' : '0.8';
             }
