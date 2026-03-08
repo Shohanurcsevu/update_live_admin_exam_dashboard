@@ -8,8 +8,22 @@ require_once '../subject/db_connect.php';
 
 date_default_timezone_set('Asia/Dhaka');
 
-// Get date from query parameter, default to today
-$target_date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+// Helper to get study date (rollover at 5 AM)
+function get_study_date() {
+    $now = time();
+    $hour = intval(date('G', $now));
+    if ($hour < 5) {
+        return date('Y-m-d', strtotime('yesterday'));
+    }
+    return date('Y-m-d', $now);
+}
+
+// Get date from query parameter, default to study current day
+$target_date = isset($_GET['date']) ? $_GET['date'] : get_study_date();
+$next_date = date('Y-m-d', strtotime($target_date . ' + 1 day'));
+
+$start_ts = $target_date . ' 05:00:00';
+$end_ts = $next_date . ' 05:00:00';
 
 try {
     // Get individual session blocks for requested day's 24h timeline
@@ -36,7 +50,7 @@ try {
             FROM performance p
             JOIN exams e ON p.exam_id = e.id
             JOIN subjects s ON e.subject_id = s.id
-            WHERE DATE(p.attempt_time) = ?
+            WHERE p.attempt_time BETWEEN ? AND ?
             AND p.time_used_seconds > 0
 
             UNION ALL
@@ -59,28 +73,41 @@ try {
                 s.id as subject_id
             FROM activity_log al
             LEFT JOIN subjects s ON al.activity_message = s.subject_name
-            WHERE al.activity_type = 'pomodoro_session'
-            AND DATE(al.timestamp) = ?
+            WHERE al.activity_type IN ('pomodoro_session', 'pomodoro_break')
+            AND al.timestamp BETWEEN ? AND ?
 
             UNION ALL
 
-            -- Active Pomodoro/Break sessions: Ongoing right now (only for today)
+            -- Active/Paused Pomodoro/Break sessions: Ongoing right now (only for today)
             SELECT 
                 (HOUR(start_time) + MINUTE(start_time)/60.0) as start_hour,
-                (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(start_time)) / 3600.0 as duration_hours,
+                CASE 
+                    WHEN status = 'paused' THEN (UNIX_TIMESTAMP(last_heartbeat) - UNIX_TIMESTAMP(start_time)) / 3600.0
+                    ELSE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(start_time)) / 3600.0
+                END as duration_hours,
                 subject_name,
-                CASE WHEN session_type = 'break' THEN 'break' ELSE 'pomodoro_active' END as session_type,
+                CASE 
+                    WHEN status = 'paused' THEN 'pomodoro_paused'
+                    WHEN session_type = 'break' THEN 'break' 
+                    ELSE 'pomodoro_active' 
+                END as session_type,
                 subject_id
             FROM study_sessions
-            WHERE status = 'active'
-            AND DATE(start_time) = ?
-            AND ? = CURRENT_DATE
+            WHERE status IN ('active', 'paused')
+            AND start_time BETWEEN ? AND ?
+            AND ? = ?
         ) timeline
         ORDER BY start_hour ASC
     ";
 
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssss", $target_date, $target_date, $target_date, $target_date);
+    $current_study_date = get_study_date();
+    $stmt->bind_param("ssssssss", 
+        $start_ts, $end_ts, // Exams
+        $start_ts, $end_ts, // activity_log
+        $start_ts, $end_ts, // study_sessions
+        $target_date, $current_study_date // today filter
+    );
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -90,19 +117,20 @@ try {
 
     $sessions = [];
     while ($row = $result->fetch_assoc()) {
-        $start = max(0, floatval($row['start_hour']));
+        $start = floatval($row['start_hour']);
         $duration = max(0.01, floatval($row['duration_hours'])); 
 
         $sessions[] = [
             'start_hour' => round($start, 3),
             'duration_hours' => round($duration, 3),
-            'subject' => $row['subject_name'],
+            'subject' => $row['subject_name'] ?? 'Study Session',
             'type' => $row['session_type'],
             'subject_id' => $row['subject_id'] ? intval($row['subject_id']) : null
         ];
     }
 
-    $is_today = ($target_date === date('Y-m-d'));
+    // Use logical study date (5 AM rollover) to determine if this is "today"
+    $is_today = ($target_date === get_study_date());
     
     echo json_encode([
         'success' => true,

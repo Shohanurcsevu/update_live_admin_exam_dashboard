@@ -8,9 +8,23 @@ date_default_timezone_set('Asia/Dhaka');
 try {
     // Current time components for filtering yesterday's data
     $current_time = date('H:i:s');
-    $yesterday = date('Y-m-d', strtotime('-1 day'));
-    $yesterday_start = $yesterday . ' 00:00:00';
-    $yesterday_current_cutoff = $yesterday . ' ' . $current_time;
+    
+    // Get date from query parameter, default to literal yesterday
+    $yesterday = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d', strtotime('-1 day'));
+    $next_day = date('Y-m-d', strtotime($yesterday . ' +1 day'));
+
+    // Logical yesterday starts at 5 AM of $yesterday
+    $yesterday_start = $yesterday . ' 05:00:00';
+    
+    // The cutoff is $current_time on the CALENDAR day following the logical start
+    // If it's 12:48 AM, the cutoff for "Logical Yesterday" is 12:48 AM of $next_day
+    // If it's 10:00 PM, the cutoff for "Logical Yesterday" is 10:00 PM of $yesterday
+    $hour = (int)date('G');
+    if ($hour < 5) {
+        $yesterday_current_cutoff = $next_day . ' ' . $current_time;
+    } else {
+        $yesterday_current_cutoff = $yesterday . ' ' . $current_time;
+    }
 
     // 1. Study time from Exams yesterday (up to this time)
     $exam_sql = "

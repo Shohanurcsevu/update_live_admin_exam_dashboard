@@ -8,6 +8,16 @@ require_once '../subject/db_connect.php';
 
 date_default_timezone_set('Asia/Dhaka');
 
+// Helper to get study date (rollover at 5 AM)
+function get_study_date() {
+    $now = time();
+    $hour = intval(date('G', $now));
+    if ($hour < 5) {
+        return date('Y-m-d', strtotime('yesterday'));
+    }
+    return date('Y-m-d', $now);
+}
+
 // Helper to format seconds
 function format_seconds($seconds) {
     if ($seconds <= 0) return "0m";
@@ -16,6 +26,18 @@ function format_seconds($seconds) {
     if ($h > 0) return "{$h}h {$m}m";
     return "{$m}m";
 }
+
+$study_date = get_study_date();
+$yesterday_date = date('Y-m-d', strtotime($study_date . ' -1 day'));
+$next_date = date('Y-m-d', strtotime($study_date . ' +1 day'));
+$is_today_view = ($study_date === date('Y-m-d'));
+
+// Logical day boundaries (5 AM to 5 AM)
+$start_ts = $study_date . ' 05:00:00';
+$end_ts = $next_date . ' 05:00:00';
+
+$y_start_ts = $yesterday_date . ' 05:00:00';
+$y_end_ts = $study_date . ' 05:00:00';
 
 try {
     // Get today's study time per subject (including Pomodoro sessions)
@@ -41,7 +63,7 @@ try {
             FROM performance p
             JOIN exams e ON p.exam_id = e.id
             JOIN subjects s ON e.subject_id = s.id
-            WHERE DATE(p.attempt_time) = CURRENT_DATE
+            WHERE p.attempt_time BETWEEN '$start_ts' AND '$end_ts'
 
             UNION ALL
 
@@ -65,7 +87,7 @@ try {
             FROM activity_log al
             LEFT JOIN subjects s ON al.activity_message = s.subject_name
             WHERE al.activity_type = 'pomodoro_session'
-            AND DATE(al.timestamp) = CURRENT_DATE
+            AND al.timestamp BETWEEN '$start_ts' AND '$end_ts'
             GROUP BY al.activity_message, s.id
         ) combined
         GROUP BY subject_id, subject_name
@@ -98,9 +120,12 @@ try {
         SELECT 
             subject_name,
             subject_id,
-            (duration_minutes * 60 - remaining_seconds) + (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_heartbeat)) as active_seconds
+            CASE 
+                WHEN status = 'active' THEN (duration_minutes * 60 - remaining_seconds) + (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_heartbeat))
+                ELSE (duration_minutes * 60 - remaining_seconds)
+            END as active_seconds
         FROM study_sessions
-        WHERE status = 'active' AND session_type = 'focus'
+        WHERE (status = 'active' OR status = 'paused') AND session_type = 'focus'
         LIMIT 1
     ";
     $active_focus_res = $conn->query($active_focus_sql);
@@ -138,7 +163,7 @@ try {
                 END as calculated_seconds,
                 (SELECT COUNT(*) FROM questions q WHERE q.exam_id = p.exam_id AND q.is_deleted = 0) as total_questions
             FROM performance p
-            WHERE DATE(p.attempt_time) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY)
+            WHERE p.attempt_time BETWEEN '$y_start_ts' AND '$y_end_ts'
 
             UNION ALL
 
@@ -151,7 +176,7 @@ try {
                 0 as total_questions
             FROM activity_log
             WHERE activity_type = 'pomodoro_session'
-            AND DATE(timestamp) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY)
+            AND timestamp BETWEEN '$y_start_ts' AND '$y_end_ts'
         ) combined
     ";
     
@@ -225,10 +250,10 @@ try {
     $last_activity_sql = "
         SELECT MAX(last_time) as absolute_last_active
         FROM (
-            SELECT MAX(attempt_time) as last_time FROM performance WHERE DATE(attempt_time) = CURRENT_DATE
+            SELECT MAX(attempt_time) as last_time FROM performance WHERE attempt_time BETWEEN '$start_ts' AND '$end_ts'
             UNION ALL
             SELECT MAX(timestamp) as last_time FROM activity_log 
-            WHERE DATE(timestamp) = CURRENT_DATE 
+            WHERE timestamp BETWEEN '$start_ts' AND '$end_ts' 
             AND (activity_type LIKE '%Exam%' OR activity_type LIKE '%pomodoro%' OR activity_type LIKE '%Subject%')
             UNION ALL
             SELECT MAX(last_heartbeat) as last_time FROM study_sessions 
@@ -241,6 +266,7 @@ try {
 
     echo json_encode([
         'success' => true,
+        'server_time' => time(),
         'total_today_seconds' => $total_today_seconds,
         'total_today_formatted' => format_seconds($total_today_seconds),
         'yesterday_seconds' => $yesterday_seconds,
@@ -249,8 +275,7 @@ try {
         'improvement_type' => $improvement_type,
         'subjects' => $subjects,
         'calc_idle_seconds' => $calc_idle_seconds,
-        'last_active_timestamp' => $last_active_timestamp,
-        'server_time' => $now
+        'last_active_timestamp' => $last_active_timestamp
     ]);
     
 } catch (Throwable $e) {

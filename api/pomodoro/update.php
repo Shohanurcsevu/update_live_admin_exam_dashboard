@@ -24,11 +24,12 @@ try {
     } 
     elseif ($action === 'resume') {
         if ($session_id) {
-            $stmt = $conn->prepare("UPDATE study_sessions SET status = 'active', last_heartbeat = NOW() WHERE id = ? AND status = 'paused'");
+            // Shift start_time forward by the gap between pause (last_heartbeat) and now
+            $stmt = $conn->prepare("UPDATE study_sessions SET start_time = TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, last_heartbeat, NOW()), start_time), status = 'active', last_heartbeat = NOW() WHERE id = ? AND status = 'paused'");
             $stmt->bind_param("i", $session_id);
             $stmt->execute();
         } else {
-            $conn->query("UPDATE study_sessions SET status = 'active', last_heartbeat = NOW() WHERE status = 'paused' ORDER BY id DESC LIMIT 1");
+            $conn->query("UPDATE study_sessions SET start_time = TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, last_heartbeat, NOW()), start_time), status = 'active', last_heartbeat = NOW() WHERE status = 'paused' ORDER BY id DESC LIMIT 1");
         }
     } 
     elseif ($action === 'update') {

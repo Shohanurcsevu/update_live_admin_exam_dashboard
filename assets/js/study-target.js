@@ -196,7 +196,7 @@ const StudyTargetTracker = {
     async detectFirstStartTime() {
         // Fallback: Check localStorage first
         const storedStart = localStorage.getItem('study_first_start_today');
-        const today = new Date().toDateString();
+        const today = this.getLogicalDate();
         const storedDate = localStorage.getItem('study_first_start_date');
 
         if (storedStart && storedDate === today) {
@@ -230,6 +230,24 @@ const StudyTargetTracker = {
         return (relativeHour / 24) * 100;
     },
 
+    // Helper: Get the logical "study date" (rolls over at 5 AM)
+    getLogicalDate(offsetDays = 0) {
+        const now = new Date();
+        // If it's before 5 AM, our logical "today" is actually yesterday
+        if (now.getHours() < this.TIMELINE_START_HOUR) {
+            now.setDate(now.getDate() - 1);
+        }
+        if (offsetDays !== 0) {
+            now.setDate(now.getDate() + offsetDays);
+        }
+        // IMPORTANT: Use local date parts, NOT toISOString() which converts to UTC
+        // and shifts the date backwards in UTC+6 timezone during nighttime hours.
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    },
+
     startUpdateLoop() {
         if (this.updateInterval) clearInterval(this.updateInterval);
         this.updateInterval = setInterval(() => this.updateUI(), 1000);
@@ -237,10 +255,24 @@ const StudyTargetTracker = {
 
     updateUI() {
         const now = new Date();
-        const midnight = new Date();
-        midnight.setHours(23, 59, 59, 999);
+        const rollover = new Date();
+        // If it's already past 5 AM, the next rollover is tomorrow at 5 AM
+        // If it's before 5 AM, the current rollover is today at 5 AM
+        if (now.getHours() >= this.TIMELINE_START_HOUR) {
+            rollover.setDate(now.getDate() + 1);
+        }
+        rollover.setHours(this.TIMELINE_START_HOUR, 0, 0, 0);
 
-        const secondsUntilMidnight = Math.max(0, (midnight - now) / 1000);
+        const secondsUntilRollover = Math.max(0, (rollover - now) / 1000);
+
+        // --- NEW: Live Study Time Nudging ---
+        // If there's an active timeline block, we assume study is happening and increment local seconds
+        const liveActiveBlock = document.querySelector('.timeline-block-active:not(.timeline-block-paused)');
+        if (liveActiveBlock) {
+            // We increment by 1 each second. This will be resynced every 10s by the API.
+            this.studiedSeconds = (this.studiedSeconds || 0) + 1;
+        }
+
         const remainingStudySeconds = Math.max(0, this.DAILY_TARGET_SECONDS - this.studiedSeconds);
 
         // Update DOM
@@ -251,9 +283,9 @@ const StudyTargetTracker = {
         if (studiedEl) studiedEl.textContent = this.formatTime(this.studiedSeconds);
         if (remainingEl) remainingEl.textContent = this.formatTime(remainingStudySeconds);
         if (timeLeftEl) {
-            const h = Math.floor(secondsUntilMidnight / 3600);
-            const m = Math.floor((secondsUntilMidnight % 3600) / 60);
-            const s = Math.floor(secondsUntilMidnight % 60);
+            const h = Math.floor(secondsUntilRollover / 3600);
+            const m = Math.floor((secondsUntilRollover % 3600) / 60);
+            const s = Math.floor(secondsUntilRollover % 60);
             timeLeftEl.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
@@ -338,7 +370,7 @@ const StudyTargetTracker = {
             }
 
             // --- NEW: Time Buffer Logic ---
-            const bufferSeconds = secondsUntilMidnight - remainingStudySeconds;
+            const bufferSeconds = secondsUntilRollover - remainingStudySeconds;
             const absBuffer = Math.abs(bufferSeconds);
             const bufferFormatted = this.formatTime(absBuffer);
 
@@ -390,9 +422,31 @@ const StudyTargetTracker = {
         }
 
         // --- Required Pace Auto-Calculation ---
-        this.updateRequiredPace(secondsUntilMidnight, remainingStudySeconds);
+        this.updateRequiredPace(secondsUntilRollover, remainingStudySeconds);
 
-        this.checkFeasibility(secondsUntilMidnight, remainingStudySeconds);
+        this.checkFeasibility(secondsUntilRollover, remainingStudySeconds);
+
+        // --- NEW: Smooth Timeline Growth ---
+        // Find any 'active' or 'paused' block and nudge its width forward based on current time
+        const activeBlock = document.querySelector('.timeline-block-active');
+        if (activeBlock && activeBlock.dataset.startHour) {
+            const startHour = parseFloat(activeBlock.dataset.startHour);
+            // Use server-synced hour for more accurate growth and to avoid client clock drift
+            const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+            const serverHour = clientHour + (this.serverClockOffset / 3600000);
+            
+            let durationHours = serverHour - startHour;
+            // Handle midnight wrap-around (started 11pm, now is 1am)
+            if (durationHours < 0) durationHours += 24;
+            
+            // Safety check: Avoid "Full Day" glitches if clocks are slightly out of sync (now < start)
+            // If it thinks it's > 18 hours, it's likely a wrap-around error or a stale session
+            if (durationHours > 18) durationHours = 0.01;
+
+            const newWidth = (durationHours / 24) * 100;
+            // Minimum visible width for active block even if duration is near zero
+            activeBlock.style.width = `${Math.max(0.5, newWidth)}%`;
+        }
     },
 
     updateRequiredPace(secondsUntilMidnight, remainingStudySeconds) {
@@ -455,7 +509,8 @@ const StudyTargetTracker = {
 
     async fetchYesterdayProgress() {
         try {
-            const result = await CacheManager.fetchWithCache('api/analytics/get-yesterday-progress.php', 60);
+            const yesterday = this.getLogicalDate(-1);
+            const result = await CacheManager.fetchWithCache(`api/analytics/get-yesterday-progress.php?date=${yesterday}`, 60);
             if (result && result.success) {
                 this.yesterdaySeconds = result.yesterday_total_seconds;
             }
@@ -466,7 +521,7 @@ const StudyTargetTracker = {
 
     async fetchYesterdayGhost() {
         try {
-            const date = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            const date = this.getLogicalDate(-1);
             const res = await fetch(`api/analytics/get-ghost-bpm.php?date=${date}`);
             const result = await res.json();
             
@@ -1439,20 +1494,24 @@ const StudyTargetTracker = {
     // ─── Session Streak Timeline ─────────────────────────────────────────────
     async fetchSessionTimeline() {
         try {
-            // Fetch Today's Sessions
-            const todayResult = await CacheManager.fetchWithCache('api/analytics/get-session-timeline.php', 10);
+            const today = this.getLogicalDate();
+            const yesterday = this.getLogicalDate(-1);
+
+            // Fetch Today's Sessions (bypass cache for immediate results)
+            const todayResult = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${today}`, 0);
             if (todayResult && todayResult.success) {
                 this.sessionTimeline = todayResult.sessions || [];
+            } else if (todayResult) {
+                console.warn('[ST-TRACKER] Today timeline fetch fail:', todayResult.error);
             }
 
-            // Fetch Yesterday's Sessions (Ghost Trace)
-            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-            const ghostResult = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${yesterday}`, 60);
-            if (ghostResult && ghostResult.success) {
-                this.yesterdaySessions = ghostResult.sessions || [];
+            // Fetch Yesterday's Sessions for Ghost Layer (cache for 1 min)
+            const yesterdayResult = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${yesterday}`, 60);
+            if (yesterdayResult && yesterdayResult.success) {
+                this.yesterdaySessions = yesterdayResult.sessions || [];
             }
 
-            this.renderSessionTimeline(todayResult.current_hour);
+            this.renderSessionTimeline(todayResult ? todayResult.current_hour : 24);
         } catch (e) {
             console.error('[ST-TRACKER] Timeline fetch error:', e);
         }
@@ -1464,6 +1523,9 @@ const StudyTargetTracker = {
         const nowMarker = document.getElementById('timeline-now-marker');
         const labelsContainer = document.getElementById('timeline-labels-container');
         if (!bar) return;
+        
+        // Apply dashed background pattern to the main bar
+        bar.classList.add('timeline-dashed-gaps');
 
         // Expanded high-contrast vibrant color palette
         const colors = [
@@ -1540,20 +1602,31 @@ const StudyTargetTracker = {
 
         // 2. Render Today's Sessions (Foreground Layer)
         this.sessionTimeline.forEach(session => {
-            const leftPercent = this.getRelativeTimelinePercent(session.start_hour);
-            const widthPercent = Math.max(0.3, (session.duration_hours / 24) * 100);
+            const startHour = parseFloat(session.start_hour);
+            const duration = parseFloat(session.duration_hours);
+            
+            const leftPercent = this.getRelativeTimelinePercent(startHour);
+            const widthPercent = Math.max(0.5, (duration / 24) * 100);
+            
+            if (isNaN(leftPercent) || isNaN(widthPercent)) {
+                console.warn("[ST-TRACKER] Skipping invalid session block:", session);
+                return;
+            }
+
             const ci = subjectColorMap[(session.subject || 'Session').trim()] || 0;
             const palette = colors[ci];
 
             const block = document.createElement('div');
-            const isActive = session.type === 'pomodoro_active';
+            // BREAKS are also "active" blocks that need to grow while running
+            const isActive = session.type === 'pomodoro_active' || session.type === 'pomodoro_paused' || session.type === 'break';
             const isBreak = session.type === 'break';
+            const isPaused = session.type === 'pomodoro_paused';
 
             if (isActive) {
                 this.activeSubjectPalette = palette;
             }
             
-            block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-10'}`;
+            block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-10'} ${isPaused ? 'timeline-block-paused' : ''}`;
             block.style.left = `${leftPercent}%`;
             block.style.width = `${widthPercent}%`;
             block.dataset.startHour = session.start_hour;
@@ -1562,8 +1635,15 @@ const StudyTargetTracker = {
                 block.style.background = 'linear-gradient(to bottom, rgba(148, 163, 184, 0.4), rgba(100, 116, 139, 0.5))';
                 block.style.borderBottom = '1px dashed rgba(255,255,255,0.4)';
             } else {
-                block.style.background = `linear-gradient(to bottom, ${palette.main}, ${palette.grad})`;
-                block.style.opacity = (session.type === 'exam' || isActive) ? '1.0' : '0.8';
+                // MULTIPLE BACKGROUNDS: Subject Gradient + Shimmer (if active)
+                const subjectGrad = `linear-gradient(to bottom, ${palette.main}, ${palette.grad})`;
+                const shimmerGrad = isActive && !isPaused ? `, linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)` : '';
+                
+                block.style.background = subjectGrad + shimmerGrad;
+                block.style.backgroundSize = isActive && !isPaused ? `100% 100%, 200% 100%` : '100% 100%';
+                // Completed pomodoros should also be reasonably visible
+                const isPomodoroType = session.type === 'pomodoro' || session.type === 'pomodoro_active' || session.type === 'pomodoro_paused';
+                block.style.opacity = (session.type === 'exam' || isActive || isPomodoroType) ? '1.0' : '0.8';
             }
 
             // Exam/Active sessions get accents
@@ -1585,10 +1665,15 @@ const StudyTargetTracker = {
             if (isActive) label = '🔥 ACTIVE FOCUS';
             if (isBreak) label = '☕ Break';
 
-            block.title = `${session.subject || 'Session'}\n${label} · ${isActive ? 'Ongoing' : durationMin + 'm'}\nStarted: ${displayH}:${String(startM).padStart(2, '0')} ${ampm}`;
+            block.title = `${session.subject || 'Session'}\n${label} · ${ isActive ? 'Ongoing' : durationMin + 'm'}\nStarted: ${displayH}:${String(startM).padStart(2, '0')} ${ampm}`;
 
             bar.appendChild(block);
         });
+
+        // Update session count pill
+        if (countEl) {
+            countEl.textContent = `${this.sessionTimeline.length} session${this.sessionTimeline.length !== 1 ? 's' : ''}`;
+        }
 
         // --- NEW: Render Milestones (Hourly Achievements) ---
         let cumulativeHours = 0;
@@ -1680,8 +1765,21 @@ const StudyTargetTracker = {
                 }
                 .timeline-block-active {
                     animation: timeline-pulse 2s infinite ease-in-out, timeline-shimmer 3s infinite linear;
-                    background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-                    background-size: 200% 100%;
+                    /* Shimmer moved to inline multiple-background to preserve subject colors */
+                }
+                .timeline-block-paused {
+                    background-image: repeating-linear-gradient(
+                        -45deg,
+                        transparent,
+                        transparent 5px,
+                        rgba(255, 255, 255, 0.2) 5px,
+                        rgba(255, 255, 255, 0.2) 10px
+                    ) !important;
+                    animation: timeline-pulse 3s infinite ease-in-out;
+                    opacity: 0.9 !important;
+                }
+                #timeline-now-marker {
+                    z-index: 50 !important; /* Ensure Now marker is ALWAYS on top */
                 }
                 .timeline-milestone-flag {
                     z-index: 40;
@@ -1690,6 +1788,14 @@ const StudyTargetTracker = {
                     position: relative;
                 }
                 /* Vibrant Milestone Aesthetic */
+                .timeline-dashed-gaps {
+                    background-image: repeating-linear-gradient(45deg, 
+                        rgba(0,0,0,0.03) 0px, 
+                        rgba(0,0,0,0.03) 2px, 
+                        transparent 2px, 
+                        transparent 4px
+                    );
+                }
                 .timeline-vibrant-gaps {
                     background: linear-gradient(90deg, 
                         rgba(99, 102, 241, 0.08), 
