@@ -427,6 +427,10 @@ class StudyMentor {
             // Sync StudyTargetTracker if it exists
             if (window.StudyTargetTracker && typeof window.StudyTargetTracker.fetchData === 'function') {
                 window.StudyTargetTracker.fetchData(true);
+                // Also refresh the timeline immediately so the active block stops growing
+                if (typeof window.StudyTargetTracker.fetchSessionTimeline === 'function') {
+                    window.StudyTargetTracker.fetchSessionTimeline();
+                }
             }
 
             return result;

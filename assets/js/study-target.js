@@ -426,25 +426,22 @@ const StudyTargetTracker = {
 
         this.checkFeasibility(secondsUntilRollover, remainingStudySeconds);
 
-        // --- NEW: Smooth Timeline Growth ---
-        // Find any 'active' or 'paused' block and nudge its width forward based on current time
+        // --- Smooth Timeline Growth ---
+        // Only grow if there's an ACTUALLY running session in our data (not just a stale DOM element)
+        const hasActiveSession = this.sessionTimeline && this.sessionTimeline.some(s =>
+            s.type === 'pomodoro_active' || s.type === 'break' || s.type === 'pomodoro_paused'
+        );
         const activeBlock = document.querySelector('.timeline-block-active');
-        if (activeBlock && activeBlock.dataset.startHour) {
+        if (hasActiveSession && activeBlock && activeBlock.dataset.startHour) {
             const startHour = parseFloat(activeBlock.dataset.startHour);
-            // Use server-synced hour for more accurate growth and to avoid client clock drift
             const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
             const serverHour = clientHour + (this.serverClockOffset / 3600000);
             
             let durationHours = serverHour - startHour;
-            // Handle midnight wrap-around (started 11pm, now is 1am)
             if (durationHours < 0) durationHours += 24;
-            
-            // Safety check: Avoid "Full Day" glitches if clocks are slightly out of sync (now < start)
-            // If it thinks it's > 18 hours, it's likely a wrap-around error or a stale session
             if (durationHours > 18) durationHours = 0.01;
 
             const newWidth = (durationHours / 24) * 100;
-            // Minimum visible width for active block even if duration is near zero
             activeBlock.style.width = `${Math.max(0.5, newWidth)}%`;
         }
     },
