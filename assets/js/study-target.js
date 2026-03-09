@@ -40,6 +40,7 @@ const StudyTargetTracker = {
     lastStoredBpm: 0,   // NEW: Smart trigger state
     lastStoredStatus: null,
     lastStoredTime: 0,
+    currentLogicalDate: null, // NEW: Track date to trigger resets
     MILESTONE_TITLES: {
         1: "First Spark",
         2: "Steady Pulse",
@@ -132,7 +133,37 @@ const StudyTargetTracker = {
         try {
             const result = await CacheManager.fetchWithCache('api/analytics/daily-study-time.php', 1, forceRefresh);
             if (result) {
-                const newSeconds = result.total_today_seconds || 0;
+                // --- NEW: Handle Logical Day Transitions (5 AM) ---
+                const todayDate = this.getLogicalDate();
+                if (this.currentLogicalDate && this.currentLogicalDate !== todayDate) {
+                    console.log("[ST-TRACKER] New logical day detected (" + todayDate + "). Resetting daily trackers.");
+                    this.firstStartTime = null;
+                    this.studiedSeconds = 0;
+                    this.lastStudyChangeTime = null;
+                    this.recoveryStartTime = null;
+
+                    // Re-fetch all daily and historical data with forceRefresh
+                    this.fetchYesterdayProgress();
+                    this.fetchYesterdayGhost();
+                    this.fetchAIInsights();
+                    this.fetchSubjectEfficiency();
+                    this.fetchEstimatedFinish();
+                    this.fetchSessionTimeline();
+                    this.fetchFocusHeatmap();
+                    this.detectFirstStartTime(true); // Force refresh on date change
+                }
+                this.currentLogicalDate = todayDate;
+
+                const serverSeconds = result.total_today_seconds || 0;
+
+                // --- SMART SYNC: Prevent "Sawtooth" jumps ---
+                // If we are studying right now, our local counter might be slightly ahead 
+                // of what the database just returned (since DB updates are throttled).
+                // Only overwrite if the server value is significantly different (> 10s) 
+                // or if the server value is actually GREATER than our local estimate.
+                if (Math.abs(serverSeconds - this.studiedSeconds) > 10 || serverSeconds > this.studiedSeconds) {
+                    this.studiedSeconds = serverSeconds;
+                }
 
                 // --- NEW: Sync Server Clock Offset ---
                 if (result.server_time) {
@@ -152,7 +183,7 @@ const StudyTargetTracker = {
                 }
 
                 // Track study activity changes locally
-                if (newSeconds > this.studiedSeconds && this.studiedSeconds > 0) {
+                if (serverSeconds > this.studiedSeconds && this.studiedSeconds > 0) {
                     // Trigger Defibrillator Surge if coming back from Flatline (20m+ gap)
                     const gapMs = (this.lastStudyChangeTime === null) ? 0 : (Date.now() - this.lastStudyChangeTime);
                     if (gapMs > 20 * 60 * 1000) {
@@ -160,12 +191,10 @@ const StudyTargetTracker = {
                         console.log("[ST-TRACKER] Defibrillator Surge Triggered!");
                     }
                     this.lastStudyChangeTime = Date.now();
-                } else if (this.studiedSeconds === 0 && newSeconds > 0 && this.lastStudyChangeTime === null) {
+                } else if (this.studiedSeconds === 0 && serverSeconds > 0 && this.lastStudyChangeTime === null) {
                     // Initialization case: trust server time
                     // (already handled by last_active_timestamp sync above, but good to be explicit here)
                 }
-
-                this.studiedSeconds = newSeconds;
 
                 const dailyData = result.subjects || [];
 
@@ -183,7 +212,7 @@ const StudyTargetTracker = {
 
                 // Try to detect first start time if not set
                 if (!this.firstStartTime && this.studiedSeconds > 0) {
-                    this.detectFirstStartTime();
+                    this.detectFirstStartTime(forceRefresh);
                 }
 
                 this.renderSubjectCards();
@@ -193,7 +222,7 @@ const StudyTargetTracker = {
         }
     },
 
-    async detectFirstStartTime() {
+    async detectFirstStartTime(forceRefresh = false) {
         // Fallback: Check localStorage first
         const storedStart = localStorage.getItem('study_first_start_today');
         const today = this.getLogicalDate();
@@ -206,7 +235,7 @@ const StudyTargetTracker = {
 
         // Otherwise, fetch from our new first-activity API
         try {
-            const result = await CacheManager.fetchWithCache('api/analytics/get-first-activity.php', 30);
+            const result = await CacheManager.fetchWithCache('api/analytics/get-first-activity.php', 30, forceRefresh);
             if (result && result.timestamp) {
                 // Correct for MySQL timestamp format
                 this.firstStartTime = new Date(result.timestamp.replace(/-/g, '/'));
@@ -232,7 +261,7 @@ const StudyTargetTracker = {
 
     // Helper: Get the logical "study date" (rolls over at 5 AM)
     getLogicalDate(offsetDays = 0) {
-        const now = new Date();
+        const now = new Date(Date.now() + this.serverClockOffset);
         // If it's before 5 AM, our logical "today" is actually yesterday
         if (now.getHours() < this.TIMELINE_START_HOUR) {
             now.setDate(now.getDate() - 1);
@@ -254,8 +283,8 @@ const StudyTargetTracker = {
     },
 
     updateUI() {
-        const now = new Date();
-        const rollover = new Date();
+        const now = new Date(Date.now() + this.serverClockOffset);
+        const rollover = new Date(now.getTime());
         // If it's already past 5 AM, the next rollover is tomorrow at 5 AM
         // If it's before 5 AM, the current rollover is today at 5 AM
         if (now.getHours() >= this.TIMELINE_START_HOUR) {
@@ -433,16 +462,14 @@ const StudyTargetTracker = {
         );
         const activeBlock = document.querySelector('.timeline-block-active');
         if (hasRunningSession && activeBlock && activeBlock.dataset.startHour) {
+            const now = new Date(Date.now() + this.serverClockOffset);
+            const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
             const startHour = parseFloat(activeBlock.dataset.startHour);
-            const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-            const serverHour = clientHour + (this.serverClockOffset / 3600000);
-            
-            let durationHours = serverHour - startHour;
-            if (durationHours < 0) durationHours += 24;
-            if (durationHours > 18) durationHours = 0.01;
-
-            const newWidth = (durationHours / 24) * 100;
-            activeBlock.style.width = `${Math.max(0.5, newWidth)}%`;
+            if (!isNaN(startHour)) {
+                const hourDiff = (currentHour - startHour + 24) % 24;
+                const widthPercent = Math.max(0.3, (hourDiff / 24) * 100);
+                activeBlock.style.width = `${widthPercent}%`;
+            }
         }
 
         // Grow the paused GAP block (dashed bar) in real-time
@@ -907,10 +934,10 @@ const StudyTargetTracker = {
     ECG_RECOVERY_DURATION_MS: 10000,
 
     // Fatigue thresholds (ms)
-    FATIGUE_FADING_MS:   3 * 60 * 1000,   // 3 minutes
-    FATIGUE_CRITICAL_MS: 10 * 60 * 1000,  // 10 minutes
-    FATIGUE_FAILING_MS:  15 * 60 * 1000,  // 15 minutes
-    FATIGUE_DEAD_MS:     20 * 60 * 1000,  // 20 minutes
+    FATIGUE_FADING_MS:   10 * 60 * 1000,   // 10 minutes
+    FATIGUE_CRITICAL_MS: 30 * 60 * 1000,   // 30 minutes
+    FATIGUE_FAILING_MS:  45 * 60 * 1000,   // 45 minutes
+    FATIGUE_DEAD_MS:     60 * 60 * 1000,   // 60 minutes
 
     // Heart Rate Zones (mapped to study intensity)
     HEART_RATE_ZONES: [
@@ -1044,11 +1071,12 @@ const StudyTargetTracker = {
             // This makes the timeline feel alive as you study.
             const activeBlock = document.querySelector('.timeline-block-active');
             if (activeBlock) {
-                const now = new Date();
+                const now = new Date(Date.now() + this.serverClockOffset);
                 const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
                 const startHour = parseFloat(activeBlock.dataset.startHour);
                 if (!isNaN(startHour)) {
-                    const widthPercent = Math.max(0.3, ((currentHour - startHour) / 24) * 100);
+                    const hourDiff = (currentHour - startHour + 24) % 24;
+                    const widthPercent = Math.max(0.3, (hourDiff / 24) * 100);
                     activeBlock.style.width = `${widthPercent}%`;
                 }
             }
@@ -1158,11 +1186,10 @@ const StudyTargetTracker = {
             if (state.isFlatline || !this.yesterdayBpmLogs || this.yesterdayBpmLogs.length === 0) {
                 deltaEl.classList.add('hidden');
             } else {
-                const now = new Date();
+                const now = new Date(Date.now() + this.serverClockOffset);
                 const currentHour = now.getHours() + now.getMinutes() / 60;
                 
-                // Find nearest ghost log
-                const ghostLog = this.yesterdayBpmLogs.find(l => Math.abs(l.hour - currentHour) < 0.05);
+                const ghostLog = this.yesterdayBpmLogs.find(l => Math.abs(l.hour - currentHour) < 0.1);
                 const ghostBpm = ghostLog ? ghostLog.bpm : 0;
                 const wasActiveYesterday = ghostLog ? ghostLog.isActive : false;
                 
@@ -1266,7 +1293,7 @@ const StudyTargetTracker = {
         }
 
         // --- Bio-Sync Ghost Wave Calculation (Using REAL History) ---
-        const now = new Date();
+        const now = new Date(Date.now() + this.serverClockOffset);
         const currentHour = now.getHours() + now.getMinutes() / 60;
         
         // Find nearest ghost log
