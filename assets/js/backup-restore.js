@@ -171,8 +171,12 @@
             // 3. Compute SHA-256 checksum of data section
             setExportProgress(88, 'Computing integrity checksum...');
             const dataStr = JSON.stringify(backup.data);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
-            backup.checksum = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            if (crypto && crypto.subtle) {
+                const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
+                backup.checksum = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            } else {
+                backup.checksum = '';
+            }
 
             setExportProgress(90, 'Compressing backup...');
 
@@ -381,11 +385,15 @@
             // 4. Verify integrity checksum (if present)
             if (backup.checksum) {
                 setImportProgress(16, 'Verifying integrity checksum...');
-                const dataStr = JSON.stringify(backup.data);
-                const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
-                const computed = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-                if (computed !== backup.checksum) {
-                    throw new Error('Checksum mismatch — this backup file is corrupted or incomplete. Re-download and try again.');
+                if (crypto && crypto.subtle) {
+                    const dataStr = JSON.stringify(backup.data);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataStr));
+                    const computed = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                    if (computed !== backup.checksum) {
+                        throw new Error('Checksum mismatch — this backup file is corrupted or incomplete. Re-download and try again.');
+                    }
+                } else {
+                    console.warn('[Import] crypto.subtle not available — skipping checksum verification.');
                 }
             }
 

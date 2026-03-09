@@ -317,8 +317,14 @@
             // 3. Compute SHA-256 checksum of data section
             // Optimization: avoid another huge string copy by using a Blob/ArrayBuffer
             const dataBlob = new Blob([JSON.stringify(backup.data)], { type: 'application/json' });
-            const hashBuffer = await crypto.subtle.digest('SHA-256', await dataBlob.arrayBuffer());
-            backup.checksum = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            if (crypto && crypto.subtle) {
+                const hashBuffer = await crypto.subtle.digest('SHA-256', await dataBlob.arrayBuffer());
+                backup.checksum = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            } else {
+                // crypto.subtle unavailable (non-HTTPS) — skip checksum
+                backup.checksum = '';
+                console.warn('[AutoBackup] crypto.subtle not available (insecure context). Checksum skipped.');
+            }
 
             // 4. Compress with CompressionStream (client-side gzip)
             const jsonText = JSON.stringify(backup);

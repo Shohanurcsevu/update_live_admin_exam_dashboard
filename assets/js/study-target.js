@@ -1136,10 +1136,10 @@ const StudyTargetTracker = {
         const zoneEl = document.getElementById('ecg-zone-label');
         if (!bpmEl || !zoneEl) return;
 
-        // Smooth the BPM to prevent jittery numbers (lerp 5% toward actual)
+        // Smooth the BPM — gradual ramp-up from 0 to target (no instant jumps)
         const targetBpm = Math.round(state.bpm);
-        if (this.smoothedBpm === 0 && targetBpm > 0) this.smoothedBpm = targetBpm; // Fast init
-        this.smoothedBpm += (targetBpm - this.smoothedBpm) * 0.05;
+        // Lerp 8% toward actual each frame (~60fps) = ramps from 0→50 in ~3s
+        this.smoothedBpm += (targetBpm - this.smoothedBpm) * 0.08;
         const displayBpm = Math.round(this.smoothedBpm || 0);
 
         // Find matching zone
