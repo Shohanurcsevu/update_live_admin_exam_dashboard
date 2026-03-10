@@ -408,11 +408,12 @@ const StudyTargetTracker = {
                     }
                 }
 
-                clockEl.innerHTML = `<span style="letter-spacing:0.05em">${displayH}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} ${ampm}</span>${deltaText}`;
+                clockEl.innerHTML = `<strong style="letter-spacing:0.05em; font-weight:800 !important; color:#0f172a !important;">${displayH}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} ${ampm}</strong>${deltaText}`;
                 
                 // --- Cyber-HUD Style (Red Tag, Black Text) ---
-                clockEl.style.textTransform = 'uppercase';
-                clockEl.style.fontFamily = 'monospace';
+                clockEl.style.textTransform = 'lowercase';
+                clockEl.style.fontWeight = '800';
+                clockEl.style.fontFamily = "'Inter', 'system-ui', 'Segoe UI', Roboto, sans-serif";
                 
                 if (dotEl) {
                     // Marker dot still uses performance colors for clarity (Cyan/Amber)
@@ -2292,11 +2293,12 @@ const StudyTargetTracker = {
                     border-radius: 0px !important;
                     box-shadow: none !important;
                     font-size: 11px !important;
-                    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
-                    font-weight: 900 !important;
-                    white-space: nowrap;
+                    font-family: 'Inter', 'system-ui', 'Segoe UI', Roboto, sans-serif !important;
+                    font-weight: 800 !important; /* Balanced Boldness */
                     color: #0f172a !important; /* Dark Slate for consistency */
-                    text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 2px rgba(255,255,255,0.4) !important;
+                    text-shadow: 
+                        0 0 10px rgba(255,255,255,0.8), 
+                        0 0 2px rgba(255,255,255,0.4) !important;
                     position: absolute;
                 }
                 /* Cyber HUD Brackets */
