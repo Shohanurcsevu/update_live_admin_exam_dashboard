@@ -733,14 +733,68 @@ const StudyTargetTracker = {
             milestone.style.top = '0';
             milestone.style.pointerEvents = 'none';
 
+            // Format finish time
+            const fmtTime = (d) => {
+                const hh = d.getHours() % 12 || 12;
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                const ss = String(d.getSeconds()).padStart(2, '0');
+                const ap = d.getHours() >= 12 ? 'pm' : 'am';
+                return `${hh}:${mm}:${ss} ${ap}`;
+            };
+
+            // 2. Live Delta Speedometer parity
+            let deltaText = '';
+            const now = new Date();
+            const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+            if (this.yesterdaySessions.length > 0) {
+                const yesterdaySecondsAtThisTime = this.getYesterdayStudiedAt(clientHour);
+                const diff = Math.round((this.studiedSeconds - yesterdaySecondsAtThisTime) / 60); // In minutes
+                if (diff !== 0) {
+                    const sign = diff > 0 ? '+' : '';
+                    deltaText = ` <span style="opacity:0.7; font-size:0.85em; margin-left:4px" class="${diff > 0 ? 'text-emerald-500' : 'text-rose-500'}">${sign}${diff}m</span>`;
+                }
+            }
+
+            // Style objects to match clock label HUD exactly
+            const bracketOverlay = `
+                content:''; position:absolute; inset:-4px; pointer-events:none;
+                background:
+                    linear-gradient(to right, #ef4444 2px, transparent 2px) 0 0,
+                    linear-gradient(to bottom, #ef4444 2px, transparent 2px) 0 0,
+                    linear-gradient(to left, #ef4444 2px, transparent 2px) 100% 0,
+                    linear-gradient(to bottom, #ef4444 2px, transparent 2px) 100% 0,
+                    linear-gradient(to right, #ef4444 2px, transparent 2px) 0 100%,
+                    linear-gradient(to top, #ef4444 2px, transparent 2px) 0 100%,
+                    linear-gradient(to left, #ef4444 2px, transparent 2px) 100% 100%,
+                    linear-gradient(to top, #ef4444 2px, transparent 2px) 100% 100%;
+                background-repeat:no-repeat; background-size:8px 8px;
+            `;
+
             milestone.innerHTML = `
-                <div class="absolute bottom-full mb-1 flex flex-col items-center">
-                    <span style="font-size: 14px; filter: drop-shadow(0 0 6px rgba(249,115,22,0.5));">🔥</span>
+                <style>
+                    .finish-hud-tag::after { ${bracketOverlay} }
+                    .finish-hud-connector {
+                        content:''; position:absolute;
+                        bottom: -8px; left: -15px;
+                        width: 12px; height: 1.5px;
+                        background: #ef4444;
+                        transform: rotate(-20deg);
+                        transform-origin: left bottom;
+                    }
+                </style>
+                <div class="absolute bottom-[48px] left-[15px]">
+                    <div class="finish-hud-tag relative px-2 py-[3px] text-[11px] font-extrabold text-[#0f172a] whitespace-nowrap" 
+                         style="font-family: 'Inter', 'system-ui', 'Segoe UI', Roboto, sans-serif; text-transform: lowercase; text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 2px rgba(255,255,255,0.4);">
+                        <strong style="letter-spacing:0.05em; font-weight:800 !important; color:#0f172a !important;">${fmtTime(finishDate)}</strong>${deltaText}
+                        <span class="finish-hud-connector"></span>
+                    </div>
                 </div>
                 <div class="w-[2px] h-[40px] bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.8)]"></div>
             `;
 
             milestone.style.display = 'flex';
+
+
 
             // --- NEW: Target Projection Line ---
             const nowMarker = document.getElementById('timeline-now-marker');
