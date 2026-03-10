@@ -733,27 +733,13 @@ const StudyTargetTracker = {
             milestone.style.top = '0';
             milestone.style.pointerEvents = 'none';
 
-            // Format finish time
+            // Format finish time (Removed seconds for simplicity)
             const fmtTime = (d) => {
                 const hh = d.getHours() % 12 || 12;
                 const mm = String(d.getMinutes()).padStart(2, '0');
-                const ss = String(d.getSeconds()).padStart(2, '0');
                 const ap = d.getHours() >= 12 ? 'pm' : 'am';
-                return `${hh}:${mm}:${ss} ${ap}`;
+                return `${hh}:${mm} ${ap}`;
             };
-
-            // 2. Live Delta Speedometer parity
-            let deltaText = '';
-            const now = new Date();
-            const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-            if (this.yesterdaySessions.length > 0) {
-                const yesterdaySecondsAtThisTime = this.getYesterdayStudiedAt(clientHour);
-                const diff = Math.round((this.studiedSeconds - yesterdaySecondsAtThisTime) / 60); // In minutes
-                if (diff !== 0) {
-                    const sign = diff > 0 ? '+' : '';
-                    deltaText = ` <span style="opacity:0.7; font-size:0.85em; margin-left:4px" class="${diff > 0 ? 'text-emerald-500' : 'text-rose-500'}">${sign}${diff}m</span>`;
-                }
-            }
 
             // Style objects to match clock label HUD exactly
             const bracketOverlay = `
@@ -785,7 +771,7 @@ const StudyTargetTracker = {
                 <div class="absolute bottom-[48px] left-[15px]">
                     <div class="finish-hud-tag relative px-2 py-[3px] text-[11px] font-extrabold text-[#0f172a] whitespace-nowrap" 
                          style="font-family: 'Inter', 'system-ui', 'Segoe UI', Roboto, sans-serif; text-transform: lowercase; text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 2px rgba(255,255,255,0.4);">
-                        <strong style="letter-spacing:0.05em; font-weight:800 !important; color:#0f172a !important;">${fmtTime(finishDate)}</strong>${deltaText}
+                        <strong style="letter-spacing:0.05em; font-weight:800 !important; color:#0f172a !important;">${fmtTime(finishDate)}</strong>
                         <span class="finish-hud-connector"></span>
                     </div>
                 </div>
