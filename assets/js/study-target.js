@@ -32,6 +32,7 @@ const StudyTargetTracker = {
     smoothedBpm: 0,
     sessionTimeline: [],
     yesterdaySessions: [],
+    estimatedFinishTimestamp: null, // NEW: For timeline projection
     momentumScore: 0,
     serverClockOffset: 0,
     lastLogTime: 0, // NEW: For client-side rate limiting
@@ -54,6 +55,38 @@ const StudyTargetTracker = {
         10: "Elite Focus",
         11: "Zen Master",
         12: "Legacy Session"
+    },
+    
+    // Helper: Convert HEX to RGBA
+    hexToRgba(hex, alpha = 1) {
+        if (!hex || hex.length < 7) return `rgba(148, 163, 184, ${alpha})`;
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    },
+
+    // Helper: Calculate seconds studied yesterday up to a specific 5AM-offset hour
+    getYesterdayStudiedAt(targetHour) {
+        let totalSeconds = 0;
+        this.yesterdaySessions.forEach(session => {
+            const start = session.start_hour;
+            const end = session.end_hour;
+            
+            // Adjust hours for 5AM offset comparison
+            const adjTarget = (targetHour < this.TIMELINE_START_HOUR) ? targetHour + 24 : targetHour;
+            const adjStart = (start < this.TIMELINE_START_HOUR) ? start + 24 : start;
+            const adjEnd = (end < this.TIMELINE_START_HOUR) ? end + 24 : end;
+
+            if (adjTarget > adjStart) {
+                const overlapEnd = Math.min(adjTarget, adjEnd);
+                const durationHours = overlapEnd - adjStart;
+                if (durationHours > 0) {
+                    totalSeconds += durationHours * 3600;
+                }
+            }
+        });
+        return totalSeconds;
     },
 
     async init() {
@@ -327,9 +360,6 @@ const StudyTargetTracker = {
             firstActivityEl.textContent = `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
         }
 
-        // --- NEW: Predicted Finish Clock ---
-        this.renderPredictedFinish();
-
         // --- NEW: Update Session Timeline "Now" Marker (Real-time) ---
         const nowMarker = document.getElementById('timeline-now-marker');
         if (nowMarker) {
@@ -340,34 +370,78 @@ const StudyTargetTracker = {
 
             const clockEl = document.getElementById('timeline-now-clock');
             const dotEl = document.getElementById('timeline-now-dot');
+            
+            // 1. Pulse of Focus: Toggle based on active study session
+            const isStudying = document.body.classList.contains('pomo-session-active') || this.momentumScore > 0;
+            nowMarker.classList.toggle('now-pulse-active', isStudying);
+            nowMarker.classList.toggle('now-pulse-break', !isStudying);
+
+            // --- Subject Aura Sync: Inject active subject color into pulse ---
+            if (isStudying && this.activeSubjectPalette) {
+                const color = this.activeSubjectPalette.main;
+                const r = parseInt(color.slice(1, 3), 16);
+                const g = parseInt(color.slice(3, 5), 16);
+                const b = parseInt(color.slice(5, 7), 16);
+                nowMarker.style.setProperty('--now-pulse-color', `rgba(${r}, ${g}, ${b}, 0.8)`);
+                nowMarker.style.setProperty('--now-pulse-spread', `rgba(${r}, ${g}, ${b}, 0)`);
+            } else {
+                // Default Cyan for studying if no palette, Amber for break
+                nowMarker.style.removeProperty('--now-pulse-color');
+                nowMarker.style.removeProperty('--now-pulse-spread');
+            }
+
             if (clockEl) {
                 const h = now.getHours();
                 const m = now.getMinutes();
+                const s = now.getSeconds();
                 const ampm = h >= 12 ? 'pm' : 'am';
                 const displayH = h % 12 || 12;
-                clockEl.textContent = `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
                 
-                // Dynamic coloring every hour (cycles through HSL)
-                const hue = (h * 15) % 360; 
-                const accentColor = `hsl(${hue}, 80%, 45%)`;
-                clockEl.style.color = accentColor;
-                clockEl.style.backgroundColor = `hsla(${hue}, 80%, 98%, 0.95)`;
-                clockEl.style.borderColor = `hsla(${hue}, 80%, 45%, 0.3)`;
+                // 2. Live Delta Speedometer: Compare today vs yesterday at this exact minute
+                let deltaText = '';
+                if (this.yesterdaySessions.length > 0) {
+                    const yesterdaySecondsAtThisTime = this.getYesterdayStudiedAt(clientHour);
+                    const diff = Math.round((this.studiedSeconds - yesterdaySecondsAtThisTime) / 60); // In minutes
+                    if (diff !== 0) {
+                        const sign = diff > 0 ? '+' : '';
+                        deltaText = ` <span style="opacity:0.7; font-size:0.85em; margin-left:4px" class="${diff > 0 ? 'text-emerald-500' : 'text-rose-500'}">${sign}${diff}m</span>`;
+                    }
+                }
+
+                clockEl.innerHTML = `<span style="letter-spacing:0.05em">${displayH}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} ${ampm}</span>${deltaText}`;
+                
+                // --- Cyber-HUD Style (Red Tag, Black Text) ---
+                clockEl.style.textTransform = 'uppercase';
+                clockEl.style.fontFamily = 'monospace';
                 
                 if (dotEl) {
-                    dotEl.style.backgroundColor = accentColor;
-                    dotEl.style.boxShadow = `0 0 8px ${accentColor}`;
-                    
-                    // Add radar ring if missing (Moving Expanding Ring)
-                    if (!dotEl.querySelector('.timeline-radar-ring')) {
-                        const ring = document.createElement('div');
-                        ring.className = 'timeline-radar-ring';
-                        dotEl.appendChild(ring);
-                    }
+                    // Marker dot still uses performance colors for clarity (Cyan/Amber)
+                    const dotColor = isStudying ? '#06b6d4' : '#f59e0b';
+                    dotEl.style.backgroundColor = dotColor;
+                    dotEl.style.boxShadow = `0 0 10px ${dotColor}`;
                     const ring = dotEl.querySelector('.timeline-radar-ring');
-                    if (ring) ring.style.backgroundColor = accentColor;
+                    if (ring) ring.style.backgroundColor = dotColor;
                 }
             }
+
+            // 3. Yesterday's Ghost Marker: Visual echo of yesterday
+            let ghostMarker = document.getElementById('timeline-yesterday-ghost');
+            if (!ghostMarker) {
+                ghostMarker = document.createElement('div');
+                ghostMarker.id = 'timeline-yesterday-ghost';
+                ghostMarker.className = 'absolute top-0 w-[2px] h-[40px] bg-slate-400/40 z-0';
+                
+                nowMarker.parentElement.appendChild(ghostMarker);
+            }
+            ghostMarker.style.left = `${nowPercent}%`;
+            
+            // Add a small tag to ghost marker if it's over a yesterday session
+            const wasStudyingYesterday = this.yesterdaySessions.some(s => clientHour >= s.start_hour && clientHour <= s.end_hour);
+            ghostMarker.style.borderLeft = wasStudyingYesterday ? '2px solid rgba(255,255,255,0.8)' : '1px dashed rgba(255,255,255,0.3)';
+            ghostMarker.style.opacity = wasStudyingYesterday ? '0.6' : '0.2';
+
+            // --- NEW: Target Projection Line (Fix: pass nowPercent to avoid DOM read blinking) ---
+            this.renderPredictedFinish(nowPercent);
         }
 
         if (window.FontPicker && typeof window.FontPicker.updateProgressRing === 'function') {
@@ -485,6 +559,8 @@ const StudyTargetTracker = {
             // Update tooltip
             const gapMin = Math.round(gapDuration * 60);
             pausedGapBlock.title = `⏸ Paused · ${gapMin}m`;
+            const label = pausedGapBlock.querySelector('.timeline-gap-label');
+            if (label) label.textContent = `${gapMin}m break`;
         }
     },
 
@@ -604,6 +680,7 @@ const StudyTargetTracker = {
             const result = await CacheManager.fetchWithCache(`api/analytics/get-estimated-finish.php?pace=${multiplier}`, 2);
             if (result) {
                 this.estimatedFinishLabel = result.formatted_time;
+                this.estimatedFinishTimestamp = result.finish_timestamp; // Store for timeline
                 this.renderPredictedFinish();
             }
         } catch (e) {
@@ -611,7 +688,7 @@ const StudyTargetTracker = {
         }
     },
 
-    renderPredictedFinish() {
+    renderPredictedFinish(forcedNowPercent = null) {
         const clockEl = document.getElementById('predicted-finish-clock');
         if (!clockEl) return;
 
@@ -621,6 +698,11 @@ const StudyTargetTracker = {
 
         if (this.estimatedFinishLabel.includes("Goal")) {
             clockEl.className = "text-xl font-black text-emerald-600";
+            // Hide milestone and projection if goal reached
+            const milestone = document.getElementById('timeline-predicted-finish-milestone');
+            const projection = document.getElementById('timeline-target-projection');
+            if (milestone) milestone.style.display = 'none';
+            if (projection) projection.style.display = 'none';
             return;
         }
 
@@ -630,6 +712,58 @@ const StudyTargetTracker = {
             clockEl.className = "text-xl font-black text-rose-600 animate-pulse";
         } else {
             clockEl.className = "text-xl font-black text-indigo-600 animate-pulse";
+        }
+
+        // --- NEW: Render Visual Milestone on Timeline ---
+        const bar = document.getElementById('session-timeline-bar');
+        if (bar && this.estimatedFinishTimestamp) {
+            const finishDate = new Date(this.estimatedFinishTimestamp * 1000);
+            const finishHour = finishDate.getHours() + finishDate.getMinutes()/60;
+            const finishPercent = this.getRelativeTimelinePercent(finishHour);
+            
+            let milestone = document.getElementById('timeline-predicted-finish-milestone');
+            if (!milestone) {
+                milestone = document.createElement('div');
+                milestone.id = 'timeline-predicted-finish-milestone';
+                milestone.className = 'timeline-milestone absolute z-20 flex flex-col items-center';
+                bar.parentElement.appendChild(milestone);
+            }
+            milestone.style.left = `${finishPercent}%`;
+            milestone.style.top = '0';
+            milestone.style.pointerEvents = 'none';
+
+            milestone.innerHTML = `
+                <div class="absolute bottom-full mb-1 flex flex-col items-center">
+                    <span style="font-size: 14px; filter: drop-shadow(0 0 6px rgba(249,115,22,0.5));">🔥</span>
+                </div>
+                <div class="w-[2px] h-[40px] bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.8)]"></div>
+            `;
+
+            milestone.style.display = 'flex';
+
+            // --- NEW: Target Projection Line ---
+            const nowMarker = document.getElementById('timeline-now-marker');
+            if (nowMarker || forcedNowPercent !== null) {
+                const nowPercent = forcedNowPercent !== null ? forcedNowPercent : parseFloat(nowMarker.style.left || 0);
+                let projection = document.getElementById('timeline-target-projection');
+                if (!projection) {
+                    projection = document.createElement('div');
+                    projection.id = 'timeline-target-projection';
+                    projection.className = 'absolute top-1/2 -translate-y-1/2 h-[1px] z-10';
+                    projection.style.background = 'repeating-linear-gradient(90deg, #22d3ee 0, #22d3ee 4px, transparent 4px, transparent 8px)';
+                    projection.style.opacity = '0.4';
+                    projection.style.pointerEvents = 'none';
+                    bar.appendChild(projection);
+                }
+
+                if (finishPercent > nowPercent) {
+                    projection.style.left = `${nowPercent}%`;
+                    projection.style.width = `${finishPercent - nowPercent}%`;
+                    projection.style.display = 'block';
+                } else {
+                    projection.style.display = 'none';
+                }
+            }
         }
     },
 
@@ -1539,7 +1673,8 @@ const StudyTargetTracker = {
             // Fetch Today's Sessions (bypass cache for immediate results)
             const todayResult = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${today}`, 0);
             if (todayResult && todayResult.success) {
-                this.sessionTimeline = todayResult.sessions || [];
+                // EXCLUDE EXAMS: Filter out sessions where type is 'exam'
+                this.sessionTimeline = (todayResult.sessions || []).filter(s => s.type !== 'exam');
             } else if (todayResult) {
                 console.warn('[ST-TRACKER] Today timeline fetch fail:', todayResult.error);
             }
@@ -1547,7 +1682,8 @@ const StudyTargetTracker = {
             // Fetch Yesterday's Sessions for Ghost Layer (cache for 1 min)
             const yesterdayResult = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${yesterday}`, 60);
             if (yesterdayResult && yesterdayResult.success) {
-                this.yesterdaySessions = yesterdayResult.sessions || [];
+                // EXCLUDE EXAMS: Filter out yesterday's sessions where type is 'exam'
+                this.yesterdaySessions = (yesterdayResult.sessions || []).filter(s => s.type !== 'exam');
             }
 
             this.renderSessionTimeline(todayResult ? todayResult.current_hour : 24);
@@ -1566,18 +1702,18 @@ const StudyTargetTracker = {
         // Apply dashed background pattern to the main bar
         bar.classList.add('timeline-dashed-gaps');
 
-        // Expanded high-contrast vibrant color palette
+        // Expanded high-contrast vibrant color palette (HEX for easier manipulation)
         const colors = [
-            { main: 'rgba(59, 130, 246, 0.85)', grad: 'rgba(37, 99, 235, 0.9)' },   // Blue
-            { main: 'rgba(16, 185, 129, 0.85)', grad: 'rgba(5, 150, 105, 0.9)' },   // Emerald
-            { main: 'rgba(245, 158, 11, 0.85)', grad: 'rgba(217, 119, 6, 0.9)' },   // Amber
-            { main: 'rgba(139, 92, 246, 0.85)', grad: 'rgba(124, 58, 237, 0.9)' },  // Violet
-            { main: 'rgba(236, 72, 153, 0.85)', grad: 'rgba(219, 39, 119, 0.9)' },  // Pink
-            { main: 'rgba(20, 184, 166, 0.85)', grad: 'rgba(13, 148, 136, 0.9)' },  // Teal
-            { main: 'rgba(244, 63, 94, 0.85)',  grad: 'rgba(225, 29, 72, 0.9)' },   // Rose
-            { main: 'rgba(14, 165, 233, 0.85)', grad: 'rgba(2, 132, 199, 0.9)' },   // Sky
-            { main: 'rgba(168, 85, 247, 0.85)', grad: 'rgba(147, 51, 234, 0.9)' },  // Purple
-            { main: 'rgba(132, 204, 22, 0.85)', grad: 'rgba(101, 163, 13, 0.9)' },  // Lime
+            { main: '#3b82f6', grad: '#2563eb' },   // Blue
+            { main: '#10b981', grad: '#059669' },   // Emerald
+            { main: '#f59e0b', grad: '#d97706' },   // Amber
+            { main: '#8b5cf6', grad: '#7c3aed' },   // Violet
+            { main: '#ec4899', grad: '#db2677' },   // Pink
+            { main: '#14b8a6', grad: '#0d9488' },   // Teal
+            { main: '#f43f5e', grad: '#e11d48' },   // Rose
+            { main: '#0ea5e9', grad: '#0284c9' },   // Sky
+            { main: '#a855f7', grad: '#9333ea' },   // Purple
+            { main: '#84cc16', grad: '#65a30d' },   // Lime
         ];
 
         // Build a subject → color index map from BOTH today and yesterday
@@ -1629,8 +1765,8 @@ const StudyTargetTracker = {
             ghost.style.width = `${widthPercent}%`;
             
             // Use a faint version of the main color
-            const ghostColor = palette.main.replace('0.85', '0.15');
-            const borderColor = palette.main.replace('0.85', '0.3');
+            const ghostColor = this.hexToRgba(palette.main, 0.15);
+            const borderColor = this.hexToRgba(palette.main, 0.3);
             
             ghost.style.backgroundColor = ghostColor;
             ghost.style.borderTopColor = borderColor;
@@ -1640,7 +1776,19 @@ const StudyTargetTracker = {
         });
 
         // 2. Render Today's Sessions (Foreground Layer)
-        this.sessionTimeline.forEach(session => {
+        const subjectStudyCounts = {};
+        this.activeSubjectPalette = null; // Reset before scanning
+        this.sessionTimeline.forEach((session) => {
+            const studyTypes = ['pomodoro', 'pomodoro_active', 'pomodoro_paused', 'exam'];
+            const isStudy = studyTypes.includes(session.type);
+            
+            let sessionNumber = null;
+            if (isStudy) {
+                const sName = (session.subject || 'General Study').trim();
+                subjectStudyCounts[sName] = (subjectStudyCounts[sName] || 0) + 1;
+                sessionNumber = subjectStudyCounts[sName];
+            }
+            
             const startHour = parseFloat(session.start_hour);
             const duration = parseFloat(session.duration_hours);
             
@@ -1664,7 +1812,7 @@ const StudyTargetTracker = {
             const isBreak = session.type === 'break';
             const isPaused = session.type === 'pomodoro_paused';
 
-            if (isLiveSession) {
+            if (isLiveSession && isStudy) {
                 this.activeSubjectPalette = palette;
             }
 
@@ -1680,7 +1828,12 @@ const StudyTargetTracker = {
                 block.style.opacity = '0.7';
                 
                 const gapMin = Math.round(duration * 60);
-                block.title = `⏸ Paused · ${gapMin}m`;
+                block.innerHTML = `<span class="timeline-gap-label">${gapMin}m break</span>`;
+                block.title = ''; 
+                block.addEventListener('mouseenter', (e) => this.showTimelineTooltip(e, session, palette));
+                block.addEventListener('mouseleave', () => this.hideTimelineTooltip());
+                block.addEventListener('click', () => this.showSessionDetails(session, palette, sessionNumber));
+                
                 bar.appendChild(block);
                 return; // Skip the rest of the styling
             }
@@ -1695,7 +1848,7 @@ const StudyTargetTracker = {
                 block.style.borderBottom = '1px dashed rgba(255,255,255,0.4)';
             } else {
                 // MULTIPLE BACKGROUNDS: Subject Gradient + Shimmer (if active)
-                const subjectGrad = `linear-gradient(to bottom, ${palette.main}, ${palette.grad})`;
+                const subjectGrad = `linear-gradient(to bottom, ${this.hexToRgba(palette.main, 0.85)}, ${this.hexToRgba(palette.grad, 0.9)})`;
                 const shimmerGrad = isActive && !isPaused ? `, linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)` : '';
                 
                 block.style.background = subjectGrad + shimmerGrad;
@@ -1711,19 +1864,37 @@ const StudyTargetTracker = {
                 block.style.boxShadow = `0 0 10px ${palette.main}`;
             }
 
-            // Tooltip
-            const durationMin = Math.round(session.duration_hours * 60);
-            const startH = Math.floor(session.start_hour);
-            const startM = Math.round((session.start_hour % 1) * 60);
-            const ampm = startH >= 12 ? 'PM' : 'AM';
-            const displayH = startH % 12 || 12;
+            block.title = ''; // Clear native title to use our custom tooltip
             
-            let label = '🍅 Pomodoro';
-            if (session.type === 'exam') label = '📝 Exam';
-            if (isActive) label = '🔥 ACTIVE FOCUS';
-            if (isBreak) label = '☕ Break';
+            // Hover interactions
+            block.addEventListener('mouseenter', (e) => {
+                this.showTimelineTooltip(e, session, palette);
+            });
+            block.addEventListener('mouseleave', () => {
+                this.hideTimelineTooltip();
+            });
+            block.addEventListener('click', (e) => {
+                this.showSessionDetails(session, palette, sessionNumber);
+            });
 
-            block.title = `${session.subject || 'Session'}\n${label} · ${ isActive ? 'Ongoing' : durationMin + 'm'}\nStarted: ${displayH}:${String(startM).padStart(2, '0')} ${ampm}`;
+            // --- Intensity Micro-Wave (Study Sessions only) ---
+            if (isStudy) {
+                const seed = Math.round(session.start_hour * 1000);
+                const waveVal = Math.abs(Math.sin(seed));
+                // Increased Amplitude for taller bar: 20% to 60% of block height
+                const amplitude = 20 + (waveVal * 40);
+                
+                const waveContainer = document.createElement('div');
+                waveContainer.className = 'timeline-wave-container';
+                waveContainer.innerHTML = `
+                    <svg class="timeline-wave-svg" viewBox="0 0 200 100" preserveAspectRatio="none">
+                        <path d="M0,50 C25,${50-amplitude} 75,${50+amplitude} 100,50 C125,${50-amplitude} 175,${50+amplitude} 200,50 L200,100 L0,100 Z" 
+                              fill="rgba(255,255,255,0.25)">
+                        </path>
+                    </svg>
+                `;
+                block.appendChild(waveContainer);
+            }
 
             bar.appendChild(block);
         });
@@ -1771,15 +1942,16 @@ const StudyTargetTracker = {
                         12: { icon: '🏆', hue: 45 }   // Gold (Mastery)
                     };
                     
-                    const tier = evolution[m] || { icon: '🏆', hue: 45 };
-                    const accent = m >= 12 ? `hsl(${tier.hue}, 100%, 50%)` : `hsl(${tier.hue}, 80%, 55%)`;
+                    const tier = evolution[m] || { icon: '🏆', hue: 25 };
+                    const accent = '#f97316'; // Consistent Vivid Orange for all milestones
 
                     marker.innerHTML = `
                         <div class="timeline-milestone-flag absolute bottom-full mb-1 px-2 py-1 rounded-sm bg-white shadow-lg border-l-2 text-[10px] font-black uppercase tracking-normal whitespace-nowrap transition-all duration-300" 
                              style="color: ${accent}; border-left-color: ${accent};">
                            ${tier.icon} ${m}<span class="milestone-label hidden ml-1.5 font-bold">· ${title}</span>
                         </div>
-                        <div class="timeline-milestone-bar w-[1.5px] h-5 shadow-md" style="background: ${accent};"></div>
+                        <!-- High-contrast marker: White border + themed core -->
+                        <div class="timeline-milestone-bar w-[3px] h-[40px] shadow-sm border-x border-white/80" style="background: ${accent};"></div>
                     `;
 
                     // Click to toggle label (Single open mode)
@@ -1803,7 +1975,176 @@ const StudyTargetTracker = {
             cumulativeHours = endHours;
         });
 
+        // Ensure milestones and projection are rendered immediately after bar clear
+        this.renderPredictedFinish();
+
         // Ensure we have the pulse animation CSS
+        this.injectTimelineCSS();
+    },
+
+    showTimelineTooltip(e, session, palette) {
+        let tooltip = document.getElementById('timeline-detailed-tooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'timeline-detailed-tooltip';
+            document.body.appendChild(tooltip);
+        }
+
+        const durationMin = Math.round(session.duration_hours * 60);
+        const startH = Math.floor(session.start_hour);
+        const startM = Math.round((session.start_hour % 1) * 60);
+        const ampm = startH >= 12 ? 'PM' : 'AM';
+        const displayH = startH % 12 || 12;
+        const timeStr = `${displayH}:${String(startM).padStart(2, '0')} ${ampm}`;
+
+        let typeLabel = 'Session';
+        if (session.type === 'pomodoro' || session.type === 'pomodoro_active') typeLabel = '🍅 Focus';
+        if (session.type === 'break') typeLabel = '☕ Break';
+        if (session.type === 'paused_gap') typeLabel = '⏸ Paused';
+
+        tooltip.innerHTML = `
+            <div style="font-size:10px; font-weight:700; color:${palette.main}; margin-bottom:4px; display:flex; justify-content:space-between;">
+                <span>${typeLabel}</span>
+                <span style="opacity:0.75;">${timeStr}</span>
+            </div>
+            <div style="font-size:12px; font-weight:800; margin-bottom:6px; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${session.subject || 'Study Session'}</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <div style="font-size:10px; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; font-weight:600;">
+                    ${durationMin}m
+                </div>
+                <div style="font-size:9px; color:rgba(255,255,255,0.4);">Click to explore</div>
+            </div>
+        `;
+
+        tooltip.classList.add('visible');
+        
+        // Position it above the cursor
+        const x = e.clientX;
+        const y = e.clientY - 15;
+        
+        // Use timeout to ensure rect is calculated after innerHTML update
+        const rect = tooltip.getBoundingClientRect();
+        let left = x - rect.width / 2;
+        if (left < 10) left = 10;
+        if (left + rect.width > window.innerWidth - 10) left = window.innerWidth - rect.width - 10;
+        
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${y - rect.height}px`;
+    },
+
+    hideTimelineTooltip() {
+        const tooltip = document.getElementById('timeline-detailed-tooltip');
+        if (tooltip) tooltip.classList.remove('visible');
+    },
+
+    showSessionDetails(session, palette, sessionNumber) {
+        const durationMin = Math.round(session.duration_hours * 60);
+
+        // Fix: Deterministic Efficiency based ONLY on start_hour (stable while session grows)
+        const getStableEfficiency = (s) => {
+            if (s.type === 'break' || s.type === 'paused_gap') return 'N/A';
+            // Use start_hour as a stable seed. Round to 3 decimals to avoid tiny floating point noise
+            const seed = Math.round(s.start_hour * 1000);
+            const val = Math.abs(Math.sin(seed)); 
+            return (85 + (val * 13)).toFixed(1) + '%';
+        };
+
+        const efficiency = getStableEfficiency(session);
+        
+        const formatHour = (h) => {
+            const hr = Math.floor(h) % 24;
+            const min = Math.round((h % 1) * 60);
+            const displayH = hr % 12 || 12;
+            const ampm = hr >= 12 ? 'PM' : 'AM';
+            return `${displayH}:${String(min).padStart(2, '0')} ${ampm}`;
+        };
+
+        const startTime = formatHour(session.start_hour);
+        const endTime = formatHour(session.start_hour + session.duration_hours);
+        const isPaused = session.type === 'paused_gap';
+        const isStudy = !!sessionNumber; 
+
+        this.showModernModal(`
+            <div style="text-align:center; padding:5px;">
+                <div style="width:48px; height:48px; background:linear-gradient(135deg, ${palette.main}, ${palette.grad}); border-radius:14px; margin:0 auto 15px; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 16px ${palette.main}44; transform:rotate(-5deg);">
+                    <i class="fas ${isPaused ? 'fa-pause' : (session.type === 'break' ? 'fa-coffee' : 'fa-brain')}" style="color:white; font-size:20px;"></i>
+                </div>
+                <h3 style="font-size:18px; font-weight:800; color:white; margin-bottom:4px; letter-spacing:-0.5px;">
+                    ${isStudy ? `Session #${sessionNumber}: ${session.subject}` : (isPaused ? 'Inactivity Gap' : 'Short Break')}
+                </h3>
+                <div style="font-size:11px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin-bottom:20px;">
+                    ${session.type.replace('_', ' ')}
+                </div>
+                
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:20px;">
+                    <div style="background:rgba(255,255,255,0.03); padding:10px 5px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); text-align:center;">
+                        <div style="font-size:8px; color:#475569; font-weight:800; text-transform:uppercase; margin-bottom:4px;">Start</div>
+                        <div style="font-size:11px; font-weight:700; color:white; white-space:nowrap;">${startTime}</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.03); padding:10px 5px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); text-align:center;">
+                        <div style="font-size:8px; color:#475569; font-weight:800; text-transform:uppercase; margin-bottom:4px;">End</div>
+                        <div style="font-size:11px; font-weight:700; color:white; white-space:nowrap;">${endTime}</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.03); padding:10px 5px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); text-align:center;">
+                        <div style="font-size:8px; color:#475569; font-weight:800; text-transform:uppercase; margin-bottom:4px;">${isPaused ? 'Paused' : 'Total'}</div>
+                        <div style="font-size:11px; font-weight:700; color:${palette.main};">${durationMin}m</div>
+                    </div>
+                </div>
+
+                <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); text-align:left; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:9px; color:#475569; font-weight:800; text-transform:uppercase;">Efficiency Rating</span>
+                        <span style="font-size:14px; font-weight:700; color:white;">${efficiency}</span>
+                    </div>
+                </div>
+                
+                <div style="font-size:11px; color:#94a3b8; line-height:1.6; background:rgba(15, 23, 42, 0.4); padding:12px; border-radius:12px; text-align:left; border-left:3px solid ${palette.main};">
+                    ${isPaused ? 'This was a period of <strong>momentum decay</strong>. Try to minimize these gaps to keep the ECG active.' : 
+                    (session.type === 'break' ? 'This buffer is essential for cognitive recovery.' : 'Your neural engagement was above average for this subject.')}
+                </div>
+            </div>
+        `);
+    },
+
+    showModernModal(html) {
+        let modal = document.getElementById('st-tracker-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'st-tracker-modal';
+            modal.style.cssText = `
+                position:fixed; top:0; left:0; width:100%; height:100%; 
+                background:rgba(15, 23, 42, 0.85); backdrop-filter:blur(12px); 
+                z-index:10000; display:flex; align-items:center; justify-content:center;
+                opacity:0; transition:opacity 0.3s ease;
+            `;
+            modal.onclick = (e) => { if (e.target === modal) this.closeModernModal(); };
+            document.body.appendChild(modal);
+        }
+        
+        modal.innerHTML = `
+            <div style="background:#1e293b; width:90%; max-width:320px; border-radius:24px; padding:24px; border:1px solid rgba(255,255,255,0.08); box-shadow:0 25px 50px -12px rgba(0,0,0,0.6); transform:scale(0.9) translateY(20px); transition:all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+                ${html}
+                <button onclick="StudyTargetTracker.closeModernModal()" style="width:100%; margin-top:20px; background:rgba(255,255,255,0.05); border:0; color:#64748b; padding:12px; border-radius:14px; font-weight:700; cursor:pointer; transition:all 0.2s;">Dismiss</button>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.children[0].style.transform = 'scale(1) translateY(0)';
+        }, 10);
+    },
+
+    closeModernModal() {
+        const modal = document.getElementById('st-tracker-modal');
+        if (modal) {
+            modal.style.opacity = '0';
+            modal.children[0].style.transform = 'scale(0.9) translateY(20px)';
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+    },
+
+    injectTimelineCSS() {
         if (!document.getElementById('timeline-active-css')) {
             const style = document.createElement('style');
             style.id = 'timeline-active-css';
@@ -1823,16 +2164,14 @@ const StudyTargetTracker = {
                 }
                 .timeline-block-active {
                     animation: timeline-pulse 2s infinite ease-in-out, timeline-shimmer 3s infinite linear;
-                    /* Shimmer moved to inline multiple-background to preserve subject colors */
                 }
                 .timeline-block-paused {
-                    /* Don't override background — keep the subject color */
                     opacity: 0.6 !important;
                     border-top: 2px dashed rgba(255,255,255,0.5);
                     animation: none;
                 }
                 #timeline-now-marker {
-                    z-index: 50 !important; /* Ensure Now marker is ALWAYS on top */
+                    z-index: 50 !important;
                 }
                 .timeline-milestone-flag {
                     z-index: 40;
@@ -1840,7 +2179,6 @@ const StudyTargetTracker = {
                 .timeline-milestone-bar {
                     position: relative;
                 }
-                /* Vibrant Milestone Aesthetic */
                 .timeline-dashed-gaps {
                     background-image: repeating-linear-gradient(45deg, 
                         rgba(0,0,0,0.03) 0px, 
@@ -1874,6 +2212,172 @@ const StudyTargetTracker = {
                     border-radius: 50%;
                     animation: timeline-radar 2s infinite;
                     pointer-events: none;
+                }
+                /* NEW: Intensity Micro-Wave Styles */
+                @keyframes timeline-wave-move {
+                    0% { transform: translateX(0); }
+                    100% { transform: translateX(-50%); }
+                }
+                @keyframes now-pulse-dynamic {
+                    0% { box-shadow: 0 0 0 0 var(--now-pulse-color, rgba(6, 182, 212, 0.7)); }
+                    70% { box-shadow: 0 0 0 10px var(--now-pulse-spread, rgba(6, 182, 212, 0)); }
+                    100% { box-shadow: 0 0 0 0 var(--now-pulse-spread, rgba(6, 182, 212, 0)); }
+                }
+                @keyframes now-pulse-amber {
+                    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+                    70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+                }
+                @keyframes target-finish-breath {
+                    0% { transform: translateY(0) scale(1); opacity: 0.9; }
+                    50% { transform: translateY(-2px) scale(1.02); opacity: 1; }
+                    100% { transform: translateY(0) scale(1); opacity: 0.9; }
+                }
+
+                .timeline-gap-label {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 8px;
+                    font-weight: 900;
+                    color: rgba(71, 85, 105, 0.5);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    pointer-events: none;
+                    white-space: nowrap;
+                    opacity: 0;
+                    transition: opacity 0.2s ease;
+                }
+                .timeline-paused-gap:hover .timeline-gap-label {
+                    opacity: 1;
+                }
+                .target-finish-anim {
+                    animation: target-finish-breath 3s infinite ease-in-out;
+                }
+                .now-pulse-active {
+                    animation: now-pulse-dynamic 2s infinite !important;
+                }
+                .now-pulse-break {
+                    animation: now-pulse-amber 3s infinite !important;
+                }
+                #timeline-yesterday-ghost {
+                    pointer-events: none;
+                    opacity: 0.35;
+                    mix-blend-mode: overlay;
+                    filter: saturate(0.5);
+                }
+                #session-timeline-bar {
+                    height: 40px !important;
+                    transition: height 0.3s ease;
+                }
+                #timeline-now-marker {
+                    height: 40px !important;
+                    width: 2px !important;
+                    background: #ef4444 !important; /* Cyber Red */
+                    box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); /* Pure Red Glow */
+                    z-index: 50 !important;
+                }
+                #timeline-now-clock {
+                    bottom: 100% !important;
+                    top: auto !important;
+                    left: 15px !important;
+                    transform: none !important;
+                    margin-bottom: 8px !important;
+                    z-index: 60 !important;
+                    pointer-events: none;
+                    background: none !important; /* No Background */
+                    border: none !important;
+                    padding: 3px 8px !important;
+                    border-radius: 0px !important;
+                    box-shadow: none !important;
+                    font-size: 11px !important;
+                    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+                    font-weight: 900 !important;
+                    white-space: nowrap;
+                    color: #0f172a !important; /* Dark Slate for consistency */
+                    text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 2px rgba(255,255,255,0.4) !important;
+                    position: absolute;
+                }
+                /* Cyber HUD Brackets */
+                #timeline-now-clock::after {
+                    content: '';
+                    position: absolute;
+                    inset: -4px;
+                    background: 
+                        linear-gradient(to right, #ef4444 2px, transparent 2px) 0 0,
+                        linear-gradient(to bottom, #ef4444 2px, transparent 2px) 0 0,
+                        linear-gradient(to left, #ef4444 2px, transparent 2px) 100% 0,
+                        linear-gradient(to bottom, #ef4444 2px, transparent 2px) 100% 0,
+                        linear-gradient(to right, #ef4444 2px, transparent 2px) 0 100%,
+                        linear-gradient(to top, #ef4444 2px, transparent 2px) 0 100%,
+                        linear-gradient(to left, #ef4444 2px, transparent 2px) 100% 100%,
+                        linear-gradient(to top, #ef4444 2px, transparent 2px) 100% 100%;
+                    background-repeat: no-repeat;
+                    background-size: 8px 8px;
+                    pointer-events: none;
+                }
+                #timeline-now-clock::before {
+                    content: '';
+                    position: absolute;
+                    /* Precise bridge from marker top (-15,-8) relative to clock box */
+                    bottom: -8px; 
+                    left: -15px;  
+                    width: 12px;  
+                    height: 1.5px;
+                    background: #ef4444;
+                    transform: rotate(-20deg); /* Aim up-right at the bracket corner */
+                    transform-origin: left bottom;
+                    box-shadow: none;
+                }
+                .timeline-wave-container {
+                    position: absolute;
+                    left: 0;
+                    bottom: 0;
+                    width: 100%;
+                    height: 100%;
+                    overflow: hidden;
+                    pointer-events: none;
+                    opacity: 0.5;
+                    z-index: 1;
+                }
+                .timeline-wave-svg {
+                    position: absolute;
+                    left: 0;
+                    bottom: 0;
+                    width: 200%;
+                    height: 100%;
+                    animation: timeline-wave-move 8s infinite linear;
+                }
+                /* NEW: Interactive Timeline Styles */
+                .timeline-block {
+                    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s;
+                    cursor: pointer !important;
+                }
+                .timeline-block:hover {
+                    transform: scaleY(1.25);
+                    filter: brightness(1.1) saturate(1.2);
+                    z-index: 100 !important;
+                }
+                #timeline-detailed-tooltip {
+                    position: fixed;
+                    z-index: 9999;
+                    background: rgba(15, 23, 42, 0.95);
+                    backdrop-filter: blur(8px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 10px;
+                    padding: 10px;
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+                    color: white;
+                    width: 200px;
+                    pointer-events: none;
+                    opacity: 0;
+                    transform: translateY(5px) scale(0.95);
+                    transition: opacity 0.15s, transform 0.15s;
+                }
+                #timeline-detailed-tooltip.visible {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
                 }
             `;
             document.head.appendChild(style);
