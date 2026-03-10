@@ -801,6 +801,31 @@ const StudyTargetTracker = {
                     projection.style.left = `${nowPercent}%`;
                     projection.style.width = `${finishPercent - nowPercent}%`;
                     projection.style.display = 'block';
+
+                    // --- Projection Data Badge (Time Remaining) ---
+                    const remainingSeconds = this.estimatedFinishTimestamp - (Date.now() / 1000);
+                    if (remainingSeconds > 0) {
+                        const h = Math.floor(remainingSeconds / 3600);
+                        const m = Math.floor((remainingSeconds % 3600) / 60);
+                        const timeText = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                        
+                        let label = projection.querySelector('.projection-time-label');
+                        if (!label) {
+                            label = document.createElement('span');
+                            label.className = 'projection-time-label';
+                            label.style.cssText = `
+                                position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
+                                font-size:10px; font-weight:900; color:#ffffff; white-space:nowrap;
+                                font-family:'Inter', sans-serif; pointer-events:none;
+                                text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                                background:#0f172a; padding: 2px 8px; border-radius: 4px; 
+                                border: 1.5px solid #ef4444;
+                                box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+                            `;
+                            projection.appendChild(label);
+                        }
+                        label.textContent = `in ${timeText}`;
+                    }
                 } else {
                     projection.style.display = 'none';
                 }
