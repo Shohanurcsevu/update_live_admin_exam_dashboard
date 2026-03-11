@@ -2214,8 +2214,8 @@ const StudyTargetTracker = {
             // Calculate precise time for the flag label
             const milH = Math.floor(ms.hourOfDay);
             const milM = Math.round((ms.hourOfDay - milH) * 60);
-            // Simplified: 'a' or 'p' only
-            const milAmpm = milH >= 12 ? 'p' : 'a';
+            // Simplified: 'am' or 'pm'
+            const milAmpm = milH >= 12 ? 'pm' : 'am';
             const milDisplayH = milH % 12 || 12;
             const milTimeStr = `${milDisplayH}:${milM.toString().padStart(2, '0')} ${milAmpm}`;
 
@@ -2638,7 +2638,7 @@ const StudyTargetTracker = {
                     border: none !important;
                     box-shadow: none !important;
                     text-shadow: none !important;
-                    font-size: 8.5px !important;
+                    font-size: 11px !important;
                     font-weight: 600 !important;
                     letter-spacing: 0.05em;
                     line-height: 1 !important;
