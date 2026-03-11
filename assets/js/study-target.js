@@ -42,6 +42,8 @@ const StudyTargetTracker = {
     lastStoredStatus: null,
     lastStoredTime: 0,
     currentLogicalDate: null, // NEW: Track date to trigger resets
+    hasSonicBoomed: false,   // NEW: For Ghost Runner overtaking effect
+    lastVelocity: null,      // NEW: For velocity trend tracking
     MILESTONE_TITLES: {
         1: "First Spark",
         2: "Steady Pulse",
@@ -56,7 +58,7 @@ const StudyTargetTracker = {
         11: "Zen Master",
         12: "Legacy Session"
     },
-    
+
     // Helper: Convert HEX to RGBA
     hexToRgba(hex, alpha = 1) {
         if (!hex || hex.length < 7) return `rgba(148, 163, 184, ${alpha})`;
@@ -72,7 +74,7 @@ const StudyTargetTracker = {
         this.yesterdaySessions.forEach(session => {
             const start = session.start_hour;
             const end = session.end_hour;
-            
+
             // Adjust hours for 5AM offset comparison
             const adjTarget = (targetHour < this.TIMELINE_START_HOUR) ? targetHour + 24 : targetHour;
             const adjStart = (start < this.TIMELINE_START_HOUR) ? start + 24 : start;
@@ -116,6 +118,7 @@ const StudyTargetTracker = {
         this.fetchSessionTimeline(); // Fetch session streak timeline
         this.fetchYesterdayGhost(); // Fetch yesterday's sessions for Bio-Sync Ghost
         this.fetchFocusHeatmap(); // Fetch 7-day focus heatmap
+        this.fetchWeeklyDebt();   // Fetch weekly time debt ledger
         this.startUpdateLoop();
         setInterval(() => {
             this.fetchData();
@@ -124,6 +127,7 @@ const StudyTargetTracker = {
             this.fetchEstimatedFinish();
             this.fetchSessionTimeline();
             this.fetchFocusHeatmap();
+            this.fetchWeeklyDebt();
         }, 30000);
     },
 
@@ -184,6 +188,7 @@ const StudyTargetTracker = {
                     this.fetchSessionTimeline();
                     this.fetchFocusHeatmap();
                     this.detectFirstStartTime(true); // Force refresh on date change
+                    this.hasSonicBoomed = false;    // Reset ghost overtaking state
                 }
                 this.currentLogicalDate = todayDate;
 
@@ -206,7 +211,7 @@ const StudyTargetTracker = {
                 // --- Sync activity state with DB ---
                 if (result.last_active_timestamp) {
                     const serverActivityTime = result.last_active_timestamp;
-                    
+
                     // Always trust server timestamp if it's newer than our local tracker
                     // or if it's the very first time we are loading.
                     if (this.lastStudyChangeTime === null || serverActivityTime > this.lastStudyChangeTime) {
@@ -370,7 +375,7 @@ const StudyTargetTracker = {
 
             const clockEl = document.getElementById('timeline-now-clock');
             const dotEl = document.getElementById('timeline-now-dot');
-            
+
             // 1. Pulse of Focus: Toggle based on active study session
             const isStudying = document.body.classList.contains('pomo-session-active') || this.momentumScore > 0;
             nowMarker.classList.toggle('now-pulse-active', isStudying);
@@ -396,7 +401,7 @@ const StudyTargetTracker = {
                 const s = now.getSeconds();
                 const ampm = h >= 12 ? 'pm' : 'am';
                 const displayH = h % 12 || 12;
-                
+
                 // 2. Live Delta Speedometer: Compare today vs yesterday at this exact minute
                 let deltaText = '';
                 if (this.yesterdaySessions.length > 0) {
@@ -409,12 +414,12 @@ const StudyTargetTracker = {
                 }
 
                 clockEl.innerHTML = `<strong style="letter-spacing:0.05em; font-weight:800 !important; color:#0f172a !important;">${displayH}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} ${ampm}</strong>${deltaText}`;
-                
+
                 // --- Cyber-HUD Style (Red Tag, Black Text) ---
                 clockEl.style.textTransform = 'lowercase';
                 clockEl.style.fontWeight = '800';
                 clockEl.style.fontFamily = "'Inter', 'system-ui', 'Segoe UI', Roboto, sans-serif";
-                
+
                 if (dotEl) {
                     // Marker dot still uses performance colors for clarity (Cyan/Amber)
                     const dotColor = isStudying ? '#06b6d4' : '#f59e0b';
@@ -431,11 +436,11 @@ const StudyTargetTracker = {
                 ghostMarker = document.createElement('div');
                 ghostMarker.id = 'timeline-yesterday-ghost';
                 ghostMarker.className = 'absolute top-0 w-[2px] h-[40px] bg-slate-400/40 z-0';
-                
+
                 nowMarker.parentElement.appendChild(ghostMarker);
             }
             ghostMarker.style.left = `${nowPercent}%`;
-            
+
             // Add a small tag to ghost marker if it's over a yesterday session
             const wasStudyingYesterday = this.yesterdaySessions.some(s => clientHour >= s.start_hour && clientHour <= s.end_hour);
             ghostMarker.style.borderLeft = wasStudyingYesterday ? '2px solid rgba(255,255,255,0.8)' : '1px dashed rgba(255,255,255,0.3)';
@@ -474,7 +479,42 @@ const StudyTargetTracker = {
                 ghostBar.style.width = `${yesterdayPercent}%`;
             }
 
-            const diffSeconds = this.studiedSeconds - this.yesterdaySeconds;
+            const now = new Date(Date.now() + this.serverClockOffset);
+            const clientHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+            const yesterdayScAtNow = this.getYesterdayStudiedAt(clientHour);
+            const diffSeconds = this.studiedSeconds - yesterdayScAtNow;
+
+            // --- NEW: Ghost Runner Phantom Logic ---
+            const phantom = document.getElementById('ghost-phantom-runner');
+            if (phantom) {
+                const yesterdayPercentAtNow = Math.min(100, (yesterdayScAtNow / this.DAILY_TARGET_SECONDS) * 100);
+                phantom.style.left = `${yesterdayPercentAtNow}%`;
+
+                // State 1: Behind (Overtaken)
+                if (diffSeconds > 0) {
+                    phantom.style.opacity = '0.3';
+                    phantom.style.filter = 'grayscale(1)';
+                    phantom.classList.remove('phantom-warning');
+
+                    // Trigger Sonic Boom?
+                    if (!this.hasSonicBoomed) {
+                        this.hasSonicBoomed = true;
+                        const barContainer = mainBar.parentElement;
+                        barContainer.classList.add('sonic-boom-trigger');
+                        setTimeout(() => barContainer.classList.remove('sonic-boom-trigger'), 2000);
+                        if (typeof showToast === 'function') {
+                            showToast("🚀 SONIC BOOM! You just overtook Yesterday's Ghost!", "success");
+                        }
+                    }
+                }
+                // State 2: Ahead (Danger)
+                else {
+                    phantom.style.opacity = '1';
+                    phantom.style.filter = 'none';
+                    phantom.classList.add('phantom-warning');
+                    this.hasSonicBoomed = false; // Reset if ghost passes us again
+                }
+            }
 
             // Trigger Comeback Protocol if > 1 hour behind
             if (diffSeconds < -3600 && !this.protocolActive && !this.protocolTriggered) {
@@ -588,6 +628,20 @@ const StudyTargetTracker = {
 
         this.updateBioSyncDisplay();
         this.updateFlowOrbState();
+
+        // --- Intelligence Features (throttled to ~10s, error-isolated) ---
+        if (this._intellTick === undefined) this._intellTick = 9; // Fire on first tick
+        this._intellTick++;
+        if (this._intellTick % 10 === 0) {
+            try { this.predictFocusCliff(); } catch (e) { console.warn('[ST] FocusCliff err:', e); }
+            try { this.checkSubjectRotation(); } catch (e) { console.warn('[ST] Rotation err:', e); }
+            try { this.updateCompletionOdds(); } catch (e) { console.warn('[ST] Odds err:', e); }
+            try { this.updateDailyStreak(); } catch (e) { console.warn('[ST] Streak err:', e); }
+            try { this.updateSessionEndurance(); } catch (e) { console.warn('[ST] Endurance err:', e); }
+        }
+
+        // Velocity speedometer: run every second
+        try { this.updateVelocity(); } catch (e) { console.warn('[ST] Velocity err:', e); }
     },
 
     updateRequiredPace(secondsUntilMidnight, remainingStudySeconds) {
@@ -665,7 +719,7 @@ const StudyTargetTracker = {
             const date = this.getLogicalDate(-1);
             const res = await fetch(`api/analytics/get-ghost-bpm.php?date=${date}`);
             const result = await res.json();
-            
+
             if (result && result.success) {
                 this.yesterdayBpmLogs = result.logs || [];
                 console.log(`[ST-TRACKER] Ghost Rhythm Synced: ${this.yesterdayBpmLogs.length} points from database.`);
@@ -708,14 +762,14 @@ const StudyTargetTracker = {
             if (result) {
                 this.estimatedFinishLabel = result.formatted_time;
                 this.estimatedFinishTimestamp = result.finish_timestamp;
-                
+
                 // Best Case (assuming 1.2x of current multiplier if multiplier is 1.0, or just regular boost)
                 const bestMultiplier = Math.max(1.1, multiplier * 1.1);
                 const bestResult = await CacheManager.fetchWithCache(`api/analytics/get-estimated-finish.php?pace=${bestMultiplier}`, 5);
                 if (bestResult) {
                     this.bestCaseFinishLabel = bestResult.formatted_time;
                 }
-                
+
                 this.renderPredictedFinish();
             }
         } catch (e) {
@@ -769,9 +823,9 @@ const StudyTargetTracker = {
         const bar = document.getElementById('session-timeline-bar');
         if (bar && this.estimatedFinishTimestamp) {
             const finishDate = new Date(this.estimatedFinishTimestamp * 1000);
-            const finishHour = finishDate.getHours() + finishDate.getMinutes()/60;
+            const finishHour = finishDate.getHours() + finishDate.getMinutes() / 60;
             const finishPercent = this.getRelativeTimelinePercent(finishHour);
-            
+
             let milestone = document.getElementById('timeline-predicted-finish-milestone');
             if (!milestone) {
                 milestone = document.createElement('div');
@@ -858,7 +912,7 @@ const StudyTargetTracker = {
                         const h = Math.floor(remainingSeconds / 3600);
                         const m = Math.floor((remainingSeconds % 3600) / 60);
                         const timeText = h > 0 ? `${h}h ${m}m` : `${m}m`;
-                        
+
                         let label = projection.querySelector('.projection-time-label');
                         if (!label) {
                             label = document.createElement('span');
@@ -1111,14 +1165,15 @@ const StudyTargetTracker = {
 
     // ─── Feature: Rhythm Memory (Upgraded to Cloud Sync) ─────────────────────
 
-    async logBPMToDatabase() {
+    async logBPMToDatabase(precomputedState) {
         // Allow low BPM if active (starting up from flatline)
         const currentBpm = Math.round(this.smoothedBpm || 0);
         if (currentBpm <= 0 && !this.lastStoredStatus) return; // Still flatline
-        
+
         const now = Date.now();
+        // Use pre-computed state if available (avoids redundant recalculation)
+        const state = precomputedState || this.calculateECGState(this.subjects.filter(s => s.seconds > 0));
         const activeSubjects = this.subjects.filter(s => s.seconds > 0);
-        const state = this.calculateECGState(activeSubjects);
         const currentStatus = (state.isFlatline || activeSubjects.length === 0) ? 0 : 1;
 
         // --- SMART TRIGGER LOGIC ---
@@ -1153,7 +1208,7 @@ const StudyTargetTracker = {
                 bpm: currentBpm,
                 is_active: currentStatus
             };
-            
+
             this.lastStoredBpm = currentBpm;
             this.lastStoredStatus = currentStatus;
             this.lastStoredTime = now;
@@ -1169,7 +1224,7 @@ const StudyTargetTracker = {
             } else {
                 console.warn("[ST-TRACKER] BPM Sync Failed:", result.error);
             }
-        } catch (e) { 
+        } catch (e) {
             console.error("[ST-TRACKER] Save Error:", e);
         }
     },
@@ -1184,18 +1239,18 @@ const StudyTargetTracker = {
     ECG_RECOVERY_DURATION_MS: 10000,
 
     // Fatigue thresholds (ms)
-    FATIGUE_FADING_MS:   10 * 60 * 1000,   // 10 minutes
+    FATIGUE_FADING_MS: 10 * 60 * 1000,   // 10 minutes
     FATIGUE_CRITICAL_MS: 30 * 60 * 1000,   // 30 minutes
-    FATIGUE_FAILING_MS:  45 * 60 * 1000,   // 45 minutes
-    FATIGUE_DEAD_MS:     60 * 60 * 1000,   // 60 minutes
+    FATIGUE_FAILING_MS: 45 * 60 * 1000,   // 45 minutes
+    FATIGUE_DEAD_MS: 60 * 60 * 1000,   // 60 minutes
 
     // Heart Rate Zones (mapped to study intensity)
     HEART_RATE_ZONES: [
-        { name: 'Flatline', min: 0,  max: 0,  color: '#94a3b8', bgClass: 'bg-gray-100',  textClass: 'text-gray-400'  },
-        { name: 'Resting',  min: 1,  max: 59, color: '#64748b', bgClass: 'bg-slate-100', textClass: 'text-slate-500' },
-        { name: 'Warm-up',  min: 60, max: 69, color: '#10b981', bgClass: 'bg-emerald-50',textClass: 'text-emerald-600'},
-        { name: 'Active',   min: 70, max: 84, color: '#3b82f6', bgClass: 'bg-blue-50',   textClass: 'text-blue-600'  },
-        { name: 'Peak',     min: 85, max: 999,color: '#ef4444', bgClass: 'bg-rose-50',   textClass: 'text-rose-500'  },
+        { name: 'Flatline', min: 0, max: 0, color: '#94a3b8', bgClass: 'bg-gray-100', textClass: 'text-gray-400' },
+        { name: 'Resting', min: 1, max: 59, color: '#64748b', bgClass: 'bg-slate-100', textClass: 'text-slate-500' },
+        { name: 'Warm-up', min: 60, max: 69, color: '#10b981', bgClass: 'bg-emerald-50', textClass: 'text-emerald-600' },
+        { name: 'Active', min: 70, max: 84, color: '#3b82f6', bgClass: 'bg-blue-50', textClass: 'text-blue-600' },
+        { name: 'Peak', min: 85, max: 999, color: '#ef4444', bgClass: 'bg-rose-50', textClass: 'text-rose-500' },
     ],
 
     // Color palette for multi-subject waveforms
@@ -1267,21 +1322,34 @@ const StudyTargetTracker = {
         const activeSubjects = this.subjects.filter(s => s.seconds > 0);
         const state = this.calculateECGState(activeSubjects);
 
-        this.updateMomentumLabel(state);
-        this.updateBPMDisplay(state);
-
         this.ecgFrameCount++;
         const frameCount = this.ecgFrameCount;
 
-        // Smart Trigger BPM Logging: Check every 60 frames (approx 1s)
+        // Throttled operations: DOM updates + network (once per second at ~60fps)
         if (frameCount % 60 === 0) {
-            this.logBPMToDatabase();
+            this.updateMomentumLabel(state);
+            this.updateBPMDisplay(state);
+            this.logBPMToDatabase(state);
+
+            // Sync Active Session Block on Timeline
+            if (!this._cachedActiveBlock || !document.body.contains(this._cachedActiveBlock)) {
+                this._cachedActiveBlock = document.querySelector('.timeline-block-active');
+            }
+            if (this._cachedActiveBlock) {
+                const now = new Date(Date.now() + this.serverClockOffset);
+                const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+                const startHour = parseFloat(this._cachedActiveBlock.dataset.startHour);
+                if (!isNaN(startHour)) {
+                    const hourDiff = (currentHour - startHour + 24) % 24;
+                    this._cachedActiveBlock.style.width = `${Math.max(0.3, (hourDiff / 24) * 100)}%`;
+                }
+            }
         }
 
         // Layer 1: Grid
         this.drawECGGrid(ctx, canvas, state.isFlatline);
 
-        // Layer 2: Bio-Sync Ghost waveform (Yesterday's activity sync)
+        // Layer 2: Bio-Sync Ghost waveform
         this.drawBioSyncGhost(ctx, canvas, frameCount, state);
 
         // Layer 3: Calculate the new ECG point
@@ -1290,14 +1358,14 @@ const StudyTargetTracker = {
         // Sync card border on spike
         this.syncCardBorder(state, pointResult, frameCount);
 
-        // Push new points
+        // Push new points (ring buffer style)
         const mainY = isNaN(pointResult.mainY) ? canvas.height / 2 : pointResult.mainY;
-        this.ecgPoints.push({ y: mainY, time: Date.now() });
+        this.ecgPoints.push({ y: mainY });
         if (this.ecgPoints.length > this.ECG_MAX_POINTS) this.ecgPoints.shift();
 
         if (!this.ghostPoints) this.ghostPoints = [];
         const ghostY = isNaN(pointResult.ghostY) ? canvas.height / 2 : pointResult.ghostY;
-        this.ghostPoints.push({ y: ghostY, time: Date.now() });
+        this.ghostPoints.push({ y: ghostY });
         if (this.ghostPoints.length > this.ECG_MAX_POINTS) this.ghostPoints.shift();
 
         // Layer 4: Per-subject waveform overlays
@@ -1313,30 +1381,12 @@ const StudyTargetTracker = {
         if (state.isFlatline) {
             this.drawFlatlineOverlay(ctx, canvas, frameCount, state.gapMs);
         }
-
-
-        // --- NEW: Sync Active Session Block on Timeline ---
-        if (frameCount % 60 === 0) { 
-            // Every second (at 60fps), slightly update the width of any active block 
-            // This makes the timeline feel alive as you study.
-            const activeBlock = document.querySelector('.timeline-block-active');
-            if (activeBlock) {
-                const now = new Date(Date.now() + this.serverClockOffset);
-                const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-                const startHour = parseFloat(activeBlock.dataset.startHour);
-                if (!isNaN(startHour)) {
-                    const hourDiff = (currentHour - startHour + 24) % 24;
-                    const widthPercent = Math.max(0.3, (hourDiff / 24) * 100);
-                    activeBlock.style.width = `${widthPercent}%`;
-                }
-            }
-        }
     },
 
     // ─── State Calculation ──────────────────────────────────────────────────
     calculateECGState(activeSubjects) {
         const now = Date.now() + this.serverClockOffset;
-        
+
         // --- NEW: Fix Initial Flatline Bug ---
         // If lastStudyChangeTime is null, we haven't synced yet. 
         // Force a large gapMs to trigger "Signal Lost" instead of defaulting to 50 BPM.
@@ -1382,7 +1432,7 @@ const StudyTargetTracker = {
                 statusColorClass = 'text-rose-500 bg-rose-50 border-rose-100/50';
             }
         }
- 
+
         // Simplified Flatline Detection: Purely based on fatigue factor
         const isFlatline = (fatigueFactor === 0);
 
@@ -1438,7 +1488,7 @@ const StudyTargetTracker = {
 
         // Find matching zone
         const zone = this.HEART_RATE_ZONES.find(z => displayBpm >= z.min && displayBpm <= z.max)
-                  || this.HEART_RATE_ZONES[0];
+            || this.HEART_RATE_ZONES[0];
 
         bpmEl.textContent = state.isFlatline ? '--' : displayBpm;
         bpmEl.style.color = zone.color;
@@ -1454,13 +1504,13 @@ const StudyTargetTracker = {
             } else {
                 const now = new Date(Date.now() + this.serverClockOffset);
                 const currentHour = now.getHours() + now.getMinutes() / 60;
-                
+
                 const ghostLog = this.yesterdayBpmLogs.find(l => Math.abs(l.hour - currentHour) < 0.1);
                 const ghostBpm = ghostLog ? ghostLog.bpm : 0;
                 const wasActiveYesterday = ghostLog ? ghostLog.isActive : false;
-                
+
                 const delta = displayBpm - ghostBpm;
-                
+
                 deltaEl.classList.remove('hidden');
                 if (wasActiveYesterday) {
                     const isFaster = delta >= 0;
@@ -1474,31 +1524,37 @@ const StudyTargetTracker = {
         }
     },
 
-    // ─── Grid Drawing ───────────────────────────────────────────────────────
+    // ─── Grid Drawing (Batched for performance) ─────────────────────────────
     drawECGGrid(ctx, canvas, isFlatline) {
         const gridSize = this.ECG_GRID_SIZE;
+        const majorStep = gridSize * 5;
         const r = isFlatline ? 100 : 239;
         const g = isFlatline ? 100 : 68;
         const b = isFlatline ? 100 : 68;
 
+        // Batch minor lines into one path
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.05)`;
+        ctx.lineWidth = 0.5;
         for (let x = 0; x < canvas.width; x += gridSize) {
-            const isMajor = x % (gridSize * 5) === 0;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${isMajor ? 0.2 : 0.05})`;
-            ctx.lineWidth = isMajor ? 1 : 0.5;
-            ctx.stroke();
+            if (x % majorStep !== 0) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); }
         }
         for (let y = 0; y < canvas.height; y += gridSize) {
-            const isMajor = y % (gridSize * 5) === 0;
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${isMajor ? 0.2 : 0.05})`;
-            ctx.lineWidth = isMajor ? 1 : 0.5;
-            ctx.stroke();
+            if (y % majorStep !== 0) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
         }
+        ctx.stroke();
+
+        // Batch major lines into one path
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.2)`;
+        ctx.lineWidth = 1;
+        for (let x = 0; x < canvas.width; x += majorStep) {
+            ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        }
+        for (let y = 0; y < canvas.height; y += majorStep) {
+            ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
     },
 
     // ─── Bio-Sync Ghost Waveform ───────────────────────────────────────────
@@ -1506,7 +1562,7 @@ const StudyTargetTracker = {
         if (!this.yesterdayBpmLogs || this.yesterdayBpmLogs.length === 0) return;
 
         if (!this.ghostPoints) this.ghostPoints = [];
-        
+
         // Draw the ghost trail
         if (this.ghostPoints.length <= 1) return;
 
@@ -1561,7 +1617,7 @@ const StudyTargetTracker = {
         // --- Bio-Sync Ghost Wave Calculation (Using REAL History) ---
         const now = new Date(Date.now() + this.serverClockOffset);
         const currentHour = now.getHours() + now.getMinutes() / 60;
-        
+
         // Find nearest ghost log
         const ghostLog = this.yesterdayBpmLogs.find(l => Math.abs(l.hour - currentHour) < 0.05);
         const wasActiveYesterday = ghostLog ? ghostLog.isActive : false;
@@ -1572,7 +1628,7 @@ const StudyTargetTracker = {
         let ghostY = centerX;
 
         if (wasActiveYesterday && yesterdayBpm > 0) {
-            const ghostIntensity = 18; 
+            const ghostIntensity = 18;
             if (ghostCycle < 15) {
                 const p = ghostCycle / 15;
                 ghostY = centerX + Math.sin(p * Math.PI * 2) * (ghostIntensity * 1.1);
@@ -1665,7 +1721,7 @@ const StudyTargetTracker = {
         }
     },
 
-    // ─── Particle System ────────────────────────────────────────────────────
+    // ─── Particle System (Optimized: swap-and-pop removal) ────────────────
     updateECGParticles(ctx, canvas, state, pointResult) {
         const frameCount = this.ecgFrameCount;
         const accent = this.getAccentColors(state, frameCount);
@@ -1689,22 +1745,29 @@ const StudyTargetTracker = {
             }
 
             if (this.ecgParticles.length > this.ECG_PARTICLE_CAP) {
-                this.ecgParticles.splice(0, this.ecgParticles.length - this.ECG_PARTICLE_CAP);
+                this.ecgParticles.length = this.ECG_PARTICLE_CAP; // Truncate tail
             }
         }
 
-        // Update & render existing particles
+        // Update & render existing particles (swap-and-pop for O(1) removal)
         const colorPrefix = `rgba(${accent.rgb}, `;
-        for (let i = this.ecgParticles.length - 1; i >= 0; i--) {
+        const decayRate = pointResult.activeSpike ? 0.03 : 0.015;
+        let len = this.ecgParticles.length;
+        for (let i = len - 1; i >= 0; i--) {
             const p = this.ecgParticles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= decayRate;
+            if (p.life <= 0) {
+                // Swap with last element and pop (O(1) instead of splice O(n))
+                this.ecgParticles[i] = this.ecgParticles[--len];
+                this.ecgParticles.length = len;
+                continue;
+            }
             ctx.beginPath();
             ctx.fillStyle = colorPrefix + p.life + ')';
             ctx.arc(p.x, p.y, p.size || 1, 0, Math.PI * 2);
             ctx.fill();
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life -= (pointResult.activeSpike ? 0.03 : 0.015);
-            if (p.life <= 0) this.ecgParticles.splice(i, 1);
         }
     },
 
@@ -1731,51 +1794,62 @@ const StudyTargetTracker = {
         this.drawSmoothedPath(ctx, canvas, this.ecgPoints);
         ctx.stroke();
 
-        // Leading Eye (still uses shadowBlur — only 2 arcs, negligible cost)
+        // Leading Eye (optimized: no shadowBlur, use radial gradient glow instead)
         const lastPoint = this.ecgPoints[this.ecgPoints.length - 1];
         const lx = (this.ecgPoints.length - 1) / this.ECG_MAX_POINTS * canvas.width;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = accent.hex;
+
+        // Soft glow ring (replaces expensive shadowBlur)
+        const glowRadius = 7 + Math.sin(frameCount * 0.1) * 3;
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(${accent.rgb}, 0.3)`;
+        ctx.lineWidth = 3;
+        ctx.arc(lx, lastPoint.y, glowRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Core dot
         ctx.beginPath();
         ctx.fillStyle = accent.hex;
         ctx.arc(lx, lastPoint.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.beginPath();
-        ctx.strokeStyle = `rgba(${accent.rgb}, 0.5)`;
-        ctx.arc(lx, lastPoint.y, 7 + Math.sin(frameCount * 0.1) * 3, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
     },
 
-    // Helper: Draw a series of points as a smooth quadratic curve
+    // Helper: Draw a series of points as a smooth quadratic curve (zero-alloc)
     drawSmoothedPath(ctx, canvas, points) {
         if (!points || points.length < 2) return;
 
-        // SANITY CHECK: Remove any NaN points that could crash the canvas context
-        const validPoints = points.filter(p => p && !isNaN(p.y));
-        if (validPoints.length < 2) return;
+        // Find first valid point without creating a new array
+        let startIdx = -1;
+        for (let i = 0; i < points.length; i++) {
+            if (points[i] && !isNaN(points[i].y)) { startIdx = i; break; }
+        }
+        if (startIdx < 0) return;
 
+        const widthScale = canvas.width / this.ECG_MAX_POINTS;
         ctx.beginPath();
         ctx.lineJoin = 'round';
-        
-        // Move to first point
-        ctx.moveTo(0, validPoints[0].y);
+        ctx.moveTo(startIdx * widthScale, points[startIdx].y);
 
-        for (let i = 1; i < validPoints.length - 1; i++) {
-            const x = (i / this.ECG_MAX_POINTS) * canvas.width;
-            const nextX = ((i + 1) / this.ECG_MAX_POINTS) * canvas.width;
-            
-            // Midpoint for quadratic bezier
-            const cx = (x + nextX) / 2;
-            const cy = (validPoints[i].y + validPoints[i+1].y) / 2;
-            
-            ctx.quadraticCurveTo(x, validPoints[i].y, cx, cy);
+        let prevValidIdx = startIdx;
+        for (let i = startIdx + 1; i < points.length; i++) {
+            if (!points[i] || isNaN(points[i].y)) continue; // Skip NaN inline
+            const x = i * widthScale;
+            // Look ahead for next valid for smooth bezier
+            let nextValidY = points[i].y;
+            for (let j = i + 1; j < points.length; j++) {
+                if (points[j] && !isNaN(points[j].y)) { nextValidY = points[j].y; break; }
+            }
+            const prevX = prevValidIdx * widthScale;
+            const cx = (x + prevX) / 2 + (x - prevX) / 2;
+            const cy = (points[i].y + nextValidY) / 2;
+            ctx.quadraticCurveTo(x, points[i].y, (x + (i + 1) * widthScale) / 2, cy);
+            prevValidIdx = i;
         }
 
         // Draw last segment
         const lastIdx = points.length - 1;
-        const lx = (lastIdx / this.ECG_MAX_POINTS) * canvas.width;
-        ctx.lineTo(lx, points[lastIdx].y);
+        if (points[lastIdx] && !isNaN(points[lastIdx].y)) {
+            ctx.lineTo(lastIdx * widthScale, points[lastIdx].y);
+        }
     },
 
     // ─── Flatline Overlay ───────────────────────────────────────────────────
@@ -1814,8 +1888,9 @@ const StudyTargetTracker = {
             // Fetch Yesterday's Sessions for Ghost Layer (cache for 1 min)
             const yesterdayResult = await CacheManager.fetchWithCache(`api/analytics/get-session-timeline.php?date=${yesterday}`, 60);
             if (yesterdayResult && yesterdayResult.success) {
-                // EXCLUDE EXAMS: Filter out yesterday's sessions where type is 'exam'
-                this.yesterdaySessions = (yesterdayResult.sessions || []).filter(s => s.type !== 'exam');
+                // Include ALL sessions (including exams) for the Ghost Runner calculation 
+                // to match the main progress bar's studiedSeconds logic.
+                this.yesterdaySessions = yesterdayResult.sessions || [];
             }
 
             this.renderSessionTimeline(todayResult ? todayResult.current_hour : 24);
@@ -1830,7 +1905,7 @@ const StudyTargetTracker = {
         const nowMarker = document.getElementById('timeline-now-marker');
         const labelsContainer = document.getElementById('timeline-labels-container');
         if (!bar) return;
-        
+
         // Apply dashed background pattern to the main bar
         bar.classList.add('timeline-dashed-gaps');
 
@@ -1873,7 +1948,7 @@ const StudyTargetTracker = {
                 const hour = (this.TIMELINE_START_HOUR + i) % 24;
                 const ampm = hour >= 12 ? 'p' : 'a';
                 const displayH = hour % 12 || 12;
-                
+
                 const span = document.createElement('span');
                 span.className = `text-[9px] font-black text-slate-900 uppercase`;
                 span.textContent = `${displayH}${ampm}`;
@@ -1883,6 +1958,9 @@ const StudyTargetTracker = {
 
         // 1. Render Yesterday's Shadow (Background Layer)
         this.yesterdaySessions.forEach(session => {
+            // EXCLUDE EXAMS from rendering (but they remain in calculation)
+            if (session.type === 'exam') return;
+
             const leftPercent = this.getRelativeTimelinePercent(session.start_hour);
             const widthPercent = (session.duration_hours / 24) * 100;
             if (widthPercent <= 0) return;
@@ -1895,14 +1973,14 @@ const StudyTargetTracker = {
             ghost.className = 'timeline-ghost-block absolute top-0 h-full z-0 pointer-events-none rounded-sm border-t border-dashed';
             ghost.style.left = `${leftPercent}%`;
             ghost.style.width = `${widthPercent}%`;
-            
+
             // Use a faint version of the main color
             const ghostColor = this.hexToRgba(palette.main, 0.15);
             const borderColor = this.hexToRgba(palette.main, 0.3);
-            
+
             ghost.style.backgroundColor = ghostColor;
             ghost.style.borderTopColor = borderColor;
-            
+
             ghost.title = `Yesterday: ${session.subject || 'Session'}\n${Math.round(session.duration_hours * 60)}m`;
             bar.appendChild(ghost);
         });
@@ -1913,20 +1991,20 @@ const StudyTargetTracker = {
         this.sessionTimeline.forEach((session) => {
             const studyTypes = ['pomodoro', 'pomodoro_active', 'pomodoro_paused', 'exam'];
             const isStudy = studyTypes.includes(session.type);
-            
+
             let sessionNumber = null;
             if (isStudy) {
                 const sName = (session.subject || 'General Study').trim();
                 subjectStudyCounts[sName] = (subjectStudyCounts[sName] || 0) + 1;
                 sessionNumber = subjectStudyCounts[sName];
             }
-            
+
             const startHour = parseFloat(session.start_hour);
             const duration = parseFloat(session.duration_hours);
-            
+
             const leftPercent = this.getRelativeTimelinePercent(startHour);
             const widthPercent = Math.max(0.5, (duration / 24) * 100);
-            
+
             if (isNaN(leftPercent) || isNaN(widthPercent)) {
                 console.warn("[ST-TRACKER] Skipping invalid session block:", session);
                 return;
@@ -1958,23 +2036,23 @@ const StudyTargetTracker = {
                 block.style.borderTop = '1px dashed rgba(148,163,184,0.5)';
                 block.style.borderBottom = '1px dashed rgba(148,163,184,0.5)';
                 block.style.opacity = '0.7';
-                
+
                 const gapMin = Math.round(duration * 60);
                 block.innerHTML = `<span class="timeline-gap-label">${gapMin}m break</span>`;
-                block.title = ''; 
+                block.title = '';
                 block.addEventListener('mouseenter', (e) => this.showTimelineTooltip(e, session, palette));
                 block.addEventListener('mouseleave', () => this.hideTimelineTooltip());
                 block.addEventListener('click', () => this.showSessionDetails(session, palette, sessionNumber));
-                
+
                 bar.appendChild(block);
                 return; // Skip the rest of the styling
             }
-            
+
             block.className = `timeline-block absolute top-0 h-full rounded-sm transition-all cursor-default ${isActive ? 'timeline-block-active z-10' : 'z-10'} ${isPaused ? 'timeline-block-paused' : ''}`;
             block.style.left = `${leftPercent}%`;
             block.style.width = `${widthPercent}%`;
             block.dataset.startHour = session.start_hour;
-            
+
             if (isBreak) {
                 block.style.background = 'linear-gradient(to bottom, rgba(148, 163, 184, 0.4), rgba(100, 116, 139, 0.5))';
                 block.style.borderBottom = '1px dashed rgba(255,255,255,0.4)';
@@ -1982,7 +2060,7 @@ const StudyTargetTracker = {
                 // MULTIPLE BACKGROUNDS: Subject Gradient + Shimmer (if active)
                 const subjectGrad = `linear-gradient(to bottom, ${this.hexToRgba(palette.main, 0.85)}, ${this.hexToRgba(palette.grad, 0.9)})`;
                 const shimmerGrad = isActive && !isPaused ? `, linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)` : '';
-                
+
                 block.style.background = subjectGrad + shimmerGrad;
                 block.style.backgroundSize = isActive && !isPaused ? `100% 100%, 200% 100%` : '100% 100%';
                 const isPomodoroType = session.type === 'pomodoro' || session.type === 'pomodoro_active' || session.type === 'pomodoro_paused';
@@ -1997,7 +2075,7 @@ const StudyTargetTracker = {
             }
 
             block.title = ''; // Clear native title to use our custom tooltip
-            
+
             // Hover interactions
             block.addEventListener('mouseenter', (e) => {
                 this.showTimelineTooltip(e, session, palette);
@@ -2015,12 +2093,12 @@ const StudyTargetTracker = {
                 const waveVal = Math.abs(Math.sin(seed));
                 // Increased Amplitude for taller bar: 20% to 60% of block height
                 const amplitude = 20 + (waveVal * 40);
-                
+
                 const waveContainer = document.createElement('div');
                 waveContainer.className = 'timeline-wave-container';
                 waveContainer.innerHTML = `
                     <svg class="timeline-wave-svg" viewBox="0 0 200 100" preserveAspectRatio="none">
-                        <path d="M0,50 C25,${50-amplitude} 75,${50+amplitude} 100,50 C125,${50-amplitude} 175,${50+amplitude} 200,50 L200,100 L0,100 Z" 
+                        <path d="M0,50 C25,${50 - amplitude} 75,${50 + amplitude} 100,50 C125,${50 - amplitude} 175,${50 + amplitude} 200,50 L200,100 L0,100 Z" 
                               fill="rgba(255,255,255,0.25)">
                         </path>
                     </svg>
@@ -2039,25 +2117,25 @@ const StudyTargetTracker = {
         // --- NEW: Render Milestones (Hourly Achievements) ---
         let cumulativeHours = 0;
         const sortedSessions = [...this.sessionTimeline].sort((a, b) => a.start_hour - b.start_hour);
-        
+
         sortedSessions.forEach(session => {
             const startHours = cumulativeHours;
             const endHours = cumulativeHours + session.duration_hours;
-            
+
             // Check if we passed any whole hour marks (1.0, 2.0, etc.)
             for (let m = Math.floor(startHours) + 1; m <= Math.floor(endHours); m++) {
                 if (m > 0) {
                     // Exact hour of day when this milestone was reached
                     const hourOfDay = (session.start_hour + (m - startHours)) % 24;
                     const leftPercent = this.getRelativeTimelinePercent(hourOfDay);
-                    
+
                     const marker = document.createElement('div');
                     marker.className = 'timeline-milestone group absolute z-20 flex flex-col items-center cursor-pointer';
                     marker.style.left = `${leftPercent}%`;
                     marker.style.top = '0'; // Stay perfectly aligned with bar top
-                    
+
                     const title = this.MILESTONE_TITLES[m] || `${m}h Milestone`;
-                    
+
                     // Granular Evolution: Unique Icon + Color per hour (1-12)
                     const evolution = {
                         1: { icon: '🌱', hue: 100 }, // Light Green
@@ -2073,7 +2151,7 @@ const StudyTargetTracker = {
                         11: { icon: '🌌', hue: 240 }, // Deep Blue
                         12: { icon: '🏆', hue: 45 }   // Gold (Mastery)
                     };
-                    
+
                     const tier = evolution[m] || { icon: '🏆', hue: 25 };
                     const accent = '#f97316'; // Consistent Vivid Orange for all milestones
 
@@ -2091,16 +2169,16 @@ const StudyTargetTracker = {
                         e.stopPropagation();
                         const myLabel = marker.querySelector('.milestone-label');
                         const isHidden = myLabel.classList.contains('hidden');
-                        
+
                         // Close ALL others first
                         document.querySelectorAll('.milestone-label').forEach(el => el.classList.add('hidden'));
-                        
+
                         // Toggle this one
                         if (isHidden) {
                             myLabel.classList.remove('hidden');
                         }
                     };
-                    
+
                     bar.parentElement.appendChild(marker);
                 }
             }
@@ -2149,17 +2227,17 @@ const StudyTargetTracker = {
         `;
 
         tooltip.classList.add('visible');
-        
+
         // Position it above the cursor
         const x = e.clientX;
         const y = e.clientY - 15;
-        
+
         // Use timeout to ensure rect is calculated after innerHTML update
         const rect = tooltip.getBoundingClientRect();
         let left = x - rect.width / 2;
         if (left < 10) left = 10;
         if (left + rect.width > window.innerWidth - 10) left = window.innerWidth - rect.width - 10;
-        
+
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${y - rect.height}px`;
     },
@@ -2177,12 +2255,12 @@ const StudyTargetTracker = {
             if (s.type === 'break' || s.type === 'paused_gap') return 'N/A';
             // Use start_hour as a stable seed. Round to 3 decimals to avoid tiny floating point noise
             const seed = Math.round(s.start_hour * 1000);
-            const val = Math.abs(Math.sin(seed)); 
+            const val = Math.abs(Math.sin(seed));
             return (85 + (val * 13)).toFixed(1) + '%';
         };
 
         const efficiency = getStableEfficiency(session);
-        
+
         const formatHour = (h) => {
             const hr = Math.floor(h) % 24;
             const min = Math.round((h % 1) * 60);
@@ -2194,7 +2272,7 @@ const StudyTargetTracker = {
         const startTime = formatHour(session.start_hour);
         const endTime = formatHour(session.start_hour + session.duration_hours);
         const isPaused = session.type === 'paused_gap';
-        const isStudy = !!sessionNumber; 
+        const isStudy = !!sessionNumber;
 
         this.showModernModal(`
             <div style="text-align:center; padding:5px;">
@@ -2231,8 +2309,8 @@ const StudyTargetTracker = {
                 </div>
                 
                 <div style="font-size:11px; color:#94a3b8; line-height:1.6; background:rgba(15, 23, 42, 0.4); padding:12px; border-radius:12px; text-align:left; border-left:3px solid ${palette.main};">
-                    ${isPaused ? 'This was a period of <strong>momentum decay</strong>. Try to minimize these gaps to keep the ECG active.' : 
-                    (session.type === 'break' ? 'This buffer is essential for cognitive recovery.' : 'Your neural engagement was above average for this subject.')}
+                    ${isPaused ? 'This was a period of <strong>momentum decay</strong>. Try to minimize these gaps to keep the ECG active.' :
+                (session.type === 'break' ? 'This buffer is essential for cognitive recovery.' : 'Your neural engagement was above average for this subject.')}
                 </div>
             </div>
         `);
@@ -2252,14 +2330,14 @@ const StudyTargetTracker = {
             modal.onclick = (e) => { if (e.target === modal) this.closeModernModal(); };
             document.body.appendChild(modal);
         }
-        
+
         modal.innerHTML = `
             <div style="background:#1e293b; width:90%; max-width:320px; border-radius:24px; padding:24px; border:1px solid rgba(255,255,255,0.08); box-shadow:0 25px 50px -12px rgba(0,0,0,0.6); transform:scale(0.9) translateY(20px); transition:all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
                 ${html}
                 <button onclick="StudyTargetTracker.closeModernModal()" style="width:100%; margin-top:20px; background:rgba(255,255,255,0.05); border:0; color:#64748b; padding:12px; border-radius:14px; font-weight:700; cursor:pointer; transition:all 0.2s;">Dismiss</button>
             </div>
         `;
-        
+
         modal.style.display = 'flex';
         setTimeout(() => {
             modal.style.opacity = '1';
@@ -2398,6 +2476,29 @@ const StudyTargetTracker = {
                     opacity: 0.35;
                     mix-blend-mode: overlay;
                     filter: saturate(0.5);
+                }
+
+                /* NEW: Ghost Runner Phantom Styles */
+                @keyframes phantom-red-glow {
+                    0%, 100% { filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.4)); opacity: 0.8; }
+                    50% { filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9)); opacity: 1; }
+                }
+                .phantom-warning {
+                    animation: phantom-red-glow 1s infinite ease-in-out !important;
+                    z-index: 20 !important;
+                }
+                @keyframes sonic-boom-flare {
+                    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8); border: 2px solid white; }
+                    100% { box-shadow: 0 0 40px 20px rgba(59, 130, 246, 0); border: 2px solid transparent; }
+                }
+                .sonic-boom-trigger::after {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    border-radius: 9999px;
+                    animation: sonic-boom-flare 1s ease-out forwards;
+                    pointer-events: none;
+                    z-index: 5;
                 }
                 #session-timeline-bar {
                     height: 40px !important;
@@ -2634,7 +2735,7 @@ const StudyTargetTracker = {
                 const mins = grid[d] ? grid[d][h] : 0;
                 const bg = getColor(mins);
                 const minsRounded = Math.round(mins);
-                const hourLabel = h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h-12}pm`;
+                const hourLabel = h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`;
                 const tooltip = minsRounded > 0
                     ? `${days[d]} ${hourLabel}: ${minsRounded}m studied`
                     : `${days[d]} ${hourLabel}: No study`;
@@ -2646,7 +2747,7 @@ const StudyTargetTracker = {
                 // NOW Marker logic (Distinct Style for Active Cell)
                 const isNow = isToday && h === currentHour;
                 const activeClass = isNow ? 'heatmap-cell-active' : '';
-                
+
                 // If it's active but has no data, give it a tiny 'prime' tint
                 const finalBg = (isNow && mins <= 0) ? 'rgba(79, 70, 229, 0.1)' : bg;
 
@@ -2745,7 +2846,7 @@ const StudyTargetTracker = {
 
             // Set properties based on state
             let speed = 0.02;
-            let color = this.protocolActive ? '#22d3ee' : '#ef4444'; 
+            let color = this.protocolActive ? '#22d3ee' : '#ef4444';
             let viscosity = 0.5;
 
             // Priority 1: Active Subject Sync (Override)
@@ -2753,7 +2854,7 @@ const StudyTargetTracker = {
                 color = this.activeSubjectPalette.main;
                 speed = 0.06;
                 viscosity = 0.75;
-            } 
+            }
             // Priority 2: Standard States
             else if (this.protocolActive) {
                 speed = 0.1; // Maximum overdrive
@@ -2852,7 +2953,7 @@ const StudyTargetTracker = {
 
         this.sessionTimeline.forEach(session => {
             if (session.type !== 'pomodoro_active' && session.type !== 'pomodoro') return;
-            
+
             const start = session.start_hour;
             const end = session.end_hour || (session.type.includes('active') ? currentHour : (start + (session.duration_hours || 0)));
 
@@ -2908,6 +3009,493 @@ const StudyTargetTracker = {
             // High-visibility vibrant orange for low sync to encourage improvement
             badge.className = 'text-[10px] font-black text-white bg-gradient-to-r from-rose-500 via-orange-400 to-rose-600 px-2 py-0.5 rounded-lg border-b-2 border-rose-700 shadow-md flex items-center gap-1.5 animate-sync-pulse';
             badge.title = "Syncing... align your next session with your peak for a massive boost!";
+        }
+    },
+
+    // ─── Intelligence Feature 1: Cognitive Decay Predictor ──────────────────
+    predictFocusCliff() {
+        const countdownEl = document.getElementById('focus-cliff-countdown');
+        const badgeEl = document.getElementById('focus-cliff-badge');
+        if (!countdownEl || !badgeEl) return;
+
+        const now = new Date(Date.now() + this.serverClockOffset);
+        const currentHour = now.getHours() + now.getMinutes() / 60;
+
+        // Strategy: Find the hour where yesterday's BPM declined for 3+ consecutive readings
+        let focusCliffHour = null;
+        if (this.yesterdayBpmLogs && this.yesterdayBpmLogs.length >= 4) {
+            // Sort by hour
+            const sorted = [...this.yesterdayBpmLogs]
+                .filter(l => l.isActive && l.bpm > 0)
+                .sort((a, b) => a.hour - b.hour);
+
+            let declineStreak = 0;
+            for (let i = 1; i < sorted.length; i++) {
+                if (sorted[i].bpm < sorted[i - 1].bpm) {
+                    declineStreak++;
+                    if (declineStreak >= 3) {
+                        focusCliffHour = sorted[i - 2].hour; // Point where decline began
+                        break;
+                    }
+                } else {
+                    declineStreak = 0;
+                }
+            }
+        }
+
+        // If no historical pattern, estimate based on session duration (average ~4h focus)
+        if (focusCliffHour === null) {
+            if (this.lastStudyChangeTime && this.studiedSeconds > 0) {
+                const sessionStartHour = new Date(this.lastStudyChangeTime).getHours();
+                focusCliffHour = (sessionStartHour + 4) % 24; // Default 4h cliff
+            } else {
+                countdownEl.textContent = 'No data';
+                badgeEl.textContent = 'Need more history';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
+                return;
+            }
+        }
+
+        // Calculate time until cliff
+        let hoursUntilCliff = focusCliffHour - currentHour;
+        if (hoursUntilCliff < 0) hoursUntilCliff += 24;
+        if (hoursUntilCliff > 12) hoursUntilCliff = 0; // Already passed today
+
+        // Check if we're currently studying
+        const isStudying = document.body.classList.contains('pomo-session-active');
+
+        if (hoursUntilCliff <= 0 || !isStudying) {
+            // Already past cliff or not studying
+            if (isStudying) {
+                countdownEl.textContent = 'Now!';
+                badgeEl.textContent = 'Take a break';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
+            } else {
+                const cliffH = Math.floor(focusCliffHour);
+                const cliffM = Math.round((focusCliffHour % 1) * 60);
+                const ampm = cliffH >= 12 ? 'PM' : 'AM';
+                const displayH = cliffH % 12 || 12;
+                countdownEl.textContent = `${displayH}:${String(cliffM).padStart(2, '0')} ${ampm}`;
+                badgeEl.textContent = 'Predicted cliff';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-violet-100 text-violet-600 w-fit uppercase tracking-tighter';
+            }
+        } else {
+            const h = Math.floor(hoursUntilCliff);
+            const m = Math.round((hoursUntilCliff % 1) * 60);
+            countdownEl.textContent = h > 0 ? `~${h}h ${m}m` : `~${m}m`;
+
+            // Color based on urgency
+            if (hoursUntilCliff <= 0.5) {
+                badgeEl.textContent = 'Imminent!';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
+            } else if (hoursUntilCliff <= 1.5) {
+                badgeEl.textContent = 'Approaching';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
+            } else {
+                badgeEl.textContent = 'Safe zone';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+            }
+        }
+    },
+
+    // ─── Intelligence Feature 2: Time Debt Ledger ───────────────────────────
+    weeklyDebtData: null,
+    weeklyDebtLastFetch: 0,
+
+    async fetchWeeklyDebt() {
+        // Throttle: Only fetch once per 5 minutes
+        if (Date.now() - this.weeklyDebtLastFetch < 300000 && this.weeklyDebtData !== null) {
+            this.renderTimeDebt();
+            return;
+        }
+
+        try {
+            let totalBalance = 0;
+            const dayResults = [];
+
+            // Fetch last 7 days of progress in parallel
+            const promises = [];
+            for (let i = 1; i <= 7; i++) {
+                const date = this.getLogicalDate(-i);
+                promises.push(
+                    CacheManager.fetchWithCache(`api/analytics/get-yesterday-progress.php?date=${date}`, 300)
+                        .then(result => ({
+                            day: i,
+                            seconds: (result && result.success) ? (result.yesterday_total_seconds || 0) : 0
+                        }))
+                        .catch(() => ({ day: i, seconds: 0 }))
+                );
+            }
+
+            const results = await Promise.all(promises);
+            results.forEach(r => {
+                const diff = r.seconds - this.DAILY_TARGET_SECONDS;
+                totalBalance += diff;
+                dayResults.push({ day: r.day, seconds: r.seconds, diff });
+            });
+
+            this.weeklyDebtData = { totalBalance, days: dayResults };
+            this.weeklyDebtLastFetch = Date.now();
+            this.renderTimeDebt();
+        } catch (e) {
+            console.error('[ST-TRACKER] Weekly Debt Error:', e);
+        }
+    },
+
+    renderTimeDebt() {
+        const displayEl = document.getElementById('time-debt-display');
+        const badgeEl = document.getElementById('time-debt-badge');
+        const cardEl = document.getElementById('time-debt-card');
+        if (!displayEl || !badgeEl || !this.weeklyDebtData) return;
+
+        const balance = this.weeklyDebtData.totalBalance;
+        const absBalance = Math.abs(balance);
+        const h = Math.floor(absBalance / 3600);
+        const m = Math.round((absBalance % 3600) / 60);
+        const formatted = h > 0 ? `${h}h ${m}m` : `${m}m`;
+
+        if (balance >= 0) {
+            // Surplus
+            displayEl.textContent = `+${formatted}`;
+            displayEl.className = 'text-xl font-black text-emerald-600';
+            badgeEl.textContent = 'Surplus · 7 Days';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+            if (cardEl) {
+                cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-emerald-50/60').replace(/border-\w+-\d+/, 'border-emerald-100');
+            }
+        } else {
+            // Debt
+            displayEl.textContent = `-${formatted}`;
+            displayEl.className = 'text-xl font-black text-rose-600';
+
+            // Suggest action
+            const dailyExtra = Math.ceil(absBalance / 7 / 60); // Extra mins per day
+            badgeEl.textContent = `Debt · +${dailyExtra}m/day to clear`;
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter';
+            if (cardEl) {
+                cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-rose-50/60').replace(/border-\w+-\d+/, 'border-rose-100');
+            }
+        }
+    },
+
+    // ─── Intelligence Feature 3: Smart Subject Rotation ─────────────────────
+    checkSubjectRotation() {
+        const cardEl = document.getElementById('subject-rotation-card');
+        const nameEl = document.getElementById('rotation-subject-name');
+        const reasonEl = document.getElementById('rotation-reason');
+        if (!cardEl || !nameEl || !reasonEl) return;
+
+        // Only show when actively studying
+        const isStudying = document.body.classList.contains('pomo-session-active');
+        if (!isStudying || !this.subjects || this.subjects.length < 2) {
+            cardEl.classList.add('hidden');
+            return;
+        }
+
+        // Find current active subject (the one being studied right now)
+        const activeSubjects = this.subjects.filter(s => s.seconds > 0);
+        if (activeSubjects.length === 0) { cardEl.classList.add('hidden'); return; }
+
+        // Sort by study time to find the most-studied subject today
+        const sorted = [...activeSubjects].sort((a, b) => b.seconds - a.seconds);
+        const topSubject = sorted[0];
+
+        // Only suggest rotation if the top subject has been studied > 90 minutes
+        const topMinutes = topSubject.seconds / 60;
+        if (topMinutes < 90) {
+            cardEl.classList.add('hidden');
+            return;
+        }
+
+        // Find the best candidate to switch to:
+        // Compare against today's subjects list
+        const candidates = this.subjects.filter(s => {
+            return s.name !== topSubject.name && s.seconds < topSubject.seconds;
+        });
+
+        if (candidates.length === 0) { cardEl.classList.add('hidden'); return; }
+
+        // Score candidates: lower today-time = higher priority
+        const scored = candidates.map(c => {
+            return {
+                name: c.name,
+                score: (topSubject.seconds - c.seconds) / 60,
+                todayMins: Math.round(c.seconds / 60)
+            };
+        }).sort((a, b) => b.score - a.score);
+
+        const best = scored[0];
+        cardEl.classList.remove('hidden');
+        nameEl.textContent = best.name;
+
+        const topMins = Math.round(topMinutes);
+        if (best.todayMins === 0) {
+            reasonEl.textContent = `${topSubject.name} at ${topMins}m · Start this`;
+        } else {
+            reasonEl.textContent = `${topSubject.name} at ${topMins}m · This only ${best.todayMins}m`;
+        }
+        reasonEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-cyan-100 text-cyan-600 w-fit uppercase tracking-tighter';
+    },
+
+    // ─── Stats Card: Completion Odds ────────────────────────────────────────
+    updateCompletionOdds() {
+        const valueEl = document.getElementById('completion-odds-value');
+        const badgeEl = document.getElementById('completion-odds-badge');
+        if (!valueEl || !badgeEl) return;
+
+        const now = new Date(Date.now() + this.serverClockOffset);
+        const rollover = new Date(now.getTime());
+        if (now.getHours() >= this.TIMELINE_START_HOUR) {
+            rollover.setDate(now.getDate() + 1);
+        }
+        rollover.setHours(this.TIMELINE_START_HOUR, 0, 0, 0);
+        const secondsLeft = Math.max(0, (rollover - now) / 1000);
+
+        const remaining = this.DAILY_TARGET_SECONDS - this.studiedSeconds;
+
+        // Already completed
+        if (remaining <= 0) {
+            valueEl.textContent = '100%';
+            valueEl.className = 'text-2xl font-black text-emerald-600';
+            badgeEl.textContent = 'Target Complete!';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+            return;
+        }
+
+        // No time left
+        if (secondsLeft <= 0) {
+            valueEl.textContent = '0%';
+            valueEl.className = 'text-2xl font-black text-rose-600';
+            badgeEl.textContent = 'Day over';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter';
+            return;
+        }
+
+        // Calculate required pace (minutes of study per hour)
+        const hoursLeft = secondsLeft / 3600;
+        const remainingHours = remaining / 3600;
+        const requiredMinsPerHour = (remainingHours / hoursLeft) * 60;
+
+        // Probability model: based on how feasible the required pace is
+        // 45 m/hr = very comfortable (95%), 55 m/hr = pushing (60%), 60 m/hr = impossible (5%)
+        let odds;
+        if (requiredMinsPerHour <= 30) {
+            odds = 98;
+        } else if (requiredMinsPerHour <= 40) {
+            odds = 92 - (requiredMinsPerHour - 30) * 0.5;
+        } else if (requiredMinsPerHour <= 50) {
+            odds = 87 - (requiredMinsPerHour - 40) * 2;
+        } else if (requiredMinsPerHour <= 55) {
+            odds = 67 - (requiredMinsPerHour - 50) * 6;
+        } else if (requiredMinsPerHour <= 58) {
+            odds = 37 - (requiredMinsPerHour - 55) * 8;
+        } else if (requiredMinsPerHour <= 60) {
+            odds = 13 - (requiredMinsPerHour - 58) * 5;
+        } else {
+            odds = Math.max(1, 3 - (requiredMinsPerHour - 60));
+        }
+
+        // Boost odds if studying right now (active session adds momentum)
+        const isStudying = document.body.classList.contains('pomo-session-active');
+        if (isStudying) odds = Math.min(99, odds + 5);
+
+        odds = Math.max(1, Math.min(99, Math.round(odds)));
+
+        valueEl.textContent = `${odds}%`;
+
+        // Color coding
+        if (odds >= 70) {
+            valueEl.className = 'text-2xl font-black text-emerald-600';
+            badgeEl.textContent = 'On track';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+        } else if (odds >= 40) {
+            valueEl.className = 'text-2xl font-black text-amber-600';
+            badgeEl.textContent = 'Needs focus';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
+        } else {
+            valueEl.className = 'text-2xl font-black text-rose-600';
+            badgeEl.textContent = 'At risk';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
+        }
+    },
+
+    // ─── Stats Card: Daily Streak ───────────────────────────────────────────
+    updateDailyStreak() {
+        const valueEl = document.getElementById('daily-streak-value');
+        const badgeEl = document.getElementById('daily-streak-badge');
+        if (!valueEl || !badgeEl || !this.weeklyDebtData) return;
+
+        // Count consecutive days from most recent where seconds >= target
+        let streak = 0;
+        // Sort by day (1 = yesterday, 2 = day before, etc.)
+        const sortedDays = [...this.weeklyDebtData.days].sort((a, b) => a.day - b.day);
+
+        for (const d of sortedDays) {
+            if (d.seconds >= this.DAILY_TARGET_SECONDS) {
+                streak++;
+            } else {
+                break; // Streak broken
+            }
+        }
+
+        // Check if today is also on track (projected)
+        const now = new Date(Date.now() + this.serverClockOffset);
+        const rollover = new Date(now.getTime());
+        if (now.getHours() >= this.TIMELINE_START_HOUR) {
+            rollover.setDate(now.getDate() + 1);
+        }
+        rollover.setHours(this.TIMELINE_START_HOUR, 0, 0, 0);
+        const secondsLeft = Math.max(0, (rollover - now) / 1000);
+        const remaining = this.DAILY_TARGET_SECONDS - this.studiedSeconds;
+        const todayOnTrack = remaining <= 0 || (remaining / secondsLeft) < 1; // Can finish at 1:1 pace
+
+        if (streak === 0) {
+            valueEl.textContent = '0';
+            valueEl.className = 'text-2xl font-black text-gray-400';
+            badgeEl.textContent = todayOnTrack ? 'Start one today!' : 'No streak';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
+        } else {
+            valueEl.textContent = `🔥 ${streak}`;
+            valueEl.className = 'text-2xl font-black text-orange-600';
+
+            if (todayOnTrack) {
+                badgeEl.textContent = `${streak + 1} if you finish today`;
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-orange-100 text-orange-600 w-fit uppercase tracking-tighter';
+            } else {
+                badgeEl.textContent = 'Streak at risk!';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
+            }
+        }
+    },
+
+    // ─── Stats Card: Session Endurance ───────────────────────────────────────
+    updateSessionEndurance() {
+        const valueEl = document.getElementById('session-endurance-value');
+        const badgeEl = document.getElementById('session-endurance-badge');
+        if (!valueEl || !badgeEl) return;
+
+        // Find longest study session today from sessionTimeline
+        let longestToday = 0;
+        let longestSubject = '';
+        if (this.sessionTimeline && this.sessionTimeline.length > 0) {
+            this.sessionTimeline.forEach(s => {
+                if (s.type === 'pomodoro' || s.type === 'pomodoro_active') {
+                    const mins = Math.round(s.duration_hours * 60);
+                    if (mins > longestToday) {
+                        longestToday = mins;
+                        longestSubject = s.subject || 'Study';
+                    }
+                }
+            });
+        }
+
+        // Find longest yesterday for comparison
+        let longestYesterday = 0;
+        if (this.yesterdaySessions && this.yesterdaySessions.length > 0) {
+            this.yesterdaySessions.forEach(s => {
+                if (s.type !== 'break' && s.type !== 'paused_gap') {
+                    const mins = Math.round((s.duration_hours || ((s.end_hour - s.start_hour + 24) % 24)) * 60);
+                    if (mins > longestYesterday) longestYesterday = mins;
+                }
+            });
+        }
+
+        if (longestToday === 0) {
+            valueEl.textContent = '0m';
+            valueEl.className = 'text-2xl font-black text-gray-400';
+            badgeEl.textContent = 'No sessions yet';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
+            return;
+        }
+
+        const h = Math.floor(longestToday / 60);
+        const m = longestToday % 60;
+        valueEl.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+        valueEl.className = 'text-2xl font-black text-teal-600';
+
+        // Compare with yesterday
+        if (longestYesterday > 0) {
+            const diff = longestToday - longestYesterday;
+            if (diff > 0) {
+                badgeEl.textContent = `+${diff}m vs yesterday · New PR!`;
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+            } else if (diff === 0) {
+                badgeEl.textContent = `Tied with yesterday`;
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
+            } else {
+                badgeEl.textContent = `${diff}m vs yesterday`;
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
+            }
+        } else {
+            badgeEl.textContent = longestSubject;
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
+        }
+    },
+
+    // ─── Stats Card: Velocity ───────────────────────────────────────────────
+    updateVelocity() {
+        const valueEl = document.getElementById('velocity-value');
+        const badgeEl = document.getElementById('velocity-badge');
+        const cardEl = document.getElementById('velocity-card');
+        if (!valueEl || !badgeEl || !cardEl) return;
+
+        if (!this.firstStartTime || this.studiedSeconds <= 0) {
+            valueEl.textContent = '--';
+            badgeEl.textContent = 'm/hr';
+            return;
+        }
+
+        const now = new Date(Date.now() + this.serverClockOffset);
+        // Calculate elapsed seconds since first activity
+        const elapsedSeconds = Math.max(1, (now - this.firstStartTime) / 1000);
+
+        // Velocity = (Studied Seconds / Elapsed Seconds) * 60
+        const velocityVal = (this.studiedSeconds / elapsedSeconds) * 60;
+
+        // SPEEDOMETER: Show 1 decimal place for visual movement
+        const currentVelocity = parseFloat(velocityVal.toFixed(1));
+
+        // Binary Trend: Up or Down only (Sticky logic)
+        if (this._lastTrendIcon === undefined) {
+            this._lastTrendIcon = '↑';
+            this._lastTrendClass = 'trend-up-animate';
+            this._lastTrendColor = 'text-emerald-600';
+        }
+
+        if (this.lastRawVelocity !== null) {
+            if (velocityVal > this.lastRawVelocity) {
+                this._lastTrendIcon = '↑';
+                this._lastTrendClass = 'trend-up-animate';
+                this._lastTrendColor = 'text-emerald-600';
+            } else if (velocityVal < this.lastRawVelocity) {
+                this._lastTrendIcon = '↓';
+                this._lastTrendClass = 'trend-down-animate';
+                this._lastTrendColor = 'text-rose-600';
+            }
+        }
+        this.lastRawVelocity = velocityVal;
+        this.lastVelocity = currentVelocity;
+
+        // Apply HTML with animated span (Sticky binary trend)
+        valueEl.innerHTML = `
+            ${currentVelocity.toFixed(1)}<span class="text-xs opacity-50 font-normal ml-1">m/hr</span>
+            <span class="trend-animate ${this._lastTrendClass}" style="margin-left: 8px;">${this._lastTrendIcon}</span>
+        `;
+        valueEl.className = `text-2xl font-black ${this._lastTrendColor}`;
+
+        // Color card based on level (using raw value)
+        if (velocityVal >= 50) {
+            badgeEl.textContent = 'Elite Speed';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-fuchsia-100 text-fuchsia-600 w-fit uppercase tracking-tighter';
+            cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-fuchsia-50/60').replace(/border-\w+-\d+/, 'border-fuchsia-100');
+        } else if (currentVelocity >= 35) {
+            badgeEl.textContent = 'High Output';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-indigo-100 text-indigo-600 w-fit uppercase tracking-tighter';
+            cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-indigo-50/60').replace(/border-\w+-\d+/, 'border-indigo-100');
+        } else {
+            badgeEl.textContent = 'Cruising';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-slate-100 text-slate-600 w-fit uppercase tracking-tighter';
+            cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-slate-50/60').replace(/border-\w+-\d+/, 'border-slate-100');
         }
     }
 };

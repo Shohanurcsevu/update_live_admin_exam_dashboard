@@ -418,3 +418,43 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #cbd5e1;
 }
+
+/* Velocity Trend Animations */
+.trend-animate {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 12px;
+    position: relative;
+    top: -2px;
+}
+
+.trend-up-animate {
+    animation: trendUp 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.trend-down-animate {
+    animation: trendDown 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.trend-stable-animate {
+    animation: trendStable 5s ease-in-out infinite;
+}
+
+@keyframes trendUp {
+    0% { transform: translateY(14px); opacity: 0; }
+    25% { transform: translateY(7px); opacity: 1; }
+    75% { transform: translateY(-7px); opacity: 1; }
+    100% { transform: translateY(-14px); opacity: 0; }
+}
+
+@keyframes trendDown {
+    0% { transform: translateY(-14px); opacity: 0; }
+    25% { transform: translateY(-7px); opacity: 1; }
+    75% { transform: translateY(7px); opacity: 1; }
+    100% { transform: translateY(14px); opacity: 0; }
+}
+
+@keyframes trendStable {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
