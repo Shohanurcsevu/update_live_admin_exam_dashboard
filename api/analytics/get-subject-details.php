@@ -14,8 +14,19 @@ if (!$subject_id) {
 
 try {
     // Determine date range condition
-    $dateCondition = "DATE(p.attempt_time) = CURRENT_DATE";
-    if ($range === 'week') {
+    if ($range === 'today') {
+        $now = time();
+        $hour = intval(date('G', $now));
+        if ($hour < 5) {
+            $study_date = date('Y-m-d', strtotime('yesterday'));
+        } else {
+            $study_date = date('Y-m-d', $now);
+        }
+        $next_date = date('Y-m-d', strtotime($study_date . ' +1 day'));
+        $start_ts = $study_date . ' 05:00:00';
+        $end_ts = $next_date . ' 05:00:00';
+        $dateCondition = "p.attempt_time BETWEEN '$start_ts' AND '$end_ts'";
+    } elseif ($range === 'week') {
         $dateCondition = "p.attempt_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
     } elseif ($range === 'month') {
         $dateCondition = "p.attempt_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";

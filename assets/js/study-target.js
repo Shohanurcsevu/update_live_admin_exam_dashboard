@@ -460,6 +460,14 @@ const StudyTargetTracker = {
         if (mainBar) mainBar.style.width = `${todayPercent}%`;
         if (percentageEl) percentageEl.textContent = `${Math.round(todayPercent)}%`;
 
+        const projectedBar = document.getElementById('projected-progress-bar');
+        if (projectedBar) {
+            const projectedSeconds = this.studiedSeconds + (3600 * (this.currentPaceMultiplier || 1.0));
+            const projectedPercent = Math.min(100, (projectedSeconds / this.DAILY_TARGET_SECONDS) * 100);
+            projectedBar.style.width = `${projectedPercent}%`;
+            projectedBar.style.display = (this.studiedSeconds > 0) ? 'block' : 'none';
+        }
+
         if (this.yesterdaySeconds !== undefined) {
             const yesterdayPercent = Math.min(100, (this.yesterdaySeconds / this.DAILY_TARGET_SECONDS) * 100);
             if (ghostBar) {
@@ -516,9 +524,23 @@ const StudyTargetTracker = {
 
                 paceEl.classList.remove('hidden');
                 if (diffSeconds >= 0) {
-                    paceEl.textContent = `${diffFormatted} ahead of yesterday`;
-                    paceEl.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600";
+                    // Overtake celebration logic
+                    if (!this.hasOvertakenYesterday && this.yesterdaySeconds > 0) {
+                        this.hasOvertakenYesterday = true;
+                        if (typeof showToast === 'function') {
+                            showToast("🚀 Milestone: You've overtaken yesterday's progress!", 'success');
+                        }
+                        // Visual bump for the progress bar
+                        const mainBar = document.getElementById('main-progress-bar');
+                        if (mainBar) {
+                            mainBar.classList.add('shadow-[0_0_25px_rgba(34,197,94,0.8)]');
+                            setTimeout(() => mainBar.classList.remove('shadow-[0_0_25px_rgba(34,197,94,0.8)]'), 3000);
+                        }
+                    }
+                    paceEl.textContent = `${diffFormatted} ahead of yesterday 🏆`;
+                    paceEl.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 animate-bounce";
                 } else {
+                    this.hasOvertakenYesterday = false;
                     paceEl.textContent = `${diffFormatted} behind yesterday`;
                     paceEl.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600";
                 }
@@ -563,6 +585,9 @@ const StudyTargetTracker = {
             const label = pausedGapBlock.querySelector('.timeline-gap-label');
             if (label) label.textContent = `${gapMin}m break`;
         }
+
+        this.updateBioSyncDisplay();
+        this.updateFlowOrbState();
     },
 
     updateRequiredPace(secondsUntilMidnight, remainingStudySeconds) {
@@ -678,10 +703,19 @@ const StudyTargetTracker = {
     async fetchEstimatedFinish(pace = null) {
         const multiplier = pace || this.currentPaceMultiplier || 1.0;
         try {
+            // Realistic Case (Actual pace)
             const result = await CacheManager.fetchWithCache(`api/analytics/get-estimated-finish.php?pace=${multiplier}`, 2);
             if (result) {
                 this.estimatedFinishLabel = result.formatted_time;
-                this.estimatedFinishTimestamp = result.finish_timestamp; // Store for timeline
+                this.estimatedFinishTimestamp = result.finish_timestamp;
+                
+                // Best Case (assuming 1.2x of current multiplier if multiplier is 1.0, or just regular boost)
+                const bestMultiplier = Math.max(1.1, multiplier * 1.1);
+                const bestResult = await CacheManager.fetchWithCache(`api/analytics/get-estimated-finish.php?pace=${bestMultiplier}`, 5);
+                if (bestResult) {
+                    this.bestCaseFinishLabel = bestResult.formatted_time;
+                }
+                
                 this.renderPredictedFinish();
             }
         } catch (e) {
@@ -694,6 +728,22 @@ const StudyTargetTracker = {
         if (!clockEl) return;
 
         clockEl.textContent = this.estimatedFinishLabel;
+
+        // Best Case Badge
+        let bestCaseEl = document.getElementById('best-case-finish');
+        if (this.bestCaseFinishLabel && !this.estimatedFinishLabel.includes("Goal")) {
+            if (!bestCaseEl) {
+                const parent = clockEl.parentElement;
+                bestCaseEl = document.createElement('div');
+                bestCaseEl.id = 'best-case-finish';
+                bestCaseEl.className = 'text-[9px] font-bold text-emerald-500 mt-1 uppercase tracking-tighter';
+                parent.appendChild(bestCaseEl);
+            }
+            bestCaseEl.innerHTML = `<span class="opacity-60">Best Case:</span> ${this.bestCaseFinishLabel} <span class="material-symbols-outlined text-[10px]">rocket_launch</span>`;
+            bestCaseEl.style.display = 'block';
+        } else if (bestCaseEl) {
+            bestCaseEl.style.display = 'none';
+        }
 
         const multiplier = this.currentPaceMultiplier || 1.0;
 
@@ -1308,13 +1358,29 @@ const StudyTargetTracker = {
         } else if (gapMs > this.FATIGUE_CRITICAL_MS) {
             const p = (gapMs - this.FATIGUE_CRITICAL_MS) / (this.FATIGUE_FAILING_MS - this.FATIGUE_CRITICAL_MS);
             fatigueFactor = 0.5 - (p * 0.3);
-            statusLabel = 'Critical Drift';
+            statusLabel = 'Burnout Risk';
             statusColorClass = 'text-amber-600 bg-amber-50 border-amber-100/50 animate-pulse';
         } else if (gapMs > this.FATIGUE_FADING_MS) {
             const p = (gapMs - this.FATIGUE_FADING_MS) / (this.FATIGUE_CRITICAL_MS - this.FATIGUE_FADING_MS);
             fatigueFactor = 1.0 - (p * 0.5);
-            statusLabel = 'Fading Rhythm';
+            statusLabel = 'Fading Focus';
             statusColorClass = 'text-rose-400 bg-rose-50 border-rose-100/50';
+        } else {
+            // New Flow State logic based on duration and number of active subjects
+            const activeMins = (now - this.lastStudyChangeTime) / 60000;
+            if (activeMins > 45 && activeSubjects.length >= 2) {
+                statusLabel = 'Hyper Focus';
+                statusColorClass = 'text-indigo-600 bg-indigo-50 border-indigo-200 animate-pulse font-black';
+            } else if (activeMins > 20) {
+                statusLabel = 'Flow State';
+                statusColorClass = 'text-emerald-600 bg-emerald-50 border-emerald-200 font-bold';
+            } else if (activeMins > 5) {
+                statusLabel = 'Deep Work';
+                statusColorClass = 'text-blue-600 bg-blue-50 border-blue-200';
+            } else {
+                statusLabel = 'Warm-up';
+                statusColorClass = 'text-rose-500 bg-rose-50 border-rose-100/50';
+            }
         }
  
         // Simplified Flatline Detection: Purely based on fatigue factor
@@ -2416,6 +2482,20 @@ const StudyTargetTracker = {
                     height: 100%;
                     animation: timeline-wave-move 8s infinite linear;
                 }
+                @keyframes sync-spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                @keyframes sync-pulse {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.05); opacity: 0.8; }
+                }
+                .animate-sync-spin {
+                    animation: sync-spin 3s infinite linear;
+                }
+                .animate-sync-pulse {
+                    animation: sync-pulse 2s infinite ease-in-out;
+                }
                 /* NEW: Interactive Timeline Styles */
                 .timeline-block {
                     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s;
@@ -2469,6 +2549,7 @@ const StudyTargetTracker = {
         if (!container) return;
 
         const { grid, days, peak_hour, peak_minutes } = data;
+        this.historicalPeakHour = peak_hour;
 
         // Update peak badge
         if (peakBadge && peak_hour !== undefined) {
@@ -2478,65 +2559,108 @@ const StudyTargetTracker = {
             peakBadge.className = 'text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full';
         }
 
-        // Intensity color scale (0 = empty, up to peak_minutes or 60)
+        // Intensity color scale
         const maxMins = Math.max(peak_minutes || 30, 10);
         const getColor = (mins) => {
-            if (mins <= 0) return 'rgba(241, 245, 249, 0.6)'; // slate-100
+            if (mins <= 0) return 'rgba(241, 245, 249, 0.4)';
             const ratio = Math.min(1, mins / maxMins);
-            if (ratio < 0.25) return `rgba(199, 210, 254, ${0.4 + ratio * 2})`; // indigo-200
-            if (ratio < 0.5) return `rgba(165, 180, 252, ${0.5 + ratio})`; // indigo-300
-            if (ratio < 0.75) return `rgba(129, 140, 248, ${0.6 + ratio * 0.4})`; // indigo-400
-            return `rgba(99, 102, 241, ${0.7 + ratio * 0.3})`; // indigo-500
+            if (ratio < 0.25) return `rgba(199, 210, 254, ${0.4 + ratio * 2})`;
+            if (ratio < 0.5) return `rgba(165, 180, 252, ${0.5 + ratio})`;
+            if (ratio < 0.75) return `rgba(129, 140, 248, ${0.6 + ratio * 0.4})`;
+            return `rgba(79, 70, 229, ${0.8 + ratio * 0.2})`; // indigo-600 base
         };
 
+        // Align Hours to 5 AM Cycle
+        const orderedHours = [];
+        for (let i = 0; i < 24; i++) {
+            orderedHours.push((i + this.TIMELINE_START_HOUR) % 24);
+        }
+
         // Build grid HTML
-        let html = '<div style="display:grid; grid-template-columns: 28px repeat(24, 1fr); gap: 1px; min-width: 400px;">';
+        let html = `
+            <style>
+                .heatmap-cell {
+                    height: 14px;
+                    border-radius: 4px;
+                    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s, background 0.3s;
+                    cursor: pointer;
+                    will-change: transform;
+                }
+                .heatmap-cell:hover {
+                    transform: scale(1.15);
+                    z-index: 20;
+                    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+                }
+            </style>
+            <div style="display:grid; grid-template-columns: 32px repeat(24, 1fr); gap: 3px; min-width: 580px; position:relative; padding: 4px 0;">
+                <style>
+                    .heatmap-cell-active {
+                        position: relative;
+                        box-shadow: 0 0 0 2px #4f46e5;
+                        z-index: 10;
+                        animation: heatmap-pulse 2s infinite;
+                        border-radius: 4px;
+                    }
+                    @keyframes heatmap-pulse {
+                        0% { box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.4); }
+                        50% { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.6); }
+                        100% { box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.4); }
+                    }
+                </style>
+        `;
 
         // Header row: empty corner + hour labels
         html += '<div></div>';
-        for (let h = 0; h < 24; h++) {
-            if (h % 3 === 0) {
-                const label = h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
-                html += `<div style="text-align:center;font-size:7px;font-weight:800;color:#9ca3af;line-height:1;padding-bottom:2px;">${label}</div>`;
-            } else {
-                html += '<div></div>';
-            }
-        }
+        const now = new Date(Date.now() + (this.serverClockOffset || 0));
+        const currentHour = now.getHours();
+
+        orderedHours.forEach((h) => {
+            const label = h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`;
+            html += `<div style="text-align:center;font-size:8px;font-weight:900;color:#6b7280;line-height:1;padding-bottom:6px;text-transform:lowercase;position:relative;">
+                        ${label}
+                    </div>`;
+        });
 
         // Data rows
         for (let d = 0; d < 7; d++) {
-            // Day label
             const isToday = d === 6;
             const dayStyle = isToday
-                ? 'font-size:8px;font-weight:900;color:#4f46e5;line-height:14px;'
-                : 'font-size:8px;font-weight:700;color:#9ca3af;line-height:14px;';
+                ? 'font-size:8px;font-weight:900;color:#4f46e5;line-height:12px;padding-right:4px;'
+                : 'font-size:8px;font-weight:700;color:#9ca3af;line-height:12px;padding-right:4px;';
             html += `<div style="${dayStyle}">${days[d]}</div>`;
 
-            // 24 hour cells
-            for (let h = 0; h < 24; h++) {
+            // 24 hour cells (Ordered 5 AM to 4 AM)
+            orderedHours.forEach(h => {
                 const mins = grid[d] ? grid[d][h] : 0;
                 const bg = getColor(mins);
                 const minsRounded = Math.round(mins);
-                const hourLabel = h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h-12}p`;
+                const hourLabel = h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h-12}pm`;
                 const tooltip = minsRounded > 0
                     ? `${days[d]} ${hourLabel}: ${minsRounded}m studied`
                     : `${days[d]} ${hourLabel}: No study`;
 
-                html += `<div title="${tooltip}" style="
-                    background:${bg};
-                    height:14px;
-                    border-radius:2px;
-                    transition:background 0.3s;
-                    cursor:default;
-                "></div>`;
-            }
+                // Golden Window Check (Peak hour +/- 1)
+                const isPeak = Math.abs(h - peak_hour) <= 1;
+                const peakStyle = isPeak && minsRounded > 20 ? 'border: 1px solid rgba(99, 102, 241, 0.4);' : '';
+
+                // NOW Marker logic (Distinct Style for Active Cell)
+                const isNow = isToday && h === currentHour;
+                const activeClass = isNow ? 'heatmap-cell-active' : '';
+                
+                // If it's active but has no data, give it a tiny 'prime' tint
+                const finalBg = (isNow && mins <= 0) ? 'rgba(79, 70, 229, 0.1)' : bg;
+
+                html += `
+                    <div class="heatmap-cell h-cell-${h} ${activeClass}" 
+                         title="${tooltip}" 
+                         style="background:${finalBg}; ${peakStyle}">
+                    </div>`;
+            });
         }
 
         html += '</div>';
         container.innerHTML = html;
     },
-
-
     updateFlowOrbState() {
         const container = document.querySelector('.orb-container');
         if (!container) return;
@@ -2565,7 +2689,7 @@ const StudyTargetTracker = {
     // Weighted: Progress (40%) + Pace (25%) + Vitality (20%) + Sessions (15%)
     calculateMomentumScore() {
         // Factor 1: Today's progress vs 12h target (0-40 pts)
-        const targetSec = (this.targetHours || 12) * 3600;
+        const targetSec = (this.DAILY_TARGET_HOURS || 12) * 3600;
         const progressRatio = Math.min(1, this.studiedSeconds / targetSec);
         const progressScore = progressRatio * 40;
 
@@ -2712,6 +2836,79 @@ const StudyTargetTracker = {
         };
 
         animateOrb();
+    },
+
+    calculateBioSyncScore() {
+        if (this.historicalPeakHour === undefined) return 0;
+        if (!this.sessionTimeline || this.sessionTimeline.length === 0) return 0;
+
+        const peak = this.historicalPeakHour;
+        const windowStart = (peak - 1.5 + 24) % 24;
+        const windowEnd = (peak + 1.5 + 24) % 24;
+
+        let minutesInWindow = 0;
+        const now = new Date(Date.now() + (this.serverClockOffset || 0));
+        const currentHour = now.getHours() + now.getMinutes() / 60;
+
+        this.sessionTimeline.forEach(session => {
+            if (session.type !== 'pomodoro_active' && session.type !== 'pomodoro') return;
+            
+            const start = session.start_hour;
+            const end = session.end_hour || (session.type.includes('active') ? currentHour : (start + (session.duration_hours || 0)));
+
+            const isInWindow = (h) => {
+                if (windowStart <= windowEnd) {
+                    return h >= windowStart && h <= windowEnd;
+                } else {
+                    return h >= windowStart || h <= windowEnd;
+                }
+            };
+
+            const durationMins = ((end - start + 24) % 24) * 60;
+            for (let i = 0; i < durationMins; i += 5) {
+                const chunkHour = (start + (i / 60)) % 24;
+                if (isInWindow(chunkHour)) {
+                    minutesInWindow += Math.min(5, durationMins - i);
+                }
+            }
+        });
+
+        const score = Math.min(100, (minutesInWindow / 144) * 100);
+        return Math.round(score);
+    },
+
+    updateBioSyncDisplay() {
+        const badge = document.getElementById('bio-sync-badge');
+        const text = document.getElementById('bio-sync-text');
+        if (!badge || !text) return;
+
+        if (this.historicalPeakHour === undefined || this.studiedSeconds <= 0) {
+            badge.classList.add('hidden');
+            return;
+        }
+
+        const score = this.calculateBioSyncScore();
+        text.textContent = `${score}% Sync`;
+        badge.classList.remove('hidden');
+
+        const icon = badge.querySelector('.material-symbols-outlined');
+        if (icon) {
+            icon.textContent = 'cyclone';
+            icon.classList.add('animate-sync-spin');
+        }
+
+        // Dynamic Styling & Animation
+        if (score >= 80) {
+            badge.className = 'text-[10px] font-black text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 px-2 py-0.5 rounded-lg border-b-2 border-emerald-700 shadow-lg flex items-center gap-1.5 animate-sync-pulse';
+            badge.title = "Perfect Sync! You're in your natural flow state.";
+        } else if (score >= 40) {
+            badge.className = 'text-[10px] font-black text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-2 py-0.5 rounded-lg border-b-2 border-indigo-700 shadow-md flex items-center gap-1.5 animate-sync-pulse';
+            badge.title = "Good Sync. Alignment is strong.";
+        } else {
+            // High-visibility vibrant orange for low sync to encourage improvement
+            badge.className = 'text-[10px] font-black text-white bg-gradient-to-r from-rose-500 via-orange-400 to-rose-600 px-2 py-0.5 rounded-lg border-b-2 border-rose-700 shadow-md flex items-center gap-1.5 animate-sync-pulse';
+            badge.title = "Syncing... align your next session with your peak for a massive boost!";
+        }
     }
 };
 

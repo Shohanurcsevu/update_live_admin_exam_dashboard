@@ -13,6 +13,23 @@ $DAILY_TARGET_HOURS = 12;
 $DAILY_TARGET_SECONDS = $DAILY_TARGET_HOURS * 3600;
 $BUFFER_MULTIPLIER = 1.1; // 10% buffer for breaks/transitions
 
+// Helper to get study date (rollover at 5 AM)
+function get_study_date() {
+    $now = time();
+    $hour = intval(date('G', $now));
+    if ($hour < 5) {
+        return date('Y-m-d', strtotime('yesterday'));
+    }
+    return date('Y-m-d', $now);
+}
+
+$study_date = get_study_date();
+$next_date = date('Y-m-d', strtotime($study_date . ' +1 day'));
+
+// Logical day boundaries (5 AM to 5 AM)
+$start_ts = $study_date . ' 05:00:00';
+$end_ts = $next_date . ' 05:00:00';
+
 // Get Pace Multiplier from request (default 1.0)
 $pace_multiplier = isset($_GET['pace']) ? floatval($_GET['pace']) : 1.0;
 if ($pace_multiplier <= 0) $pace_multiplier = 1.0; // Prevent division by zero
@@ -33,7 +50,7 @@ try {
             FROM performance p
             JOIN exams e ON p.exam_id = e.id
             JOIN subjects s ON e.subject_id = s.id
-            WHERE DATE(p.attempt_time) = CURRENT_DATE
+            WHERE p.attempt_time BETWEEN '$start_ts' AND '$end_ts'
 
             UNION ALL
 
@@ -47,7 +64,7 @@ try {
             FROM activity_log al
             LEFT JOIN subjects s ON al.activity_message = s.subject_name
             WHERE al.activity_type = 'pomodoro_session'
-            AND DATE(al.timestamp) = CURRENT_DATE
+            AND al.timestamp BETWEEN '$start_ts' AND '$end_ts'
         ) combined
     ";
     

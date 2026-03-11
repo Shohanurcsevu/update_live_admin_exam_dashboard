@@ -45,7 +45,8 @@ function initializeDashboardPage() {
     let examIdToDelete = null;
 
     // --- Helper Functions ---
-    const showToast = (message, type = 'success') => {
+    window.showToast = (message, type = 'success') => {
+        const toastContainer = document.getElementById('toast-container');
         if (!toastContainer) return;
         const toast = document.createElement('div');
         let bgColor, icon;
@@ -58,6 +59,7 @@ function initializeDashboardPage() {
         toastContainer.appendChild(toast);
         setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s ease'; setTimeout(() => toast.remove(), 500); }, 3000);
     };
+    const showToast = window.showToast;
 
     // --- Section 1: Summary Cards Logic ---
     function animateCount(element, targetValue) {
@@ -1243,19 +1245,28 @@ function initializeDashboardPage() {
             const now = new Date();
             const nowTime = now.getTime();
 
-            // 1. Daily Study Countdown
-            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime();
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
-            const dailyDiff = endOfDay - nowTime;
+            // 1. Daily Study Countdown (Logical Day: 5 AM to 5 AM)
+            const TIMELINE_START_HOUR = 5;
+            const startOfLogicalDay = new Date(now);
+            if (now.getHours() < TIMELINE_START_HOUR) {
+                startOfLogicalDay.setDate(now.getDate() - 1);
+            }
+            startOfLogicalDay.setHours(TIMELINE_START_HOUR, 0, 0, 0);
+
+            const endOfLogicalDay = new Date(startOfLogicalDay);
+            endOfLogicalDay.setDate(endOfLogicalDay.getDate() + 1);
+
+            const dailyDiff = endOfLogicalDay.getTime() - nowTime;
 
             if (dailyDiff > 0) {
-                const hours = Math.floor((dailyDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const hours = Math.floor((dailyDiff / (1000 * 60 * 60)));
                 const minutes = Math.floor((dailyDiff % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((dailyDiff % (1000 * 60)) / 1000);
                 dailyTimerEl.textContent = `${hours.toString().padStart(2, '0')} : ${minutes.toString().padStart(2, '0')} : ${seconds.toString().padStart(2, '0')}`;
 
-                // Daily progress (time spent today)
-                const dailyProgress = Math.min(100, ((nowTime - startOfDay) / (endOfDay - startOfDay)) * 100);
+                // Daily progress (position within the 24h 5 AM - 5 AM window)
+                const totalWindow = endOfLogicalDay.getTime() - startOfLogicalDay.getTime();
+                const dailyProgress = Math.min(100, ((nowTime - startOfLogicalDay.getTime()) / totalWindow) * 100);
                 if (dailyProgressEl) dailyProgressEl.style.width = `${dailyProgress}%`;
             }
 

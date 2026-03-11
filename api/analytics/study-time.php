@@ -18,9 +18,19 @@ $prev_end = '';
 
 switch ($range) {
     case 'today':
-        $current_start = date('Y-m-d 00:00:00');
-        $prev_start = date('Y-m-d 00:00:00', strtotime('-1 day'));
-        $prev_end = date('Y-m-d 23:59:59', strtotime('-1 day'));
+        $now = time();
+        $hour = intval(date('G', $now));
+        
+        // Logical today starts at 5 AM
+        if ($hour < 5) {
+            $study_date = date('Y-m-d', strtotime('-1 day'));
+        } else {
+            $study_date = date('Y-m-d');
+        }
+        
+        $current_start = $study_date . ' 05:00:00';
+        $prev_start = date('Y-m-d', strtotime($study_date . ' -1 day')) . ' 05:00:00';
+        $prev_end = date('Y-m-d H:i:s', strtotime($current_start . ' -1 second'));
         break;
     case 'week':
         $current_start = date('Y-m-d H:i:s', strtotime('-7 days'));

@@ -206,7 +206,13 @@
                         <div class="col-span-2 lg:col-span-7">
                             <div class="flex justify-between items-center mb-1.5">
                                 <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">7-Day Focus Heatmap</p>
-                                <span id="heatmap-peak-badge" class="text-[8px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">Loading...</span>
+                                <div class="flex items-center gap-2">
+                                    <span id="bio-sync-badge" class="hidden text-[10px] font-black text-white px-2 py-0.5 rounded-lg border-b-2 shadow-lg flex items-center gap-1.5 transition-all duration-300">
+                                        <span class="material-symbols-outlined text-sm animate-sync-spin">cyclone</span>
+                                        <span id="bio-sync-text">--% Sync</span>
+                                    </span>
+                                    <span id="heatmap-peak-badge" class="text-[8px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">Loading...</span>
+                                </div>
                             </div>
                             <div id="focus-heatmap-grid" class="overflow-x-auto">
                                 <!-- Grid rendered by JS -->
@@ -227,11 +233,25 @@
                             </div>
                             <div
                                 class="relative w-full h-4 bg-gray-100/50 rounded-full overflow-hidden border border-gray-100">
+                                <style>
+                                    @keyframes wave-ripple {
+                                        0% { opacity: 0.4; transform: translateX(-100%) skewX(-15deg); }
+                                        50% { opacity: 0.8; }
+                                        100% { opacity: 0.4; transform: translateX(100%) skewX(-15deg); }
+                                    }
+                                    .projected-wave {
+                                        background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0.2), transparent);
+                                        animation: wave-ripple 2.5s infinite linear;
+                                    }
+                                </style>
                                 <div id="ghost-progress-bar"
                                     class="absolute top-0 left-0 h-full bg-amber-400/30 transition-all duration-1000 ease-out"
                                     style="width: 0%"></div>
                                 <div id="sim-ghost-bar"
                                     class="absolute top-0 left-0 h-full bg-indigo-400/20 transition-all duration-300 ease-out hidden"
+                                    style="width: 0%"></div>
+                                <div id="projected-progress-bar"
+                                    class="absolute top-0 left-0 h-full projected-wave transition-all duration-1000 ease-out"
                                     style="width: 0%"></div>
                                 <div id="main-progress-bar"
                                     class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-600 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out"
