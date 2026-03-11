@@ -1,4 +1,16 @@
 /* Study Target Tracker Styles */
+.projection-rollover {
+    background: repeating-linear-gradient(90deg, #f43f5e 0, #f43f5e 4px, transparent 4px, transparent 8px) !important;
+    opacity: 0.8 !important;
+    z-index: 30 !important;
+}
+
+#timeline-target-projection {
+    background: repeating-linear-gradient(90deg, #22d3ee 0, #22d3ee 4px, transparent 4px, transparent 8px);
+    opacity: 0.4;
+    pointer-events: none;
+}
+
 .study-target-container {
     perspective: 1000px;
 }

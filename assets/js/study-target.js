@@ -614,7 +614,7 @@ const StudyTargetTracker = {
         if (pausedGapBlock && pausedGapBlock.dataset.startHour) {
             const gapStart = parseFloat(pausedGapBlock.dataset.startHour);
             const clientHr = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-            const serverHr = clientHr + (this.serverClockOffset / 3600000);
+            const serverHr = clientHr; // 'now' is already server-time corrected at line 602
             let gapDuration = serverHr - gapStart;
             if (gapDuration < 0) gapDuration += 24;
             if (gapDuration > 18) gapDuration = 0.01;
@@ -837,6 +837,15 @@ const StudyTargetTracker = {
             milestone.style.top = '0';
             milestone.style.pointerEvents = 'none';
 
+            // --- Focus Cliff Warning Integration ---
+            let isPostCliff = false;
+            if (this.focusCliffHour !== null) {
+                const adjFinish = (finishHour - this.TIMELINE_START_HOUR + 24) % 24;
+                const adjCliff = (this.focusCliffHour - this.TIMELINE_START_HOUR + 24) % 24;
+                if (adjFinish > adjCliff) isPostCliff = true;
+            }
+            milestone.classList.toggle('milestone-post-cliff', isPostCliff);
+
             // Format finish time (Removed seconds for simplicity)
             const fmtTime = (d) => {
                 const hh = d.getHours() % 12 || 12;
@@ -846,40 +855,41 @@ const StudyTargetTracker = {
             };
 
             // Style objects to match clock label HUD exactly
+            const bracketColor = isPostCliff ? '#f59e0b' : '#ef4444';
             const bracketOverlay = `
                 content:''; position:absolute; inset:-4px; pointer-events:none;
                 background:
-                    linear-gradient(to right, #ef4444 2px, transparent 2px) 0 0,
-                    linear-gradient(to bottom, #ef4444 2px, transparent 2px) 0 0,
-                    linear-gradient(to left, #ef4444 2px, transparent 2px) 100% 0,
-                    linear-gradient(to bottom, #ef4444 2px, transparent 2px) 100% 0,
-                    linear-gradient(to right, #ef4444 2px, transparent 2px) 0 100%,
-                    linear-gradient(to top, #ef4444 2px, transparent 2px) 0 100%,
-                    linear-gradient(to left, #ef4444 2px, transparent 2px) 100% 100%,
-                    linear-gradient(to top, #ef4444 2px, transparent 2px) 100% 100%;
+                    linear-gradient(to right, ${bracketColor} 2px, transparent 2px) 0 0,
+                    linear-gradient(to bottom, ${bracketColor} 2px, transparent 2px) 0 0,
+                    linear-gradient(to left, ${bracketColor} 2px, transparent 2px) 100% 0,
+                    linear-gradient(to bottom, ${bracketColor} 2px, transparent 2px) 100% 0,
+                    linear-gradient(to right, ${bracketColor} 2px, transparent 2px) 0 100%,
+                    linear-gradient(to top, ${bracketColor} 2px, transparent 2px) 0 100%,
+                    linear-gradient(to left, ${bracketColor} 2px, transparent 2px) 100% 100%,
+                    linear-gradient(to top, ${bracketColor} 2px, transparent 2px) 100% 100%;
                 background-repeat:no-repeat; background-size:8px 8px;
             `;
 
             milestone.innerHTML = `
                 <style>
-                    .finish-hud-tag::after { ${bracketOverlay} }
-                    .finish-hud-connector {
+                    #timeline-predicted-finish-milestone .finish-hud-tag::after { ${bracketOverlay} }
+                    #timeline-predicted-finish-milestone .finish-hud-connector {
                         content:''; position:absolute;
                         bottom: -8px; left: -15px;
                         width: 12px; height: 1.5px;
-                        background: #ef4444;
+                        background: ${bracketColor};
                         transform: rotate(-20deg);
                         transform-origin: left bottom;
                     }
                 </style>
                 <div class="absolute bottom-[48px] left-[15px]">
-                    <div class="finish-hud-tag relative px-2 py-[3px] text-[11px] font-extrabold text-[#0f172a] whitespace-nowrap" 
+                    <div class="finish-hud-tag relative px-2 py-[3px] text-[11px] font-extrabold text-[#0f172a] whitespace-nowrap"
                          style="font-family: 'Inter', 'system-ui', 'Segoe UI', Roboto, sans-serif; text-transform: lowercase; text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 2px rgba(255,255,255,0.4);">
-                        <strong style="letter-spacing:0.05em; font-weight:800 !important; color:#0f172a !important;">${fmtTime(finishDate)}</strong>
+                        <strong style="letter-spacing:0.05em; font-weight:800 !important; color:${isPostCliff ? '#b45309' : '#0f172a'} !important;">${fmtTime(finishDate)}</strong>
                         <span class="finish-hud-connector"></span>
                     </div>
                 </div>
-                <div class="w-[2px] h-[40px] bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.8)]"></div>
+                <div class="w-[1.5px] h-[40px] ${isPostCliff ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.8)]' : 'bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.8)]'}"></div>
             `;
 
             milestone.style.display = 'flex';
@@ -895,9 +905,6 @@ const StudyTargetTracker = {
                     projection = document.createElement('div');
                     projection.id = 'timeline-target-projection';
                     projection.className = 'absolute top-1/2 -translate-y-1/2 h-[1px] z-10';
-                    projection.style.background = 'repeating-linear-gradient(90deg, #22d3ee 0, #22d3ee 4px, transparent 4px, transparent 8px)';
-                    projection.style.opacity = '0.4';
-                    projection.style.pointerEvents = 'none';
                     bar.appendChild(projection);
                 }
 
@@ -905,9 +912,10 @@ const StudyTargetTracker = {
                     projection.style.left = `${nowPercent}%`;
                     projection.style.width = `${finishPercent - nowPercent}%`;
                     projection.style.display = 'block';
+                    projection.classList.remove('projection-rollover');
 
                     // --- Projection Data Badge (Time Remaining) ---
-                    const remainingSeconds = this.estimatedFinishTimestamp - (Date.now() / 1000);
+                    const remainingSeconds = this.estimatedFinishTimestamp - ((Date.now() + (this.serverClockOffset || 0)) / 1000);
                     if (remainingSeconds > 0) {
                         const h = Math.floor(remainingSeconds / 3600);
                         const m = Math.floor((remainingSeconds % 3600) / 60);
@@ -931,7 +939,20 @@ const StudyTargetTracker = {
                         label.textContent = `in ${timeText}`;
                     }
                 } else {
-                    projection.style.display = 'none';
+                    // --- NEW: Rollover Warning Logic ---
+                    // If finish is behind 'now' in percentage but we are not goal-reached,
+                    // it means it has wrapped around to the next logical day (past 5 AM).
+                    projection.style.left = `${nowPercent}%`;
+                    projection.style.width = `${100 - nowPercent}%`;
+                    projection.style.display = 'block';
+                    projection.classList.add('projection-rollover');
+
+                    let label = projection.querySelector('.projection-time-label');
+                    if (label) {
+                        label.textContent = "ROLLOVER RISK: Goal slips to tomorrow";
+                        label.style.background = "#be123c"; // rose-700
+                        label.style.border = "1.5px solid #ffffff";
+                    }
                 }
             }
         }
@@ -1906,6 +1927,30 @@ const StudyTargetTracker = {
         const labelsContainer = document.getElementById('timeline-labels-container');
         if (!bar) return;
 
+        // --- 0. Pre-calculate Milestones for Label Coordination ---
+        const calculatedMilestones = [];
+        let cumHours = 0;
+        const sortedForMilestones = [...this.sessionTimeline].sort((a, b) => a.start_hour - b.start_hour);
+        sortedForMilestones.forEach(session => {
+            const studyTypes = ['pomodoro', 'pomodoro_active', 'pomodoro_paused', 'exam'];
+            if (!studyTypes.includes(session.type)) return;
+
+            const startH = cumHours;
+            const endH = cumHours + session.duration_hours;
+
+            for (let m = Math.floor(startH) + 1; m <= Math.floor(endH); m++) {
+                if (m > 0) {
+                    const hourOfDay = (parseFloat(session.start_hour) + (m - startH)) % 24;
+                    calculatedMilestones.push({
+                        hourOfDay,
+                        m,
+                        leftPercent: this.getRelativeTimelinePercent(hourOfDay)
+                    });
+                }
+            }
+            cumHours = endH;
+        });
+
         // Apply dashed background pattern to the main bar
         bar.classList.add('timeline-dashed-gaps');
 
@@ -1941,19 +1986,43 @@ const StudyTargetTracker = {
         const oldMilestones = bar.parentElement.querySelectorAll('.timeline-milestone');
         oldMilestones.forEach(m => m.remove());
 
-        // --- NEW: Programmatic Label Sync ---
         if (labelsContainer) {
             labelsContainer.innerHTML = '';
+            labelsContainer.style.position = 'relative'; 
+            labelsContainer.style.height = '20px';
+            labelsContainer.style.overflow = 'visible';
+            
+            // Ensure the bar itself doesn't clip the flags now that markers are inside it
+            bar.style.overflow = 'visible';
+            bar.style.position = 'relative'; 
+
+            // 1. Pixel-based Spacing Calculation
+            const containerWidth = labelsContainer.offsetWidth || bar.offsetWidth || 1000;
+            const minSpacingPx = 32; 
+            const spacingPercent = (minSpacingPx / containerWidth) * 100;
+
+            // 2. Build Unified Candidate List (HOURS ONLY)
+            const candidates = [];
+
             for (let i = 0; i <= 24; i++) {
                 const hour = (this.TIMELINE_START_HOUR + i) % 24;
-                const ampm = hour >= 12 ? 'p' : 'a';
-                const displayH = hour % 12 || 12;
-
-                const span = document.createElement('span');
-                span.className = `text-[9px] font-black text-slate-900 uppercase`;
-                span.textContent = `${displayH}${ampm}`;
-                labelsContainer.appendChild(span);
+                candidates.push({
+                    left: this.getRelativeTimelinePercent(hour),
+                    type: 'hour',
+                    text: `${hour % 12 || 12}${hour >= 12 ? 'p' : 'a'}`
+                });
             }
+
+            // 3. Render Hour Labels (No collision check needed for plain hours as they are 1h apart, but kept for robustness)
+            candidates.forEach(label => {
+                const el = document.createElement('span');
+                el.className = `absolute text-[10px] font-black text-slate-800 uppercase`;
+                el.style.top = '2px';
+                el.style.left = `${label.left}%`;
+                el.style.transform = 'translateX(-50%)';
+                el.textContent = label.text;
+                labelsContainer.appendChild(el);
+            });
         }
 
         // 1. Render Yesterday's Shadow (Background Layer)
@@ -2114,75 +2183,71 @@ const StudyTargetTracker = {
             countEl.textContent = `${this.sessionTimeline.length} session${this.sessionTimeline.length !== 1 ? 's' : ''}`;
         }
 
-        // --- NEW: Render Milestones (Hourly Achievements) ---
-        let cumulativeHours = 0;
-        const sortedSessions = [...this.sessionTimeline].sort((a, b) => a.start_hour - b.start_hour);
+        // --- NEW: Render Milestones (Flags & Bars only) ---
+        calculatedMilestones.forEach(ms => {
+            const marker = document.createElement('div');
+            // Simplified: All flags now show BEFORE the marker (right-aligned to the bar)
+            marker.className = 'timeline-milestone group absolute z-20 flex flex-col cursor-pointer h-full';
+            marker.style.left = `${ms.leftPercent}%`;
+            marker.style.top = '0';
 
-        sortedSessions.forEach(session => {
-            const startHours = cumulativeHours;
-            const endHours = cumulativeHours + session.duration_hours;
+            const title = this.MILESTONE_TITLES[ms.m] || `${ms.m}h Milestone`;
 
-            // Check if we passed any whole hour marks (1.0, 2.0, etc.)
-            for (let m = Math.floor(startHours) + 1; m <= Math.floor(endHours); m++) {
-                if (m > 0) {
-                    // Exact hour of day when this milestone was reached
-                    const hourOfDay = (session.start_hour + (m - startHours)) % 24;
-                    const leftPercent = this.getRelativeTimelinePercent(hourOfDay);
+            const evolution = {
+                1: { icon: '🌱', hue: 100 },
+                2: { icon: '🌿', hue: 120 },
+                3: { icon: '🚩', hue: 210 },
+                4: { icon: '🕯️', hue: 45 },
+                5: { icon: '✨', hue: 180 },
+                6: { icon: '🔥', hue: 25 },
+                7: { icon: '🧨', hue: 0 },
+                8: { icon: '⚡', hue: 280 },
+                9: { icon: '🌀', hue: 320 },
+                10: { icon: '💠', hue: 195 },
+                11: { icon: '🌌', hue: 240 },
+                12: { icon: '🏆', hue: 45 }
+            };
 
-                    const marker = document.createElement('div');
-                    marker.className = 'timeline-milestone group absolute z-20 flex flex-col items-center cursor-pointer';
-                    marker.style.left = `${leftPercent}%`;
-                    marker.style.top = '0'; // Stay perfectly aligned with bar top
+            const tier = evolution[ms.m] || { icon: '🏆', hue: 25 };
+            const accent = 'red';
 
-                    const title = this.MILESTONE_TITLES[m] || `${m}h Milestone`;
+            // Calculate precise time for the flag label
+            const milH = Math.floor(ms.hourOfDay);
+            const milM = Math.round((ms.hourOfDay - milH) * 60);
+            // Simplified: 'a' or 'p' only
+            const milAmpm = milH >= 12 ? 'p' : 'a';
+            const milDisplayH = milH % 12 || 12;
+            const milTimeStr = `${milDisplayH}:${milM.toString().padStart(2, '0')} ${milAmpm}`;
 
-                    // Granular Evolution: Unique Icon + Color per hour (1-12)
-                    const evolution = {
-                        1: { icon: '🌱', hue: 100 }, // Light Green
-                        2: { icon: '🌿', hue: 120 }, // Green
-                        3: { icon: '🚩', hue: 210 }, // Blue
-                        4: { icon: '🕯️', hue: 45 },  // Yellow
-                        5: { icon: '✨', hue: 180 }, // Cyan
-                        6: { icon: '🔥', hue: 25 },  // Orange
-                        7: { icon: '🧨', hue: 0 },   // Red
-                        8: { icon: '⚡', hue: 280 }, // Purple
-                        9: { icon: '🌀', hue: 320 }, // Pink
-                        10: { icon: '💠', hue: 195 }, // Sky
-                        11: { icon: '🌌', hue: 240 }, // Deep Blue
-                        12: { icon: '🏆', hue: 45 }   // Gold (Mastery)
-                    };
+            // Uniform Left Alignment: Position flag BEFORE (left of) marker
+            const alignmentClass = 'right-0 timeline-milestone-flag-cyber';
+            const marginClass = 'mr-[1px]';
 
-                    const tier = evolution[m] || { icon: '🏆', hue: 25 };
-                    const accent = '#f97316'; // Consistent Vivid Orange for all milestones
+            marker.innerHTML = `
+                <div class="timeline-milestone-flag absolute bottom-full mb-1 px-1.5 py-0.5 whitespace-nowrap transition-all duration-300 ${alignmentClass} ${marginClass}" 
+                        style="color: #ef4444;">
+                    ${tier.icon} ${ms.m} - ${milTimeStr}<span class="milestone-label hidden ml-1.5 font-bold"> · ${title}</span>
+                </div>
+                <!-- h-full matches the track exactly when appended to 'bar' -->
+                <div class="timeline-milestone-bar w-[2px] h-full shadow-sm mx-auto" style="background: #ef4444; pointer-events: auto;"></div>
+            `;
 
-                    marker.innerHTML = `
-                        <div class="timeline-milestone-flag absolute bottom-full mb-1 px-2 py-1 rounded-sm bg-white shadow-lg border-l-2 text-[10px] font-black uppercase tracking-normal whitespace-nowrap transition-all duration-300" 
-                             style="color: ${accent}; border-left-color: ${accent};">
-                           ${tier.icon} ${m}<span class="milestone-label hidden ml-1.5 font-bold">· ${title}</span>
-                        </div>
-                        <!-- High-contrast marker: White border + themed core -->
-                        <div class="timeline-milestone-bar w-[3px] h-[40px] shadow-sm border-x border-white/80" style="background: ${accent};"></div>
-                    `;
+            // Click to toggle label (Single open mode)
+            marker.onclick = (e) => {
+                e.stopPropagation();
+                const myLabel = marker.querySelector('.milestone-label');
+                const isHidden = myLabel.classList.contains('hidden');
 
-                    // Click to toggle label (Single open mode)
-                    marker.onclick = (e) => {
-                        e.stopPropagation();
-                        const myLabel = marker.querySelector('.milestone-label');
-                        const isHidden = myLabel.classList.contains('hidden');
+                // Close ALL others first
+                document.querySelectorAll('.milestone-label').forEach(el => el.classList.add('hidden'));
 
-                        // Close ALL others first
-                        document.querySelectorAll('.milestone-label').forEach(el => el.classList.add('hidden'));
-
-                        // Toggle this one
-                        if (isHidden) {
-                            myLabel.classList.remove('hidden');
-                        }
-                    };
-
-                    bar.parentElement.appendChild(marker);
+                // Toggle this one
+                if (isHidden) {
+                    myLabel.classList.remove('hidden');
                 }
-            }
-            cumulativeHours = endHours;
+            };
+
+            bar.appendChild(marker);
         });
 
         // Ensure milestones and projection are rendered immediately after bar clear
@@ -2383,8 +2448,15 @@ const StudyTargetTracker = {
                 #timeline-now-marker {
                     z-index: 50 !important;
                 }
+                #timeline-labels-container {
+                    margin-top: 8px !important; /* Perfectly aligns hour label baseline with milestone timestamp boxes */
+                    transition: margin-top 0.3s ease;
+                }
                 .timeline-milestone-flag {
                     z-index: 40;
+                }
+                .timeline-milestone-time {
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
                 }
                 .timeline-milestone-bar {
                     position: relative;
@@ -2534,7 +2606,7 @@ const StudyTargetTracker = {
                     position: absolute;
                 }
                 /* Cyber HUD Brackets */
-                #timeline-now-clock::after {
+                #timeline-now-clock::after, .timeline-milestone-flag-cyber::after {
                     content: '';
                     position: absolute;
                     inset: -4px;
@@ -2550,6 +2622,16 @@ const StudyTargetTracker = {
                     background-repeat: no-repeat;
                     background-size: 8px 8px;
                     pointer-events: none;
+                }
+                .timeline-milestone-flag-cyber {
+                    background: none !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    text-shadow: none !important;
+                    font-size: 8.5px !important;
+                    font-weight: 600 !important;
+                    letter-spacing: 0.05em;
+                    line-height: 1 !important;
                 }
                 #timeline-now-clock::before {
                     content: '';
@@ -3096,6 +3178,7 @@ const StudyTargetTracker = {
                 badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
             }
         }
+        this.focusCliffHour = focusCliffHour;
     },
 
     // ─── Intelligence Feature 2: Time Debt Ledger ───────────────────────────
