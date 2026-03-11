@@ -2186,8 +2186,8 @@ const StudyTargetTracker = {
         // --- NEW: Render Milestones (Flags & Bars only) ---
         calculatedMilestones.forEach(ms => {
             const marker = document.createElement('div');
-            // Simplified: All flags now show BEFORE the marker (right-aligned to the bar)
-            marker.className = 'timeline-milestone group absolute z-20 flex flex-col cursor-pointer h-full';
+            // Fixed: Use w-[2px] and items-center to anchor the bridge precisely to marker center
+            marker.className = 'timeline-milestone group absolute z-20 flex flex-col items-center cursor-pointer h-full w-[2px]';
             marker.style.left = `${ms.leftPercent}%`;
             marker.style.top = '0';
 
@@ -2219,17 +2219,27 @@ const StudyTargetTracker = {
             const milDisplayH = milH % 12 || 12;
             const milTimeStr = `${milDisplayH}:${milM.toString().padStart(2, '0')} ${milAmpm}`;
 
-            // Uniform Left Alignment: Position flag BEFORE (left of) marker
-            const alignmentClass = 'right-0 timeline-milestone-flag-cyber';
-            const marginClass = 'mr-[1px]';
+            // NEW: Alternating HUD Positioning with Connectors (Top-Left / Bottom-Right)
+            // Odd (1,3,5) -> Top-Left (above track, left of marker)
+            // Even (2,4,6) -> Bottom-Right (below track, right of marker)
+            const isOdd = ms.m % 2 !== 0;
+            // 12.5px symmetrical offsets hit the bracket corner at exactly 45 degrees
+            const flagPosClass = isOdd 
+                ? 'bottom-[calc(100%+12.5px)] right-[12.5px]' 
+                : 'top-[calc(100%+35px)] left-[39px]';
+            const bridgeClass = isOdd ? 'bridge-odd' : 'bridge-even';
 
             marker.innerHTML = `
-                <div class="timeline-milestone-flag absolute bottom-full mb-1 px-1.5 py-0.5 whitespace-nowrap transition-all duration-300 ${alignmentClass} ${marginClass}" 
+                <div class="timeline-milestone-flag absolute whitespace-nowrap transition-all duration-300 timeline-milestone-flag-cyber ${flagPosClass}" 
                         style="color: #ef4444;">
                     ${tier.icon} ${ms.m} - ${milTimeStr}<span class="milestone-label hidden ml-1.5 font-bold"> · ${title}</span>
                 </div>
-                <!-- h-full matches the track exactly when appended to 'bar' -->
-                <div class="timeline-milestone-bar w-[2px] h-full shadow-sm mx-auto" style="background: #ef4444; pointer-events: auto;"></div>
+                
+                <!-- Vertical marker bar with integrated bridge -->
+                <div class="timeline-milestone-bar w-[2px] h-full shadow-sm" style="background: #ef4444; pointer-events: auto; position: relative;">
+                    <!-- Slanted HUD Connector (anchored from bar) -->
+                    <div class="milestone-bridge ${bridgeClass}"></div>
+                </div>
             `;
 
             // Click to toggle label (Single open mode)
@@ -2632,6 +2642,29 @@ const StudyTargetTracker = {
                     font-weight: 600 !important;
                     letter-spacing: 0.05em;
                     line-height: 1 !important;
+                    white-space: nowrap;
+                    z-index: 60 !important;
+                }
+                .milestone-bridge {
+                    position: absolute;
+                    width: 14px;
+                    height: 2px;
+                    background: #ef4444;
+                    pointer-events: none;
+                    z-index: 55;
+                }
+                .bridge-odd {
+                    top: 0;
+                    right: 0;
+                    transform: rotate(45deg);
+                    transform-origin: right top;
+                }
+                .bridge-even {
+                    bottom: 0;
+                    left: 0;
+                    width: 47px;
+                    transform: rotate(42deg);
+                    transform-origin: left bottom;
                 }
                 #timeline-now-clock::before {
                     content: '';
