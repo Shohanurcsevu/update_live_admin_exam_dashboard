@@ -222,11 +222,11 @@
                         <!-- Session Endurance -->
                         <div id="session-endurance-card" class="col-span-2 lg:col-span-1 bg-teal-50/60 p-3 rounded-xl border border-teal-100 flex flex-col justify-between min-h-[80px]">
                             <div class="flex justify-between items-center mb-1">
-                                <p class="text-[10px] font-black text-teal-500 uppercase tracking-widest">Best Sprint</p>
+                                <p class="text-[10px] font-black text-teal-500 uppercase tracking-widest">Focus Volume</p>
                                 <span class="material-symbols-outlined text-[12px] text-teal-400 tooltip-trigger"
-                                      data-tooltip-title="Session Endurance"
-                                      data-tooltip-desc="Your longest single unbroken study session today vs yesterday's best."
-                                      data-tooltip-color="#0d9488">timer</span>
+                                      data-tooltip-title="Focus Volume"
+                                      data-tooltip-desc="Your total cumulative study time today compared to your full total from yesterday."
+                                      data-tooltip-color="#0d9488">inventory_2</span>
                             </div>
                             <div id="session-endurance-value" class="text-2xl font-black text-teal-900">
                                 --
@@ -237,7 +237,7 @@
                         </div>
 
                         <!-- Velocity -->
-                        <div id="velocity-card" class="col-span-2 lg:col-span-1 bg-fuchsia-50/60 p-3 rounded-xl border border-fuchsia-100 flex flex-col justify-between min-h-[80px]">
+                        <div id="velocity-card" class="col-span-2 lg:col-span-1 bg-fuchsia-50/60 p-3 rounded-xl border border-fuchsia-100 flex flex-col justify-between min-h-[80px] transition-all duration-300">
                             <div class="flex justify-between items-center mb-1">
                                 <p class="text-[10px] font-black text-fuchsia-500 uppercase tracking-widest">Velocity</p>
                                 <span class="material-symbols-outlined text-[12px] text-fuchsia-400 tooltip-trigger"
@@ -245,11 +245,17 @@
                                       data-tooltip-desc="Average study minutes per hour since starting, tracks acceleration trends."
                                       data-tooltip-color="#d946ef">trending_up</span>
                             </div>
-                            <div id="velocity-value" class="text-2xl font-black text-fuchsia-900">
-                                --
+                            
+                            <div id="velocity-value" class="text-2xl font-black text-fuchsia-900 leading-none">
+                                --<span class="text-xs opacity-50 font-normal ml-1">m/hr</span>
                             </div>
-                            <div id="velocity-badge" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-fuchsia-100 text-fuchsia-600 w-fit uppercase tracking-tighter">
-                                m/hr
+
+                            <!-- Compact horizontal behavioral row (No Labels) -->
+                            <div class="flex justify-between items-end mt-1 pt-1 border-t border-fuchsia-100/50">
+                                <p id="velocity-depth" class="text-[9px] font-black text-fuchsia-700 opacity-80" title="Depth">--</p>
+                                <p id="velocity-ratio" class="text-[9px] font-black text-fuchsia-700 opacity-80" title="Focus Ratio">--</p>
+                                <p id="velocity-accel" class="text-[9px] font-black text-fuchsia-700 opacity-80" title="Acceleration">--</p>
+                                <p id="velocity-fatigue" class="text-[9px] font-black text-fuchsia-700 opacity-80" title="Fatigue Drop">--</p>
                             </div>
                         </div>
 

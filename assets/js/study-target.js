@@ -44,6 +44,9 @@ const StudyTargetTracker = {
     currentLogicalDate: null, // NEW: Track date to trigger resets
     hasSonicBoomed: false,   // NEW: For Ghost Runner overtaking effect
     lastVelocity: null,      // NEW: For velocity trend tracking
+    lastRawVelocity: null,   // NEW: High-sensitivity trend
+    lastResumeTime: null,    // NEW: For Session Depth
+    peakVelocity: 0,         // NEW: For Fatigue Drop
     MILESTONE_TITLES: {
         1: "First Spark",
         2: "Steady Pulse",
@@ -261,30 +264,36 @@ const StudyTargetTracker = {
     },
 
     async detectFirstStartTime(forceRefresh = false) {
-        // Fallback: Check localStorage first
-        const storedStart = localStorage.getItem('study_first_start_today');
         const today = this.getLogicalDate();
         const storedDate = localStorage.getItem('study_first_start_date');
-
-        if (storedStart && storedDate === today) {
+        
+        // If the stored date doesn't match today, clear stale data
+        if (storedDate && storedDate !== today) {
+            localStorage.removeItem('study_first_start_today');
+            localStorage.removeItem('study_first_start_date');
+        }
+        
+        // Check localStorage (only if not a temporary value)
+        const storedStart = localStorage.getItem('study_first_start_today');
+        if (storedStart && storedDate === today && !this._firstStartTimeIsTemp) {
             this.firstStartTime = new Date(parseInt(storedStart));
             return;
         }
 
-        // Otherwise, fetch from our new first-activity API
+        // Fetch from server API (always overrides temporary values)
         try {
             const result = await CacheManager.fetchWithCache('api/analytics/get-first-activity.php', 30, forceRefresh);
             if (result && result.timestamp) {
-                // Correct for MySQL timestamp format
                 this.firstStartTime = new Date(result.timestamp.replace(/-/g, '/'));
+                this._firstStartTimeIsTemp = false;
                 localStorage.setItem('study_first_start_today', this.firstStartTime.getTime());
                 localStorage.setItem('study_first_start_date', today);
-            } else {
-                // If no activity found, we don't set firstStartTime yet
-                // But we can back-calculate if they have already studied
-                if (this.studiedSeconds > 0) {
-                    this.firstStartTime = new Date(Date.now() - (this.studiedSeconds * 1000));
-                }
+            } else if (this.studiedSeconds > 0) {
+                // No server data — use logical day start (5 AM) for daily density
+                const logicalDate = this.getLogicalDate();
+                const dayAnchorStr = logicalDate.replace(/-/g, '/') + ' ' + String(this.TIMELINE_START_HOUR).padStart(2, '0') + ':00:00';
+                this.firstStartTime = new Date(dayAnchorStr);
+                this._firstStartTimeIsTemp = false;
             }
         } catch (e) {
             console.error("Failed to detect first start time:", e);
@@ -333,12 +342,27 @@ const StudyTargetTracker = {
         const secondsUntilRollover = Math.max(0, (rollover - now) / 1000);
 
         // --- NEW: Live Study Time Nudging ---
-        // If there's an active timeline block, we assume study is happening and increment local seconds
         const liveActiveBlock = document.querySelector('.timeline-block-active:not(.timeline-block-paused)');
         if (liveActiveBlock) {
-            // We increment by 1 each second. This will be resynced every 10s by the API.
             this.studiedSeconds = (this.studiedSeconds || 0) + 1;
+            
+            // Only set firstStartTime as a TEMPORARY fallback if the async
+            // detectFirstStartTime hasn't resolved yet. Don't persist to localStorage
+            // — the async function will set the real server value and overwrite this.
+            if (!this.firstStartTime) {
+                this.firstStartTime = new Date(now.getTime());
+                this._firstStartTimeIsTemp = true; // Mark as temporary
+            }
+
+            // Track continuous focus start
+            if (this.lastResumeTime === null) {
+                this.lastResumeTime = now.getTime();
+            }
+        } else {
+            this.lastResumeTime = null;
         }
+
+
 
         const remainingStudySeconds = Math.max(0, this.DAILY_TARGET_SECONDS - this.studiedSeconds);
 
@@ -637,11 +661,11 @@ const StudyTargetTracker = {
             try { this.checkSubjectRotation(); } catch (e) { console.warn('[ST] Rotation err:', e); }
             try { this.updateCompletionOdds(); } catch (e) { console.warn('[ST] Odds err:', e); }
             try { this.updateDailyStreak(); } catch (e) { console.warn('[ST] Streak err:', e); }
-            try { this.updateSessionEndurance(); } catch (e) { console.warn('[ST] Endurance err:', e); }
         }
 
-        // Velocity speedometer: run every second
+        // High-frequency updates: run every second
         try { this.updateVelocity(); } catch (e) { console.warn('[ST] Velocity err:', e); }
+        try { this.updateSessionEndurance(); } catch (e) { console.warn('[ST] Focus Volume err:', e); }
     },
 
     updateRequiredPace(secondsUntilMidnight, remainingStudySeconds) {
@@ -3491,48 +3515,26 @@ const StudyTargetTracker = {
         const badgeEl = document.getElementById('session-endurance-badge');
         if (!valueEl || !badgeEl) return;
 
-        // Find longest study session today from sessionTimeline
-        let longestToday = 0;
-        let longestSubject = '';
-        if (this.sessionTimeline && this.sessionTimeline.length > 0) {
-            this.sessionTimeline.forEach(s => {
-                if (s.type === 'pomodoro' || s.type === 'pomodoro_active') {
-                    const mins = Math.round(s.duration_hours * 60);
-                    if (mins > longestToday) {
-                        longestToday = mins;
-                        longestSubject = s.subject || 'Study';
-                    }
-                }
-            });
-        }
+        // Focus Volume: Today's total vs Yesterday's full total
+        let totalTodayMins = Math.round((this.studiedSeconds || 0) / 60);
+        let totalYesterdayMins = Math.round((this.yesterdaySeconds || 0) / 60);
 
-        // Find longest yesterday for comparison
-        let longestYesterday = 0;
-        if (this.yesterdaySessions && this.yesterdaySessions.length > 0) {
-            this.yesterdaySessions.forEach(s => {
-                if (s.type !== 'break' && s.type !== 'paused_gap') {
-                    const mins = Math.round((s.duration_hours || ((s.end_hour - s.start_hour + 24) % 24)) * 60);
-                    if (mins > longestYesterday) longestYesterday = mins;
-                }
-            });
-        }
-
-        if (longestToday === 0) {
+        if (totalTodayMins === 0) {
             valueEl.textContent = '0m';
             valueEl.className = 'text-2xl font-black text-gray-400';
-            badgeEl.textContent = 'No sessions yet';
+            badgeEl.textContent = 'No study volume yet';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
             return;
         }
 
-        const h = Math.floor(longestToday / 60);
-        const m = longestToday % 60;
+        const h = Math.floor(totalTodayMins / 60);
+        const m = totalTodayMins % 60;
         valueEl.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
         valueEl.className = 'text-2xl font-black text-teal-600';
 
-        // Compare with yesterday
-        if (longestYesterday > 0) {
-            const diff = longestToday - longestYesterday;
+        // Compare with yesterday's total
+        if (totalYesterdayMins > 0) {
+            const diff = totalTodayMins - totalYesterdayMins;
             if (diff > 0) {
                 badgeEl.textContent = `+${diff}m vs yesterday · New PR!`;
                 badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
@@ -3544,7 +3546,7 @@ const StudyTargetTracker = {
                 badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
             }
         } else {
-            badgeEl.textContent = longestSubject;
+            badgeEl.textContent = 'Volume Tracking Active';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
         }
     },
@@ -3552,27 +3554,66 @@ const StudyTargetTracker = {
     // ─── Stats Card: Velocity ───────────────────────────────────────────────
     updateVelocity() {
         const valueEl = document.getElementById('velocity-value');
-        const badgeEl = document.getElementById('velocity-badge');
         const cardEl = document.getElementById('velocity-card');
-        if (!valueEl || !badgeEl || !cardEl) return;
+        const depthEl = document.getElementById('velocity-depth');
+        const ratioEl = document.getElementById('velocity-ratio');
+        const accelEl = document.getElementById('velocity-accel');
+        const fatigueEl = document.getElementById('velocity-fatigue');
 
-        if (!this.firstStartTime || this.studiedSeconds <= 0) {
-            valueEl.textContent = '--';
-            badgeEl.textContent = 'm/hr';
+        if (!valueEl || !cardEl) return;
+
+        if (this.studiedSeconds <= 0) {
+            valueEl.innerHTML = `--<span class="text-xs opacity-50 font-normal ml-1">m/hr</span>`;
+            if (depthEl) depthEl.textContent = '--';
+            if (ratioEl) ratioEl.textContent = '--';
+            if (accelEl) accelEl.textContent = '--';
+            if (fatigueEl) fatigueEl.textContent = '--';
             return;
         }
 
         const now = new Date(Date.now() + this.serverClockOffset);
-        // Calculate elapsed seconds since first activity
-        const elapsedSeconds = Math.max(1, (now - this.firstStartTime) / 1000);
+        const nowMs = now.getTime();
 
-        // Velocity = (Studied Seconds / Elapsed Seconds) * 60
-        const velocityVal = (this.studiedSeconds / elapsedSeconds) * 60;
+        // --- 1. Real Data-Driven Speedometer ---
+        // Use 5 AM anchor (logical day start) since studiedSeconds = total since 5 AM
+        // Velocity = (studiedSeconds / secondsSince5AM) * 60
+        // Naturally: studying → ratio improves → speed climbs by decimal
+        //            paused   → only elapsed grows → speed drops gradually
+        const logicalDateStr = this.getLogicalDate();
+        const dayAnchorStr = logicalDateStr.replace(/-/g, '/') + ' ' + String(this.TIMELINE_START_HOUR).padStart(2, '0') + ':00:00';
+        const dayAnchor = new Date(dayAnchorStr);
+        const elapsedSeconds = Math.max(1, (nowMs - dayAnchor.getTime()) / 1000);
+        const velocityRaw = (this.studiedSeconds / elapsedSeconds) * 60;
+        const currentVelocity = parseFloat(Math.min(60, Math.max(0, velocityRaw)).toFixed(1));
 
-        // SPEEDOMETER: Show 1 decimal place for visual movement
-        const currentVelocity = parseFloat(velocityVal.toFixed(1));
+        // --- 2. Acceleration (delta from previous tick) ---
+        const prevVelocity = this.lastRawVelocity !== null ? this.lastRawVelocity : currentVelocity;
+        const accelerationDelta = currentVelocity - prevVelocity;
 
-        // Binary Trend: Up or Down only (Sticky logic)
+        // --- 3. Daily Focus Ratio (same anchor) ---
+        const dailyFocusRatio = Math.min(100, (this.studiedSeconds / elapsedSeconds) * 100);
+
+        // Update Peak Velocity for Fatigue Drop tracking
+        if (currentVelocity > (this.peakVelocity || 0)) {
+            this.peakVelocity = currentVelocity;
+        }
+
+        // --- Calculate Other Sub-Metrics ---
+        // Session count from timeline
+        const sessionBlocks = document.querySelectorAll('.timeline-block');
+        const sessionCount = sessionBlocks ? sessionBlocks.length : 0;
+
+        let sessionDepthMins = 0;
+        let sessionDepthDisplay = '0m';
+        if (this.lastResumeTime) {
+            const depthSecs = Math.floor((nowMs - this.lastResumeTime) / 1000);
+            sessionDepthMins = Math.floor(depthSecs / 60);
+            sessionDepthDisplay = depthSecs < 60 ? `${depthSecs}s` : `${sessionDepthMins}m`;
+        }
+        const fatigueDropPercent = this.peakVelocity > 0 ? ((this.peakVelocity - currentVelocity) / this.peakVelocity) * 100 : 0;
+
+        // --- Trend Logic (Sticky) ---
+        // Use velocityRaw (unrounded) for high-sensitivity trend detection
         if (this._lastTrendIcon === undefined) {
             this._lastTrendIcon = '↑';
             this._lastTrendClass = 'trend-up-animate';
@@ -3580,39 +3621,58 @@ const StudyTargetTracker = {
         }
 
         if (this.lastRawVelocity !== null) {
-            if (velocityVal > this.lastRawVelocity) {
+            if (velocityRaw > this.lastRawVelocity) {
                 this._lastTrendIcon = '↑';
                 this._lastTrendClass = 'trend-up-animate';
                 this._lastTrendColor = 'text-emerald-600';
-            } else if (velocityVal < this.lastRawVelocity) {
+            } else if (velocityRaw < this.lastRawVelocity) {
                 this._lastTrendIcon = '↓';
                 this._lastTrendClass = 'trend-down-animate';
                 this._lastTrendColor = 'text-rose-600';
             }
         }
-        this.lastRawVelocity = velocityVal;
+        this.lastRawVelocity = velocityRaw; // Store UNROUNDED for next tick comparison
         this.lastVelocity = currentVelocity;
 
-        // Apply HTML with animated span (Sticky binary trend)
-        valueEl.innerHTML = `
-            ${currentVelocity.toFixed(1)}<span class="text-xs opacity-50 font-normal ml-1">m/hr</span>
-            <span class="trend-animate ${this._lastTrendClass}" style="margin-left: 8px;">${this._lastTrendIcon}</span>
-        `;
-        valueEl.className = `text-2xl font-black ${this._lastTrendColor}`;
+        // Apply HTML with pixel-aligned trend arrow
+        valueEl.innerHTML = `${currentVelocity.toFixed(1)}<span class="text-xs opacity-50 font-normal ml-1">m/hr</span><span class="trend-animate ${this._lastTrendClass} ${this._lastTrendColor}" style="font-size:14px;display:inline-block;position:relative;top:-12px;margin-left:6px;">${this._lastTrendIcon}</span>`;
+        
+        // --- 4. Gauge Ranges & Colors ---
+        // 0–20: distracted (Slate) | 20–40: weak focus (Amber)
+        // 40–55: good (Indigo) | 55–60: deep focus (Fuchsia)
+        let themeColorClass = 'text-slate-600';
+        let bgClass = 'bg-slate-50/60';
+        let borderClass = 'border-slate-100';
 
-        // Color card based on level (using raw value)
-        if (velocityVal >= 50) {
-            badgeEl.textContent = 'Elite Speed';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-fuchsia-100 text-fuchsia-600 w-fit uppercase tracking-tighter';
-            cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-fuchsia-50/60').replace(/border-\w+-\d+/, 'border-fuchsia-100');
-        } else if (currentVelocity >= 35) {
-            badgeEl.textContent = 'High Output';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-indigo-100 text-indigo-600 w-fit uppercase tracking-tighter';
-            cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-indigo-50/60').replace(/border-\w+-\d+/, 'border-indigo-100');
-        } else {
-            badgeEl.textContent = 'Cruising';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-slate-100 text-slate-600 w-fit uppercase tracking-tighter';
-            cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, 'bg-slate-50/60').replace(/border-\w+-\d+/, 'border-slate-100');
+        if (currentVelocity >= 55) {
+            themeColorClass = 'text-fuchsia-600';
+            bgClass = 'bg-fuchsia-50/60';
+            borderClass = 'border-fuchsia-100';
+        } else if (currentVelocity >= 40) {
+            themeColorClass = 'text-indigo-600';
+            bgClass = 'bg-indigo-50/60';
+            borderClass = 'border-indigo-100';
+        } else if (currentVelocity >= 20) {
+            themeColorClass = 'text-amber-600';
+            bgClass = 'bg-amber-50/60';
+            borderClass = 'border-amber-100';
+        }
+
+        valueEl.className = `text-2xl font-black ${themeColorClass}`;
+        cardEl.className = cardEl.className.replace(/bg-\w+-50\/60/, bgClass).replace(/border-\w+-\d+/, borderClass);
+
+        // Inject Sub-Metrics
+        if (depthEl) depthEl.textContent = `S${sessionCount}·${sessionDepthDisplay}`;
+        if (ratioEl) ratioEl.textContent = `${Math.round(dailyFocusRatio)}%`;
+        if (accelEl) {
+            const sign = accelerationDelta > 0 ? '+' : (accelerationDelta < 0 ? '' : '');
+            accelEl.textContent = `${sign}${accelerationDelta.toFixed(2)}`;
+            accelEl.className = `text-[9px] font-black ${accelerationDelta > 0 ? 'text-emerald-500' : (accelerationDelta < 0 ? 'text-rose-500' : themeColorClass)} opacity-80`;
+        }
+        if (fatigueEl) {
+            const fatigueVal = Math.max(0, fatigueDropPercent);
+            fatigueEl.textContent = `${fatigueVal.toFixed(1)}%`;
+            fatigueEl.className = `text-[9px] font-black ${fatigueVal > 10 ? 'text-rose-500' : themeColorClass} opacity-80`;
         }
     }
 };
