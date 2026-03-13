@@ -3523,7 +3523,7 @@ const StudyTargetTracker = {
             valueEl.textContent = '0m';
             valueEl.className = 'text-2xl font-black text-gray-400';
             badgeEl.textContent = 'No study volume yet';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
+            badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
             return;
         }
 
@@ -3534,20 +3534,24 @@ const StudyTargetTracker = {
 
         // Compare with yesterday's total
         if (totalYesterdayMins > 0) {
+            const yh = Math.floor(totalYesterdayMins / 60);
+            const ym = totalYesterdayMins % 60;
+            const formattedYesterday = yh > 0 ? `${yh}h ${ym}m` : `${ym}m`;
+
             const diff = totalTodayMins - totalYesterdayMins;
             if (diff > 0) {
-                badgeEl.textContent = `+${diff}m vs yesterday · New PR!`;
-                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+                badgeEl.textContent = `+${diff}m vs ${formattedYesterday} · New PR!`;
+                badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
             } else if (diff === 0) {
-                badgeEl.textContent = `Tied with yesterday`;
-                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
+                badgeEl.textContent = `Tied with ${formattedYesterday}`;
+                badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
             } else {
-                badgeEl.textContent = `${diff}m vs yesterday`;
-                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
+                badgeEl.textContent = `${diff}m vs ${formattedYesterday}`;
+                badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
             }
         } else {
             badgeEl.textContent = 'Volume Tracking Active';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
+            badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
         }
     },
 
