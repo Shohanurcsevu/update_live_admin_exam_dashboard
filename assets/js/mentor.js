@@ -648,8 +648,17 @@ class StudyMentor {
             const isPaused = arguments[0] === true;
             
             // Global State for HUD & Other Components
-            document.body.classList.toggle('pomo-session-active', this.focusSession.isActive && !isPaused);
-            document.body.classList.toggle('pomo-session-paused', this.focusSession.isActive && isPaused);
+            document.body.classList.toggle('pomo-focus-active', this.focusSession.isActive && !isPaused);
+            document.body.classList.toggle('pomo-focus-paused', this.focusSession.isActive && isPaused);
+            
+            // Legacy classes for compatibility while transitioning study-target.js
+            document.body.classList.toggle('pomo-session-active', (this.focusSession.isActive || this.breakSession.isActive) && !isPaused);
+            document.body.classList.toggle('pomo-session-paused', (this.focusSession.isActive || this.breakSession.isActive) && isPaused);
+
+            // Trigger immediate HUD/Timeline update if available
+            if (window.StudyTargetTracker) {
+                window.StudyTargetTracker.updateUI();
+            }
 
             if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
@@ -1026,8 +1035,13 @@ class StudyMentor {
         }
 
         // Clear Global State
-        document.body.classList.remove('pomo-session-active');
-        document.body.classList.remove('pomo-session-paused');
+        document.body.classList.remove('pomo-focus-active', 'pomo-focus-paused', 'pomo-break-active', 'pomo-break-paused');
+        document.body.classList.remove('pomo-session-active', 'pomo-session-paused');
+
+        // Trigger immediate HUD/Timeline update if available
+        if (window.StudyTargetTracker) {
+            window.StudyTargetTracker.updateUI();
+        }
     }
 
     startBreakSession(subjectId = null, subjectName = null) {
@@ -1171,8 +1185,17 @@ class StudyMentor {
             const isPaused = arguments[0] === true;
 
             // Global State for HUD & Other Components
-            document.body.classList.toggle('pomo-session-active', this.breakSession.isActive && !isPaused);
-            document.body.classList.toggle('pomo-session-paused', this.breakSession.isActive && isPaused);
+            document.body.classList.toggle('pomo-break-active', this.breakSession.isActive && !isPaused);
+            document.body.classList.toggle('pomo-break-paused', this.breakSession.isActive && isPaused);
+
+            // Legacy classes for compatibility
+            document.body.classList.toggle('pomo-session-active', (this.focusSession.isActive || this.breakSession.isActive) && !isPaused);
+            document.body.classList.toggle('pomo-session-paused', (this.focusSession.isActive || this.breakSession.isActive) && isPaused);
+
+            // Trigger immediate HUD/Timeline update if available
+            if (window.StudyTargetTracker) {
+                window.StudyTargetTracker.updateUI();
+            }
 
             if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
