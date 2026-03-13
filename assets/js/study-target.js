@@ -31,6 +31,7 @@ const StudyTargetTracker = {
     flowOrbFrameCount: 0,
     smoothedBpm: 0,
     sessionTimeline: [],
+    timelineDataLoaded: false, // Guard: don't show break HUD until first fetch
     yesterdaySessions: [],
     estimatedFinishTimestamp: null, // NEW: For timeline projection
     momentumScore: 0,
@@ -472,6 +473,9 @@ const StudyTargetTracker = {
 
             // --- NEW: Target Projection Line (Fix: pass nowPercent to avoid DOM read blinking) ---
             this.renderPredictedFinish(nowPercent);
+
+            // --- NEW: Break Tracker Line (Real-time dynamic gap) ---
+            this.renderBreakTracker(nowPercent);
         }
 
         if (window.FontPicker && typeof window.FontPicker.updateProgressRing === 'function') {
@@ -1926,6 +1930,7 @@ const StudyTargetTracker = {
             if (todayResult && todayResult.success) {
                 // EXCLUDE EXAMS: Filter out sessions where type is 'exam'
                 this.sessionTimeline = (todayResult.sessions || []).filter(s => s.type !== 'exam');
+                this.timelineDataLoaded = true;
             } else if (todayResult) {
                 console.warn('[ST-TRACKER] Today timeline fetch fail:', todayResult.error);
             }
@@ -2009,6 +2014,9 @@ const StudyTargetTracker = {
         oldBlocks.forEach(b => b.remove());
         const oldMilestones = bar.parentElement.querySelectorAll('.timeline-milestone');
         oldMilestones.forEach(m => m.remove());
+        // Clear the dynamic break bridge so it gets rebuilt fresh
+        const oldBreakBridge = document.getElementById('timeline-break-projection');
+        if (oldBreakBridge) oldBreakBridge.remove();
 
         if (labelsContainer) {
             labelsContainer.innerHTML = '';
@@ -2081,9 +2089,42 @@ const StudyTargetTracker = {
         // 2. Render Today's Sessions (Foreground Layer)
         const subjectStudyCounts = {};
         this.activeSubjectPalette = null; // Reset before scanning
-        this.sessionTimeline.forEach((session) => {
+        this.lastSessionEndPercent = 0; // Reset for recalculation
+
+        // --- 2a. Compute Inter-Session Break Gaps ---
+        // Sort sessions by start_hour to find temporal gaps between completed sessions
+        const studyOnlyTypes = ['pomodoro', 'pomodoro_active', 'pomodoro_paused', 'exam'];
+        const sortedSessions = [...this.sessionTimeline]
+            .filter(s => studyOnlyTypes.includes(s.type) || s.type === 'paused_gap' || s.type === 'break')
+            .sort((a, b) => parseFloat(a.start_hour) - parseFloat(b.start_hour));
+
+        const interBreaks = [];
+        for (let i = 0; i < sortedSessions.length - 1; i++) {
+            const curr = sortedSessions[i];
+            const next = sortedSessions[i + 1];
+            const currEnd = parseFloat(curr.start_hour) + parseFloat(curr.duration_hours);
+            const nextStart = parseFloat(next.start_hour);
+            const gapHours = nextStart - currEnd;
+
+            // Only show gaps > 1 minute (0.0167 hours) to avoid micro-gaps
+            if (gapHours > 0.0167) {
+                interBreaks.push({
+                    start_hour: currEnd,
+                    duration_hours: gapHours,
+                    type: 'inter_break',
+                    subject: 'Break'
+                });
+            }
+        }
+
+        // Merge inter-breaks into the session list for rendering
+        const allBlocks = [...this.sessionTimeline, ...interBreaks]
+            .sort((a, b) => parseFloat(a.start_hour) - parseFloat(b.start_hour));
+
+        allBlocks.forEach((session) => {
             const studyTypes = ['pomodoro', 'pomodoro_active', 'pomodoro_paused', 'exam'];
             const isStudy = studyTypes.includes(session.type);
+            const isInterBreak = session.type === 'inter_break';
 
             let sessionNumber = null;
             if (isStudy) {
@@ -2096,10 +2137,50 @@ const StudyTargetTracker = {
             const duration = parseFloat(session.duration_hours);
 
             const leftPercent = this.getRelativeTimelinePercent(startHour);
-            const widthPercent = Math.max(0.5, (duration / 24) * 100);
+            const widthPercent = isInterBreak ? (duration / 24) * 100 : Math.max(0.5, (duration / 24) * 100);
 
             if (isNaN(leftPercent) || isNaN(widthPercent)) {
                 console.warn("[ST-TRACKER] Skipping invalid session block:", session);
+                return;
+            }
+
+            // --- Inter-Session Break Block (Static) ---
+            if (isInterBreak) {
+                const breakBlock = document.createElement('div');
+                breakBlock.className = 'timeline-block timeline-inter-break absolute top-0 h-full z-5 cursor-default';
+                breakBlock.style.left = `${leftPercent}%`;
+                breakBlock.style.width = `${Math.max(0.3, widthPercent)}%`;
+                breakBlock.style.background = 'repeating-linear-gradient(90deg, rgba(100,116,139,0.15) 0px, rgba(100,116,139,0.15) 4px, transparent 4px, transparent 8px)';
+                breakBlock.style.borderTop = '1.5px dashed rgba(100,116,139,0.4)';
+                breakBlock.style.borderBottom = '1.5px dashed rgba(100,116,139,0.4)';
+                breakBlock.style.opacity = '0.8';
+
+                // Duration label (show HH:mm format for > 1h, else Xm)
+                const gapMinutes = Math.round(duration * 60);
+                let gapLabel;
+                if (gapMinutes >= 60) {
+                    const gh = Math.floor(gapMinutes / 60);
+                    const gm = gapMinutes % 60;
+                    gapLabel = `${gh}h${gm > 0 ? gm + 'm' : ''}`;
+                } else {
+                    gapLabel = `${gapMinutes}m`;
+                }
+
+                // Only show label if there's enough visual space (> ~2% of timeline = ~30min)
+                if (widthPercent > 1.5) {
+                    breakBlock.innerHTML = `<span style="
+                        position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+                        font-size:8px; font-weight:700; color:#64748b; white-space:nowrap;
+                        font-family:'Inter',sans-serif; pointer-events:none;
+                        background:rgba(241,245,249,0.85); padding:0px 4px; border-radius:2px;
+                    ">⏸ ${gapLabel}</span>`;
+                }
+
+                breakBlock.title = `Break: ${gapLabel}`;
+
+                // Track end for dynamic break bridge
+                this.lastSessionEndPercent = Math.max(this.lastSessionEndPercent || 0, leftPercent + widthPercent);
+                bar.appendChild(breakBlock);
                 return;
             }
 
@@ -2137,6 +2218,7 @@ const StudyTargetTracker = {
                 block.addEventListener('mouseleave', () => this.hideTimelineTooltip());
                 block.addEventListener('click', () => this.showSessionDetails(session, palette, sessionNumber));
 
+                this.lastSessionEndPercent = Math.max(this.lastSessionEndPercent || 0, leftPercent + widthPercent);
                 bar.appendChild(block);
                 return; // Skip the rest of the styling
             }
@@ -2198,7 +2280,7 @@ const StudyTargetTracker = {
                 `;
                 block.appendChild(waveContainer);
             }
-
+            this.lastSessionEndPercent = Math.max(this.lastSessionEndPercent || 0, leftPercent + widthPercent);
             bar.appendChild(block);
         });
 
@@ -2289,6 +2371,68 @@ const StudyTargetTracker = {
 
         // Ensure we have the pulse animation CSS
         this.injectTimelineCSS();
+    },
+
+    // ─── Break Tracker Rendering (Real-time HUD at Now Marker) ────────────────
+    renderBreakTracker(nowPercent) {
+        const nowMarker = document.getElementById('timeline-now-marker');
+        if (!nowMarker) return;
+
+        // Guard: Don't show anything until first timeline data fetch completes
+        if (!this.timelineDataLoaded) return;
+
+        const isStudyingRunning = document.body.classList.contains('pomo-session-active');
+        const isStudyingPaused = document.body.classList.contains('pomo-session-paused');
+        const lastEnd = parseFloat(this.lastSessionEndPercent) || 0;
+
+        // --- Transition Detection: Capture the exact moment studying stops or pauses ---
+        if (isStudyingRunning) {
+            this._wasStudying = true;
+            this._breakStartTimestamp = null;
+            const breakHud = document.getElementById('timeline-break-hud');
+            if (breakHud) breakHud.style.display = 'none';
+            return;
+        }
+
+        // Just transitioned from studying to not studying (could be pause or break)
+        if (this._wasStudying && !isStudyingRunning) {
+            this._wasStudying = false;
+            this._breakStartTimestamp = Date.now();
+        }
+
+        // Calculate break/pause duration in seconds
+        let breakSecondsTotal = 0;
+        if (this._breakStartTimestamp) {
+            breakSecondsTotal = Math.floor((Date.now() - this._breakStartTimestamp) / 1000);
+        } else if (lastEnd > 0 && nowPercent > lastEnd + 0.01) {
+            const breakWidth = Math.max(0, nowPercent - lastEnd);
+            breakSecondsTotal = Math.round((breakWidth / 100) * 86400);
+        }
+
+        if (breakSecondsTotal > 0) {
+            let breakHud = document.getElementById('timeline-break-hud');
+            if (!breakHud) {
+                breakHud = document.createElement('span');
+                breakHud.id = 'timeline-break-hud';
+                breakHud.className = 'timeline-break-hud-cyber';
+                nowMarker.appendChild(breakHud);
+            }
+
+            const label = isStudyingPaused ? "Paused" : "Break";
+            const icon = isStudyingPaused ? "⏳" : "⏸";
+            const labelColor = isStudyingPaused ? "#b45309" : "#475569"; // Amber for paused, slate for break
+
+            const bh = Math.floor(breakSecondsTotal / 3600);
+            const bm = Math.floor((breakSecondsTotal % 3600) / 60);
+            const bs = breakSecondsTotal % 60;
+            const hhmmss = [bh, bm, bs].map(v => v.toString().padStart(2, '0')).join(':');
+            
+            breakHud.innerHTML = `<strong style="letter-spacing:0.05em; font-weight:800; color:${labelColor};">${icon} ${label} ${hhmmss}</strong>`;
+            breakHud.style.display = 'block';
+        } else {
+            const breakHud = document.getElementById('timeline-break-hud');
+            if (breakHud) breakHud.style.display = 'none';
+        }
     },
 
     showTimelineTooltip(e, session, palette) {
@@ -2702,6 +2846,62 @@ const StudyTargetTracker = {
                     background: #ef4444;
                     transform: rotate(-20deg); /* Aim up-right at the bracket corner */
                     transform-origin: left bottom;
+                    box-shadow: none;
+                }
+                /* Break Timer HUD (Left side of Now marker) */
+                .timeline-break-hud-cyber {
+                    position: absolute;
+                    bottom: 100%;
+                    top: auto;
+                    right: 15px; /* Mirror of Now clock's left:15px */
+                    transform: none;
+                    margin-bottom: 8px;
+                    z-index: 60;
+                    pointer-events: none;
+                    background: none;
+                    border: none;
+                    padding: 3px 8px;
+                    border-radius: 0px;
+                    box-shadow: none;
+                    font-size: 11px;
+                    font-family: 'Inter', 'system-ui', 'Segoe UI', Roboto, sans-serif;
+                    font-weight: 800;
+                    color: #475569;
+                    text-shadow: 
+                        0 0 10px rgba(255,255,255,0.8), 
+                        0 0 2px rgba(255,255,255,0.4);
+                    white-space: nowrap;
+                    display: none;
+                }
+                /* Cyber HUD Brackets for Break Timer */
+                .timeline-break-hud-cyber::after {
+                    content: '';
+                    position: absolute;
+                    inset: -4px;
+                    background: 
+                        linear-gradient(to right, #64748b 2px, transparent 2px) 0 0,
+                        linear-gradient(to bottom, #64748b 2px, transparent 2px) 0 0,
+                        linear-gradient(to left, #64748b 2px, transparent 2px) 100% 0,
+                        linear-gradient(to bottom, #64748b 2px, transparent 2px) 100% 0,
+                        linear-gradient(to right, #64748b 2px, transparent 2px) 0 100%,
+                        linear-gradient(to top, #64748b 2px, transparent 2px) 0 100%,
+                        linear-gradient(to left, #64748b 2px, transparent 2px) 100% 100%,
+                        linear-gradient(to top, #64748b 2px, transparent 2px) 100% 100%;
+                    background-repeat: no-repeat;
+                    background-size: 8px 8px;
+                    pointer-events: none;
+                }
+                /* Bridge connector for Break Timer (right side, mirrored) */
+                .timeline-break-hud-cyber::before {
+                    content: '';
+                    position: absolute;
+                    bottom: -8px;
+                    right: -15px; /* Mirrored from Now clock's left: -15px */
+                    width: 12px;
+                    height: 1.5px;
+                    background: #64748b;
+                    transform: rotate(20deg); /* Mirror angle */
+                    transform-origin: right bottom;
                     box-shadow: none;
                 }
                 .timeline-wave-container {

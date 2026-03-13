@@ -644,6 +644,13 @@ class StudyMentor {
 
             // Hide UI if not on dashboard, but keep timer running
             this.updateStatusIndicator();
+
+            const isPaused = arguments[0] === true;
+            
+            // Global State for HUD & Other Components
+            document.body.classList.toggle('pomo-session-active', this.focusSession.isActive && !isPaused);
+            document.body.classList.toggle('pomo-session-paused', this.focusSession.isActive && isPaused);
+
             if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
                 badge?.classList.add('hidden');
@@ -661,7 +668,6 @@ class StudyMentor {
             // Force Boss Theme Visuals for Timer
             this.applyTimerTheme();
 
-            const isPaused = arguments[0] === true;
             const toggleIcon = this.pomodoroNudgeExpanded ? '▼' : '▲';
             const toggleTitle = this.pomodoroNudgeExpanded ? 'Shrink' : 'Expand';
 
@@ -1018,6 +1024,10 @@ class StudyMentor {
             const teaser = document.getElementById('mentor-teaser');
             if (teaser) teaser.classList.add('hidden');
         }
+
+        // Clear Global State
+        document.body.classList.remove('pomo-session-active');
+        document.body.classList.remove('pomo-session-paused');
     }
 
     startBreakSession(subjectId = null, subjectName = null) {
@@ -1157,6 +1167,13 @@ class StudyMentor {
 
             // Hide UI if not on dashboard, but keep timer running
             this.updateStatusIndicator();
+
+            const isPaused = arguments[0] === true;
+
+            // Global State for HUD & Other Components
+            document.body.classList.toggle('pomo-session-active', this.breakSession.isActive && !isPaused);
+            document.body.classList.toggle('pomo-session-paused', this.breakSession.isActive && isPaused);
+
             if (!this.isOnDashboard()) {
                 teaser.classList.add('hidden');
                 badge?.classList.add('hidden');
@@ -1173,7 +1190,6 @@ class StudyMentor {
 
             this.applyBreakTheme();
 
-            const isPaused = arguments[0] === true;
             const toggleIcon = this.pomodoroNudgeExpanded ? '▼' : '▲';
             const toggleTitle = this.pomodoroNudgeExpanded ? 'Shrink' : 'Expand';
 
