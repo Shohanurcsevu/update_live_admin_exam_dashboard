@@ -12,6 +12,8 @@ function initializeTakeExamInterface() {
     let lastSyncedState = null;
     let hasUnsavedChanges = false;
     let currentNavFilter = 'all'; // 'all', 'unanswered', 'flagged'
+    let idealPace = 0; // seconds per question
+    let startTime = null;
     const originalLoadPage = window.loadPage;
 
     const resultModal = document.getElementById('result-modal');
@@ -124,6 +126,7 @@ function initializeTakeExamInterface() {
         setupNavigatorFilters();
         updateNavigator();
         setupProgressTracking();
+        updatePaceCoach();
     }
 
     function setupProgressTracking() {
@@ -290,6 +293,9 @@ function initializeTakeExamInterface() {
             if (timerEl) timerEl.textContent = timeStr;
             if (timerMobileEl) timerMobileEl.textContent = timeStr;
 
+            // Update pace coach every 10 seconds
+            if (timer % 10 === 0) updatePaceCoach();
+
             if (--timer < 0) {
                 clearInterval(timerInterval);
                 submitExam();
@@ -336,6 +342,8 @@ function initializeTakeExamInterface() {
         
         saveStateToServer(); // Trigger sync
         updateNavigator();
+        updatePaceCoach(); // Update pace on answer
+    }
     }
 
     function toggleFlag(e) {
@@ -750,6 +758,12 @@ function initializeTakeExamInterface() {
                 }
                 
                 renderExam(result.data);
+
+                examData = result.data;
+                idealPace = (examData.details.duration * 60) / examData.questions.length;
+                startTime = Date.now();
+
+                setupExitPrevention();
             }
             else showToast(result.message, 'error');
         } catch (e) { showToast('Failed to load exam details.', 'error'); }
@@ -909,7 +923,277 @@ function initializeTakeExamInterface() {
         });
     }
 
+    function updatePaceCoach() {
+        const paceEl = document.getElementById('pace-coach');
+        const paceMobileEl = document.getElementById('pace-coach-mobile');
+        const labelEl = document.getElementById('pace-label');
+        const diffEl = document.getElementById('pace-diff');
+
+        if (!examData || !examData.questions || examData.questions.length === 0) return;
+
+        const answeredCount = Object.keys(userAnswers).length;
+        if (answeredCount === 0) {
+            if (paceEl) paceEl.classList.add('hidden');
+            if (paceMobileEl) paceMobileEl.classList.add('hidden');
+            return;
+        }
+
+        const elapsedSeconds = (Date.now() - startTime) / 1000;
+        const currentPace = elapsedSeconds / answeredCount;
+        const diff = idealPace - currentPace; // positive means ahead (faster)
+
+        // Thresholds
+        const margin = idealPace * 0.1; // 10% margin
+        let status = 'ontrack';
+        if (diff > margin) status = 'ahead';
+        else if (diff < -margin) status = 'behind';
+
+        // Update UI
+        const updateUI = (container, label, diffText) => {
+            if (!container) return;
+            container.classList.remove('hidden', 'flex');
+            container.classList.add('flex');
+            
+            container.classList.remove('bg-gray-50', 'bg-green-50', 'bg-amber-50', 'bg-indigo-50', 'border-gray-100', 'border-green-100', 'border-amber-100', 'border-indigo-100');
+            if (label) label.classList.remove('text-gray-500', 'text-green-600', 'text-amber-600', 'text-indigo-600');
+            if (diffText) diffText.classList.remove('text-gray-400', 'text-green-500', 'text-amber-500', 'text-indigo-500');
+
+            let colorBase = 'gray';
+            let statusText = 'On Track';
+            let iconText = 'timer';
+
+            if (status === 'ahead') {
+                colorBase = 'indigo';
+                statusText = 'Ahead';
+                iconText = 'bolt';
+            } else if (status === 'behind') {
+                colorBase = 'amber';
+                statusText = 'Behind';
+                iconText = 'warning';
+            }
+
+            container.classList.add(`bg-${colorBase}-50`, `border-${colorBase}-100`);
+            if (label) {
+                label.classList.add(`text-${colorBase}-600`);
+                label.textContent = statusText;
+                const icon = container.querySelector('.material-symbols-outlined');
+                if (icon) icon.textContent = iconText;
+            }
+            if (diffText) {
+                diffText.classList.add(`text-${colorBase}-500`);
+                const absDiff = Math.abs(diff).toFixed(1);
+                diffText.textContent = `${diff > 0 ? '-' : '+'}${absDiff}s/q`;
+            }
+
+            // Mobile specific
+            if (container.id === 'pace-coach-mobile') {
+                const mobileText = container.querySelector('span:not(.material-symbols-outlined)');
+                if (mobileText) mobileText.textContent = statusText;
+            }
+        };
+```
+                <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <span class="material-symbols-outlined text-amber-500 text-4xl">sync_disabled</span>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">Session Terminated</h3>
+                <p class="text-gray-600 mb-8 leading-relaxed">
+                    This exam has been submitted, cancelled, or resumed on another device. This session is no longer active.
+                </p>
+                <button id="sync-go-back-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-200">
+                    Go Back to Exam List
+                </button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('sync-go-back-btn').addEventListener('click', () => {
+            window.onbeforeunload = null;
+            overlay.remove();
+            if (window.loadPage) window.loadPage('take-exam-list');
+            else window.location.reload();
+        });
+    }
+
+    function startSyncMonitoring() {
+        // Check periodically
+        if (window.syncInterval) clearInterval(window.syncInterval);
+        window.syncInterval = setInterval(verifySessionStatus, 20000); // Every 20 seconds
+
+        // Check on visibility change (when tab becomes active)
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && isExamInProgress) {
+                verifySessionStatus();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    async function saveStateToServer() {
+        if (!isExamInProgress || !window.serverSessionId) return;
+
+        const currentState = {
+            answers: userAnswers,
+            flagged: Array.from(flaggedQuestions),
+            timestamp: Date.now()
+        };
+
+        // Don't save if nothing changed
+        const stateStr = JSON.stringify(currentState);
+        if (stateStr === lastSyncedState) return;
+
+        setSyncIndicator('saving');
+
+        try {
+            const response = await fetch(`${API_URL}active-session.php?action=save_state`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    exam_id: examId,
+                    state: currentState
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                lastSyncedState = stateStr;
+                setSyncIndicator('synced');
+            } else {
+                setSyncIndicator('error');
+            }
+        } catch (error) {
+            setSyncIndicator('error');
+        }
+    }
+
+    function startStateSync() {
+        // Initial state
+        lastSyncedState = JSON.stringify({
+            answers: userAnswers,
+            flagged: Array.from(flaggedQuestions),
+            timestamp: Date.now()
+        });
+
+        // Periodic sync every 25 seconds
+        if (window.stateSyncInterval) clearInterval(window.stateSyncInterval);
+        window.stateSyncInterval = setInterval(saveStateToServer, 25000);
+
+        // Also save on answering
+        const originalHandleOptionClick = window.handleOptionClick; // Wait, handleOptionClick is not global
+    }
+
+    function setSyncIndicator(status) {
+        const indicators = [
+            document.getElementById('cloud-sync-indicator'),
+            document.getElementById('cloud-sync-indicator-mobile')
+        ];
+
+        indicators.forEach(el => {
+            if (!el) return;
+            const icon = el.querySelector('.material-symbols-outlined');
+            const text = el.querySelector('span:not(.material-symbols-outlined)');
+
+            el.classList.remove('text-indigo-600', 'text-gray-300', 'text-amber-500', 'text-red-500', 'animate-pulse');
+            
+            switch(status) {
+                case 'saving':
+                    el.classList.add('text-amber-500', 'animate-pulse');
+                    icon.textContent = 'cloud_upload';
+                    if (text) text.textContent = 'Syncing...';
+                    break;
+                case 'synced':
+                    el.classList.add('text-indigo-600');
+                    el.style.opacity = '1';
+                    icon.textContent = 'cloud_done';
+                    if (text) text.textContent = 'Synced';
+                    setTimeout(() => { if (el) el.style.opacity = '0.5'; }, 2000);
+                    break;
+                case 'error':
+                    el.classList.add('text-red-500');
+                    icon.textContent = 'cloud_off';
+                    if (text) text.textContent = 'Sync Error';
+                    break;
+                default:
+                    el.classList.add('text-gray-300');
+                    icon.textContent = 'cloud_queue';
+                    if (text) text.textContent = 'Idle';
+            }
+        });
+    }
+
+    function updatePaceCoach() {
+        const paceEl = document.getElementById('pace-coach');
+        const paceMobileEl = document.getElementById('pace-coach-mobile');
+        const labelEl = document.getElementById('pace-label');
+        const diffEl = document.getElementById('pace-diff');
+
+        if (!examData || !examData.questions || examData.questions.length === 0) return;
+
+        const answeredCount = Object.keys(userAnswers).length;
+        if (answeredCount === 0) {
+            if (paceEl) paceEl.classList.add('hidden');
+            if (paceMobileEl) paceMobileEl.classList.add('hidden');
+            return;
+        }
+
+        const elapsedSeconds = (Date.now() - startTime) / 1000;
+        const currentPace = elapsedSeconds / answeredCount;
+        const diff = idealPace - currentPace; // positive means ahead (faster)
+
+        // Thresholds
+        const margin = idealPace * 0.1; // 10% margin
+        let status = 'ontrack';
+        if (diff > margin) status = 'ahead';
+        else if (diff < -margin) status = 'behind';
+
+        // Update UI
+        const updateUI = (container, label, diffText) => {
+            if (!container) return;
+            container.classList.remove('hidden', 'flex');
+            container.classList.add('flex');
+            
+            container.classList.remove('bg-gray-50', 'bg-green-50', 'bg-amber-50', 'bg-indigo-50', 'border-gray-100', 'border-green-100', 'border-amber-100', 'border-indigo-100');
+            if (label) label.classList.remove('text-gray-500', 'text-green-600', 'text-amber-600', 'text-indigo-600');
+            if (diffText) diffText.classList.remove('text-gray-400', 'text-green-500', 'text-amber-500', 'text-indigo-500');
+
+            let colorBase = 'gray';
+            let statusText = 'On Track';
+            let iconText = 'timer';
+
+            if (status === 'ahead') {
+                colorBase = 'indigo';
+                statusText = 'Ahead';
+                iconText = 'bolt';
+            } else if (status === 'behind') {
+                colorBase = 'amber';
+                statusText = 'Behind';
+                iconText = 'warning';
+            }
+
+            container.classList.add(`bg-${colorBase}-50`, `border-${colorBase}-100`);
+            if (label) {
+                label.classList.add(`text-${colorBase}-600`);
+                label.textContent = statusText;
+                const icon = container.querySelector('.material-symbols-outlined');
+                if (icon) icon.textContent = iconText;
+            }
+            if (diffText) {
+                diffText.classList.add(`text-${colorBase}-500`);
+                const absDiff = Math.abs(diff).toFixed(1);
+                diffText.textContent = `${diff > 0 ? '-' : '+'}${absDiff}s/q`;
+            }
+
+            // Mobile specific
+            if (container.id === 'pace-coach-mobile') {
+                const mobileText = container.querySelector('span:not(.material-symbols-outlined)');
+                if (mobileText) mobileText.textContent = statusText;
+            }
+        };
+
+        updateUI(paceEl, labelEl, diffEl);
+        updateUI(paceMobileEl, paceMobileEl.querySelector('span:not(.material-symbols-outlined)'), null);
+    }
+
     loadExam();
 }
 
 initializeTakeExamInterface();
+```
