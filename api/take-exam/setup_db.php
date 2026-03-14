@@ -49,6 +49,7 @@ if ($conn->query($sql) === TRUE) {
         exam_title VARCHAR(255),
         start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         status ENUM('ACTIVE', 'COMPLETED', 'CANCELLED') DEFAULT 'ACTIVE',
+        current_state LONGTEXT DEFAULT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX (status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";

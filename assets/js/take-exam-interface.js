@@ -9,6 +9,9 @@ function initializeTakeExamInterface() {
     let flaggedQuestions = new Set();
     let timerInterval;
     let isExamInProgress = false;
+    let lastSyncedState = null;
+    let hasUnsavedChanges = false;
+    let currentNavFilter = 'all'; // 'all', 'unanswered', 'flagged'
     const originalLoadPage = window.loadPage;
 
     const resultModal = document.getElementById('result-modal');
@@ -103,10 +106,11 @@ function initializeTakeExamInterface() {
         })
         .then(res => res.json())
         .then(result => {
-           if (result.success && result.session_id) {
-               window.serverSessionId = result.session_id;
-               startSyncMonitoring();
-           }
+            if (result.success && result.session_id) {
+                window.serverSessionId = result.session_id;
+                startSyncMonitoring();
+                startStateSync();
+            }
         })
         .catch(() => { });
 
@@ -117,6 +121,7 @@ function initializeTakeExamInterface() {
 
         setupExitPrevention();
         startTimer(details.duration * 60);
+        setupNavigatorFilters();
         updateNavigator();
         setupProgressTracking();
     }
@@ -328,7 +333,8 @@ function initializeTakeExamInterface() {
         btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-sm');
         btn.querySelector('span').classList.remove('bg-gray-100', 'text-gray-300', 'border-gray-200');
         btn.querySelector('span').classList.add('bg-blue-600', 'text-white', 'border-blue-600');
-
+        
+        saveStateToServer(); // Trigger sync
         updateNavigator();
     }
 
@@ -345,6 +351,7 @@ function initializeTakeExamInterface() {
             btn.classList.remove('text-gray-400');
             btn.classList.add('text-yellow-500');
         }
+        saveStateToServer(); // Trigger sync
         updateNavigator();
     }
 
@@ -354,12 +361,19 @@ function initializeTakeExamInterface() {
 
         navContainer.innerHTML = '';
         examData.questions.forEach((q, idx) => {
+            const isAnswered = !!userAnswers[q.id];
+            const isFlagged = flaggedQuestions.has(q.id);
+
+            // Apply filters
+            if (currentNavFilter === 'unanswered' && isAnswered) return;
+            if (currentNavFilter === 'flagged' && !isFlagged) return;
+
             let bgColor = 'bg-white border-gray-300 text-gray-600';
-            if (userAnswers[q.id]) bgColor = 'bg-green-500 border-green-600 text-white';
-            if (flaggedQuestions.has(q.id)) bgColor = 'bg-yellow-500 border-yellow-600 text-white';
+            if (isAnswered) bgColor = 'bg-green-500 border-green-600 text-white';
+            if (isFlagged) bgColor = 'bg-yellow-500 border-yellow-600 text-white';
 
             const btn = document.createElement('button');
-            btn.className = `w-full aspect-square flex items-center justify-center rounded-lg md:rounded-xl border-2 text-[10px] md:text-sm font-black transition-all hover:scale-105 active:scale-95 ${bgColor}`;
+            btn.className = `w-full aspect-square flex items-center justify-center rounded-lg md:rounded-xl border-2 text-[10px] md:text-sm font-black transition-all hover:scale-105 active:scale-95 animate-in zoom-in duration-300 ${bgColor}`;
             btn.title = `Question ${idx + 1}`;
             btn.innerText = idx + 1;
             btn.addEventListener('click', () => {
@@ -370,6 +384,34 @@ function initializeTakeExamInterface() {
                 }
             });
             navContainer.appendChild(btn);
+        });
+
+        // If no questions match the filter, show a message
+        if (navContainer.children.length === 0) {
+            const msg = document.createElement('div');
+            msg.className = 'col-span-full py-8 text-center text-gray-400 text-[10px] font-medium animate-in fade-in duration-500';
+            msg.innerHTML = `No questions match this filter`;
+            navContainer.appendChild(msg);
+        }
+    }
+
+    function setupNavigatorFilters() {
+        const filterBtns = document.querySelectorAll('.nav-filter-btn');
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentNavFilter = btn.dataset.filter;
+                
+                // Update button styles
+                filterBtns.forEach(b => {
+                    b.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600', 'border', 'border-indigo-100');
+                    b.classList.add('text-gray-500', 'hover:bg-white/50');
+                });
+                
+                btn.classList.add('bg-white', 'shadow-sm', 'text-indigo-600', 'border', 'border-indigo-100');
+                btn.classList.remove('text-gray-500', 'hover:bg-white/50');
+                
+                updateNavigator();
+            });
         });
     }
 
@@ -678,7 +720,32 @@ function initializeTakeExamInterface() {
 
             const response = await fetch(`${API_URL}start.php${window.location.search}`);
             const result = await response.json();
-            if (result.success) renderExam(result.data);
+            
+            if (result.success) {
+                // Check Server for active session state
+                const sessionRes = await fetch(`${API_URL}active-session.php?action=check`);
+                const sessionData = await sessionRes.json();
+                
+                if (sessionData.success && sessionData.session && sessionData.session.exam_id == examId) {
+                    window.serverSessionId = sessionData.session.id;
+                    const serverState = sessionData.session.current_state;
+                    
+                    if (serverState) {
+                        console.log('[ExamInterface] Found server state:', serverState);
+                        // Merge server state with local state (Server is source of truth for cross-device)
+                        if (serverState.answers) {
+                            userAnswers = { ...userAnswers, ...serverState.answers };
+                        }
+                        if (serverState.flagged) {
+                            flaggedQuestions = new Set(serverState.flagged);
+                        }
+                        // Note: We don't necessarily sync the timer back yet to avoid confusion, 
+                        // but we could if we wanted total parity.
+                    }
+                }
+                
+                renderExam(result.data);
+            }
             else showToast(result.message, 'error');
         } catch (e) { showToast('Failed to load exam details.', 'error'); }
     }
@@ -744,6 +811,97 @@ function initializeTakeExamInterface() {
             }
         };
         document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    async function saveStateToServer() {
+        if (!isExamInProgress || !window.serverSessionId) return;
+
+        const currentState = {
+            answers: userAnswers,
+            flagged: Array.from(flaggedQuestions),
+            timestamp: Date.now()
+        };
+
+        // Don't save if nothing changed
+        const stateStr = JSON.stringify(currentState);
+        if (stateStr === lastSyncedState) return;
+
+        setSyncIndicator('saving');
+
+        try {
+            const response = await fetch(`${API_URL}active-session.php?action=save_state`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    exam_id: examId,
+                    state: currentState
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                lastSyncedState = stateStr;
+                setSyncIndicator('synced');
+            } else {
+                setSyncIndicator('error');
+            }
+        } catch (error) {
+            setSyncIndicator('error');
+        }
+    }
+
+    function startStateSync() {
+        // Initial state
+        lastSyncedState = JSON.stringify({
+            answers: userAnswers,
+            flagged: Array.from(flaggedQuestions),
+            timestamp: Date.now()
+        });
+
+        // Periodic sync every 25 seconds
+        if (window.stateSyncInterval) clearInterval(window.stateSyncInterval);
+        window.stateSyncInterval = setInterval(saveStateToServer, 25000);
+
+        // Also save on answering
+        const originalHandleOptionClick = window.handleOptionClick; // Wait, handleOptionClick is not global
+    }
+
+    function setSyncIndicator(status) {
+        const indicators = [
+            document.getElementById('cloud-sync-indicator'),
+            document.getElementById('cloud-sync-indicator-mobile')
+        ];
+
+        indicators.forEach(el => {
+            if (!el) return;
+            const icon = el.querySelector('.material-symbols-outlined');
+            const text = el.querySelector('span:not(.material-symbols-outlined)');
+
+            el.classList.remove('text-indigo-600', 'text-gray-300', 'text-amber-500', 'text-red-500', 'animate-pulse');
+            
+            switch(status) {
+                case 'saving':
+                    el.classList.add('text-amber-500', 'animate-pulse');
+                    icon.textContent = 'cloud_upload';
+                    if (text) text.textContent = 'Syncing...';
+                    break;
+                case 'synced':
+                    el.classList.add('text-indigo-600');
+                    el.style.opacity = '1';
+                    icon.textContent = 'cloud_done';
+                    if (text) text.textContent = 'Synced';
+                    setTimeout(() => { if (el) el.style.opacity = '0.5'; }, 2000);
+                    break;
+                case 'error':
+                    el.classList.add('text-red-500');
+                    icon.textContent = 'cloud_off';
+                    if (text) text.textContent = 'Sync Error';
+                    break;
+                default:
+                    el.classList.add('text-gray-300');
+                    icon.textContent = 'cloud_queue';
+                    if (text) text.textContent = 'Idle';
+            }
+        });
     }
 
     loadExam();

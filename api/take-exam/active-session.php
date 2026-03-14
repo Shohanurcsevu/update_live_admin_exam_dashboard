@@ -7,10 +7,15 @@ $action = $_GET['action'] ?? '';
 switch ($action) {
     case 'check':
         // Check for any ACTIVE session
-        $stmt = $conn->prepare("SELECT id, exam_id, exam_title, start_time FROM active_exam_sessions WHERE status = 'ACTIVE' LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, exam_id, exam_title, start_time, current_state FROM active_exam_sessions WHERE status = 'ACTIVE' LIMIT 1");
         $stmt->execute();
         $result = $stmt->get_result();
         $session = $result->fetch_assoc();
+        
+        // Return session with parsed state
+        if ($session && $session['current_state']) {
+            $session['current_state'] = json_decode($session['current_state'], true);
+        }
         
         echo json_encode(['success' => true, 'session' => $session]);
         break;
@@ -68,6 +73,27 @@ switch ($action) {
         
         $stmt->execute();
         echo json_encode(['success' => true]);
+        break;
+
+    case 'save_state':
+        $data = json_decode(file_get_contents('php://input'), true);
+        $exam_id = intval($data['exam_id'] ?? 0);
+        $state = $data['state'] ?? null;
+
+        if ($exam_id <= 0 || !$state) {
+            echo json_encode(['success' => false, 'message' => 'Missing data']);
+            exit;
+        }
+
+        $state_json = json_encode($state);
+        $stmt = $conn->prepare("UPDATE active_exam_sessions SET current_state = ? WHERE exam_id = ? AND status = 'ACTIVE'");
+        $stmt->bind_param("si", $state_json, $exam_id);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'message' => $conn->error]);
+        }
         break;
 
     default:

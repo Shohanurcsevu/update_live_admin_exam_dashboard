@@ -43,6 +43,11 @@
                             <span class="material-symbols-outlined text-xs ml-0.5">expand_less</span>
                         </div>
                     </button>
+                    
+                    <!-- Cloud Sync Indicator (Mobile) -->
+                    <div id="cloud-sync-indicator-mobile" class="flex items-center justify-center text-gray-300 transition-all duration-500">
+                        <span class="material-symbols-outlined text-lg">cloud_done</span>
+                    </div>
 
                     <!-- Timer Center -->
                     <div
@@ -81,6 +86,11 @@
                             class="text-2xl lg:text-3xl font-mono tracking-widest bg-red-600 text-white rounded-lg px-4 py-1 lg:py-2 shadow-inner">
                             00:00</div>
                     </div>
+                    <!-- Cloud Sync Indicator (Desktop) -->
+                    <div id="cloud-sync-indicator" class="flex flex-col items-center justify-center text-gray-300 transition-all duration-500 opacity-50">
+                        <span class="material-symbols-outlined text-2xl mb-1">cloud_done</span>
+                        <span class="text-[8px] font-bold uppercase tracking-widest">Synced</span>
+                    </div>
                 </div>
             </div>
 
@@ -118,6 +128,19 @@
                     <button id="close-nav-btn"
                         class="md:hidden p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
                         <span class="material-symbols-outlined text-2xl">expand_less</span>
+                    </button>
+                </div>
+
+                <!-- Navigator Filters -->
+                <div class="flex items-center gap-1.5 mb-4 p-1 bg-gray-50 rounded-xl border border-gray-100">
+                    <button class="nav-filter-btn flex-1 py-1 px-2 rounded-lg text-[10px] font-bold transition-all bg-white shadow-sm text-indigo-600 border border-indigo-100" data-filter="all">
+                        All
+                    </button>
+                    <button class="nav-filter-btn flex-1 py-1 px-2 rounded-lg text-[10px] font-bold transition-all text-gray-500 hover:bg-white/50" data-filter="unanswered">
+                        Pending
+                    </button>
+                    <button class="nav-filter-btn flex-1 py-1 px-2 rounded-lg text-[10px] font-bold transition-all text-gray-500 hover:bg-white/50" data-filter="flagged">
+                        Flagged
                     </button>
                 </div>
 
