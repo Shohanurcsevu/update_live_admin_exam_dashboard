@@ -462,7 +462,6 @@
             return;
         }
 
-        // Get the first selected topic to determine subject_id and lesson_id
         const firstTopic = Array.from(state.selectedTopics.values())[0];
 
         function getSelectedPriorities() {
