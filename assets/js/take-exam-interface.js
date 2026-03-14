@@ -654,7 +654,7 @@ function initializeTakeExamInterface() {
                 console.warn('[ExamInterface] idbManager is undefined!');
             }
 
-            const response = await fetch(`${API_URL}start.php?exam_id=${examId}`);
+            const response = await fetch(`${API_URL}start.php${window.location.search}`);
             const result = await response.json();
             if (result.success) renderExam(result.data);
             else showToast(result.message, 'error');

@@ -193,7 +193,12 @@ function initializeTakeExamListPage() {
                             </td>
                             <td class="py-3 px-6 text-center">
                                  <div class="flex items-center justify-center gap-2">
-                                     <button class="take-exam-btn bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow-sm transition-all active:scale-95" data-id="${exam.id}">Take</button>
+                                     <button class="take-exam-btn bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow-sm transition-all active:scale-95" 
+                                        data-id="${exam.id}" 
+                                        data-title="${exam.exam_title}" 
+                                        data-duration="${exam.duration}" 
+                                        data-questions="${exam.total_questions}"
+                                        data-instructions="${exam.instructions || ''}">Take</button>
                                      <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Study Materials">
                                         <span class="material-symbols-outlined text-sm">menu_book</span>
                                      </button>
@@ -235,7 +240,12 @@ function initializeTakeExamListPage() {
                                 </span>` : ''}
                             </div>
                             <div class="grid grid-cols-2 gap-2 pt-2">
-                                <button class="take-exam-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center" data-id="${exam.id}">Take</button>
+                                <button class="take-exam-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center" 
+                                    data-id="${exam.id}" 
+                                    data-title="${exam.exam_title}" 
+                                    data-duration="${exam.duration}" 
+                                    data-questions="${exam.total_questions}"
+                                    data-instructions="${exam.instructions || ''}">Take</button>
                                 <button class="study-exam-btn w-full border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">menu_book</span> Study
                                 </button>
@@ -316,19 +326,123 @@ function initializeTakeExamListPage() {
     tableBody.addEventListener('click', (e) => handleListClick(e));
     cardView.addEventListener('click', (e) => handleListClick(e));
 
+    function openSetupModal() {
+        if (!currentExamForSetup) return;
+
+        document.getElementById('setup-exam-title').textContent = currentExamForSetup.title;
+        document.getElementById('setup-duration').textContent = currentExamForSetup.duration;
+        document.getElementById('setup-total-qs').textContent = currentExamForSetup.questions;
+        
+        const instructions = currentExamForSetup.instructions;
+        const instEl = document.getElementById('setup-instructions');
+        if (instructions && instructions.trim() !== '') {
+            document.getElementById('setup-instructions-text').textContent = instructions;
+            instEl.classList.remove('hidden');
+        } else {
+            instEl.classList.add('hidden');
+        }
+        
+        document.getElementById('setup-num-questions').value = '';
+        
+        // Reset priorities
+        document.querySelectorAll('.priority-input:checked').forEach(cb => cb.checked = false);
+
+        // Reset error message
+        const errorEl = document.getElementById('setup-error-message');
+        if (errorEl) errorEl.classList.add('hidden');
+
+        // Reset button state
+        const confirmBtn = document.getElementById('confirm-setup-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<span class="material-symbols-outlined text-sm">rocket_launch</span> Start Exam';
+        }
+
+        setupModal.classList.remove('hidden');
+        setupModal.classList.add('flex');
+        setTimeout(() => {
+            setupContent.classList.remove('scale-95', 'opacity-0');
+            setupContent.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function closeSetupModal() {
+        setupContent.classList.remove('scale-100', 'opacity-100');
+        setupContent.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            setupModal.classList.add('hidden');
+            setupModal.classList.remove('flex');
+            currentExamForSetup = null;
+        }, 300);
+    }
+
+    document.getElementById('close-setup-modal').addEventListener('click', closeSetupModal);
+    document.getElementById('cancel-setup-btn').addEventListener('click', closeSetupModal);
+    document.getElementById('confirm-setup-btn').addEventListener('click', async () => {
+        if (!currentExamForSetup) return;
+
+        const confirmBtn = document.getElementById('confirm-setup-btn');
+        const errorEl = document.getElementById('setup-error-message');
+        const numQuestions = document.getElementById('setup-num-questions').value;
+        const selectedPriorities = Array.from(document.querySelectorAll('.priority-input:checked')).map(cb => cb.value);
+
+        // Hide old error
+        if (errorEl) errorEl.classList.add('hidden');
+
+        // Show loading state
+        const originalHTML = confirmBtn.innerHTML;
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Checking...';
+
+        try {
+            let queryParams = `?exam_id=${currentExamForSetup.id}`;
+            if (numQuestions) queryParams += `&num_questions=${numQuestions}`;
+            if (selectedPriorities.length > 0) queryParams += `&priorities=${selectedPriorities.join(',')}`;
+
+            const response = await fetch(`api/take-exam/start.php${queryParams}`);
+            const result = await response.json();
+
+            if (result.success && result.data.questions.length > 0) {
+                // Success! Navigate to exam
+                if (window.loadPage) {
+                    closeSetupModal();
+                    window.loadPage('take-exam-interface', queryParams);
+                }
+            } else {
+                // No questions found
+                if (errorEl) errorEl.classList.remove('hidden');
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = originalHTML;
+            }
+        } catch (error) {
+            showToast('Error verifying questions. Please try again.', 'error');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = originalHTML;
+        }
+    });
+
     // Delete Modal Logic
     const deleteModal = document.getElementById('delete-exam-confirm-modal');
     let examIdToDelete = null;
+
+// Setup Modal Logic
+    const setupModal = document.getElementById('take-exam-setup-modal');
+    const setupContent = document.getElementById('setup-modal-content');
+    let currentExamForSetup = null;
 
     function handleListClick(e) {
         const target = e.target.closest('button');
         if (!target) return;
 
         if (target.classList.contains('take-exam-btn')) {
-            const examId = target.dataset.id;
-            if (window.loadPage) {
-                window.loadPage('take-exam-interface', `?exam_id=${examId}`);
-            }
+            currentExamForSetup = {
+                id: target.dataset.id,
+                title: target.dataset.title,
+                duration: target.dataset.duration,
+                questions: target.dataset.questions,
+                instructions: target.dataset.instructions
+            };
+            openSetupModal();
         } else if (target.classList.contains('study-exam-btn')) {
             const examId = target.dataset.id;
             handleStudyMaterials(examId, target);

@@ -27,9 +27,39 @@ if (!$exam_details) {
     exit; 
 }
 
-$question_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation FROM questions WHERE exam_id = ? AND is_deleted = 0";
+$num_questions = isset($_GET['num_questions']) ? intval($_GET['num_questions']) : 0;
+$priorities = isset($_GET['priorities']) ? explode(',', $_GET['priorities']) : [];
+$priorities = array_filter($priorities, function($val) { return $val !== ''; });
+$priorities = array_unique(array_map('intval', $priorities));
+
+$question_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority FROM questions WHERE exam_id = ? AND is_deleted = 0";
+
+if (!empty($priorities)) {
+    $placeholders = implode(',', array_fill(0, count($priorities), '?'));
+    $question_sql .= " AND priority IN ($placeholders)";
+}
+
+if ($num_questions > 0) {
+    $question_sql .= " ORDER BY RAND() LIMIT ?";
+}
+
 $stmt = $conn->prepare($question_sql);
-$stmt->bind_param("i", $exam_id);
+
+// Bind parameters dynamically
+$bind_types = "i";
+$bind_params = [$exam_id];
+
+if (!empty($priorities)) {
+    $bind_types .= str_repeat("i", count($priorities));
+    foreach ($priorities as $p) $bind_params[] = $p;
+}
+
+if ($num_questions > 0) {
+    $bind_types .= "i";
+    $bind_params[] = $num_questions;
+}
+
+$stmt->bind_param($bind_types, ...$bind_params);
 $stmt->execute();
 $result = $stmt->get_result();
 $questions = [];
@@ -41,4 +71,4 @@ while ($row = $result->fetch_assoc()) {
 echo json_encode(['success' => true, 'data' => ['details' => $exam_details, 'questions' => $questions]]);
 $stmt->close();
 $conn->close();
-?>
+?>

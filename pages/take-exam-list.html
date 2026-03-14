@@ -85,3 +85,106 @@
         </div>
     </div>
 </div>
+
+<!-- Exam Setup Modal -->
+<div id="take-exam-setup-modal"
+    class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-[250] p-4 transition-all duration-300">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0 duration-300" id="setup-modal-content">
+        <!-- Header -->
+        <div class="bg-indigo-600 p-6 text-white relative">
+            <h3 id="setup-exam-title" class="text-xl font-bold leading-tight pr-8">Exam Title</h3>
+            <p id="setup-exam-meta" class="text-indigo-100 text-sm mt-1 flex items-center gap-2">
+                <span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">schedule</span> <span id="setup-duration">0</span>m</span>
+                <span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">quiz</span> <span id="setup-total-qs">0</span> Qs</span>
+            </p>
+            <div id="setup-instructions" class="mt-3 p-3 bg-indigo-500/30 rounded-xl text-[11px] text-white/90 border border-white/10 hidden">
+                <span class="font-bold block mb-1 uppercase tracking-widest opacity-60">Instructions:</span>
+                <span id="setup-instructions-text"></span>
+            </div>
+            <button id="close-setup-modal" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6 space-y-6">
+            <!-- Question Count -->
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-indigo-500 text-lg">format_list_numbered</span>
+                    Number of Questions
+                </label>
+                <input type="number" id="setup-num-questions" placeholder="Leave empty for all questions"
+                    class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm"
+                    min="1">
+                <p class="text-[10px] text-gray-400 mt-1.5 italic">Random questions will be selected if a number is specified.</p>
+            </div>
+
+            <!-- Priority Filters -->
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-amber-500 text-lg">priority_high</span>
+                    Priority Filters
+                </label>
+                <div class="grid grid-cols-4 gap-2" id="priority-options">
+                    <label class="priority-checkbox-label cursor-pointer group">
+                        <input type="checkbox" value="0" class="hidden priority-input">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                            <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">0</span>
+                        </div>
+                    </label>
+                    <label class="priority-checkbox-label cursor-pointer group">
+                        <input type="checkbox" value="1" class="hidden priority-input">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                            <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">P1</span>
+                        </div>
+                    </label>
+                    <label class="priority-checkbox-label cursor-pointer group">
+                        <input type="checkbox" value="2" class="hidden priority-input">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                            <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">P2</span>
+                        </div>
+                    </label>
+                    <label class="priority-checkbox-label cursor-pointer group">
+                        <input type="checkbox" value="3" class="hidden priority-input">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                            <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">P3</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Error Message Container -->
+            <div id="setup-error-message" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 animate-pulse">
+                <span class="material-symbols-outlined text-red-500 text-lg">error</span>
+                <div class="flex-1">
+                    <p class="text-xs font-bold text-red-700">No Questions Found</p>
+                    <p class="text-[10px] text-red-600 leading-tight mt-0.5">There are no questions matching your selected filters. Please adjust the priority or number of questions.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+            <button id="cancel-setup-btn"
+                class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-100 transition-all">
+                Cancel
+            </button>
+            <button id="confirm-setup-btn"
+                class="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-lg">play_arrow</span>
+                Start Exam
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .priority-input:checked + .priority-card {
+        border-color: #4f46e5;
+        background-color: #eef2ff;
+    }
+    .priority-input:checked + .priority-card span {
+        color: #4f46e5;
+    }
+</style>
