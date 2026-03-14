@@ -95,6 +95,21 @@ function initializeTakeExamInterface() {
             }).catch(() => { });
         }
 
+        // Notify Server about ACTIVE session (Cross-Device)
+        fetch(`${API_URL}active-session.php?action=start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exam_id: examId, exam_title: details.exam_title })
+        })
+        .then(res => res.json())
+        .then(result => {
+           if (result.success && result.session_id) {
+               window.serverSessionId = result.session_id;
+               startSyncMonitoring();
+           }
+        })
+        .catch(() => { });
+
         // Hide Mentor Icon
         if (window.studyMentor) window.studyMentor.closePanel();
         const mentorWidget = document.getElementById('study-mentor-widget');
@@ -518,6 +533,13 @@ function initializeTakeExamInterface() {
             }).catch(() => { });
         }
 
+        // Notify Server about COMPLETED session (Cross-Device)
+        fetch(`${API_URL}active-session.php?action=complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exam_id: examId })
+        }).catch(() => { });
+
         try {
             const response = await fetch(`${API_URL}submit.php`, {
                 method: 'POST',
@@ -659,6 +681,69 @@ function initializeTakeExamInterface() {
             if (result.success) renderExam(result.data);
             else showToast(result.message, 'error');
         } catch (e) { showToast('Failed to load exam details.', 'error'); }
+    }
+
+    async function verifySessionStatus() {
+        if (!window.serverSessionId || !isExamInProgress) return;
+
+        try {
+            const response = await fetch(`${API_URL}active-session.php?action=check`);
+            const result = await response.json();
+
+            // If no active session found or the ID doesn't match ours, then we are synced out
+            if (!result.session || result.session.id != window.serverSessionId) {
+                handleSessionSyncConflict();
+            }
+        } catch (error) {
+            console.error('Session sync check failed:', error);
+        }
+    }
+
+    function handleSessionSyncConflict() {
+        isExamInProgress = false;
+        clearInterval(timerInterval);
+        if (window.syncInterval) clearInterval(window.syncInterval);
+
+        // Show overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'session-sync-overlay';
+        overlay.className = 'fixed inset-0 bg-gray-900/95 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-gray-100">
+                <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <span class="material-symbols-outlined text-amber-500 text-4xl">sync_disabled</span>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">Session Terminated</h3>
+                <p class="text-gray-600 mb-8 leading-relaxed">
+                    This exam has been submitted, cancelled, or resumed on another device. This session is no longer active.
+                </p>
+                <button id="sync-go-back-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-indigo-200">
+                    Go Back to Exam List
+                </button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('sync-go-back-btn').addEventListener('click', () => {
+            window.onbeforeunload = null;
+            overlay.remove();
+            if (window.loadPage) window.loadPage('take-exam-list');
+            else window.location.reload();
+        });
+    }
+
+    function startSyncMonitoring() {
+        // Check periodically
+        if (window.syncInterval) clearInterval(window.syncInterval);
+        window.syncInterval = setInterval(verifySessionStatus, 20000); // Every 20 seconds
+
+        // Check on visibility change (when tab becomes active)
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && isExamInProgress) {
+                verifySessionStatus();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
     }
 
     loadExam();

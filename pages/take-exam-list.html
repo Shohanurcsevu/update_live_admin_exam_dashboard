@@ -89,7 +89,7 @@
 <!-- Exam Setup Modal -->
 <div id="take-exam-setup-modal"
     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-[250] p-4 transition-all duration-300">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0 duration-300" id="setup-modal-content">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0 duration-300 flex flex-col max-h-[90vh]" id="setup-modal-content">
         <!-- Header -->
         <div class="bg-indigo-600 p-6 text-white relative">
             <h3 id="setup-exam-title" class="text-xl font-bold leading-tight pr-8">Exam Title</h3>
@@ -101,13 +101,84 @@
                 <span class="font-bold block mb-1 uppercase tracking-widest opacity-60">Instructions:</span>
                 <span id="setup-instructions-text"></span>
             </div>
+
+            <!-- Performance Context -->
+            <div id="setup-performance-context" class="mt-4 p-3 bg-black/20 rounded-2xl border border-white/5 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span id="setup-last-percentage-badge" class="px-2 py-0.5 bg-green-500/20 text-green-300 rounded-full font-bold text-[10px] border border-green-500/20">0%</span>
+                        <span class="text-white/90 font-bold text-[11px]">Last Score</span>
+                    </div>
+                    <span id="setup-attempt-count-text" class="text-white/40 text-[10px]">0 Attempts</span>
+                </div>
+                <div class="flex items-center justify-between text-[10px]">
+                    <span id="setup-last-score-detail" class="text-white/60">Score: 0 / 0</span>
+                    <span id="setup-motivation-text" class="text-indigo-200 italic">Target: 100%! 🎯</span>
+                </div>
+            </div>
+
             <button id="close-setup-modal" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors">
                 <span class="material-symbols-outlined text-sm">close</span>
             </button>
         </div>
 
         <!-- Body -->
-        <div class="p-6 space-y-6">
+        <div class="p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+            <!-- Active Session Warning (NEW) -->
+            <div id="active-session-container" class="hidden bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 mb-4 text-center">
+                <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="material-symbols-outlined text-4xl">warning</span>
+                </div>
+                <h3 class="text-amber-900 font-bold text-lg mb-2">An exam is already running!</h3>
+                <p class="text-amber-700 text-sm mb-6 leading-relaxed">
+                    The exam <span id="running-exam-title" class="font-bold underline text-amber-800"></span> is currently in progress on another device/session.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button id="resume-active-btn" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-200">
+                        <span class="material-symbols-outlined">play_circle</span>
+                        Resume Now
+                    </button>
+                    <button id="cancel-active-btn" class="flex-1 bg-white hover:bg-red-50 text-red-600 border-2 border-red-200 font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined">cancel</span>
+                        Terminte & New
+                    </button>
+                </div>
+            </div>
+
+            <div id="setup-options-container" class="space-y-6">
+                <!-- Presets Section -->
+            <div id="presets-section" class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="block text-sm font-bold text-gray-100/10 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-indigo-500 text-sm">bookmark</span>
+                        <span class="text-gray-700 text-xs">Quick Presets</span>
+                    </label>
+                    <button id="toggle-save-preset" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors">
+                        <span class="material-symbols-outlined text-xs">add</span>
+                        Save Current
+                    </button>
+                </div>
+                
+                <div id="preset-chips-container" class="flex flex-wrap gap-2 min-h-[32px]">
+                    <div class="animate-pulse flex gap-2">
+                        <div class="h-7 w-16 bg-gray-100 rounded-full"></div>
+                        <div class="h-7 w-20 bg-gray-100 rounded-full"></div>
+                    </div>
+                </div>
+
+                <div id="save-preset-form" class="hidden">
+                    <div class="flex gap-2">
+                        <input type="text" id="new-preset-name" placeholder="Name (e.g. My Study)" 
+                            class="flex-1 px-3 py-2 text-xs rounded-lg border border-indigo-100 focus:ring-1 focus:ring-indigo-500 outline-none">
+                        <button id="confirm-save-preset" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm">
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-px bg-gray-100"></div>
+
             <!-- Question Count -->
             <div>
                 <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
@@ -128,30 +199,40 @@
                 </label>
                 <div class="grid grid-cols-4 gap-2" id="priority-options">
                     <label class="priority-checkbox-label cursor-pointer group">
-                        <input type="checkbox" value="0" class="hidden priority-input">
-                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                        <input type="checkbox" value="0" class="hidden priority-input" id="priority-check-0">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card relative overflow-hidden">
                             <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">0</span>
+                            <span class="text-[8px] font-bold text-gray-300 mt-0.5 priority-count" id="count-priority-0">...</span>
                         </div>
                     </label>
                     <label class="priority-checkbox-label cursor-pointer group">
-                        <input type="checkbox" value="1" class="hidden priority-input">
-                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                        <input type="checkbox" value="1" class="hidden priority-input" id="priority-check-1">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card relative overflow-hidden">
                             <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">P1</span>
+                            <span class="text-[8px] font-bold text-gray-300 mt-0.5 priority-count" id="count-priority-1">...</span>
                         </div>
                     </label>
                     <label class="priority-checkbox-label cursor-pointer group">
-                        <input type="checkbox" value="2" class="hidden priority-input">
-                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                        <input type="checkbox" value="2" class="hidden priority-input" id="priority-check-2">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card relative overflow-hidden">
                             <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">P2</span>
+                            <span class="text-[8px] font-bold text-gray-300 mt-0.5 priority-count" id="count-priority-2">...</span>
                         </div>
                     </label>
                     <label class="priority-checkbox-label cursor-pointer group">
-                        <input type="checkbox" value="3" class="hidden priority-input">
-                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card">
+                        <input type="checkbox" value="3" class="hidden priority-input" id="priority-check-3">
+                        <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-gray-100 group-hover:bg-gray-50 transition-all priority-card relative overflow-hidden">
                             <span class="text-[10px] font-black text-gray-400 group-hover:text-indigo-500">P3</span>
+                            <span class="text-[8px] font-bold text-gray-300 mt-0.5 priority-count" id="count-priority-3">...</span>
                         </div>
                     </label>
                 </div>
+            </div>
+
+            <!-- Live Selection Summary -->
+            <div id="selection-summary-container" class="hidden p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center gap-3 transition-colors duration-300">
+                <span id="selection-summary-icon" class="material-symbols-outlined text-indigo-500 text-lg">info</span>
+                <p id="selection-summary-text" class="text-[10px] font-bold text-indigo-700"></p>
             </div>
 
             <!-- Error Message Container -->
@@ -160,6 +241,7 @@
                 <div class="flex-1">
                     <p class="text-xs font-bold text-red-700">No Questions Found</p>
                     <p class="text-[10px] text-red-600 leading-tight mt-0.5">There are no questions matching your selected filters. Please adjust the priority or number of questions.</p>
+                </div>
                 </div>
             </div>
         </div>
@@ -186,5 +268,58 @@
     }
     .priority-input:checked + .priority-card span {
         color: #4f46e5;
+    }
+
+    .preset-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        background-color: #eef2ff;
+        color: #4338ca;
+        border: 1px solid #e0e7ff;
+        border-radius: 9999px;
+        font-size: 10px;
+        font-weight: 700;
+        transition: all 0.2s;
+        cursor: pointer;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    
+    .preset-chip:hover {
+        background-color: #e0e7ff;
+    }
+
+    .preset-chip:active {
+        transform: scale(0.95);
+    }
+    
+    .preset-chip.active {
+        background-color: #4f46e5;
+        color: #ffffff;
+        border-color: #4f46e5;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transform: scale(1.05);
+    }
+
+    .preset-delete-btn {
+        color: #a5b4fc;
+        transition: color 0.15s;
+        margin-left: 0.125rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .preset-delete-btn:hover {
+        color: #ef4444;
+    }
+    
+    .preset-chip.active .preset-delete-btn {
+        color: #c7d2fe;
+    }
+
+    .preset-chip.active .preset-delete-btn:hover {
+        color: #ffffff;
     }
 </style>

@@ -13,6 +13,7 @@ function initializeTakeExamListPage() {
     let currentPage = 1;
     const itemsPerPage = 20;
     let isFetching = false;
+    let currentPriorityDistribution = { "0": 0, "1": 0, "2": 0, "3": 0 };
 
     // --- Toast Function ---
     function showToast(message, type = 'error') {
@@ -198,7 +199,11 @@ function initializeTakeExamListPage() {
                                         data-title="${exam.exam_title}" 
                                         data-duration="${exam.duration}" 
                                         data-questions="${exam.total_questions}"
-                                        data-instructions="${exam.instructions || ''}">Take</button>
+                                        data-instructions="${exam.instructions || ''}"
+                                        data-last-score="${exam.last_score || 0}"
+                                        data-last-percentage="${exam.last_percentage || 0}"
+                                        data-attempt-count="${exam.attempt_count || 0}"
+                                        data-total-marks="${exam.total_marks || 0}">Take</button>
                                      <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Study Materials">
                                         <span class="material-symbols-outlined text-sm">menu_book</span>
                                      </button>
@@ -245,7 +250,11 @@ function initializeTakeExamListPage() {
                                     data-title="${exam.exam_title}" 
                                     data-duration="${exam.duration}" 
                                     data-questions="${exam.total_questions}"
-                                    data-instructions="${exam.instructions || ''}">Take</button>
+                                    data-instructions="${exam.instructions || ''}"
+                                    data-last-score="${exam.last_score || 0}"
+                                    data-last-percentage="${exam.last_percentage || 0}"
+                                    data-attempt-count="${exam.attempt_count || 0}"
+                                    data-total-marks="${exam.total_marks || 0}">Take</button>
                                 <button class="study-exam-btn w-full border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">menu_book</span> Study
                                 </button>
@@ -326,6 +335,110 @@ function initializeTakeExamListPage() {
     tableBody.addEventListener('click', (e) => handleListClick(e));
     cardView.addEventListener('click', (e) => handleListClick(e));
 
+    function updateSelectionSummary() {
+        const container = document.getElementById('selection-summary-container');
+        const textEl = document.getElementById('selection-summary-text');
+        const iconEl = document.getElementById('selection-summary-icon');
+        const numInput = document.getElementById('setup-num-questions');
+        const confirmBtn = document.getElementById('confirm-setup-btn');
+        const userCount = parseInt(numInput.value) || 0;
+        
+        const selectedPriorities = Array.from(document.querySelectorAll('.priority-input:checked')).map(cb => cb.value);
+        
+        let availableCount = 0;
+        if (selectedPriorities.length === 0) {
+            availableCount = parseInt(currentExamForSetup.questions) || 0;
+        } else {
+            selectedPriorities.forEach(p => {
+                availableCount += (currentPriorityDistribution[p] || 0);
+            });
+        }
+
+        if (availableCount > 0 || userCount > 0) {
+            container.classList.remove('hidden');
+            
+            // Check for over-limit
+            const isOverLimit = userCount > availableCount;
+            
+            if (isOverLimit) {
+                // Warning State (Amber)
+                container.classList.replace('bg-indigo-50', 'bg-amber-50');
+                container.classList.replace('border-indigo-100', 'border-amber-200');
+                iconEl.classList.replace('text-indigo-500', 'text-amber-500');
+                iconEl.textContent = 'warning';
+                textEl.classList.replace('text-indigo-700', 'text-amber-700');
+                
+                textEl.innerHTML = `Only <span class="text-amber-900 font-extrabold">${availableCount}</span> questions found for these filters. Proceed with ${availableCount}?`;
+                confirmBtn.innerHTML = `<span class="material-symbols-outlined text-sm">rocket_launch</span> Proceed with ${availableCount} Questions`;
+            } else {
+                // Normal State (Indigo)
+                container.classList.replace('bg-amber-50', 'bg-indigo-50');
+                container.classList.replace('border-amber-200', 'border-indigo-100');
+                iconEl.classList.replace('text-amber-500', 'text-indigo-500');
+                iconEl.textContent = 'info';
+                textEl.classList.replace('text-amber-700', 'text-indigo-700');
+
+                if (userCount > 0) {
+                    textEl.innerHTML = `Selected: <span class="text-indigo-900 font-extrabold">${userCount}</span> questions (out of ${availableCount} matching filters).`;
+                } else {
+                    textEl.innerHTML = `Selected: <span class="text-indigo-900 font-extrabold">${availableCount}</span> questions available.`;
+                }
+                confirmBtn.innerHTML = '<span class="material-symbols-outlined text-sm">rocket_launch</span> Start Exam';
+            }
+        } else {
+            container.classList.add('hidden');
+            confirmBtn.innerHTML = '<span class="material-symbols-outlined text-sm">rocket_launch</span> Start Exam';
+        }
+    }
+
+    async function fetchPriorityCounts(examId) {
+        const counts = document.querySelectorAll('.priority-count');
+        const checkboxes = document.querySelectorAll('.priority-input');
+        
+        counts.forEach(c => {
+            c.textContent = '...';
+            c.classList.remove('text-indigo-600', 'text-gray-300');
+            c.classList.add('text-gray-300');
+        });
+
+        checkboxes.forEach(cb => {
+            cb.disabled = true;
+            cb.closest('.priority-checkbox-label').classList.add('opacity-50', 'pointer-events-none');
+        });
+
+        try {
+            const response = await fetch(`api/take-exam/start.php?exam_id=${examId}&action=get_counts`);
+            const result = await response.json();
+
+            if (result.success) {
+                currentPriorityDistribution = result.data;
+                Object.keys(currentPriorityDistribution).forEach(priority => {
+                    const countEl = document.getElementById(`count-priority-${priority}`);
+                    const checkbox = document.getElementById(`priority-check-${priority}`);
+                    const count = currentPriorityDistribution[priority];
+
+                    if (countEl) {
+                        countEl.textContent = `(${count})`;
+                        if (count > 0) {
+                            countEl.classList.remove('text-gray-300');
+                            countEl.classList.add('text-indigo-600');
+                            if (checkbox) {
+                                checkbox.disabled = false;
+                                checkbox.closest('.priority-checkbox-label').classList.remove('opacity-50', 'pointer-events-none');
+                            }
+                        } else {
+                            countEl.classList.add('text-red-300');
+                        }
+                    }
+                });
+                updateSelectionSummary();
+            }
+        } catch (error) {
+            console.error('Failed to fetch priority counts:', error);
+            counts.forEach(c => c.textContent = '(?)');
+        }
+    }
+
     function openSetupModal() {
         if (!currentExamForSetup) return;
 
@@ -341,9 +454,43 @@ function initializeTakeExamListPage() {
         } else {
             instEl.classList.add('hidden');
         }
+
+        // Performance Context
+        const perfEl = document.getElementById('setup-performance-context');
+        const attempts = parseInt(currentExamForSetup.attemptCount) || 0;
+        
+        if (attempts > 0) {
+            const lastScore = parseFloat(currentExamForSetup.lastScore) || 0;
+            const totalMarks = parseFloat(currentExamForSetup.totalMarks) || 0;
+            const lastPerc = parseFloat(currentExamForSetup.lastPercentage) || 0;
+            
+            document.getElementById('setup-last-percentage-badge').textContent = `${Math.round(lastPerc)}%`;
+            document.getElementById('setup-attempt-count-text').textContent = `${attempts} ${attempts === 1 ? 'Attempt' : 'Attempts'}`;
+            document.getElementById('setup-last-score-detail').textContent = `Score: ${lastScore} / ${totalMarks}`;
+            
+            const motivationEl = document.getElementById('setup-motivation-text');
+            if (lastPerc >= 100) {
+                motivationEl.textContent = 'Perfect! Keep it up! 🏆';
+                motivationEl.className = 'text-green-300 italic';
+            } else {
+                motivationEl.textContent = `Beat your last ${Math.round(lastPerc)}%! 🎯`;
+                motivationEl.className = 'text-indigo-200 italic';
+            }
+            
+            perfEl.classList.remove('hidden');
+        } else {
+            perfEl.classList.add('hidden');
+        }
         
         document.getElementById('setup-num-questions').value = '';
         
+        // Reset local distribution
+        currentPriorityDistribution = { "0": 0, "1": 0, "2": 0, "3": 0 };
+
+        // Reset summary
+        const summaryContainer = document.getElementById('selection-summary-container');
+        if (summaryContainer) summaryContainer.classList.add('hidden');
+
         // Reset priorities
         document.querySelectorAll('.priority-input:checked').forEach(cb => cb.checked = false);
 
@@ -357,6 +504,9 @@ function initializeTakeExamListPage() {
             confirmBtn.disabled = false;
             confirmBtn.innerHTML = '<span class="material-symbols-outlined text-sm">rocket_launch</span> Start Exam';
         }
+        
+        // Finalize modal open
+        checkActiveSession();
 
         setupModal.classList.remove('hidden');
         setupModal.classList.add('flex');
@@ -364,6 +514,159 @@ function initializeTakeExamListPage() {
             setupContent.classList.remove('scale-95', 'opacity-0');
             setupContent.classList.add('scale-100', 'opacity-100');
         }, 10);
+
+        // Fetch presets and counts
+        loadPresets();
+        fetchPriorityCounts(currentExamForSetup.id);
+    }
+
+    // --- Preset System Logic ---
+    async function loadPresets() {
+        const container = document.getElementById('preset-chips-container');
+        if (!container) return;
+
+        try {
+            const response = await fetch('api/take-exam/presets.php');
+            const result = await response.json();
+
+            if (result.success) {
+                renderPresets(result.data);
+            }
+        } catch (error) {
+            console.error('Failed to load presets:', error);
+            container.innerHTML = '<span class="text-[8px] text-gray-400 italic">Error loading presets</span>';
+        }
+    }
+
+    function renderPresets(presets) {
+        const container = document.getElementById('preset-chips-container');
+        container.innerHTML = '';
+
+        if (presets.length === 0) {
+            container.innerHTML = '<span class="text-[8px] text-gray-400 italic">No saved presets</span>';
+            return;
+        }
+
+        presets.forEach(preset => {
+            const chip = document.createElement('div');
+            chip.className = 'preset-chip group-preset';
+            chip.dataset.id = preset.id;
+            chip.dataset.config = JSON.stringify(preset);
+            
+            chip.innerHTML = `
+                <span>${preset.name}</span>
+                <button class="preset-delete-btn material-symbols-outlined text-[10px]" data-id="${preset.id}">close</button>
+            `;
+            
+            chip.addEventListener('click', (e) => {
+                if (e.target.classList.contains('preset-delete-btn')) {
+                    e.stopPropagation();
+                    deletePreset(preset.id, chip);
+                } else {
+                    applyPreset(preset, chip);
+                }
+            });
+            
+            container.appendChild(chip);
+        });
+    }
+
+    function applyPreset(preset, activeChip) {
+        const isCurrentlyActive = activeChip.classList.contains('active');
+        
+        // Remove active class from all chips first
+        document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+
+        if (isCurrentlyActive) {
+            // If it was already active, we are "unselecting" it
+            document.getElementById('setup-num-questions').value = '';
+            document.querySelectorAll('.priority-input').forEach(cb => cb.checked = false);
+            updateSelectionSummary();
+            showToast('Preset deselected', 'success');
+            return;
+        }
+
+        // Otherwise, apply the preset
+        activeChip.classList.add('active');
+
+        // Set inputs
+        const numInput = document.getElementById('setup-num-questions');
+        numInput.value = preset.num_questions || '';
+
+        // Set priorities
+        const presetPriorities = preset.priorities ? preset.priorities.split(',') : [];
+        document.querySelectorAll('.priority-input').forEach(cb => {
+            cb.checked = presetPriorities.includes(cb.value);
+        });
+
+        updateSelectionSummary();
+        showToast(`Applied preset: ${preset.name}`, 'success');
+    }
+
+    async function savePreset() {
+        const nameInput = document.getElementById('new-preset-name');
+        const name = nameInput.value.trim();
+        const numInput = document.getElementById('setup-num-questions');
+        const num_questions = numInput.value;
+        const selectedPriorities = Array.from(document.querySelectorAll('.priority-input:checked')).map(cb => cb.value).join(',');
+
+        if (!name) {
+            showToast('Please enter a name for the preset.', 'error');
+            return;
+        }
+
+        const saveBtn = document.getElementById('confirm-save-preset');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        try {
+            const response = await fetch('api/take-exam/presets.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, num_questions, priorities: selectedPriorities })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Preset saved!', 'success');
+                nameInput.value = '';
+                document.getElementById('save-preset-form').classList.add('hidden');
+                loadPresets();
+            } else {
+                showToast(result.message || 'Failed to save preset.');
+            }
+        } catch (error) {
+            showToast('Network error while saving preset.');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    async function deletePreset(id, chipEl) {
+        if (!confirm('Delete this preset?')) return;
+
+        try {
+            const response = await fetch('api/take-exam/presets.php', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                chipEl.style.transform = 'scale(0.8)';
+                chipEl.style.opacity = '0';
+                setTimeout(() => {
+                    loadPresets();
+                }, 200);
+            } else {
+                showToast(result.message || 'Failed to delete preset.');
+            }
+        } catch (error) {
+            showToast('Network error while deleting preset.');
+        }
     }
 
     function closeSetupModal() {
@@ -395,18 +698,36 @@ function initializeTakeExamListPage() {
         confirmBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Checking...';
 
         try {
+            // Recalculate available count for safety
+            let availableCount = 0;
+            if (selectedPriorities.length === 0) {
+                availableCount = parseInt(currentExamForSetup.questions) || 0;
+            } else {
+                selectedPriorities.forEach(p => {
+                    availableCount += (currentPriorityDistribution[p] || 0);
+                });
+            }
+
+            const finalNumQuestions = numQuestions ? Math.min(parseInt(numQuestions), availableCount) : 0;
+
             let queryParams = `?exam_id=${currentExamForSetup.id}`;
-            if (numQuestions) queryParams += `&num_questions=${numQuestions}`;
             if (selectedPriorities.length > 0) queryParams += `&priorities=${selectedPriorities.join(',')}`;
 
-            const response = await fetch(`api/take-exam/start.php${queryParams}`);
+            // Use lightweight check action
+            const response = await fetch(`api/take-exam/start.php${queryParams}&action=check`);
             const result = await response.json();
 
-            if (result.success && result.data.questions.length > 0) {
+            if (result.success && result.count > 0) {
                 // Success! Navigate to exam
                 if (window.loadPage) {
                     closeSetupModal();
-                    window.loadPage('take-exam-interface', queryParams);
+                    
+                    // Full query params for the interface
+                    let finalParams = `?exam_id=${currentExamForSetup.id}`;
+                    if (finalNumQuestions > 0) finalParams += `&num_questions=${finalNumQuestions}`;
+                    if (selectedPriorities.length > 0) finalParams += `&priorities=${selectedPriorities.join(',')}`;
+                    
+                    window.loadPage('take-exam-interface', finalParams);
                 }
             } else {
                 // No questions found
@@ -419,6 +740,12 @@ function initializeTakeExamListPage() {
             confirmBtn.disabled = false;
             confirmBtn.innerHTML = originalHTML;
         }
+    });
+
+    // --- Live Selection Listeners ---
+    document.getElementById('setup-num-questions').addEventListener('input', updateSelectionSummary);
+    document.querySelectorAll('.priority-input').forEach(cb => {
+        cb.addEventListener('change', updateSelectionSummary);
     });
 
     // Delete Modal Logic
@@ -440,7 +767,11 @@ function initializeTakeExamListPage() {
                 title: target.dataset.title,
                 duration: target.dataset.duration,
                 questions: target.dataset.questions,
-                instructions: target.dataset.instructions
+                instructions: target.dataset.instructions,
+                lastScore: target.dataset.lastScore,
+                lastPercentage: target.dataset.lastPercentage,
+                attemptCount: target.dataset.attemptCount,
+                totalMarks: target.dataset.totalMarks
             };
             openSetupModal();
         } else if (target.classList.contains('study-exam-btn')) {
@@ -495,6 +826,20 @@ function initializeTakeExamListPage() {
             deleteModal.classList.remove('flex');
             examIdToDelete = null;
         }
+    });
+
+    // --- Preset UI Listeners ---
+    document.getElementById('toggle-save-preset').addEventListener('click', () => {
+        const form = document.getElementById('save-preset-form');
+        form.classList.toggle('hidden');
+        if (!form.classList.contains('hidden')) {
+            document.getElementById('new-preset-name').focus();
+        }
+    });
+
+    document.getElementById('confirm-save-preset').addEventListener('click', savePreset);
+    document.getElementById('new-preset-name').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') savePreset();
     });
 
     async function handlePrintExam(examId) {
@@ -564,8 +909,77 @@ function initializeTakeExamListPage() {
         }
     }
 
-    // --- Initial Load ---
+    async function checkActiveSession() {
+        const warningContainer = document.getElementById('active-session-container');
+        const optionsContainer = document.getElementById('setup-options-container');
+        const titleEl = document.getElementById('running-exam-title');
+        const footerBtn = document.getElementById('confirm-setup-btn');
+
+        try {
+            const response = await fetch('api/take-exam/active-session.php?action=check');
+            const result = await response.json();
+
+            if (result.success && result.session) {
+                // An active session exists!
+                titleEl.textContent = result.session.exam_title;
+                warningContainer.classList.remove('hidden');
+                optionsContainer.classList.add('hidden');
+                footerBtn.disabled = true;
+                footerBtn.classList.add('opacity-50');
+
+                // Store session info for resume/cancel
+                warningContainer.dataset.sessionId = result.session.id;
+                warningContainer.dataset.examId = result.session.exam_id;
+            } else {
+                warningContainer.classList.add('hidden');
+                optionsContainer.classList.remove('hidden');
+                footerBtn.disabled = false;
+                footerBtn.classList.remove('opacity-50');
+            }
+        } catch (error) {
+            console.error('Failed to check active session:', error);
+        }
+    }
+
+    async function cancelActiveSession() {
+        const warningContainer = document.getElementById('active-session-container');
+        const sessionId = warningContainer.dataset.sessionId;
+
+        if (!confirm('Are you sure you want to terminate the running exam? Any unsaved progress will be lost.')) return;
+
+        try {
+            const response = await fetch('api/take-exam/active-session.php?action=cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Running exam terminated. You can now start a new one.', 'success');
+                checkActiveSession(); // Refresh modal state
+            } else {
+                showToast(result.message || 'Failed to cancel session.');
+            }
+        } catch (error) {
+            showToast('Network error while cancelling session.');
+        }
+    }
+
+    document.getElementById('resume-active-btn').addEventListener('click', () => {
+        const warningContainer = document.getElementById('active-session-container');
+        const examId = warningContainer.dataset.examId;
+        if (window.loadPage && examId) {
+            closeSetupModal();
+            window.loadPage('take-exam-interface', `?exam_id=${examId}`);
+        }
+    });
+
+    document.getElementById('cancel-active-btn').addEventListener('click', cancelActiveSession);
+
+    // Initial Load
     populateSubjects();
 }
+
 initializeTakeExamListPage();
 

@@ -27,6 +27,46 @@ if (!$exam_details) {
     exit; 
 }
 
+// --- NEW: Dynamic Question Counts ---
+if (isset($_GET['action'])) {
+    if ($_GET['action'] === 'get_counts') {
+        $count_sql = "SELECT priority, COUNT(*) as count FROM questions WHERE exam_id = ? AND is_deleted = 0 GROUP BY priority";
+        $stmt = $conn->prepare($count_sql);
+        $stmt->bind_param("i", $exam_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $counts = ["0" => 0, "1" => 0, "2" => 0, "3" => 0];
+        while ($row = $result->fetch_assoc()) {
+            $counts[strval($row['priority'])] = intval($row['count']);
+        }
+        echo json_encode(['success' => true, 'data' => $counts]);
+        exit;
+    }
+
+    if ($_GET['action'] === 'check') {
+        $priorities = isset($_GET['priorities']) ? explode(',', $_GET['priorities']) : [];
+        $priorities = array_filter($priorities, function($val) { return $val !== ''; });
+        $priorities = array_unique(array_map('intval', $priorities));
+
+        $count_sql = "SELECT COUNT(*) as total FROM questions WHERE exam_id = ? AND is_deleted = 0";
+        if (!empty($priorities)) {
+            $placeholders = implode(',', array_fill(0, count($priorities), '?'));
+            $count_sql .= " AND priority IN ($placeholders)";
+        }
+
+        $stmt = $conn->prepare($count_sql);
+        $bind_types = "i" . str_repeat("i", count($priorities));
+        $bind_params = array_merge([$exam_id], $priorities);
+        
+        $stmt->bind_param($bind_types, ...$bind_params);
+        $stmt->execute();
+        $count = $stmt->get_result()->fetch_assoc()['total'];
+        
+        echo json_encode(['success' => true, 'count' => intval($count)]);
+        exit;
+    }
+}
+
 $num_questions = isset($_GET['num_questions']) ? intval($_GET['num_questions']) : 0;
 $priorities = isset($_GET['priorities']) ? explode(',', $_GET['priorities']) : [];
 $priorities = array_filter($priorities, function($val) { return $val !== ''; });
