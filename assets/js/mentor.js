@@ -503,6 +503,9 @@ class StudyMentor {
         this.focusSession.subject = subjectName;
         this.focusSession.subjectId = subjectId;
         this.isContinuationPromptActive = false;
+        
+        // Clear nudge state
+        document.body.classList.remove('pomo-nudge-active');
         this.focusSession.timeRemaining = 25 * 60;
         this.focusSession.totalDuration = 25 * 60;
 
@@ -797,6 +800,9 @@ class StudyMentor {
         const completedSubject = this.focusSession.subject || "General Focus";
         this.focusSession.isActive = false;
 
+        // Clear nudge state
+        document.body.classList.remove('pomo-nudge-active');
+
         // Clear focus body classes so Break HUD can detect the transition immediately
         document.body.classList.remove('pomo-focus-active', 'pomo-focus-paused');
         document.body.classList.remove('pomo-session-active', 'pomo-session-paused');
@@ -848,6 +854,7 @@ class StudyMentor {
     showContinuationPrompt() {
         this.ensureNudgeExpanded();
         this.isContinuationPromptActive = true;
+        document.body.classList.add('pomo-nudge-active');
         const subject = this.focusSession.subject;
         const sessionCount = this.sessionChain.completedSessions;
 
@@ -884,6 +891,7 @@ class StudyMentor {
 
     showBreakChoicePrompt() {
         this.isContinuationPromptActive = true;
+        document.body.classList.add('pomo-nudge-active');
         const subject = this.sessionChain.subjectName || this.focusSession.subject;
         const teaserText = document.getElementById('teaser-text');
         if (teaserText) {
@@ -924,6 +932,10 @@ class StudyMentor {
 
     continueSession() {
         this.isContinuationPromptActive = false;
+        
+        // Clear nudge state
+        document.body.classList.remove('pomo-nudge-active');
+
         this.sessionChain.isActive = true;
         // Ensure subject propagates to chain
         this.sessionChain.subjectId = this.focusSession.subjectId;
@@ -934,6 +946,7 @@ class StudyMentor {
 
     endSessionChain() {
         this.isContinuationPromptActive = false;
+        document.body.classList.remove('pomo-nudge-active');
         this.sessionChain.awaitingContinuationChoice = false;
         this.sessionChain.awaitingResumeConfirmation = false;
         const teaser = document.getElementById('mentor-teaser');
@@ -980,6 +993,7 @@ class StudyMentor {
     showResumePrompt() {
         this.ensureNudgeExpanded();
         this.isContinuationPromptActive = true;
+        document.body.classList.add('pomo-nudge-active');
         const subject = this.sessionChain.subjectName || this.breakSession.subject || this.focusSession.subject || "your subject";
         const nextSession = (this.sessionChain.completedSessions || 0) + 1; // Fallback correctly to 1 if missing
 
@@ -1016,6 +1030,7 @@ class StudyMentor {
 
     stopFocusSession(keepTeaser = false) {
         if (!keepTeaser) this.ensureNudgeExpanded();
+        document.body.classList.remove('pomo-nudge-active');
         // Signal "STOP" and Log Duration if active
         if (this.focusSession.isActive && !this.breakSession.isActive) {
             const elapsedSeconds = this.focusSession.totalDuration - this.focusSession.timeRemaining;
@@ -1078,6 +1093,7 @@ class StudyMentor {
 
         // Stop heartbeat audio immediately when starting a break
         this.stopHeartbeatAudio();
+        document.body.classList.remove('pomo-nudge-active');
 
         this.breakSession.isActive = true;
         this.breakSession.subject = finalSubjectName;

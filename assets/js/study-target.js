@@ -2430,11 +2430,12 @@ const StudyTargetTracker = {
             breakSecondsTotal = Math.round((breakWidth / 100) * 86400);
         }
 
+        const isNudgeActive = document.body.classList.contains('pomo-nudge-active');
         const isPaused = isFocusPaused || isBreakPaused;
         const isBreak = isBreakRunning || isBreakPaused || (!isFocusRunning && !isFocusPaused);
 
-        // Show HUD if we are in any break or pause state
-        if (breakSecondsTotal >= 0 && (isPaused || isBreak)) {
+        // Show HUD if we are in any break, pause, or nudge (waiting) state
+        if (breakSecondsTotal >= 0 && (isPaused || isBreak || isNudgeActive)) {
             let breakHud = document.getElementById('timeline-break-hud');
             if (!breakHud) {
                 breakHud = document.createElement('span');
@@ -2443,10 +2444,23 @@ const StudyTargetTracker = {
                 nowMarker.appendChild(breakHud);
             }
 
-            const label = isPaused ? "Paused" : "Break";
-            const icon = isPaused ? "⏳" : "⏸";
-            const animClass = isPaused ? "animate-hud-spin" : "animate-hud-pulse";
-            const labelColor = isPaused ? "#b45309" : "#475569"; // Amber for paused, slate for break
+            // Determine label, icon, and colors based on precise state
+            let label = "Break";
+            let icon = "⏸";
+            let animClass = "animate-hud-pulse";
+            let labelColor = "#475569"; // Slate for general break
+
+            if (isNudgeActive) {
+                label = "Waiting";
+                icon = "📡";
+                animClass = "animate-hud-pulse"; // Standard pulse for waiting
+                labelColor = "#4f46e5"; // Indigo for waiting/active decision
+            } else if (isPaused) {
+                label = "Paused";
+                icon = "⏳";
+                animClass = "animate-hud-spin";
+                labelColor = "#b45309"; // Amber for paused
+            }
 
             const bh = Math.floor(breakSecondsTotal / 3600);
             const bm = Math.floor((breakSecondsTotal % 3600) / 60);
