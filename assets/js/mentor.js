@@ -797,6 +797,15 @@ class StudyMentor {
         const completedSubject = this.focusSession.subject || "General Focus";
         this.focusSession.isActive = false;
 
+        // Clear focus body classes so Break HUD can detect the transition immediately
+        document.body.classList.remove('pomo-focus-active', 'pomo-focus-paused');
+        document.body.classList.remove('pomo-session-active', 'pomo-session-paused');
+
+        // Trigger immediate HUD/Timeline update so Break HUD appears instantly
+        if (window.StudyTargetTracker) {
+            window.StudyTargetTracker.updateUI();
+        }
+
         // Prevent restoreSession from re-processing this completion on the next poll
         this.lastProcessedSessionStatus = 'completed';
 
@@ -929,6 +938,15 @@ class StudyMentor {
         this.sessionChain.awaitingResumeConfirmation = false;
         const teaser = document.getElementById('mentor-teaser');
         if (teaser) teaser.classList.add('hidden'); // Ensure prompt UI disappears immediately
+
+        // Clear all session body classes so Break HUD can detect transition
+        document.body.classList.remove('pomo-focus-active', 'pomo-focus-paused', 'pomo-break-active', 'pomo-break-paused');
+        document.body.classList.remove('pomo-session-active', 'pomo-session-paused');
+
+        // Trigger immediate HUD/Timeline update so Break HUD appears instantly
+        if (window.StudyTargetTracker) {
+            window.StudyTargetTracker.updateUI();
+        }
 
         const subject = this.sessionChain.subjectName || this.focusSession.subject;
         const count = this.sessionChain.completedSessions;

@@ -33,6 +33,7 @@ const StudyTargetTracker = {
     sessionTimeline: [],
     timelineDataLoaded: false, // Guard: don't show break HUD until first fetch
     yesterdaySessions: [],
+    yesterdayFullTotalSeconds: 0, // NEW: Static benchmark for Focus Volume
     estimatedFinishTimestamp: null, // NEW: For timeline projection
     momentumScore: 0,
     serverClockOffset: 0,
@@ -205,6 +206,11 @@ const StudyTargetTracker = {
                 // or if the server value is actually GREATER than our local estimate.
                 if (Math.abs(serverSeconds - this.studiedSeconds) > 10 || serverSeconds > this.studiedSeconds) {
                     this.studiedSeconds = serverSeconds;
+                }
+
+                // --- NEW: Handle Yesterday's Static Benchmark ---
+                if (result.yesterday_seconds) {
+                    this.yesterdayFullTotalSeconds = result.yesterday_seconds;
                 }
 
                 // --- NEW: Sync Server Clock Offset ---
@@ -3753,9 +3759,9 @@ const StudyTargetTracker = {
         const badgeEl = document.getElementById('session-endurance-badge');
         if (!valueEl || !badgeEl) return;
 
-        // Focus Volume: Today's total vs Yesterday's full total
+        // Focus Volume: Today's total vs Yesterday's full STATIC total
         let totalTodayMins = Math.round((this.studiedSeconds || 0) / 60);
-        let totalYesterdayMins = Math.round((this.yesterdaySeconds || 0) / 60);
+        let totalYesterdayMins = Math.round((this.yesterdayFullTotalSeconds || 0) / 60);
 
         if (totalTodayMins === 0) {
             valueEl.textContent = '0m';
