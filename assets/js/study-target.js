@@ -34,6 +34,7 @@ const StudyTargetTracker = {
     timelineDataLoaded: false, // Guard: don't show break HUD until first fetch
     yesterdaySessions: [],
     yesterdayFullTotalSeconds: 0, // NEW: Static benchmark for Focus Volume
+    allTimeBestSeconds: 0, // NEW: Personal Record
     estimatedFinishTimestamp: null, // NEW: For timeline projection
     momentumScore: 0,
     serverClockOffset: 0,
@@ -208,9 +209,12 @@ const StudyTargetTracker = {
                     this.studiedSeconds = serverSeconds;
                 }
 
-                // --- NEW: Handle Yesterday's Static Benchmark ---
+                // --- NEW: Handle Yesterday's Static Benchmark & All-Time Best ---
                 if (result.yesterday_seconds) {
                     this.yesterdayFullTotalSeconds = result.yesterday_seconds;
+                }
+                if (result.all_time_best_seconds !== undefined) {
+                    this.allTimeBestSeconds = result.all_time_best_seconds;
                 }
 
                 // --- NEW: Sync Server Clock Offset ---
@@ -3771,7 +3775,15 @@ const StudyTargetTracker = {
     updateSessionEndurance() {
         const valueEl = document.getElementById('session-endurance-value');
         const badgeEl = document.getElementById('session-endurance-badge');
+        const topEl = document.getElementById('session-endurance-top');
         if (!valueEl || !badgeEl) return;
+        
+        // Update Record if available
+        if (topEl && this.allTimeBestSeconds !== undefined) {
+            const th = Math.floor(this.allTimeBestSeconds / 3600);
+            const tm = Math.floor((this.allTimeBestSeconds % 3600) / 60);
+            topEl.textContent = `Top: ${th > 0 ? th + 'h ' + tm + 'm' : tm + 'm'}`;
+        }
 
         // Focus Volume: Today's total vs Yesterday's full STATIC total
         let totalTodayMins = Math.round((this.studiedSeconds || 0) / 60);

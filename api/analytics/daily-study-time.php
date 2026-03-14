@@ -264,6 +264,34 @@ try {
     $last_activity_row = $last_activity_res->fetch_assoc();
     $last_active_timestamp = $last_activity_row['absolute_last_active'] ? strtotime($last_activity_row['absolute_last_active']) * 1000 : null;
 
+    // --- Added: Fetch All-Time Best Daily Study Volume ---
+    $all_time_best_sql = "
+        SELECT MAX(day_total) as all_time_best FROM (
+            SELECT study_day, SUM(seconds) as day_total FROM (
+                -- Exam Performance
+                SELECT DATE(DATE_SUB(attempt_time, INTERVAL 5 HOUR)) as study_day, time_used_seconds as seconds FROM performance
+                UNION ALL
+                -- Pomodoro Sessions (including historical durations)
+                SELECT DATE(DATE_SUB(timestamp, INTERVAL 5 HOUR)) as study_day, 
+                       CASE 
+                           WHEN activity_details LIKE '%duration%' THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.duration')) AS DECIMAL) * 60 
+                           ELSE 25 * 60 
+                       END as seconds 
+                FROM activity_log 
+                WHERE activity_type = 'pomodoro_session'
+            ) combined_source
+            GROUP BY study_day
+        ) day_totals
+    ";
+    $all_time_best_res = $conn->query($all_time_best_sql);
+    $all_time_best_seconds = 0;
+    if ($all_time_best_res && $best_row = $all_time_best_res->fetch_assoc()) {
+        $all_time_best_seconds = floatval($best_row['all_time_best'] ?? 0);
+    }
+    
+    // Ensure today's current total is also considered if it's the new record
+    $all_time_best_seconds = max($all_time_best_seconds, $total_today_seconds);
+
     echo json_encode([
         'success' => true,
         'server_time' => time(),
@@ -271,6 +299,8 @@ try {
         'total_today_formatted' => format_seconds($total_today_seconds),
         'yesterday_seconds' => $yesterday_seconds,
         'yesterday_formatted' => format_seconds($yesterday_seconds),
+        'all_time_best_seconds' => $all_time_best_seconds,
+        'all_time_best_formatted' => format_seconds($all_time_best_seconds),
         'improvement_percent' => round($improvement, 1),
         'improvement_type' => $improvement_type,
         'subjects' => $subjects,
