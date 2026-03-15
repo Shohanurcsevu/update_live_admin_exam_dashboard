@@ -72,12 +72,20 @@ $priorities = isset($_GET['priorities']) ? explode(',', $_GET['priorities']) : [
 $priorities = array_filter($priorities, function($val) { return $val !== ''; });
 $priorities = array_unique(array_map('intval', $priorities));
 
-$question_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority FROM questions WHERE exam_id = ? AND is_deleted = 0";
+$question_sql = "SELECT q.id, q.subject_id, q.lesson_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority,
+                 COUNT(qa.id) as taken_count, 
+                 SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+                 SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count
+                 FROM questions q
+                 LEFT JOIN question_attempts qa ON q.id = qa.question_id
+                 WHERE q.exam_id = ? AND q.is_deleted = 0";
 
 if (!empty($priorities)) {
     $placeholders = implode(',', array_fill(0, count($priorities), '?'));
-    $question_sql .= " AND priority IN ($placeholders)";
+    $question_sql .= " AND q.priority IN ($placeholders)";
 }
+
+$question_sql .= " GROUP BY q.id";
 
 if ($num_questions > 0) {
     $question_sql .= " ORDER BY RAND() LIMIT ?";

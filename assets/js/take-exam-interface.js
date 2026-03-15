@@ -12,7 +12,10 @@ function initializeTakeExamInterface() {
     let lastSyncedState = null;
     let hasUnsavedChanges = false;
     let currentNavFilter = 'all'; // 'all', 'unanswered', 'flagged'
+    let timeSpentPerQuestion = {}; // Tracks seconds spent per question ID
+    let activeQuestionId = null;  // Tracks the current question in view
     const originalLoadPage = window.loadPage;
+
 
     const resultModal = document.getElementById('result-modal');
     const closeResultModalBtn = document.getElementById('close-result-modal-btn');
@@ -50,6 +53,34 @@ function initializeTakeExamInterface() {
 
         let fullHTML = '';
         shuffle(data.questions).forEach((q, index) => {
+            // Priority-based background logic
+            const priorityColors = {
+                1: 'bg-emerald-50/50 border-emerald-100', // Low
+                2: 'bg-amber-50/50 border-amber-100',   // Medium
+                3: 'bg-rose-50/50 border-rose-100'      // High
+            };
+            const priorityClass = priorityColors[q.priority] || 'bg-gray-50 border-gray-100';
+
+            // Question Insights Calculation
+            const takenCount = parseInt(q.taken_count) || 0;
+            const correctCount = parseInt(q.correct_count) || 0;
+            const wrongCount = parseInt(q.wrong_count) || 0;
+
+            const takenStatus = takenCount > 0 
+                ? `<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">Taken ${takenCount} times</span>` 
+                : `<span class="px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-500 text-[10px] font-bold uppercase tracking-wider">Never Taken</span>`;
+
+            let insightsHTML = `<div id="insights-${q.id}" class="hidden flex flex-wrap gap-2 mt-2">` + takenStatus;
+            if (takenCount > 0) {
+                const correctRate = Math.round((correctCount / takenCount) * 100);
+                const wrongRate = Math.round((wrongCount / takenCount) * 100);
+                insightsHTML += `
+                    <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">Correct: ${correctRate}%</span>
+                    <span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">Wrong: ${wrongRate}%</span>
+                `;
+            }
+            insightsHTML += `</div>`;
+
             const optionsArray = Object.entries(q.options);
             const shuffledOptions = shuffle(optionsArray);
 
@@ -61,7 +92,8 @@ function initializeTakeExamInterface() {
                 const selectedIconClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-400';
                 return `
                     <button class="option-btn p-4 text-left rounded-xl border-2 transition-all flex items-start gap-3 active:scale-[0.98] ${selectedClass}" 
-                        data-question-id="${q.id}" data-option-key="${originalKey}" ${isAnswered ? 'disabled' : ''}>
+                        data-question-id="${q.id}" data-option-key="${originalKey}" ${isAnswered ? 'disabled' : ''}
+                        role="radio" aria-checked="${isSelected}" aria-label="Option ${optionLabels[displayKey]}: ${value}">
                         <span class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-[10px] font-black ${selectedIconClass}">
                             ${optionLabels[displayKey]}
                         </span>
@@ -71,16 +103,23 @@ function initializeTakeExamInterface() {
             }).join('');
 
             const questionHTML = `
-                <div class="border rounded-lg p-4 bg-gray-50 relative group scroll-mt-24 sm:scroll-mt-32" id="question-${q.id}">
-                    <button class="flag-btn absolute top-4 right-4 text-gray-400 hover:text-yellow-500 transition-colors" data-question-id="${q.id}" title="Flag for Review">
-                         <span class="material-symbols-outlined text-xl">flag</span>
-                    </button>
-                    <p class="text-gray-800 font-semibold pr-8">${toBengali(index + 1)}. ${q.question}</p>
+                <div class="border rounded-lg p-4 ${priorityClass} relative group scroll-mt-24 sm:scroll-mt-32" id="question-${q.id}">
+                    <div class="absolute top-4 right-4 flex items-center gap-1.5">
+                         <button class="toggle-insights-btn w-8 h-8 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-colors" data-question-id="${q.id}" title="View Question Stats">
+                            <span class="material-symbols-outlined text-xl">bar_chart</span>
+                         </button>
+                         <button class="flag-btn w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 transition-colors" data-question-id="${q.id}" title="Flag for Review">
+                              <span class="material-symbols-outlined text-xl">flag</span>
+                         </button>
+                    </div>
+                    <p class="text-gray-800 font-semibold pr-24 sm:pr-28">${toBengali(index + 1)}. ${q.question}</p>
+                    ${insightsHTML}
                     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         ${optionsHTML}
                     </div>
                 </div>
             `;
+
             fullHTML += questionHTML;
         });
         questionsArea.innerHTML = fullHTML;
@@ -139,7 +178,9 @@ function initializeTakeExamInterface() {
                     const qIndex = examData.questions.findIndex(q => q.id == qId);
                     if (qIndex !== -1) {
                         progressText.innerHTML = `Q ${qIndex + 1} / ${examData.questions.length}`;
+                        activeQuestionId = qId;
                     }
+
                 }
             });
         }, {
@@ -290,7 +331,13 @@ function initializeTakeExamInterface() {
             if (timerEl) timerEl.textContent = timeStr;
             if (timerMobileEl) timerMobileEl.textContent = timeStr;
 
+            // Increment time for active question
+            if (activeQuestionId) {
+                timeSpentPerQuestion[activeQuestionId] = (timeSpentPerQuestion[activeQuestionId] || 0) + 1;
+            }
+
             if (--timer < 0) {
+
                 clearInterval(timerInterval);
                 submitExam(true); // Explicitly pass true for auto-submit
             }
@@ -325,12 +372,14 @@ function initializeTakeExamInterface() {
             b.disabled = true;
             b.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-sm');
             b.classList.add('bg-gray-50', 'text-gray-400', 'opacity-60', 'border-gray-100');
+            b.setAttribute('aria-checked', 'false');
             b.querySelector('span').classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
             b.querySelector('span').classList.add('bg-gray-100', 'text-gray-300', 'border-gray-200');
         });
 
         btn.classList.remove('bg-gray-50', 'text-gray-400', 'opacity-60', 'border-gray-100');
         btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-sm');
+        btn.setAttribute('aria-checked', 'true');
         btn.querySelector('span').classList.remove('bg-gray-100', 'text-gray-300', 'border-gray-200');
         btn.querySelector('span').classList.add('bg-blue-600', 'text-white', 'border-blue-600');
         
@@ -536,9 +585,11 @@ function initializeTakeExamInterface() {
             unanswered,
             mistakes,
             correct_ids,
+            time_per_question: timeSpentPerQuestion,
             time_used_seconds: (examData.details.duration * 60) - timeLeftSeconds,
             time_left_seconds: timeLeftSeconds
         };
+
     }
 
     function showSubmissionConfirmation(unansweredCount) {
@@ -770,7 +821,22 @@ function initializeTakeExamInterface() {
         questionsArea.addEventListener('click', (e) => {
             if (e.target.closest('.option-btn')) handleOptionClick(e);
             if (e.target.closest('.flag-btn')) toggleFlag(e);
+            
+            const toggleBtn = e.target.closest('.toggle-insights-btn');
+            if (toggleBtn) {
+                const qId = toggleBtn.dataset.questionId;
+                const insightsDiv = document.getElementById(`insights-${qId}`);
+                if (insightsDiv) {
+                    const isHidden = insightsDiv.classList.toggle('hidden');
+                    toggleBtn.classList.toggle('bg-indigo-50', isHidden);
+                    toggleBtn.classList.toggle('bg-indigo-600', !isHidden);
+                    toggleBtn.classList.toggle('text-indigo-500', isHidden);
+                    toggleBtn.classList.toggle('text-white', !isHidden);
+                }
+            }
+
         });
+
     }
     if (submitExamBtn) submitExamBtn.addEventListener('click', () => submitExam(false));
     if (submitExamBtnMobile) submitExamBtnMobile.addEventListener('click', () => submitExam(false));

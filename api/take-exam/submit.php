@@ -111,8 +111,9 @@ if ($stmt->execute()) {
     $q_stmt->execute();
     $questions_result = $q_stmt->get_result();
 
-    $insert_attempt_stmt = $conn->prepare("INSERT INTO question_attempts (question_id, exam_id, selected_answer, is_correct) VALUES (?, ?, ?, ?)");
+    $insert_attempt_stmt = $conn->prepare("INSERT INTO question_attempts (question_id, exam_id, selected_answer, is_correct, time_spent_seconds) VALUES (?, ?, ?, ?, ?)");
     $selected_answers = $performance['selected_answers'];
+    $time_per_question = isset($performance['time_per_question']) ? $performance['time_per_question'] : [];
 
     while ($q_row = $questions_result->fetch_assoc()) {
         $qid = $q_row['id'];
@@ -122,10 +123,12 @@ if ($stmt->execute()) {
 
         $selected = isset($selected_answers[$qid]) ? $selected_answers[$qid] : null;
         $is_correct = ($selected !== null && $selected === $correct_answer) ? 1 : 0;
+        $time_spent = isset($time_per_question[$qid]) ? intval($time_per_question[$qid]) : 0;
 
         // Insert attempt record
-        $insert_attempt_stmt->bind_param("iisi", $qid, $exam_id, $selected, $is_correct);
+        $insert_attempt_stmt->bind_param("iisii", $qid, $exam_id, $selected, $is_correct, $time_spent);
         $insert_attempt_stmt->execute();
+
 
         // SRS Calculation
         if ($selected !== null) {
