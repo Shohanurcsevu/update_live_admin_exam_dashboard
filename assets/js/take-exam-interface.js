@@ -292,7 +292,7 @@ function initializeTakeExamInterface() {
 
             if (--timer < 0) {
                 clearInterval(timerInterval);
-                submitExam();
+                submitExam(true); // Explicitly pass true for auto-submit
             }
         }, 1000);
     }
@@ -541,8 +541,94 @@ function initializeTakeExamInterface() {
         };
     }
 
-    async function submitExam(isAutoSubmit = false) {
-        if (!isExamInProgress && !isAutoSubmit) return;
+    function showSubmissionConfirmation(unansweredCount) {
+        let modal = document.getElementById('submission-confirm-modal');
+        if (!modal) {
+            const modalHTML = `
+                <div id="submission-confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-[200] p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+                    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-auto overflow-hidden transform scale-95 transition-transform duration-300">
+                        <div id="sub-modal-header" class="p-6 text-center relative overflow-hidden">
+                            <div class="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 rounded-full bg-white opacity-10"></div>
+                            <div class="absolute bottom-0 left-0 -ml-8 -mb-8 w-16 h-16 rounded-full bg-white opacity-10"></div>
+                            <span id="sub-modal-icon" class="material-symbols-outlined text-6xl text-white mb-2 relative z-10 animate-bounce-slow">help</span>
+                            <h3 class="text-2xl font-black text-white relative z-10 tracking-tight">Finish Exam?</h3>
+                        </div>
+                        <div class="p-8 text-center">
+                            <p id="sub-modal-message" class="text-gray-600 mb-8 font-medium leading-relaxed"></p>
+                            <div class="flex flex-col gap-4">
+                                <button id="sub-confirm-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-green-100 transition-all active:scale-95 flex items-center justify-center gap-3">
+                                    <span class="material-symbols-outlined">check_circle</span> Yes, Submit Now
+                                </button>
+                                <button id="sub-cancel-btn" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-4 px-6 rounded-2xl transition-all active:scale-95">
+                                    Wait, Let me check
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            modal = document.getElementById('submission-confirm-modal');
+        }
+
+        const header = document.getElementById('sub-modal-header');
+        const icon = document.getElementById('sub-modal-icon');
+        const message = document.getElementById('sub-modal-message');
+        const confirmBtn = document.getElementById('sub-confirm-btn');
+        const cancelBtn = document.getElementById('sub-cancel-btn');
+
+        if (unansweredCount > 0) {
+            header.className = 'bg-gradient-to-br from-amber-400 to-orange-500 p-8 text-center relative overflow-hidden';
+            icon.textContent = 'warning';
+            message.innerHTML = `You still have <span class="text-orange-600 font-black text-xl">${unansweredCount}</span> questions <span class="text-orange-600 underline decoration-2 underline-offset-4">unanswered</span>.<br><span class="text-sm text-gray-400 mt-2 block">Are you sure you want to finish?</span>`;
+        } else {
+            header.className = 'bg-gradient-to-br from-indigo-500 to-blue-600 p-8 text-center relative overflow-hidden';
+            icon.textContent = 'verified';
+            message.innerHTML = `All set! You've answered all questions.<br><span class="text-sm text-gray-400 mt-2 block">Ready to see your results?</span>`;
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modal.children[0].classList.remove('scale-95');
+        }, 10);
+
+        const hideModal = () => {
+            modal.classList.add('opacity-0');
+            modal.children[0].classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        };
+
+        // Important: Use named functions to allow clean removal
+        const onConfirm = () => { hideModal(); cleanup(); submitExam(false, true); };
+        const onCancel = () => { hideModal(); cleanup(); };
+
+        const cleanup = () => {
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+        };
+
+        confirmBtn.onclick = onConfirm; // Using onclick to ensure single listener
+        cancelBtn.onclick = onCancel;
+    }
+
+    async function submitExam(isAutoSubmit = false, isConfirmed = false) {
+        // Handle event objects or explicit booleans
+        const auto = isAutoSubmit === true;
+        
+        if (!isExamInProgress && !auto) return;
+
+        // Show confirmation for manual clicks that aren't already confirmed
+        if (!auto && !isConfirmed) {
+            const performance = calculatePerformance();
+            showSubmissionConfirmation(performance.unanswered);
+            return;
+        }
+
         clearInterval(timerInterval);
         isExamInProgress = false;
         window.onbeforeunload = null;
@@ -686,8 +772,8 @@ function initializeTakeExamInterface() {
             if (e.target.closest('.flag-btn')) toggleFlag(e);
         });
     }
-    if (submitExamBtn) submitExamBtn.addEventListener('click', submitExam);
-    if (submitExamBtnMobile) submitExamBtnMobile.addEventListener('click', submitExam);
+    if (submitExamBtn) submitExamBtn.addEventListener('click', () => submitExam(false));
+    if (submitExamBtnMobile) submitExamBtnMobile.addEventListener('click', () => submitExam(false));
     const mobileNavTrigger = document.getElementById('mobile-nav-trigger');
     const closeNavBtn = document.getElementById('close-nav-btn');
     const navOverlay = document.getElementById('nav-overlay');
