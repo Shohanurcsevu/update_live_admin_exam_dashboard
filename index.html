@@ -60,6 +60,7 @@
             let a = localStorage.getItem('user_avatar');
             let n = localStorage.getItem('user_name');
             let ac = localStorage.getItem('app_accent');
+            let s = localStorage.getItem('app_sound_preference');
 
             // 2. Apply immediate styles & data if found
             if (f) document.documentElement.style.setProperty('--app-font', "'" + f + "'");
@@ -79,7 +80,7 @@
             // Note: user_name is applied later by FontPicker but we cache it here
 
             // 3. Fallback: If cache is incomplete, fetch from Database
-            if (!f || !a || !n || !ac) {
+            if (!f || !a || !n || !ac || !s) {
                 try {
                     const response = await fetch('api/profile/settings.php');
                     const result = await response.json();
@@ -105,6 +106,9 @@
                         }
                         if (!n && settings.user_name) {
                             localStorage.setItem('user_name', settings.user_name);
+                        }
+                        if (!s && settings.app_sound_preference) {
+                            localStorage.setItem('app_sound_preference', settings.app_sound_preference);
                         }
                     }
                 } catch (e) {

@@ -53,6 +53,7 @@ class StudyMentor {
         };
 
         this.isSoundEnabled = localStorage.getItem('study_mentor_sound_enabled') !== 'false';
+        this.currentSound = localStorage.getItem('app_sound_preference') || 'assets/audio/r.mp3';
 
         this.init();
     }
@@ -2159,6 +2160,23 @@ class StudyMentor {
         }
     }
 
+    setHeartbeatSound(soundFile) {
+        this.currentSound = soundFile;
+        localStorage.setItem('app_sound_preference', soundFile);
+        
+        // If sound already exists, update its source
+        if (this.heartbeatAudio) {
+            const wasPlaying = this.heartbeatPlaying;
+            this.stopHeartbeatAudio();
+            this.heartbeatAudio.src = soundFile;
+            
+            // Resume if it was playing
+            if (wasPlaying && this.isSoundEnabled) {
+                this.playHeartbeat();
+            }
+        }
+    }
+
     playHeartbeat() {
         try {
             // If the sound is already playing, don't restart it
@@ -2166,7 +2184,7 @@ class StudyMentor {
 
             // Create the audio element once and reuse it
             if (!this.heartbeatAudio) {
-                this.heartbeatAudio = new Audio('assets/audio/r.mp3');
+                this.heartbeatAudio = new Audio(this.currentSound);
                 this.heartbeatAudio.volume = 0.5;
 
                 this.heartbeatAudio.addEventListener('ended', () => {

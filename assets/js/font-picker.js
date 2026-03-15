@@ -7,6 +7,14 @@ const FontPicker = {
     DEFAULT_FONT: 'Space Grotesk',
     DEFAULT_NAME: 'User Name',
     DEFAULT_ACCENT: '#6366f1',
+    SOUND_KEY: 'app_sound_preference',
+    DEFAULT_SOUND: 'assets/audio/r.mp3',
+
+    /** Available sounds for the heartbeat pulse */
+    sounds: [
+        { id: 'pulse-1', label: 'Deep Pulse', file: 'assets/audio/r.mp3', icon: 'favorite' },
+        { id: 'pulse-2', label: 'Soft Echo', file: 'assets/audio/r1.mp3', icon: 'waves' },
+    ],
 
     /** Available fonts — label, family (Google Fonts), and a preview weight */
     fonts: [
@@ -65,7 +73,10 @@ const FontPicker = {
         // 4. Restore Accent Color
         await this._loadSavedAccent();
 
-        // 5. Build dropdown UI once the profile image is in the DOM
+        // 5. Restore Sound Preference
+        await this._loadSavedSound();
+
+        // 6. Build dropdown UI once the profile image is in the DOM
         this._buildDropdown();
 
         // 5. Bind events
@@ -142,6 +153,27 @@ const FontPicker = {
         this._applyAccent(cached || this.DEFAULT_ACCENT, false);
     },
 
+    /**
+     * Load Sound Preference from Database
+     */
+    async _loadSavedSound() {
+        const cached = localStorage.getItem(this.SOUND_KEY);
+        
+        try {
+            const response = await fetch(`api/profile/settings.php?key=app_sound_preference`);
+            const result = await response.json();
+            
+            if (result.success && result.data.app_sound_preference) {
+                this._applySound(result.data.app_sound_preference, false);
+                return;
+            }
+        } catch (error) {
+            console.warn("[FontPicker] Failed to fetch sound from DB.");
+        }
+
+        this._applySound(cached || this.DEFAULT_SOUND, false);
+    },
+
     // ── Private Methods ────────────────────────────────────────
 
     /**
@@ -202,17 +234,44 @@ const FontPicker = {
     },
 
     /**
+     * Apply a sound preference globally.
+     */
+    _applySound(soundFile, saveToDB = true) {
+        // 1. Update StudyMentor if available
+        if (window.studyMentor) {
+            window.studyMentor.setHeartbeatSound(soundFile);
+        }
+
+        // 2. Persist
+        localStorage.setItem(this.SOUND_KEY, soundFile);
+        if (saveToDB) {
+            this._saveToDatabase('app_sound_preference', soundFile);
+        }
+        this._currentSound = soundFile;
+    },
+
+    /**
      * Save any setting to MySQL database
      */
     async _saveToDatabase(key, value) {
         try {
-            await fetch('api/profile/settings.php', {
+            const response = await fetch('api/profile/settings.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key, value })
             });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                console.log(`[FontPicker] Successfully saved ${key} to database.`);
+            } else {
+                console.error(`[FontPicker] Database save failed for ${key}:`, result.message);
+                if (window.showToast) window.showToast(`Failed to sync ${key}`, 'error');
+            }
         } catch (error) {
-            console.error(`FontPicker: Database sync failed for ${key}`, error);
+            console.error(`[FontPicker] Connection error during database sync for ${key}:`, error);
+            if (window.showToast) window.showToast("Cloud sync failed (Connection Error)", "error");
         }
     },
 
@@ -250,7 +309,7 @@ const FontPicker = {
         // Create dropdown container
         const dropdown = document.createElement('div');
         dropdown.id = 'font-picker-dropdown';
-        dropdown.className = 'font-picker-dropdown';
+        dropdown.className = 'font-picker-dropdown custom-scrollbar';
         dropdown.setAttribute('role', 'menu');
         dropdown.innerHTML = `
             <!-- User Header Section -->
@@ -313,6 +372,25 @@ const FontPicker = {
                         <button class="fp-option" data-font="${f.family}" role="menuitemradio">
                             <span class="fp-option-preview" style="font-family:'${f.family}',sans-serif">${f.label}</span>
                             <span class="fp-option-tag">${f.tag}</span>
+                            <span class="fp-check material-symbols-outlined">check_circle</span>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="fp-divider"></div>
+
+            <!-- Sound Pulse Section -->
+            <div class="fp-section">
+                <div class="fp-header">
+                    <span class="material-symbols-outlined fp-header-icon">audiotrack</span>
+                    <span class="fp-header-text">Sound Pulse</span>
+                </div>
+                <div class="fp-list" role="group">
+                    ${this.sounds.map(s => `
+                        <button class="fp-option fp-sound-option" data-sound="${s.file}" role="menuitemradio">
+                            <span class="material-symbols-outlined mr-2 opacity-70">${s.icon}</span>
+                            <span class="fp-option-preview">${s.label}</span>
                             <span class="fp-check material-symbols-outlined">check_circle</span>
                         </button>
                     `).join('')}
@@ -398,9 +476,9 @@ const FontPicker = {
             }
 
             // 3. Click on a font option
-            const option = e.target.closest('.fp-option');
-            if (option && dropdown.contains(option)) {
-                const font = option.dataset.font;
+            const fontOption = e.target.closest('.fp-option:not(.fp-sound-option)');
+            if (fontOption && dropdown.contains(fontOption)) {
+                const font = fontOption.dataset.font;
                 this._applyFont(font);
                 this._updateActiveState();
                 this._close();
@@ -412,6 +490,15 @@ const FontPicker = {
             if (swatch && dropdown.contains(swatch)) {
                 const color = swatch.dataset.accent;
                 this._applyAccent(color);
+                this._updateActiveState();
+                return;
+            }
+
+            // 5. Click on a sound option
+            const soundOption = e.target.closest('.fp-sound-option');
+            if (soundOption && dropdown.contains(soundOption)) {
+                const sound = soundOption.dataset.sound;
+                this._applySound(sound);
                 this._updateActiveState();
                 return;
             }
@@ -541,6 +628,12 @@ const FontPicker = {
         this._dropdown.querySelectorAll('.fp-color-swatch').forEach(btn => {
             const isActive = btn.dataset.accent === this._currentAccent;
             btn.classList.toggle('active', isActive);
+        });
+
+        // Update sound active state
+        this._dropdown.querySelectorAll('.fp-sound-option').forEach(btn => {
+            const isActive = btn.dataset.sound === this._currentSound;
+            btn.classList.toggle('fp-active', isActive);
         });
     }
 };

@@ -473,6 +473,24 @@ const SmartHeader = {
                     this.syncFocusTimer(); // Immediate UI update
                 }
             });
+
+            // Right-click shortcut: Cycle sounds
+            soundToggle.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (window.FontPicker && typeof window.FontPicker.sounds !== 'undefined') {
+                    const fp = window.FontPicker;
+                    const currentIndex = fp.sounds.findIndex(s => s.file === fp._currentSound);
+                    const nextIndex = (currentIndex + 1) % fp.sounds.length;
+                    const nextSound = fp.sounds[nextIndex];
+                    
+                    fp._applySound(nextSound.file);
+                    fp._updateActiveState();
+                    
+                    if (window.showToast) {
+                        window.showToast(`Sound: ${nextSound.label}`, 'info');
+                    }
+                }
+            });
         }
     }
 };
