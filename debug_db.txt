@@ -1,0 +1,75 @@
+DB Info:
+Host: localhost
+User: root
+DB: admin_examtaking
+
+Array
+(
+    [id] => 859
+    [exam_title] => Model Test 1
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 858
+    [exam_title] => tp
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 857
+    [exam_title] => tr
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 856
+    [exam_title] => T
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 855
+    [exam_title] => Del
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 854
+    [exam_title] => Test Del Rev B
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 853
+    [exam_title] => মানিক বন্দ্যোপাধ্যায়
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 852
+    [exam_title] => মাহমুদুল হক (১৯৪১-২০০৮)
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 851
+    [exam_title] => মাযহারুল ইসলাম (১৯২৯-২০০৩)
+    [is_revision] => 0
+)
+
+Array
+(
+    [id] => 850
+    [exam_title] => মানিক বন্দ্যোপাধ্যায় (১৯০৮-১৯৫৬)
+    [is_revision] => 0
+)
+

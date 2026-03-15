@@ -42,12 +42,14 @@ try {
 
 
     // 2. Prepare the INSERT statement for questions.
-    $insert_q_stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $insert_q_stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation, priority, original_question_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
     
     $q_subject_id = 0; $q_lesson_id = 0; $q_topic_id = 0;
-    $q_question = ''; $q_options = ''; $q_answer = ''; $q_explanation = '';
+    $q_question = ''; $q_options = ''; $q_answer = ''; $q_explanation = ''; $q_priority = 0; $q_original_id = 0;
     
-    $insert_q_stmt->bind_param("iiiissss", $q_subject_id, $q_lesson_id, $q_topic_id, $new_exam_id, $q_question, $q_options, $q_answer, $q_explanation);
+    $insert_q_stmt->bind_param("iiiissssii", $q_subject_id, $q_lesson_id, $q_topic_id, $new_exam_id, $q_question, $q_options, $q_answer, $q_explanation, $q_priority, $q_original_id);
+
 
     // 3. Loop through the source lessons to fetch and insert questions.
     foreach ($source_lessons as $source) {
@@ -58,7 +60,8 @@ try {
         error_log("Processing source lesson ID: {$source_lesson_id}, attempting to fetch {$question_count} questions.");
 
         if ($question_count > 0) {
-            $fetch_sql = "SELECT id, subject_id, topic_id, question, options, answer, explanation FROM questions WHERE lesson_id = ? AND is_deleted = 0";
+            $fetch_sql = "SELECT id, subject_id, topic_id, question, options, answer, explanation, priority FROM questions WHERE lesson_id = ? AND is_deleted = 0";
+
             $fetch_params = [$source_lesson_id];
             $fetch_types = "i";
 
@@ -93,6 +96,9 @@ try {
                 $q_options = $q_row['options'];
                 $q_answer = $q_row['answer'];
                 $q_explanation = $q_row['explanation'];
+                $q_priority = $q_row['priority'];
+                $q_original_id = $q_row['id'];
+
 
                 // --- DEBUGGING: Log before each insert ---
                 error_log("Attempting to insert question: '{$q_question}' into exam ID {$new_exam_id}.");

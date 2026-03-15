@@ -20,8 +20,9 @@ $target_id = $exam_id ?: $topic_id;
 $sql = "SELECT 
             q.id as question_id,
             q.priority,
-            SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count,
-            COUNT(qa.id) as total_attempts
+            SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
+            COUNT(qa.selected_answer) as total_attempts
+
         FROM questions q
         LEFT JOIN question_attempts qa ON q.id = qa.question_id
         WHERE $where_clause AND q.is_deleted = 0
@@ -74,9 +75,10 @@ if ($ins_stmt->execute()) {
     $new_exam_id = $conn->insert_id;
     
     // 4. Copy questions to the new exam
-    $copy_stmt = $conn->prepare("INSERT INTO questions (exam_id, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority) 
-                                 SELECT ?, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority 
+    $copy_stmt = $conn->prepare("INSERT INTO questions (exam_id, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority, original_question_id) 
+                                 SELECT ?, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority, id 
                                  FROM questions WHERE id = ?");
+
     
     foreach ($questions as $q) {
         $qid = $q['question_id'];

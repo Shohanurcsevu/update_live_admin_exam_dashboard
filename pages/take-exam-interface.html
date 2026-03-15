@@ -49,6 +49,12 @@
                         <span class="material-symbols-outlined text-lg">cloud_done</span>
                     </div>
 
+                    <!-- Global Insights Toggle (Mobile) -->
+                    <button id="global-insights-toggle-mobile" class="w-8 h-8 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-500 border border-indigo-100 shadow-sm transition-all active:scale-90" title="Toggle All Stats">
+                        <span class="material-symbols-outlined text-lg">analytics</span>
+                    </button>
+
+
                     <!-- Timer Center -->
                     <div
                         class="bg-red-50 px-3 py-1 rounded-xl border border-red-100 flex flex-col items-center shadow-sm">
@@ -57,7 +63,11 @@
                             In</span>
                         <div id="timer-mobile"
                             class="text-lg font-mono font-black tracking-tighter text-red-600 leading-none">00:00</div>
+                        <div id="predictive-finish-mobile" class="text-[7px] font-bold text-red-400 uppercase tracking-tight mt-0.5 opacity-0 transition-opacity">
+                            Est: <span id="est-finish-time-mobile">--:--</span>
+                        </div>
                     </div>
+
 
                     <!-- Submit Right -->
                     <button id="submit-exam-btn-mobile"
@@ -85,12 +95,25 @@
                         <div id="timer"
                             class="text-2xl lg:text-3xl font-mono tracking-widest bg-red-600 text-white rounded-lg px-4 py-1 lg:py-2 shadow-inner">
                             00:00</div>
+                        <div id="predictive-finish-desktop" class="text-[10px] uppercase font-bold text-gray-400 mt-2 opacity-0 transition-opacity">
+                            Est. Finish: <span id="est-finish-time" class="text-indigo-600">--:--</span>
+                        </div>
                     </div>
+
+                    <!-- Global Insights Toggle (Desktop) -->
+                    <div class="flex flex-col items-center justify-center">
+                        <button id="global-insights-toggle" class="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-500 border border-indigo-100 hover:bg-indigo-600 hover:text-white hover:shadow-lg transition-all active:scale-95 group mb-1" title="Toggle All Question Stats">
+                            <span class="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">analytics</span>
+                        </button>
+                        <span class="text-[8px] font-bold uppercase tracking-widest text-indigo-400">Stats</span>
+                    </div>
+
                     <!-- Cloud Sync Indicator (Desktop) -->
                     <div id="cloud-sync-indicator" class="flex flex-col items-center justify-center text-gray-300 transition-all duration-500 opacity-50">
                         <span class="material-symbols-outlined text-2xl mb-1">cloud_done</span>
                         <span class="text-[8px] font-bold uppercase tracking-widest">Synced</span>
                     </div>
+
                 </div>
             </div>
 

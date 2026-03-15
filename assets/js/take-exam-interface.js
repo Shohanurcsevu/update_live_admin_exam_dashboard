@@ -14,7 +14,18 @@ function initializeTakeExamInterface() {
     let currentNavFilter = 'all'; // 'all', 'unanswered', 'flagged'
     let timeSpentPerQuestion = {}; // Tracks seconds spent per question ID
     let activeQuestionId = null;  // Tracks the current question in view
+    let shownPacerHints = new Set(); // Tracks shown hints per question to avoid spam
+    let allInsightsVisible = false; // Tracks global insights visibility state
+
+    
+    const AI_PACER_THRESHOLDS = {
+        1: 120, // Low priority: 2 minutes
+        2: 240, // Medium priority: 4 minutes
+        3: 420  // High priority: 7 minutes
+    };
+
     const originalLoadPage = window.loadPage;
+
 
 
     const resultModal = document.getElementById('result-modal');
@@ -333,8 +344,19 @@ function initializeTakeExamInterface() {
 
             // Increment time for active question
             if (activeQuestionId) {
-                timeSpentPerQuestion[activeQuestionId] = (timeSpentPerQuestion[activeQuestionId] || 0) + 1;
+                const currentSeconds = (timeSpentPerQuestion[activeQuestionId] || 0) + 1;
+                timeSpentPerQuestion[activeQuestionId] = currentSeconds;
+
+                // AI Pacer Check
+                checkAIPacing(activeQuestionId, currentSeconds);
             }
+
+            // Update Predictive Clock every 2 seconds to avoid flickering
+            if (timer % 2 === 0) {
+                updatePredictiveClock();
+            }
+
+
 
             if (--timer < 0) {
 
@@ -828,16 +850,65 @@ function initializeTakeExamInterface() {
                 const insightsDiv = document.getElementById(`insights-${qId}`);
                 if (insightsDiv) {
                     const isHidden = insightsDiv.classList.toggle('hidden');
-                    toggleBtn.classList.toggle('bg-indigo-50', isHidden);
-                    toggleBtn.classList.toggle('bg-indigo-600', !isHidden);
-                    toggleBtn.classList.toggle('text-indigo-500', isHidden);
-                    toggleBtn.classList.toggle('text-white', !isHidden);
+                    updateToggleButtonState(toggleBtn, isHidden);
                 }
             }
+
 
         });
 
     }
+
+    function updateToggleButtonState(btn, isHidden) {
+        if (!btn) return;
+        btn.classList.toggle('bg-indigo-50', isHidden);
+        btn.classList.toggle('bg-indigo-600', !isHidden);
+        btn.classList.toggle('text-indigo-500', isHidden);
+        btn.classList.toggle('text-white', !isHidden);
+    }
+
+    function toggleAllInsights() {
+        allInsightsVisible = !allInsightsVisible;
+        const toggleButtons = document.querySelectorAll('.toggle-insights-btn');
+        
+        toggleButtons.forEach(btn => {
+            const qId = btn.dataset.questionId;
+            const insightsDiv = document.getElementById(`insights-${qId}`);
+            if (insightsDiv) {
+                if (allInsightsVisible) {
+                    insightsDiv.classList.remove('hidden');
+                    updateToggleButtonState(btn, false);
+                } else {
+                    insightsDiv.classList.add('hidden');
+                    updateToggleButtonState(btn, true);
+                }
+            }
+        });
+
+        // Update Global Buttons State
+        const globalBtns = [
+            document.getElementById('global-insights-toggle'),
+            document.getElementById('global-insights-toggle-mobile')
+        ];
+
+        globalBtns.forEach(btn => {
+            if (!btn) return;
+            if (allInsightsVisible) {
+                btn.classList.remove('bg-indigo-50', 'text-indigo-500');
+                btn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg');
+            } else {
+                btn.classList.add('bg-indigo-50', 'text-indigo-500');
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+            }
+        });
+    }
+
+    const globalToggleBtn = document.getElementById('global-insights-toggle');
+    const globalToggleBtnMobile = document.getElementById('global-insights-toggle-mobile');
+
+    if (globalToggleBtn) globalToggleBtn.addEventListener('click', toggleAllInsights);
+    if (globalToggleBtnMobile) globalToggleBtnMobile.addEventListener('click', toggleAllInsights);
+
     if (submitExamBtn) submitExamBtn.addEventListener('click', () => submitExam(false));
     if (submitExamBtnMobile) submitExamBtnMobile.addEventListener('click', () => submitExam(false));
     const mobileNavTrigger = document.getElementById('mobile-nav-trigger');
@@ -1061,7 +1132,102 @@ function initializeTakeExamInterface() {
         });
     }
 
+    function updatePredictiveClock() {
+        const estFinishEl = document.getElementById('est-finish-time');
+        const estFinishMobileEl = document.getElementById('est-finish-time-mobile');
+        const estFinishCont = document.getElementById('predictive-finish-desktop');
+        const estFinishMobileCont = document.getElementById('predictive-finish-mobile');
+
+        if (!estFinishEl || !examData.questions) return;
+
+        const totalQuestions = examData.questions.length;
+        const answeredIds = Object.keys(userAnswers);
+        const answeredCount = answeredIds.length;
+        const unansweredCount = totalQuestions - answeredCount;
+
+        if (unansweredCount <= 0) {
+            if (estFinishCont) estFinishCont.classList.add('opacity-0');
+            if (estFinishMobileCont) estFinishMobileCont.classList.add('opacity-0');
+            return;
+        }
+
+        let avgTime = 0;
+        if (answeredCount > 0) {
+            let totalSpentOnAnswered = 0;
+            answeredIds.forEach(id => {
+                totalSpentOnAnswered += (timeSpentPerQuestion[id] || 0);
+            });
+            avgTime = totalSpentOnAnswered / answeredCount;
+            // Minimum avg time of 5 seconds to prevent near-instant predictions
+            if (avgTime < 5) avgTime = 5;
+        } else {
+            // Initial fallback based on total duration
+            const totalDurationSec = (examData.duration || 30) * 60;
+            avgTime = totalDurationSec / totalQuestions;
+        }
+
+        const remainingSec = avgTime * unansweredCount;
+        const now = new Date();
+        const finishTime = new Date(now.getTime() + (remainingSec * 1000));
+
+        const timeStr = finishTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (estFinishEl) estFinishEl.textContent = timeStr;
+        if (estFinishMobileEl) estFinishMobileEl.textContent = timeStr;
+        
+        if (estFinishCont) estFinishCont.classList.remove('opacity-0', 'hidden');
+        if (estFinishMobileCont) estFinishMobileCont.classList.remove('opacity-0', 'hidden');
+    }
+
+    function checkAIPacing(qId, seconds) {
+
+        if (shownPacerHints.has(qId)) return;
+
+        const question = examData.questions.find(q => q.id == qId);
+        if (!question) return;
+
+        const threshold = AI_PACER_THRESHOLDS[question.priority] || 300;
+        
+        if (seconds >= threshold) {
+            shownPacerHints.add(qId);
+            const priorityText = question.priority == 1 ? 'low-priority' : (question.priority == 2 ? 'medium-priority' : 'high-priority');
+            showPacerHint(`AI Note: You've spent over ${Math.floor(threshold/60)} minutes on this ${priorityText} question. Consider flagging it and moving to next ones to optimize your time.`);
+        }
+    }
+
+    function showPacerHint(message) {
+        const hintId = 'ai-pacer-hint';
+        let hintEl = document.getElementById(hintId);
+        
+        if (!hintEl) {
+            hintEl = document.createElement('div');
+            hintEl.id = hintId;
+            hintEl.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-indigo-600 text-white p-4 rounded-2xl shadow-2xl z-[100] flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-300';
+            document.body.appendChild(hintEl);
+        }
+
+        hintEl.innerHTML = `
+            <span class="material-symbols-outlined flex-shrink-0 text-amber-300">lightbulb</span>
+            <div class="flex-1">
+                <p class="text-xs font-bold uppercase tracking-wider mb-1 opacity-80">Time Management Tip</p>
+                <p class="text-sm font-medium leading-snug">${message}</p>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-white/60 hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        `;
+
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (hintEl && hintEl.parentElement) {
+                hintEl.classList.add('animate-out', 'fade-out', 'slide-out-to-bottom-5');
+                setTimeout(() => hintEl.remove(), 300);
+            }
+        }, 12000);
+    }
+
     loadExam();
+
 }
 
 initializeTakeExamInterface();

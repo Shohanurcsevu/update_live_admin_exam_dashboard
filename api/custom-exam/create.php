@@ -55,8 +55,9 @@ try {
     $stmt->close();
 
     // Prepare question insert
-    $insert_q_stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $insert_q_stmt = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation, priority, original_question_id)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
 
     $used_question_ids = [];
 
@@ -65,8 +66,9 @@ try {
         $question_count = intval($source['question_count']);
 
         if ($question_count > 0) {
-            $fetch_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation
+            $fetch_sql = "SELECT id, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority
                           FROM questions WHERE exam_id = ? AND is_deleted = 0";
+
             $fetch_params = [$source_exam_id];
             $fetch_types = "i";
 
@@ -101,13 +103,15 @@ try {
 
             while ($q_row = $questions_result->fetch_assoc()) {
                 $used_question_ids[] = $q_row['id'];
-                $insert_q_stmt->bind_param("iiiissss",
+                $insert_q_stmt->bind_param("iiiissssii",
                     $q_row['subject_id'], $q_row['lesson_id'], $q_row['topic_id'],
                     $new_exam_id, $q_row['question'], $q_row['options'],
-                    $q_row['answer'], $q_row['explanation']
+                    $q_row['answer'], $q_row['explanation'], $q_row['priority'],
+                    $q_row['id'] // original_question_id
                 );
                 $insert_q_stmt->execute();
             }
+
             $fetch_q_stmt->close();
         }
     }

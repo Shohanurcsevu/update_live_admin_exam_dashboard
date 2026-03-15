@@ -106,10 +106,11 @@ if ($stmt->execute()) {
             consecutive_correct = VALUES(consecutive_correct)
     ");
 
-    $q_stmt = $conn->prepare("SELECT id, question, answer FROM questions WHERE exam_id = ? AND is_deleted = 0");
+    $q_stmt = $conn->prepare("SELECT id, question, answer, original_question_id FROM questions WHERE exam_id = ? AND is_deleted = 0");
     $q_stmt->bind_param("i", $exam_id);
     $q_stmt->execute();
     $questions_result = $q_stmt->get_result();
+
 
     $insert_attempt_stmt = $conn->prepare("INSERT INTO question_attempts (question_id, exam_id, selected_answer, is_correct, time_spent_seconds) VALUES (?, ?, ?, ?, ?)");
     $selected_answers = $performance['selected_answers'];
@@ -125,9 +126,13 @@ if ($stmt->execute()) {
         $is_correct = ($selected !== null && $selected === $correct_answer) ? 1 : 0;
         $time_spent = isset($time_per_question[$qid]) ? intval($time_per_question[$qid]) : 0;
 
-        // Insert attempt record
-        $insert_attempt_stmt->bind_param("iisii", $qid, $exam_id, $selected, $is_correct, $time_spent);
+        // Use original ID for stats and SRS if this is a custom question
+        $master_qid = ($q_row['original_question_id']) ? intval($q_row['original_question_id']) : $qid;
+
+        // Insert attempt record against the master question ID
+        $insert_attempt_stmt->bind_param("iisii", $master_qid, $exam_id, $selected, $is_correct, $time_spent);
         $insert_attempt_stmt->execute();
+
 
 
         // SRS Calculation
@@ -158,8 +163,9 @@ if ($stmt->execute()) {
 
             // Schedule at midnight of the target day, not 24h from now
             $next_review = date('Y-m-d 00:00:00', strtotime("+$new_interval days"));
-            $srs_upsert->bind_param("issii", $qid, $q_hash, $next_review, $new_interval, $new_consecutive);
+            $srs_upsert->bind_param("issii", $master_qid, $q_hash, $next_review, $new_interval, $new_consecutive);
             $srs_upsert->execute();
+
         }
     }
 

@@ -56,8 +56,9 @@ $sql = "SELECT
             MAX(q.priority) as priority,
             SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
             SUM(CASE WHEN qa.selected_answer IS NULL AND qa.id IS NOT NULL THEN 1 ELSE 0 END) as unattempted_count,
-            SUM(CASE WHEN qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as answered_count,
-            COUNT(qa.id) as total_attempts
+            COUNT(qa.selected_answer) as answered_count,
+            COUNT(qa.selected_answer) as total_attempts
+
         FROM questions q
         $srs_join
         LEFT JOIN question_attempts qa ON q.id = qa.question_id
@@ -120,13 +121,14 @@ try {
     $new_exam_id = $conn->insert_id;
     $insert_exam->close();
     
-    $insert_q = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation, priority) 
+    $insert_q = $conn->prepare("INSERT INTO questions (subject_id, lesson_id, topic_id, exam_id, question, options, answer, explanation, priority, original_question_id) 
                                  SELECT 
                                     COALESCE(subject_id, ?), 
                                     COALESCE(lesson_id, ?), 
                                     COALESCE(topic_id, ?), 
-                                    ?, question, options, answer, explanation, priority 
+                                    ?, question, options, answer, explanation, priority, id 
                                  FROM questions WHERE id = ?");
+
     
     foreach ($aggregated_questions as $q) {
         $insert_q->bind_param("iiiii", $subject_id, $lesson_id, $topic_id, $new_exam_id, $q['ref_id']);
