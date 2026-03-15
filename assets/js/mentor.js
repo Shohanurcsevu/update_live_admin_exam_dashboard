@@ -162,6 +162,26 @@ class StudyMentor {
                     const teaser = document.getElementById('mentor-teaser');
                     if (teaser) teaser.classList.add('hidden');
                 }
+            }
+
+            // Cross-device Sound Sync (Session-independent)
+            if (result.success && result.study_mentor_sound_enabled !== undefined) {
+                const serverSoundEnabled = result.study_mentor_sound_enabled === 'true';
+                if (this.isSoundEnabled !== serverSoundEnabled) {
+                    this.isSoundEnabled = serverSoundEnabled;
+                    localStorage.setItem('study_mentor_sound_enabled', this.isSoundEnabled);
+                    this.updateStatusIndicator();
+                    
+                    // Stop heartbeat if disabled by another device
+                    if (!this.isSoundEnabled && this.heartbeatAudio) {
+                        this.heartbeatAudio.pause();
+                        this.heartbeatAudio.currentTime = 0;
+                        this.heartbeatPlaying = false;
+                    }
+                }
+            }
+
+            if (result.success && !result.session) {
                 return;
             }
 
@@ -1934,11 +1954,26 @@ class StudyMentor {
         localStorage.setItem('study_mentor_sound_enabled', this.isSoundEnabled);
         this.updateStatusIndicator();
 
+        // Persist to server
+        this._saveSetting('study_mentor_sound_enabled', this.isSoundEnabled);
+
         // Stop the heartbeat audio if sound is disabled
         if (!this.isSoundEnabled && this.heartbeatAudio) {
             this.heartbeatAudio.pause();
             this.heartbeatAudio.currentTime = 0;
             this.heartbeatPlaying = false;
+        }
+    }
+
+    async _saveSetting(key, value) {
+        try {
+            await fetch('api/profile/settings.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value: String(value) })
+            });
+        } catch (e) {
+            console.error(`Failed to save setting ${key}:`, e);
         }
     }
 
