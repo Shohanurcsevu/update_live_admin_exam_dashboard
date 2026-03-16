@@ -66,14 +66,17 @@ try {
         $question_count = intval($source['question_count']);
 
         if ($question_count > 0) {
-            $fetch_sql = "SELECT id, subject_id, topic_id, question, options, answer, explanation, priority FROM questions WHERE lesson_id = ? AND is_deleted = 0";
+            $fetch_sql = "SELECT q.id, q.subject_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority, COUNT(qa.selected_answer) AS attempt_count 
+                          FROM questions q 
+                          LEFT JOIN question_attempts qa ON q.id = qa.question_id 
+                          WHERE q.lesson_id = ? AND q.is_deleted = 0";
 
             $fetch_params = [$source_lesson_id]; 
             $fetch_types = "i";
 
             if (!empty($all_fetched_question_ids)) {
                 $placeholders = str_repeat('?,', count($all_fetched_question_ids) - 1) . '?';
-                $fetch_sql .= " AND id NOT IN ($placeholders)";
+                $fetch_sql .= " AND q.id NOT IN ($placeholders)";
                 foreach ($all_fetched_question_ids as $id) {
                     $fetch_params[] = $id; 
                     $fetch_types .= 'i';
@@ -83,14 +86,14 @@ try {
             // Priority levels filter
             if (!empty($data['priority_levels'])) {
                 $priority_placeholders = implode(',', array_fill(0, count($data['priority_levels']), '?'));
-                $fetch_sql .= " AND priority IN ($priority_placeholders)";
+                $fetch_sql .= " AND q.priority IN ($priority_placeholders)";
                 foreach ($data['priority_levels'] as $p) {
                     $fetch_params[] = intval($p);
                     $fetch_types .= 'i';
                 }
             }
 
-            $fetch_sql .= " ORDER BY RAND() LIMIT ?";
+            $fetch_sql .= " GROUP BY q.id ORDER BY attempt_count ASC, RAND() LIMIT ?";
             $fetch_params[] = $question_count; 
             $fetch_types .= 'i';
 
