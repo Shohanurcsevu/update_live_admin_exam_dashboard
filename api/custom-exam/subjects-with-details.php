@@ -26,10 +26,11 @@ if ($subjects_result) {
                 l.lesson_name, 
                 l.py_bcs_ques, 
                 l.is_complete,
-                COUNT(q.id) as total_questions
+                COUNT(DISTINCT q.id) as total_questions,
+                (COUNT(DISTINCT q.id) - COUNT(DISTINCT qa.question_id)) as unseen_questions
             FROM lessons l
-            LEFT JOIN questions q ON l.id = q.lesson_id AND q.is_deleted = 0
-            LEFT JOIN exams e ON q.exam_id = e.id AND e.is_deleted = 0 AND e.topic_id IS NOT NULL
+            LEFT JOIN questions q ON l.id = q.lesson_id AND q.is_deleted = 0 AND q.original_question_id IS NULL
+            LEFT JOIN question_attempts qa ON q.id = qa.question_id
             WHERE l.subject_id = ?
             GROUP BY l.id
             ORDER BY l.lesson_name ASC

@@ -37,6 +37,7 @@
         selectionSummary: document.getElementById('selection-summary'),
         totalSelected: document.getElementById('total-selected'),
         selectedLessonsList: document.getElementById('selected-lessons-list'),
+        clearSelectionBtn: document.getElementById('clear-selection-btn'),
 
         // Step containers
         step1Content: document.getElementById('step-1-content'),
@@ -91,7 +92,11 @@
         selectPresetClose: document.getElementById('select-preset-close'),
         selectPresetCancel: document.getElementById('select-preset-cancel'),
         presetListContainer: document.getElementById('preset-list-container'),
-        targetLessonInfo: document.getElementById('target-lesson-info')
+        targetLessonInfo: document.getElementById('target-lesson-info'),
+        
+        // Magic Fill Elements
+        magicFillBtn: document.getElementById('magic-fill-btn'),
+        magicFillDropdown: document.getElementById('magic-fill-dropdown')
     };
 
     // Utility: Show toast notification
@@ -156,6 +161,11 @@
     // Fetch hierarchical data (subjects -> lessons)
     async function fetchHierarchicalData() {
         try {
+            // Always clear cached hierarchy data so freshness counts are up-to-date
+            const hierarchyCacheKey = 'rethink_cache_api/custom-exam/subjects-with-details.php';
+            localStorage.removeItem(hierarchyCacheKey);
+            state.cache.delete('api/custom-exam/subjects-with-details.php');
+            
             const data = await fetchData('api/custom-exam/subjects-with-details.php');
             state.subjects = data.sort((a, b) => a.subject_id - b.subject_id);
             renderHierarchy();
@@ -265,8 +275,18 @@
                 <span class="font-extrabold uppercase tracking-tight">${lesson.lesson_name}</span>
                 ${completionBadge}
             </div>
-            <div class="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-0.5 pl-6">
-                ${lesson.total_questions} Questions available in this lesson
+            <div class="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-0.5 pl-6 flex items-center gap-2">
+                <span>${lesson.total_questions} Questions available</span>
+                ${parseInt(lesson.unseen_questions) > 0 ? 
+                    `<span class="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                        <span class="material-symbols-outlined text-[10px]">auto_awesome</span>
+                        ${lesson.unseen_questions} Fresh
+                     </span>` : 
+                    `<span class="bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                        <span class="material-symbols-outlined text-[10px]">done_all</span>
+                        Exhausted
+                     </span>`
+                }
             </div>
         `;
 
@@ -377,6 +397,26 @@
 
         // Enable/disable next button
         elements.nextToStep2.disabled = state.selectedLessons.size === 0 || hasError || totalQuestions === 0;
+    }
+
+    // Clear all selections
+    function clearSelection() {
+        if (!confirm('Are you sure you want to clear all selected lessons?')) return;
+        
+        // Uncheck all checkboxes and clear inputs
+        document.querySelectorAll('.lesson-checkbox:checked').forEach(checkbox => {
+            checkbox.checked = false;
+            const lessonId = checkbox.dataset.lessonId;
+            const input = document.querySelector(`.lesson-input[data-lesson-id="${lessonId}"]`);
+            if (input) {
+                input.value = '';
+                input.disabled = true;
+            }
+        });
+
+        state.selectedLessons.clear();
+        updateSelectedLessons();
+        showToast('Selection cleared.', 'info');
     }
 
     // Step navigation
@@ -604,14 +644,24 @@
                 </div>
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-500 mb-3">
-                <span class="flex items-center gap-1">
+                <span class="flex items-center gap-1" title="Lessons">
                     <span class="material-symbols-outlined text-sm">library_books</span>
-                    ${lessons.length} lesson${lessons.length !== 1 ? 's' : ''}
+                    ${lessons.length}
                 </span>
-                <span class="flex items-center gap-1">
+                <span class="flex items-center gap-1" title="Total Selected Questions">
                     <span class="material-symbols-outlined text-sm">quiz</span>
-                    ${totalQuestions} question${totalQuestions !== 1 ? 's' : ''}
+                    ${totalQuestions}
                 </span>
+                ${parseInt(preset.total_unseen) > 0 ? 
+                    `<span class="ml-auto bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[12px]">magic_button</span>
+                        ${preset.total_unseen} Fresh
+                    </span>` : 
+                    `<span class="ml-auto bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[12px]">check_circle</span>
+                        Done
+                    </span>`
+                }
             </div>
             <div class="space-y-1">
                 ${lessons.slice(0, 3).map(l => `
@@ -1128,15 +1178,190 @@
         }
     });
 
-    // Close modal on backdrop click
+    // Magic Fill Logic
+    elements.magicFillBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.magicFillDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', () => {
+        elements.magicFillDropdown.classList.add('hidden');
+    });
+
+    document.querySelectorAll('.fill-option').forEach(btn => {
+        btn.onclick = async () => {
+            const source = btn.dataset.source;
+            const targetTotal = parseInt(elements.examTotalQuestions.value) || 0;
+            const currentTotal = Array.from(state.selectedLessons.values()).reduce((sum, l) => sum + (l.questionCount || 0), 0);
+
+            if (targetTotal <= currentTotal) {
+                showToast(`Target count (${targetTotal}) is already met by current selection (${currentTotal}).`, 'info');
+                return;
+            }
+
+            const gap = targetTotal - currentTotal;
+            showToast(`Filling gap of ${gap} questions from ${source}...`, 'info');
+
+            try {
+                await smartFill(gap, source);
+            } catch (err) {
+                console.error('Smart fill failed:', err);
+                showToast('Failed to perform magic fill.', 'error');
+            }
+        };
+    });
+
+    async function smartFill(gap, source) {
+        let potentialLessons = [];
+
+        if (source === 'related') {
+            // Find lessons in the same subjects as already selected, but not selected yet
+            const selectedSubjectIds = new Set(Array.from(state.selectedLessons.values()).map(l => String(l.subjectId)));
+            state.subjects.forEach(subject => {
+                if (selectedSubjectIds.has(String(subject.subject_id))) {
+                    subject.lessons.forEach(l => {
+                        if (!state.selectedLessons.has(String(l.lesson_id)) && parseInt(l.total_questions) > 0) {
+                            potentialLessons.push({
+                                lesson_id: l.lesson_id,
+                                lesson_name: l.lesson_name,
+                                subject_id: subject.subject_id,
+                                subject_name: subject.subject_name,
+                                total_questions: parseInt(l.total_questions),
+                                unseen_questions: parseInt(l.unseen_questions) || 0,
+                                score: 0 // For related, weight is neutral or based on total questions
+                            });
+                        }
+                    });
+                }
+            });
+            potentialLessons.sort((a, b) => b.total_questions - a.total_questions);
+        } else if (source === 'fresh') {
+            // Prioritize lessons with most unseen questions
+            state.subjects.forEach(subject => {
+                subject.lessons.forEach(l => {
+                    if (!state.selectedLessons.has(String(l.lesson_id)) && parseInt(l.unseen_questions) > 0) {
+                        potentialLessons.push({
+                            lesson_id: l.lesson_id,
+                            lesson_name: l.lesson_name,
+                            subject_id: subject.subject_id,
+                            subject_name: subject.subject_name,
+                            total_questions: parseInt(l.total_questions),
+                            unseen_questions: parseInt(l.unseen_questions),
+                            score: parseInt(l.unseen_questions)
+                        });
+                    }
+                });
+            });
+            potentialLessons.sort((a, b) => b.unseen_questions - a.unseen_questions);
+        } else if (source === 'weak') {
+            // Fetch recommendations for weak areas
+            const recommendations = await fetchData('api/performance/get-recommendations.php');
+            recommendations.recommendations.forEach(rec => {
+                if (rec.lesson_id && !state.selectedLessons.has(String(rec.lesson_id))) {
+                    // Find actual lesson data in state
+                    const subject = state.subjects.find(s => s.subject_id == rec.subject_id);
+                    if (subject) {
+                        const l = subject.lessons.find(ls => ls.lesson_id == rec.lesson_id);
+                        if (l && parseInt(l.total_questions) > 0) {
+                            potentialLessons.push({
+                                lesson_id: l.lesson_id,
+                                lesson_name: l.lesson_name,
+                                subject_id: subject.subject_id,
+                                subject_name: subject.subject_name,
+                                total_questions: parseInt(l.total_questions),
+                                unseen_questions: parseInt(l.unseen_questions) || 0,
+                                score: rec.wrong_rate || 100
+                            });
+                        }
+                    }
+                }
+            });
+            potentialLessons.sort((a, b) => b.score - a.score);
+        }
+
+        if (potentialLessons.length === 0) {
+            showToast('No suitable lessons found to fill the gap.', 'warning');
+            return;
+        }
+
+        let remainingGap = gap;
+        const addedLessons = [];
+
+        for (const lesson of potentialLessons) {
+            if (remainingGap <= 0) break;
+
+            const lessonId = String(lesson.lesson_id);
+            // Decide how many to take (capped at 20 or total available to avoid one lesson taking over)
+            const take = Math.min(20, lesson.total_questions, remainingGap);
+            
+            // Add to selection
+            state.selectedLessons.set(lessonId, {
+                subjectId: lesson.subject_id,
+                subjectName: lesson.subject_name,
+                lessonName: lesson.lesson_name,
+                questionCount: take,
+                maxQuestions: lesson.total_questions
+            });
+
+            // Update DOM (expand and check)
+            const subjectHeader = elements.hierarchyTree.querySelector(`.hierarchy-header[data-subject-id="${lesson.subject_id}"]`);
+            if (subjectHeader) {
+                const subjectDiv = subjectHeader.closest('.border.rounded-lg');
+                const lessonsContainer = subjectDiv.querySelector('.hierarchy-item');
+                const icon = subjectHeader.querySelector('.expand-icon');
+
+                if (lessonsContainer.classList.contains('hidden')) {
+                    icon.classList.add('expanded');
+                    lessonsContainer.classList.remove('hidden');
+                }
+
+                if (lessonsContainer.children.length === 0) {
+                    const subj = state.subjects.find(s => s.subject_id == lesson.subject_id);
+                    subj.lessons.forEach(l => {
+                        const lDiv = createLessonElement(l, subj.subject_id, subj.subject_name, subj.color_class || 'violet');
+                        lessonsContainer.appendChild(lDiv);
+                    });
+                }
+                
+                const checkbox = lessonsContainer.querySelector(`.lesson-checkbox[data-lesson-id="${lessonId}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    const input = lessonsContainer.querySelector(`.lesson-input[data-lesson-id="${lessonId}"]`);
+                    if (input) {
+                        input.disabled = false;
+                        input.value = take;
+                    }
+                }
+            }
+
+            remainingGap -= take;
+            addedLessons.push(lesson.lesson_name);
+        }
+
+        updateSelectedLessons();
+        showToast(`Magic Fill complete! Added ${addedLessons.length} lessons to fill the gap.`, 'success');
+        
+        // Update review step details
+        const currentTotal = Array.from(state.selectedLessons.values()).reduce((sum, l) => sum + (l.questionCount || 0), 0);
+        elements.examMarks.value = currentTotal;
+        elements.examDuration.value = currentTotal;
+        elements.examTotalQuestions.value = currentTotal;
+    }
+
+    // Close modals on backdrop click
     elements.presetModal.addEventListener('click', (e) => {
         if (e.target === elements.presetModal) closePresetModal();
     });
+    
+    elements.selectPresetModal.addEventListener('click', (e) => {
+        if (e.target === elements.selectPresetModal) closeSelectPresetModal();
+    });
 
-    // Close modal on Escape key
+    // Close modals on Escape key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !elements.presetModal.classList.contains('hidden')) {
-            closePresetModal();
+        if (e.key === 'Escape') {
+            if (!elements.presetModal.classList.contains('hidden')) closePresetModal();
+            if (!elements.selectPresetModal.classList.contains('hidden')) closeSelectPresetModal();
         }
     });
 
@@ -1147,6 +1372,15 @@
             saveOrUpdatePreset();
         }
     });
+
+    // Select Preset Modal buttons
+    elements.selectPresetClose.addEventListener('click', closeSelectPresetModal);
+    elements.selectPresetCancel.addEventListener('click', closeSelectPresetModal);
+
+    // Clear Selection button
+    if (elements.clearSelectionBtn) {
+        elements.clearSelectionBtn.addEventListener('click', clearSelection);
+    }
 
     // =============================================
     // INITIALIZATION

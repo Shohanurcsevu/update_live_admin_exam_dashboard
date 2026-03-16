@@ -126,8 +126,28 @@ if ($stmt->execute()) {
         $is_correct = ($selected !== null && $selected === $correct_answer) ? 1 : 0;
         $time_spent = isset($time_per_question[$qid]) ? intval($time_per_question[$qid]) : 0;
 
-        // Use original ID for stats and SRS if this is a custom question
+        // Use absolute root ID for stats and SRS to handle nested clones
         $master_qid = ($q_row['original_question_id']) ? intval($q_row['original_question_id']) : $qid;
+        
+        // Defensive: Follow the chain if it's still nested (original_question_id points to another clone)
+        $check_root_stmt = $conn->prepare("SELECT original_question_id FROM questions WHERE id = ?");
+        $temp_qid = $master_qid;
+        $safety_limit = 10;
+        while ($safety_limit > 0) {
+            $check_root_stmt->bind_param("i", $temp_qid);
+            $check_root_stmt->execute();
+            $root_res = $check_root_stmt->get_result();
+            if ($root_row = $root_res->fetch_assoc()) {
+                if ($root_row['original_question_id']) {
+                    $temp_qid = intval($root_row['original_question_id']);
+                    $master_qid = $temp_qid;
+                    $safety_limit--;
+                    continue;
+                }
+            }
+            break;
+        }
+        $check_root_stmt->close();
 
         // Insert attempt record against the master question ID
         $insert_attempt_stmt->bind_param("iisii", $master_qid, $exam_id, $selected, $is_correct, $time_spent);

@@ -26,12 +26,32 @@ switch ($method) {
 
 $conn->close();
 
-// --- GET: List all presets ---
 function handleGet($conn) {
     $result = $conn->query("SELECT * FROM exam_presets ORDER BY updated_at DESC");
     $presets = [];
     while ($row = $result->fetch_assoc()) {
-        $row['lessons_data'] = json_decode($row['lessons_data'], true);
+        $lessons_data = json_decode($row['lessons_data'], true);
+        $total_unseen = 0;
+        
+        if (!empty($lessons_data)) {
+            $lesson_ids = array_map(function($l) { return intval($l['lesson_id']); }, $lessons_data);
+            $ids_placeholder = implode(',', $lesson_ids);
+            
+            // Get total unseen questions for these lessons
+            $unseen_res = $conn->query("
+                SELECT (COUNT(DISTINCT q.id) - COUNT(DISTINCT qa.question_id)) as unseen_count
+                FROM questions q
+                LEFT JOIN question_attempts qa ON q.id = qa.question_id
+                WHERE q.lesson_id IN ($ids_placeholder) AND q.is_deleted = 0 AND q.original_question_id IS NULL
+            ");
+            if ($unseen_res) {
+                $unseen_data = $unseen_res->fetch_assoc();
+                $total_unseen = intval($unseen_data['unseen_count']);
+            }
+        }
+        
+        $row['lessons_data'] = $lessons_data;
+        $row['total_unseen'] = $total_unseen;
         $presets[] = $row;
     }
     echo json_encode(['success' => true, 'data' => $presets]);
