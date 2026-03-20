@@ -66,8 +66,11 @@ try {
         $question_count = intval($source['question_count']);
 
         if ($question_count > 0) {
+            $prioritize_weak = isset($data['prioritize_weak']) && $data['prioritize_weak'] === true;
+
             $fetch_sql = "SELECT q.id, q.original_question_id, q.subject_id, q.lesson_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority,
-                                 COUNT(qa.id) as total_attempts
+                                 COUNT(qa.id) as total_attempts,
+                                 SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count
                           FROM questions q
                           LEFT JOIN question_attempts qa ON q.id = qa.question_id
                           WHERE q.exam_id = ? AND q.is_deleted = 0";
@@ -95,7 +98,12 @@ try {
                 }
             }
 
-            $fetch_sql .= " GROUP BY q.id ORDER BY total_attempts ASC, RAND() LIMIT ?";
+            $order_by = "total_attempts ASC, RAND()";
+            if ($prioritize_weak) {
+                $order_by = "wrong_count DESC, total_attempts ASC, RAND()";
+            }
+
+            $fetch_sql .= " GROUP BY q.id ORDER BY $order_by LIMIT ?";
             $fetch_params[] = $question_count;
             $fetch_types .= 'i';
 

@@ -56,6 +56,7 @@
     const smartSliderMaxLabel = document.getElementById('smart-slider-max-label');
     const smartWeightRecency = document.getElementById('smart-weight-recency');
     const smartSubjectBalance = document.getElementById('smart-subject-balance');
+    const prioritizeWeakAreas = document.getElementById('prioritize-weak-areas');
     const smartPreviewContainer = document.getElementById('smart-preview-container');
     const smartPreviewList = document.getElementById('smart-preview-list');
 
@@ -505,7 +506,8 @@
                     pass_mark: Math.floor(parseFloat(examMarksInput.value) * 0.4)
                 },
                 source_exams: sourceExams,
-                priority_levels: getSelectedPriorities()
+                priority_levels: getSelectedPriorities(),
+                prioritize_weak: prioritizeWeakAreas ? prioritizeWeakAreas.checked : false
             };
 
             const response = await fetch(API_CREATE_EXAM, {
