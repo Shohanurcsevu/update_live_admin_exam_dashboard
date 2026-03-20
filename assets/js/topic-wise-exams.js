@@ -9,6 +9,11 @@
         selectedTopics: new Map(), // Map<topicId, {subjectId, lessonId, topicName, questionCount, maxQuestions}>
         examDetails: {},
         // Using global CacheManager instead of local state.cache
+        presets: [],
+        editingPresetId: null,
+        editingTopics: [], // Array of {topic_id, topic_name, question_count, lesson_name, subject_name}
+        targetTopic: null, // {topic_id, topic_name, lesson_name, subject_name, qty}
+        hierarchyReady: false
     };
 
     // === SUBJECT COLOR CONFIG ===
@@ -66,14 +71,39 @@
         reviewMarks: document.getElementById('review-marks'),
         reviewQuestions: document.getElementById('review-questions'),
         reviewNegative: document.getElementById('review-negative'),
-        reviewTopicsList: document.getElementById('review-topics-list')
+        reviewTopicsList: document.getElementById('review-topics-list'),
+
+        // Preset elements
+        presetsGrid: document.getElementById('presets-grid'),
+        presetsLoading: document.getElementById('presets-loading'),
+        presetsEmpty: document.getElementById('presets-empty'),
+        savePresetBtn: document.getElementById('save-preset-btn'),
+        presetModal: document.getElementById('preset-modal'),
+        presetModalTitle: document.getElementById('preset-modal-title'),
+        presetNameInput: document.getElementById('preset-name-input'),
+        presetModalTopics: document.getElementById('preset-modal-topics'),
+        presetModalCancel: document.getElementById('preset-modal-cancel'),
+        presetModalSave: document.getElementById('preset-modal-save'),
+        addCurrentToPresetBtn: document.getElementById('add-current-to-preset'),
+
+        // Select Preset Modal
+        selectPresetModal: document.getElementById('select-preset-modal'),
+        selectPresetClose: document.getElementById('select-preset-close'),
+        selectPresetCancel: document.getElementById('select-preset-cancel'),
+        presetListContainer: document.getElementById('preset-list-container'),
+        targetTopicInfo: document.getElementById('target-topic-info'),
+        
+        // Magic Fill Elements
+        magicFillBtn: document.getElementById('magic-fill-btn'),
+        magicFillDropdown: document.getElementById('magic-fill-dropdown'),
+        clearSelectionBtn: document.getElementById('clear-selection-btn')
     };
 
     // Utility: Show toast notification
     function showToast(message, type = 'info') {
         const toastContainer = document.getElementById('toast-container');
         const toast = document.createElement('div');
-        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-amber-500' : 'bg-blue-500';
 
         toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg mb-2 transition-opacity duration-300`;
         toast.textContent = message;
@@ -103,6 +133,8 @@
             const subjectsData = await fetchData('api/custom-exam/subjects-with-details.php');
             state.subjects = subjectsData.sort((a, b) => a.subject_id - b.subject_id);
             renderHierarchy();
+            state.hierarchyReady = true;
+            loadPresets();
         } catch (error) {
             console.error('Error fetching hierarchical data:', error);
             showToast('Failed to load subjects. Please refresh the page.', 'error');
@@ -133,6 +165,7 @@
         const header = document.createElement('div');
         header.className = 'hierarchy-header transition-all duration-300 rounded-lg p-2';
         header.style.color = colors.text;
+        header.dataset.subjectId = subject.subject_id;
         header.innerHTML = `
             <span class="material-symbols-outlined expand-icon mr-2" style="color: ${colors.border}">chevron_right</span>
             <span class="font-black uppercase tracking-tight">${subject.subject_name}</span>
@@ -177,7 +210,8 @@
 
         const header = document.createElement('div');
         header.className = 'hierarchy-header flex items-center group cursor-pointer';
-
+        header.dataset.lessonId = lesson.lesson_id; // Added data-lesson-id
+        
         const completionBadge = isComplete
             ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-0.5" style="background-color: ${colors.border}; color: white">
                 <span class="material-symbols-outlined text-[10px]">check_circle</span> Complete
@@ -195,13 +229,13 @@
         topicsContainer.className = 'hierarchy-item hidden mt-2 space-y-1';
 
         async function expandLesson() {
-            if (topicsContainer.children.length > 0) return;
+            if (topicsContainer.children.length > 0 && !topicsContainer.querySelector('.text-red-500')) return; // Don't re-fetch if already loaded successfully
 
             topicsContainer.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading topics...</div>';
 
             try {
                 const topics = await fetchData(`api/custom-exam/topics.php?lesson_id=${lesson.lesson_id}`);
-                lesson.topics = topics || [];
+                lesson.topics = topics || []; // Store topics in the lesson object for later access
 
                 header.querySelector('.lessons-count').textContent = `(${lesson.topics.length} topics)`;
                 topicsContainer.innerHTML = '';
@@ -216,6 +250,7 @@
                     topicsContainer.appendChild(topicDiv);
                 });
             } catch (error) {
+                console.error(`Error fetching topics for lesson ${lesson.lesson_id}:`, error);
                 topicsContainer.innerHTML = '<div class="py-2 text-sm text-red-500">Failed to load topics.</div>';
             }
         }
@@ -286,7 +321,7 @@
         checkbox.addEventListener('change', (e) => {
             input.disabled = !e.target.checked;
             if (e.target.checked) {
-                input.value = Math.min(1, topic.total_questions); // Default to 5 or max available
+                input.value = Math.min(1, topic.total_questions); // Default to 1 or max available
                 updateSelectedTopics();
             } else {
                 input.value = '';
@@ -301,12 +336,24 @@
             }
         });
 
+        // Add to Preset button
+        const addToPresetBtn = document.createElement('button');
+        addToPresetBtn.className = 'add-to-preset-btn p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all flex items-center justify-center';
+        addToPresetBtn.title = 'Add this topic to a preset';
+        addToPresetBtn.innerHTML = '<span class="material-symbols-outlined text-lg">bookmark_add</span>';
+        addToPresetBtn.onclick = (e) => {
+            e.stopPropagation();
+            const qty = parseInt(input.value) || 1;
+            openSelectPresetModal(topic.id, topic.topic_name, lessonId, subjectId, qty);
+        };
+
         label.addEventListener('click', () => {
             checkbox.checked = !checkbox.checked;
             checkbox.dispatchEvent(new Event('change'));
         });
 
         inputContainer.appendChild(input);
+        inputContainer.appendChild(addToPresetBtn);
 
         div.appendChild(checkbox);
         div.appendChild(label);
@@ -354,12 +401,38 @@
             elements.selectedTopicsList.innerHTML = Array.from(state.selectedTopics.entries())
                 .map(([id, data]) => `<div>• ${data.topicName}: ${data.questionCount} questions</div>`)
                 .join('');
+            // Show save preset button
+            elements.savePresetBtn.classList.remove('hidden');
+            elements.savePresetBtn.classList.add('flex');
         } else {
             elements.selectionSummary.classList.add('hidden');
+            // Hide save preset button
+            elements.savePresetBtn.classList.add('hidden');
+            elements.savePresetBtn.classList.remove('flex');
         }
 
         // Enable/disable next button
         elements.nextToStep2.disabled = state.selectedTopics.size === 0 || hasError || totalQuestions === 0;
+    }
+
+    // Clear all selections
+    function clearSelection() {
+        if (!confirm('Are you sure you want to clear all selected topics?')) return;
+        
+        // Uncheck all checkboxes and clear inputs
+        document.querySelectorAll('.topic-checkbox:checked').forEach(checkbox => {
+            checkbox.checked = false;
+            const topicId = checkbox.dataset.topicId;
+            const input = document.querySelector(`.topic-input[data-topic-id="${topicId}"]`);
+            if (input) {
+                input.value = '';
+                input.disabled = true;
+            }
+        });
+
+        state.selectedTopics.clear();
+        updateSelectedTopics();
+        showToast('Selection cleared.', 'info');
     }
 
     // Step navigation
@@ -528,6 +601,505 @@
         }
     }
 
+    // =============================================
+    // PRESET SYSTEM
+    // =============================================
+
+    // Fetch all presets from API
+    async function loadPresets() {
+        elements.presetsLoading.classList.remove('hidden');
+        elements.presetsEmpty.classList.add('hidden');
+        elements.presetsGrid.innerHTML = '';
+
+        try {
+            const response = await fetch('api/custom-exam/presets.php?type=topic');
+            const result = await response.json();
+
+            if (result.success) {
+                state.presets = result.data;
+                renderPresets();
+            } else {
+                showToast('Failed to load presets.', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading presets:', error);
+        } finally {
+            elements.presetsLoading.classList.add('hidden');
+        }
+    }
+
+    // Render preset cards
+    function renderPresets() {
+        elements.presetsGrid.innerHTML = '';
+
+        if (state.presets.length === 0) {
+            elements.presetsEmpty.classList.remove('hidden');
+            return;
+        }
+
+        elements.presetsEmpty.classList.add('hidden');
+
+        state.presets.forEach(preset => {
+            const card = createPresetCard(preset);
+            elements.presetsGrid.appendChild(card);
+        });
+    }
+
+    // Create a single preset card
+    function createPresetCard(preset) {
+        const topics = preset.lessons_data || []; // Note: API returns it as lessons_data even for topics
+        const totalQuestions = topics.reduce((sum, t) => sum + (parseInt(t.question_count) || 0), 0);
+
+        const card = document.createElement('div');
+        card.className = 'preset-card';
+
+        card.innerHTML = `
+            <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="material-symbols-outlined text-indigo-500 text-xl flex-shrink-0">bookmark</span>
+                    <h4 class="font-bold text-gray-800 text-sm truncate">${preset.preset_name}</h4>
+                </div>
+                <div class="preset-actions flex items-center gap-1 flex-shrink-0 ml-2">
+                    <button class="preset-edit-btn p-1 rounded hover:bg-indigo-100 transition-colors" title="Edit Preset" data-id="${preset.id}">
+                        <span class="material-symbols-outlined text-indigo-500 text-base">edit</span>
+                    </button>
+                    <button class="preset-delete-btn p-1 rounded hover:bg-red-100 transition-colors" title="Delete Preset" data-id="${preset.id}">
+                        <span class="material-symbols-outlined text-red-400 text-base">delete</span>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-gray-500 mb-3">
+                <span class="flex items-center gap-1" title="Topics">
+                    <span class="material-symbols-outlined text-sm">hub</span>
+                    ${topics.length}
+                </span>
+                <span class="flex items-center gap-1" title="Total Selected Questions">
+                    <span class="material-symbols-outlined text-sm">quiz</span>
+                    ${totalQuestions}
+                </span>
+            </div>
+            <div class="space-y-1">
+                ${topics.slice(0, 3).map(t => `
+                    <div class="text-[11px] text-gray-500 truncate flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                        ${t.topic_name}: ${t.question_count}q
+                    </div>
+                `).join('')}
+                ${topics.length > 3 ? `<div class="text-[11px] text-indigo-500 font-semibold">+${topics.length - 3} more...</div>` : ''}
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-100">
+                <div class="text-[10px] text-indigo-600 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">arrow_forward</span>
+                    Click to apply & continue
+                </div>
+            </div>
+        `;
+
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.preset-edit-btn') || e.target.closest('.preset-delete-btn')) return;
+            applyPreset(preset);
+        });
+
+        card.querySelector('.preset-edit-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEditPresetModal(preset);
+        });
+
+        card.querySelector('.preset-delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deletePreset(preset.id, preset.preset_name);
+        });
+
+        return card;
+    }
+
+    // Apply a preset
+    async function applyPreset(preset) {
+        const topics = preset.lessons_data || [];
+        if (topics.length === 0) {
+            showToast('This preset has no topics.', 'error');
+            return;
+        }
+
+        if (!state.hierarchyReady) {
+            showToast('Loading topics data, please wait...', 'info');
+            return;
+        }
+
+        // Clear existing
+        document.querySelectorAll('.topic-checkbox:checked').forEach(cb => {
+            cb.checked = false;
+            cb.dispatchEvent(new Event('change'));
+        });
+        // For each topic in the preset, we need to:
+        // 1. Expand hierarchy
+        // 2. Check checkbox
+        // 3. Set question count
+        let appliedTopicCount = 0;
+        let missedTopicCount = 0;
+        let requestedTotalQuestions = 0;
+        let appliedTotalQuestions = 0;
+
+        for (const presetTopic of topics) {
+            const topicId = String(presetTopic.topic_id);
+            const lessonId = presetTopic.lesson_id;
+            const subjectId = presetTopic.subject_id;
+            const desiredQ = parseInt(presetTopic.question_count) || 1;
+            requestedTotalQuestions += desiredQ;
+            
+            await expandToTopic(topicId, lessonId, subjectId);
+
+            const checkbox = document.querySelector(`.topic-checkbox[data-topic-id="${topicId}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                const input = document.querySelector(`.topic-input[data-topic-id="${topicId}"]`);
+                if (input) {
+                    input.disabled = false;
+                    const maxQ = parseInt(checkbox.dataset.maxQuestions) || 0;
+                    const finalQ = Math.min(desiredQ, maxQ);
+                    input.value = finalQ;
+                    appliedTotalQuestions += finalQ;
+                }
+                appliedTopicCount++;
+            } else {
+                missedTopicCount++;
+                console.warn(`Topic ${topicId} not found in DOM after expansion.`);
+            }
+        }
+
+        updateSelectedTopics();
+
+        // Informational Feedback
+        if (missedTopicCount > 0) {
+            showToast(`Applied ${appliedTopicCount} topics, but missed ${missedTopicCount} (not found in current hierarchy).`, 'warning');
+        } else if (appliedTotalQuestions < requestedTotalQuestions) {
+            const diff = requestedTotalQuestions - appliedTotalQuestions;
+            showToast(`Applied with ${diff} fewer questions than preset (some topics had limited availability).`, 'warning');
+        } else {
+            showToast(`Preset applied successfully: ${appliedTotalQuestions} questions total.`, 'success');
+        }
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        elements.examName.value = `${preset.preset_name} - ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, ${dateStr}`;
+        
+        goToStep(2);
+    }
+
+    // Helper to expand hierarchy to reach a specific topic
+    async function expandToTopic(topicId, lessonId = null, subjectId = null) {
+        let targetSub = null;
+        let targetLes = null;
+
+        if (lessonId && subjectId) {
+            // Use provided IDs if available (much faster and more reliable for presets)
+            targetSub = state.subjects.find(s => String(s.subject_id) === String(subjectId));
+            if (targetSub) {
+                targetLes = targetSub.lessons.find(l => String(l.lesson_id) === String(lessonId));
+            }
+        }
+
+        if (!targetSub || !targetLes) {
+            // Fallback to searching only if topics are already loaded for a lesson
+            for (const sub of state.subjects) {
+                for (const les of sub.lessons) {
+                    if (les.topics && les.topics.find(t => String(t.id) === String(topicId))) {
+                        targetSub = sub;
+                        targetLes = les;
+                        break;
+                    }
+                }
+                if (targetSub) break;
+            }
+        }
+
+        if (!targetSub || !targetLes) {
+            console.warn(`Topic ${topicId} not found in hierarchy state. Expansion skipped.`);
+            return;
+        }
+
+        // 1. Expand Subject
+        const subHeader = elements.hierarchyTree.querySelector(`.hierarchy-header[data-subject-id="${targetSub.subject_id}"]`);
+        if (subHeader) {
+            const lessonsContainer = subHeader.nextElementSibling;
+            if (lessonsContainer.classList.contains('hidden')) {
+                subHeader.click(); // Simulate click to expand subject
+            }
+
+            // 2. Expand Lesson (inside the subject's lessons container)
+            const lesHeader = lessonsContainer.querySelector(`.hierarchy-header[data-lesson-id="${targetLes.lesson_id}"]`);
+            if (lesHeader) {
+                const topicsContainer = lesHeader.nextElementSibling;
+                // If the lesson is hidden, expand it
+                if (topicsContainer.classList.contains('hidden')) {
+                    lesHeader.click();
+                }
+
+                // Wait for the topic specifically to be in the DOM
+                if (!topicsContainer.querySelector(`.topic-checkbox[data-topic-id="${topicId}"]`)) {
+                    await new Promise(resolve => {
+                        const observer = new MutationObserver((mutations, obs) => {
+                            if (topicsContainer.querySelector(`.topic-checkbox[data-topic-id="${topicId}"]`)) {
+                                obs.disconnect();
+                                resolve();
+                            }
+                        });
+                        observer.observe(topicsContainer, { childList: true, subtree: true });
+                        
+                        // Timeout after 5 seconds
+                        setTimeout(() => {
+                            observer.disconnect();
+                            resolve();
+                        }, 5000);
+                    });
+                }
+            }
+        }
+    }
+
+    // Modal management functions
+    function openEditPresetModal(preset) {
+        state.editingPresetId = preset.id;
+        elements.presetModalTitle.textContent = 'Edit Preset';
+        elements.presetNameInput.value = preset.preset_name;
+        state.editingTopics = [...preset.lessons_data];
+        renderPresetModalTopics();
+        elements.presetModal.classList.remove('hidden');
+    }
+
+    function renderPresetModalTopics() {
+        elements.presetModalTopics.innerHTML = state.editingTopics.map((t, index) => `
+            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group">
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs font-black text-indigo-600 uppercase tracking-widest mb-0.5">${t.subject_name || ''}</div>
+                    <div class="font-bold text-gray-800 text-sm truncate">${t.topic_name}</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="number" value="${t.question_count}" min="1" 
+                        class="w-16 px-2 py-1 border border-gray-200 rounded-lg text-sm text-center font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                        onchange="window.updateEditTopicQty(${index}, this.value)">
+                    <button onclick="window.removeTopicFromEdit(${index})" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                        <span class="material-symbols-outlined text-base">delete</span>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.updateEditTopicQty = (index, val) => {
+        state.editingTopics[index].question_count = parseInt(val) || 1;
+    };
+
+    window.removeTopicFromEdit = (index) => {
+        state.editingTopics.splice(index, 1);
+        renderPresetModalTopics();
+    };
+
+    async function savePreset() {
+        const name = elements.presetNameInput.value.trim();
+        if (!name) {
+            showToast('Please enter a preset name.', 'error');
+            return;
+        }
+
+        if (state.editingTopics.length === 0) {
+            showToast('Preset must have at least one topic.', 'error');
+            return;
+        }
+
+        const payload = {
+            id: state.editingPresetId,
+            preset_name: name,
+            lessons_data: state.editingTopics, // API expects lessons_data
+            type: 'topic'
+        };
+
+        const method = state.editingPresetId ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch('api/custom-exam/presets.php', {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(result.message, 'success');
+                elements.presetModal.classList.add('hidden');
+                loadPresets();
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Failed to save preset.', 'error');
+        }
+    }
+
+    async function deletePreset(id, name) {
+        if (!confirm(`Are you sure you want to delete preset "${name}"?`)) return;
+
+        try {
+            const response = await fetch('api/custom-exam/presets.php', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Preset deleted.', 'success');
+                loadPresets();
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Failed to delete preset.', 'error');
+        }
+    }
+
+    function openSelectPresetModal(topicId, topicName, lessonId, subjectId, qty) {
+        state.targetTopic = { 
+            topic_id: topicId, 
+            topic_name: topicName, 
+            lesson_id: lessonId, 
+            subject_id: subjectId, 
+            question_count: qty,
+            subject_name: getSubjectName(subjectId)
+        };
+        elements.targetTopicInfo.textContent = topicName;
+        renderSelectPresetList();
+        elements.selectPresetModal.classList.remove('hidden');
+    }
+
+    function getSubjectName(id) {
+        const sub = state.subjects.find(s => String(s.subject_id) === String(id));
+        return sub ? sub.subject_name : '';
+    }
+
+    function renderSelectPresetList() {
+        if (state.presets.length === 0) {
+            elements.presetListContainer.innerHTML = '<div class="text-center py-4 text-gray-500">No presets found. Create one first!</div>';
+            return;
+        }
+
+        elements.presetListContainer.innerHTML = state.presets.map(p => `
+            <button onclick="window.addTopicToExistingPreset(${p.id})" class="w-full text-left p-4 rounded-xl border border-gray-100 hover:border-indigo-500 hover:bg-indigo-50 transition-all flex items-center justify-between group">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-indigo-400">bookmark</span>
+                    <span class="font-bold text-gray-700">${p.preset_name}</span>
+                </div>
+                <span class="material-symbols-outlined text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span>
+            </button>
+        `).join('');
+    }
+
+    window.addTopicToExistingPreset = async (presetId) => {
+        const preset = state.presets.find(p => p.id === presetId);
+        if (!preset) return;
+
+        const topics = [...preset.lessons_data];
+        const existingIdx = topics.findIndex(t => String(t.topic_id) === String(state.targetTopic.topic_id));
+
+        if (existingIdx > -1) {
+            topics[existingIdx].question_count = state.targetTopic.question_count;
+            // Also ensure IDs are updated/present
+            topics[existingIdx].lesson_id = state.targetTopic.lesson_id;
+            topics[existingIdx].subject_id = state.targetTopic.subject_id;
+        } else {
+            topics.push({
+                topic_id: state.targetTopic.topic_id,
+                topic_name: state.targetTopic.topic_name,
+                question_count: state.targetTopic.question_count,
+                lesson_id: state.targetTopic.lesson_id,
+                subject_id: state.targetTopic.subject_id,
+                subject_name: state.targetTopic.subject_name
+            });
+        }
+
+        const payload = {
+            id: presetId,
+            preset_name: preset.preset_name,
+            lessons_data: topics,
+            type: 'topic'
+        };
+
+        try {
+            const response = await fetch('api/custom-exam/presets.php', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(`Topic added to "${preset.preset_name}"`, 'success');
+                elements.selectPresetModal.classList.add('hidden');
+                loadPresets();
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Failed to update preset.', 'error');
+        }
+    };
+
+    // Magic Fill Logic
+    function handleMagicFill(source) {
+        const targetTotal = parseInt(elements.examTotalQuestions.value);
+        if (!targetTotal || targetTotal <= 0) {
+            showToast('Please enter a target total questions.', 'error');
+            return;
+        }
+
+        const selectedCount = state.selectedTopics.size;
+        if (selectedCount === 0) {
+            showToast('Please select at least one topic.', 'error');
+            return;
+        }
+
+        if (source === 'fresh') {
+            // Fill based on max questions available in each topic
+            const baseQty = Math.floor(targetTotal / selectedCount);
+            let remainder = targetTotal % selectedCount;
+
+            document.querySelectorAll('.topic-checkbox:checked').forEach((cb, idx) => {
+                const topicId = cb.dataset.topicId;
+                const input = document.querySelector(`.topic-input[data-topic-id="${topicId}"]`);
+                const maxQ = parseInt(cb.dataset.maxQuestions);
+                let qty = baseQty + (idx < remainder ? 1 : 0);
+                input.value = Math.min(qty, maxQ);
+            });
+        } else if (source === 'balanced') {
+            // Keep existing ratio but scale to total
+            let currentTotal = 0;
+            state.selectedTopics.forEach(t => currentTotal += t.questionCount);
+            
+            if (currentTotal === 0) {
+                handleMagicFill('fresh');
+                return;
+            }
+
+            const factor = targetTotal / currentTotal;
+            document.querySelectorAll('.topic-checkbox:checked').forEach(cb => {
+                const topicId = cb.dataset.topicId;
+                const input = document.querySelector(`.topic-input[data-topic-id="${topicId}"]`);
+                const currentVal = parseInt(input.value) || 1;
+                const maxQ = parseInt(cb.dataset.maxQuestions);
+                input.value = Math.min(Math.round(currentVal * factor), maxQ);
+            });
+        }
+
+        updateSelectedTopics();
+        // Recalculate duration and marks based on new totals
+        const newTotal = Array.from(state.selectedTopics.values())
+            .reduce((sum, topic) => sum + topic.questionCount, 0);
+        elements.examTotalQuestions.value = newTotal;
+        elements.examDuration.value = newTotal;
+        elements.examMarks.value = newTotal;
+        showToast(`Magic Fill applied (${source})`, 'success');
+        elements.magicFillDropdown.classList.add('hidden');
+    }
+
     // Event listeners
     elements.nextToStep2.addEventListener('click', () => goToStep(2));
     elements.backToStep1.addEventListener('click', () => goToStep(1));
@@ -542,6 +1114,92 @@
     });
     elements.backToStep2.addEventListener('click', () => goToStep(2));
     elements.generateExamBtn.addEventListener('click', generateExam);
+
+    // Preset event listeners
+    elements.savePresetBtn?.addEventListener('click', () => {
+        state.editingPresetId = null;
+        elements.presetModalTitle.textContent = 'Save as Preset';
+        elements.presetNameInput.value = '';
+        state.editingTopics = Array.from(state.selectedTopics.entries()).map(([id, data]) => ({
+            topic_id: id,
+            topic_name: data.topicName,
+            question_count: data.questionCount,
+            lesson_id: data.lessonId,
+            subject_id: data.subjectId,
+            subject_name: getSubjectName(data.subjectId)
+        }));
+        renderPresetModalTopics();
+        elements.presetModal.classList.remove('hidden');
+    });
+
+    elements.presetModalCancel?.addEventListener('click', () => {
+        elements.presetModal.classList.add('hidden');
+    });
+
+    elements.presetModalSave?.addEventListener('click', savePreset);
+
+    // Add current selection to preset modal
+    elements.addCurrentToPresetBtn?.addEventListener('click', () => {
+        if (state.selectedTopics.size === 0) {
+            showToast('No topics selected in Step 1 to add.', 'warning');
+            return;
+        }
+
+        let addedCount = 0;
+        state.selectedTopics.forEach((data, topicIdStr) => {
+            const topicId = parseInt(topicIdStr);
+            const exists = state.editingTopics.find(t => String(t.topic_id) === String(topicId));
+
+            if (!exists) {
+                state.editingTopics.push({
+                    topic_id: topicId,
+                    topic_name: data.topicName,
+                    question_count: data.questionCount,
+                    lesson_id: data.lessonId,
+                    subject_id: data.subjectId,
+                    subject_name: getSubjectName(data.subjectId)
+                });
+                addedCount++;
+            }
+        });
+
+        if (addedCount > 0) {
+            renderPresetModalTopics();
+            showToast(`Added ${addedCount} new topic(s) to preset.`, 'success');
+        } else {
+            showToast('Selected topics are already in this preset.', 'info');
+        }
+    });
+
+    elements.selectPresetClose?.addEventListener('click', () => {
+        elements.selectPresetModal.classList.add('hidden');
+    });
+
+    elements.selectPresetCancel?.addEventListener('click', () => {
+        elements.selectPresetModal.classList.add('hidden');
+    });
+
+    // Magic Fill event listeners
+    elements.magicFillBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.magicFillDropdown.classList.toggle('hidden');
+    });
+
+    document.querySelectorAll('[data-magic-fill]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            handleMagicFill(btn.dataset.magicFill);
+        });
+    });
+
+    // Close dropdowns on outside click
+    document.addEventListener('click', (e) => {
+        if (elements.magicFillBtn && !elements.magicFillBtn.contains(e.target)) {
+            elements.magicFillDropdown.classList.add('hidden');
+        }
+    });
+
+    // Clear selection
+    elements.clearSelectionBtn?.addEventListener('click', clearSelection);
 
     // Initialize
     fetchHierarchicalData();

@@ -126,6 +126,6 @@ try {
     $response['message'] = $e->getMessage();
 }
 
-    echo json_encode(['success' => true, 'data' => $response]);
+    echo json_encode($response);
 $conn->close();
 ?>

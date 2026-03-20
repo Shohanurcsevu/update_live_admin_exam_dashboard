@@ -66,8 +66,11 @@ try {
         $question_count = intval($source['question_count']);
 
         if ($question_count > 0) {
-            $fetch_sql = "SELECT id, original_question_id, subject_id, lesson_id, topic_id, question, options, answer, explanation, priority
-                          FROM questions WHERE exam_id = ? AND is_deleted = 0";
+            $fetch_sql = "SELECT q.id, q.original_question_id, q.subject_id, q.lesson_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority,
+                                 COUNT(qa.id) as total_attempts
+                          FROM questions q
+                          LEFT JOIN question_attempts qa ON q.id = qa.question_id
+                          WHERE q.exam_id = ? AND q.is_deleted = 0";
 
             $fetch_params = [$source_exam_id];
             $fetch_types = "i";
@@ -75,7 +78,7 @@ try {
             // Exclude already used
             if (!empty($used_question_ids)) {
                 $placeholders = implode(',', array_fill(0, count($used_question_ids), '?'));
-                $fetch_sql .= " AND id NOT IN ($placeholders)";
+                $fetch_sql .= " AND q.id NOT IN ($placeholders)";
                 foreach ($used_question_ids as $id) {
                     $fetch_params[] = $id;
                     $fetch_types .= 'i';
@@ -85,14 +88,14 @@ try {
             // Priority levels filter
             if (!empty($data['priority_levels'])) {
                 $priority_placeholders = implode(',', array_fill(0, count($data['priority_levels']), '?'));
-                $fetch_sql .= " AND priority IN ($priority_placeholders)";
+                $fetch_sql .= " AND q.priority IN ($priority_placeholders)";
                 foreach ($data['priority_levels'] as $p) {
                     $fetch_params[] = intval($p);
                     $fetch_types .= 'i';
                 }
             }
 
-            $fetch_sql .= " ORDER BY RAND() LIMIT ?";
+            $fetch_sql .= " GROUP BY q.id ORDER BY total_attempts ASC, RAND() LIMIT ?";
             $fetch_params[] = $question_count;
             $fetch_types .= 'i';
 

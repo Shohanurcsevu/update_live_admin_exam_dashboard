@@ -66,14 +66,17 @@ try {
         $question_count = intval($source['question_count']);
 
         if ($question_count > 0) {
-            $fetch_sql = "SELECT q.id, q.subject_id, q.lesson_id, q.question, q.options, q.answer, q.explanation, q.priority FROM questions q WHERE q.topic_id = ? AND q.is_deleted = 0 AND q.original_question_id IS NULL";
+            $fetch_sql = "SELECT q.id, q.subject_id, q.lesson_id, q.question, q.options, q.answer, q.explanation, q.priority, COUNT(qa.id) AS attempt_count 
+                          FROM questions q 
+                          LEFT JOIN question_attempts qa ON q.id = qa.question_id 
+                          WHERE q.topic_id = ? AND q.is_deleted = 0 AND q.original_question_id IS NULL";
 
             $fetch_params = [$source_topic_id];
             $fetch_types = "i";
 
             if (!empty($all_fetched_question_ids)) {
                 $placeholders = implode(',', array_fill(0, count($all_fetched_question_ids), '?'));
-                $fetch_sql .= " AND id NOT IN ($placeholders)";
+                $fetch_sql .= " AND q.id NOT IN ($placeholders)";
                 foreach ($all_fetched_question_ids as $id) {
                     $fetch_params[] = $id;
                     $fetch_types .= 'i';
@@ -90,7 +93,7 @@ try {
                 }
             }
 
-            $fetch_sql .= " ORDER BY RAND() LIMIT ?";
+            $fetch_sql .= " GROUP BY q.id ORDER BY attempt_count ASC, RAND() LIMIT ?";
             $fetch_params[] = $question_count;
             $fetch_types .= 'i';
 

@@ -169,10 +169,9 @@ function initializeDashboardPage() {
         if (!container || !list) return;
 
         try {
-            const response = await fetch('api/performance/get-recommendations.php');
-            const result = await response.json();
+            const result = await CacheManager.fetchWithCache('api/performance/get-recommendations.php', 0.5, false, skipRevalidate);
 
-            if (result.success && result.recommendations.length > 0) {
+            if (result && result.success && result.recommendations && result.recommendations.length > 0) {
                 list.innerHTML = result.recommendations.map(rec => {
                     const icon = rec.type === 'critical' ? 'priority_high' : (rec.type === 'revision' ? 'history' : 'explore');
                     const bgColor = rec.type === 'critical' ? 'bg-red-600' : (rec.type === 'revision' ? 'bg-amber-600' : 'bg-blue-600');

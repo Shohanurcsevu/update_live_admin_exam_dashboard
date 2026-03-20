@@ -8,8 +8,10 @@
 require_once '../subject/db_connect.php';
 
 // Enable error reporting for debugging Phase 2
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+// ini_set('display_errors', 1);
+// error_reporting(E_ALL);
+ini_set('display_errors', 0);
+error_reporting(0);
 
 function log_activity($conn, $type, $message) {
     $stmt = $conn->prepare("INSERT INTO activity_log (activity_type, activity_message) VALUES (?, ?)");
@@ -29,11 +31,11 @@ if (empty($data['attempt_uuid']) || empty($data['exam_id']) || !isset($data['ans
 
 $uuid = $data['attempt_uuid'];
 $exam_id = intval($data['exam_id']);
-$answers = $data['answers']; // Format: { "q_id": "option_key" }
-$start_time = $data['start_time'];
-$end_time = $data['end_time'];
-$duration_used = intval($data['duration_used']);
-$client_checksum = $data['checksum'];
+$answers = $data['answers'] ?? []; // Format: { "q_id": "option_key" }
+$start_time = $data['start_time'] ?? date('Y-m-d H:i:s');
+$end_time = $data['end_time'] ?? date('Y-m-d H:i:s');
+$duration_used = intval($data['duration_used'] ?? 0);
+$client_checksum = $data['checksum'] ?? '';
 
 // 1. Check for duplicate submission by UUID
 $dup_stmt = $conn->prepare("SELECT id FROM offline_exam_attempts WHERE attempt_uuid = ?");
@@ -109,53 +111,58 @@ if ($stmt->execute()) {
     $exam_info = $exam_info_stmt->get_result()->fetch_assoc();
     $exam_info_stmt->close();
 
-    // Get next attempt number for this exam
-    $att_num_stmt = $conn->prepare("SELECT MAX(attempt_number) as max_att FROM performance WHERE exam_id = ?");
-    $att_num_stmt->bind_param("i", $exam_id);
-    $att_num_stmt->execute();
-    $max_att = $att_num_stmt->get_result()->fetch_assoc()['max_att'];
-    $new_att_num = $max_att ? $max_att + 1 : 1;
-    $att_num_stmt->close();
+    if ($exam_info) {
+        // Get next attempt number for this exam
+        $att_num_stmt = $conn->prepare("SELECT MAX(attempt_number) as max_att FROM performance WHERE exam_id = ?");
+        $att_num_stmt->bind_param("i", $exam_id);
+        $att_num_stmt->execute();
+        $max_att = $att_num_stmt->get_result()->fetch_assoc()['max_att'];
+        $new_att_num = $max_att ? $max_att + 1 : 1;
+        $att_num_stmt->close();
 
-    $perf_stmt = $conn->prepare("INSERT INTO performance (subject_id, lesson_id, topic_id, exam_id, attempt_number, selected_answers, score, score_with_negative, right_answers, wrong_answers, unanswered, time_used_seconds, time_left_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
-    
-    // Simplification: offline mode might not track "time_left" perfectly if it finished by submit
-    $perf_stmt->bind_param("iiiiisddiiii",
-        $exam_info['subject_id'],
-        $exam_info['lesson_id'],
-        $exam_info['topic_id'],
-        $exam_id,
-        $new_att_num,
-        $answers_json,
-        $score,
-        $score_with_negative,
-        $right,
-        $wrong,
-        $unanswered,
-        $duration_used
-    );
-    $perf_stmt->execute();
-    $perf_id = $conn->insert_id;
-    $perf_stmt->close();
+        $perf_stmt = $conn->prepare("INSERT INTO performance (subject_id, lesson_id, topic_id, exam_id, attempt_number, selected_answers, score, score_with_negative, right_answers, wrong_answers, unanswered, time_used_seconds, time_left_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
+        
+        // Simplification: offline mode might not track "time_left" perfectly if it finished by submit
+        $perf_stmt->bind_param("iiiiisddiiii",
+            $exam_info['subject_id'],
+            $exam_info['lesson_id'],
+            $exam_info['topic_id'],
+            $exam_id,
+            $new_att_num,
+            $answers_json,
+            $score,
+            $score_with_negative,
+            $right,
+            $wrong,
+            $unanswered,
+            $duration_used
+        );
+        $perf_stmt->execute();
+        $perf_id = $conn->insert_id;
+        $perf_stmt->close();
 
-    // --- NEW: Update Subject Discipline Tracking ---
-    $update_subject = $conn->prepare("
-        UPDATE subjects 
-        SET study_streak = CASE 
-            WHEN DATE(last_study_at) = CURRENT_DATE THEN study_streak
-            WHEN DATE(last_study_at) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY) THEN study_streak + 1
-            ELSE 1 
-        END,
-        last_study_at = CURRENT_TIMESTAMP 
-        WHERE id = ?
-    ");
-    $update_subject->bind_param("i", $exam_info['subject_id']);
-    $update_subject->execute();
-    $update_subject->close();
+        // --- NEW: Update Subject Discipline Tracking ---
+        $update_subject = $conn->prepare("
+            UPDATE subjects 
+            SET study_streak = CASE 
+                WHEN DATE(last_study_at) = CURRENT_DATE THEN study_streak
+                WHEN DATE(last_study_at) = DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY) THEN study_streak + 1
+                ELSE 1 
+            END,
+            last_study_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        ");
+        $update_subject->bind_param("i", $exam_info['subject_id']);
+        $update_subject->execute();
+        $update_subject->close();
 
-    // ✅ Log the submission activity
-    $exam_title = $exam_info['exam_title'] ?? 'Unknown Exam';
-    log_activity($conn, 'boss_exam_completion', "Exam '{$exam_title}' (offline sync) submitted");
+        // ✅ Log the submission activity
+        $exam_title = $exam_info['exam_title'] ?? 'Unknown Exam';
+        log_activity($conn, 'boss_exam_completion', "Exam '{$exam_title}' (offline sync) submitted");
+    } else {
+        $perf_id = null;
+        log_activity($conn, 'boss_exam_completion_orphan', "Exam ID '{$exam_id}' (offline sync) submitted but metadata missing on server");
+    }
 
     echo json_encode([
         'success' => true,

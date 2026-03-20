@@ -72,6 +72,10 @@
         { name: 'trivia_snapshots', icon: 'emoji_events', label: 'Trivia Scores' },
         { name: 'app_settings', icon: 'settings', label: 'App Settings' },
         { name: 'bpm_logs', icon: 'favorite', label: 'BPM History' },
+        { name: 'active_exam_sessions', icon: 'timer', label: 'Active Sessions' },
+        { name: 'ai_instruction_presets', icon: 'smart_toy', label: 'AI Presets' },
+        { name: 'exam_presets', icon: 'settings_backup_restore', label: 'Exam Presets' },
+        { name: 'exam_setup_presets', icon: 'tune', label: 'Setup Presets' },
     ];
 
     // ─── Init ─────────────────────────────────────────────────────────────────────

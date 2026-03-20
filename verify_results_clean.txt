@@ -1,0 +1,60 @@
+VERIFICATION RESULTS
+====================
+
+Testing: exclude_custom=NO, exclude_lesson_wise=NO
+SQL: SELECT e.id, e.exam_title, e.subject_id, e.lesson_id 
+            FROM exams e 
+            WHERE e.is_deleted = 0 
+            ORDER BY e.id DESC 
+            LIMIT 10
+[LESSON-WISE] ID: 872 | Title: BCS - 14:20, 16 Mar 2026 | Sub: 1 | Lesson: NULL
+[LESSON-WISE] ID: 871 | Title: BCS - 14:16, 16 Mar 2026 | Sub: 1 | Lesson: NULL
+[LESSON-WISE] ID: 870 | Title: BCS - 14:15, 16 Mar 2026 | Sub: 1 | Lesson: NULL
+[Regular/Topic] ID: 861 | Title: মীর মশাররফ হোসেন | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 853 | Title: মানিক বন্দ্যোপাধ্যায় | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 852 | Title: মাহমুদুল হক (১৯৪১-২০০৮) | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 851 | Title: মাযহারুল ইসলাম (১৯২৯-২০০৩) | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 849 | Title: বাগধারা 8-F290 | Sub: 2 | Lesson: 158
+[Regular/Topic] ID: 848 | Title: পারিভাষিক শব্দ 4 FP- 145 | Sub: 2 | Lesson: 180
+[Regular/Topic] ID: 847 | Title: শব্দার্থ 4 FP-127 | Sub: 2 | Lesson: 175
+Found: 10 rows
+--------------------------------------------------
+
+Testing: exclude_custom=YES, exclude_lesson_wise=NO
+SQL: SELECT e.id, e.exam_title, e.subject_id, e.lesson_id 
+            FROM exams e 
+            WHERE e.is_deleted = 0 AND e.subject_id IS NOT NULL 
+            ORDER BY e.id DESC 
+            LIMIT 10
+[LESSON-WISE] ID: 872 | Title: BCS - 14:20, 16 Mar 2026 | Sub: 1 | Lesson: NULL
+[LESSON-WISE] ID: 871 | Title: BCS - 14:16, 16 Mar 2026 | Sub: 1 | Lesson: NULL
+[LESSON-WISE] ID: 870 | Title: BCS - 14:15, 16 Mar 2026 | Sub: 1 | Lesson: NULL
+[Regular/Topic] ID: 861 | Title: মীর মশাররফ হোসেন | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 853 | Title: মানিক বন্দ্যোপাধ্যায় | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 852 | Title: মাহমুদুল হক (১৯৪১-২০০৮) | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 851 | Title: মাযহারুল ইসলাম (১৯২৯-২০০৩) | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 849 | Title: বাগধারা 8-F290 | Sub: 2 | Lesson: 158
+[Regular/Topic] ID: 848 | Title: পারিভাষিক শব্দ 4 FP- 145 | Sub: 2 | Lesson: 180
+[Regular/Topic] ID: 847 | Title: শব্দার্থ 4 FP-127 | Sub: 2 | Lesson: 175
+Found: 10 rows
+--------------------------------------------------
+
+Testing: exclude_custom=YES, exclude_lesson_wise=YES
+SQL: SELECT e.id, e.exam_title, e.subject_id, e.lesson_id 
+            FROM exams e 
+            WHERE e.is_deleted = 0 AND e.subject_id IS NOT NULL AND e.lesson_id IS NOT NULL 
+            ORDER BY e.id DESC 
+            LIMIT 10
+[Regular/Topic] ID: 861 | Title: মীর মশাররফ হোসেন | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 853 | Title: মানিক বন্দ্যোপাধ্যায় | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 852 | Title: মাহমুদুল হক (১৯৪১-২০০৮) | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 851 | Title: মাযহারুল ইসলাম (১৯২৯-২০০৩) | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 849 | Title: বাগধারা 8-F290 | Sub: 2 | Lesson: 158
+[Regular/Topic] ID: 848 | Title: পারিভাষিক শব্দ 4 FP- 145 | Sub: 2 | Lesson: 180
+[Regular/Topic] ID: 847 | Title: শব্দার্থ 4 FP-127 | Sub: 2 | Lesson: 175
+[Regular/Topic] ID: 845 | Title: মামুনুর রশীদ | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 844 | Title: মাইকেল মধুসূদন দত্ত 2 | Sub: 1 | Lesson: 173
+[Regular/Topic] ID: 843 | Title: এক কথায় প্রকাশ 8-FP275 | Sub: 2 | Lesson: 177
+Found: 10 rows
+--------------------------------------------------
+

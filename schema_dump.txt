@@ -1,0 +1,131 @@
+
+==================================================
+EXAMINING TABLE: questions
+==================================================
+Field                | Type                 | Null  | Key   | Default   
+----------------------------------------------------------------------
+id                   | int(11)              | NO    | PRI   |           
+subject_id           | int(11)              | NO    |       |           
+lesson_id            | int(11)              | NO    |       |           
+topic_id             | int(11)              | NO    |       |           
+exam_id              | int(11)              | NO    |       |           
+question             | text                 | NO    |       |           
+options              | longtext             | NO    |       |           
+answer               | text                 | YES   |       |           
+explanation          | text                 | YES   |       |           
+updated_at           | timestamp            | NO    |       | current_timestamp()
+is_deleted           | tinyint(1)           | YES   |       | 0         
+priority             | int(11)              | YES   |       | 0         
+original_question_id | int(11)              | YES   | MUL   |           
+
+CREATE TABLE Statement:
+CREATE TABLE `questions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `subject_id` int(11) NOT NULL,
+  `lesson_id` int(11) NOT NULL,
+  `topic_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `question` text NOT NULL,
+  `options` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `answer` text DEFAULT NULL,
+  `explanation` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0,
+  `priority` int(11) DEFAULT 0,
+  `original_question_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_original_question_id` (`original_question_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=13502 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+
+==================================================
+EXAMINING TABLE: performance
+==================================================
+Field                | Type                 | Null  | Key   | Default   
+----------------------------------------------------------------------
+id                   | int(11)              | NO    | PRI   |           
+subject_id           | int(11)              | YES   |       |           
+lesson_id            | int(11)              | YES   |       |           
+topic_id             | int(11)              | YES   |       |           
+exam_id              | int(11)              | NO    |       |           
+attempt_number       | int(11)              | NO    |       | 1         
+attempt_time         | datetime             | NO    |       | current_timestamp()
+selected_answers     | longtext             | NO    |       |           
+score                | decimal(10,2)        | YES   |       | 0.00      
+score_with_negative  | decimal(10,2)        | YES   |       | 0.00      
+right_answers        | int(11)              | YES   |       | 0         
+wrong_answers        | int(11)              | YES   |       | 0         
+unanswered           | int(11)              | YES   |       | 0         
+time_used_seconds    | int(11)              | YES   |       | 0         
+time_left_seconds    | int(11)              | YES   |       | 0         
+
+CREATE TABLE Statement:
+CREATE TABLE `performance` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `subject_id` int(11) DEFAULT NULL,
+  `lesson_id` int(11) DEFAULT NULL,
+  `topic_id` int(11) DEFAULT NULL,
+  `exam_id` int(11) NOT NULL,
+  `attempt_number` int(11) NOT NULL DEFAULT 1,
+  `attempt_time` datetime NOT NULL DEFAULT current_timestamp(),
+  `selected_answers` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `score` decimal(10,2) DEFAULT 0.00,
+  `score_with_negative` decimal(10,2) DEFAULT 0.00,
+  `right_answers` int(11) DEFAULT 0,
+  `wrong_answers` int(11) DEFAULT 0,
+  `unanswered` int(11) DEFAULT 0,
+  `time_used_seconds` int(11) DEFAULT 0,
+  `time_left_seconds` int(11) DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1196 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+
+==================================================
+EXAMINING TABLE: question_srs
+==================================================
+Field                | Type                 | Null  | Key   | Default   
+----------------------------------------------------------------------
+question_id          | int(11)              | NO    | PRI   |           
+question_text_hash   | varchar(32)          | YES   | UNI   |           
+next_review_at       | datetime             | NO    | MUL   |           
+interval_days        | int(11)              | NO    |       | 1         
+consecutive_correct  | int(11)              | NO    |       | 0         
+
+CREATE TABLE Statement:
+CREATE TABLE `question_srs` (
+  `question_id` int(11) NOT NULL,
+  `question_text_hash` varchar(32) DEFAULT NULL,
+  `next_review_at` datetime NOT NULL,
+  `interval_days` int(11) NOT NULL DEFAULT 1,
+  `consecutive_correct` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`question_id`),
+  UNIQUE KEY `question_text_hash` (`question_text_hash`),
+  UNIQUE KEY `question_text_hash_2` (`question_text_hash`),
+  KEY `next_review_at` (`next_review_at`),
+  KEY `idx_text_hash` (`question_text_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+
+==================================================
+EXAMINING TABLE: question_attempts
+==================================================
+Field                | Type                 | Null  | Key   | Default   
+----------------------------------------------------------------------
+id                   | int(11)              | NO    | PRI   |           
+question_id          | int(11)              | NO    | MUL   |           
+exam_id              | int(11)              | NO    | MUL   |           
+selected_answer      | varchar(10)          | YES   |       |           
+is_correct           | tinyint(1)           | YES   |       |           
+time_spent_seconds   | int(11)              | YES   |       | 0         
+attempted_at         | timestamp            | NO    |       | current_timestamp()
+
+CREATE TABLE Statement:
+CREATE TABLE `question_attempts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `question_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `selected_answer` varchar(10) DEFAULT NULL,
+  `is_correct` tinyint(1) DEFAULT NULL,
+  `time_spent_seconds` int(11) DEFAULT 0,
+  `attempted_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `question_id` (`question_id`),
+  KEY `exam_id` (`exam_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4204 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

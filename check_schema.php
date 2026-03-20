@@ -1,9 +1,9 @@
 <?php
 require_once 'api/subject/db_connect.php';
-$result = $conn->query("DESCRIBE question_attempts");
-$columns = [];
-while($row = $result->fetch_assoc()) {
-    $columns[] = $row;
+$res = $conn->query("DESCRIBE exam_presets");
+$cols = [];
+while($row = $res->fetch_assoc()) {
+    $cols[] = $row['Field'];
 }
-echo json_encode($columns, JSON_PRETTY_PRINT);
+echo implode(", ", $cols);
 ?>

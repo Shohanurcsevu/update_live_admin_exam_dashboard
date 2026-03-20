@@ -46,7 +46,18 @@
     const examMarksInput = document.getElementById('exam-marks');
     const examNegativeInput = document.getElementById('exam-negative');
     const examTotalQuestionsInput = document.getElementById('exam-total-questions');
-    const bulkQuestionCountSelect = document.getElementById('bulk-question-count');
+    const bulkQuestionSlider = document.getElementById('bulk-question-slider');
+    const sliderValueDisplay = document.getElementById('slider-value-display');
+    const smartFillSlider = document.getElementById('smart-fill-slider');
+    const smartSliderDisplay = document.getElementById('smart-slider-display');
+    const smartMinMarker = document.getElementById('smart-min-marker');
+    const smartSliderHint = document.getElementById('smart-slider-hint');
+    const smartMinLabel = document.getElementById('smart-min-label');
+    const smartSliderMaxLabel = document.getElementById('smart-slider-max-label');
+    const smartWeightRecency = document.getElementById('smart-weight-recency');
+    const smartSubjectBalance = document.getElementById('smart-subject-balance');
+    const smartPreviewContainer = document.getElementById('smart-preview-container');
+    const smartPreviewList = document.getElementById('smart-preview-list');
 
     // State
     let hierarchyData = {};
@@ -143,7 +154,7 @@
             console.log('Current date filter:', currentDateFilter);
 
             // Build URL with date filter - increased limit to 100
-            let url = `${API_EXAMS}&limit=100&exclude_custom=true`;
+            let url = `${API_EXAMS}&limit=100&exclude_custom=true&exclude_lesson_wise=true&exclude_topic_wise=true`;
             if (currentDateFilter.from && currentDateFilter.to) {
                 url += `&from=${currentDateFilter.from}&to=${currentDateFilter.to}`;
             }
@@ -188,6 +199,9 @@
                     updateSelectionSummary();
                 }
             }
+
+            // Update smart slider bounds after exams are rendered
+            updateSmartSliderBounds();
         } catch (error) {
             console.error('Error loading exams:', error);
             hierarchyTree.innerHTML = `<div class="p-4 text-center text-red-500">Failed to load exams: ${error.message}</div>`;
@@ -293,6 +307,8 @@
                        data-exam-id="${exam.id}"
                        data-exam-title="${exam.exam_title}"
                        data-max-questions="${exam.total_questions}"
+                       data-subject="${exam.subject_name || 'General'}"
+                       data-update-date="${exam.updated_at || ''}"
                        min="1" 
                        max="${exam.total_questions}" 
                        placeholder="Qty"
@@ -525,45 +541,331 @@
 
     const selectAllQuestionsCheckbox = document.getElementById('select-all-questions');
 
-    // Bulk question count dropdown listener
-    if (bulkQuestionCountSelect) {
-        bulkQuestionCountSelect.addEventListener('change', () => {
-            const count = parseInt(bulkQuestionCountSelect.value);
-            if (!count) return;
+    // Helper: Update Bulk Selection
+    function applyBulkSelection(count) {
+        sliderValueDisplay.textContent = `${count} Question${count > 1 ? 's' : ''}`;
+        
+        const allCheckboxes = document.querySelectorAll('.exam-checkbox');
+        if (allCheckboxes.length === 0) return;
 
-            // If "Select All" is checked, we don't want the bulk dropdown to override everything in a confusing way
-            // But if it's not checked, we proceed as normal
-            if (selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked) {
-                showToast('Turn off "Select All Questions" to manual set a fixed number of questions', 'error');
-                bulkQuestionCountSelect.value = "";
-                return;
+        allCheckboxes.forEach(checkbox => {
+            const examId = checkbox.dataset.examId;
+            const input = document.querySelector(`.exam-input[data-exam-id="${examId}"]`);
+            if (!input) return;
+
+            if (!checkbox.checked) {
+                checkbox.checked = true;
+                input.disabled = false;
             }
 
-            const allExamInputs = document.querySelectorAll('.exam-input');
-            if (allExamInputs.length === 0) {
-                showToast('No exams loaded yet. Please wait or apply a date filter first.', 'error');
+            const maxQ = parseInt(input.dataset.maxQuestions);
+            input.value = Math.min(count, maxQ);
+
+            handleExamSelection(input);
+        });
+    }
+
+    // ====== Slider Tooltip Utility ======
+    function positionTooltip(slider, tooltip, label) {
+        const min = parseInt(slider.min);
+        const max = parseInt(slider.max);
+        const val = parseInt(slider.value);
+        const pct = (val - min) / (max - min);
+        // Offset to account for thumb width (~16px)
+        const thumbHalf = 8;
+        const trackWidth = slider.offsetWidth;
+        const px = thumbHalf + pct * (trackWidth - thumbHalf * 2);
+        tooltip.style.left = px + 'px';
+        tooltip.textContent = label;
+    }
+
+    function attachTooltip(slider, tooltip, labelFn) {
+        if (!slider || !tooltip) return;
+
+        const show = () => {
+            positionTooltip(slider, tooltip, labelFn(slider.value));
+            tooltip.classList.add('active');
+        };
+        const move = () => {
+            positionTooltip(slider, tooltip, labelFn(slider.value));
+        };
+        const hide = () => { tooltip.classList.remove('active'); };
+
+        slider.addEventListener('mousedown', show);
+        slider.addEventListener('touchstart', show, { passive: true });
+        slider.addEventListener('input', move);
+        slider.addEventListener('mouseup', hide);
+        slider.addEventListener('mouseleave', hide);
+        slider.addEventListener('touchend', hide);
+    }
+
+    const bulkTooltip = document.getElementById('bulk-slider-tooltip');
+    const smartTooltip = document.getElementById('smart-slider-tooltip');
+
+    attachTooltip(bulkQuestionSlider, bulkTooltip, (v) => `${v} / exam`);
+    attachTooltip(smartFillSlider, smartTooltip, (v) => `${v} total`);
+
+    // Bulk question slider listener
+    if (bulkQuestionSlider) {
+        // Update display while dragging
+        bulkQuestionSlider.addEventListener('input', (e) => {
+            const count = parseInt(e.target.value);
+            sliderValueDisplay.textContent = `${count} Question${count > 1 ? 's' : ''}`;
+        });
+
+        // Apply logic when interaction ends
+        bulkQuestionSlider.addEventListener('change', (e) => {
+            const count = parseInt(e.target.value);
+            
+            if (selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked) {
+                showToast('Turn off "Select All Questions" to manually set a fixed number of questions', 'error');
+                bulkQuestionSlider.value = 1;
+                sliderValueDisplay.textContent = 'Select';
                 return;
             }
 
             const allCheckboxes = document.querySelectorAll('.exam-checkbox');
+            if (allCheckboxes.length === 0) {
+                showToast('No exams loaded yet. Please wait or apply a date filter first.', 'error');
+                bulkQuestionSlider.value = 1;
+                sliderValueDisplay.textContent = 'Select';
+                return;
+            }
 
-            allCheckboxes.forEach(checkbox => {
-                const examId = checkbox.dataset.examId;
-                const input = document.querySelector(`.exam-input[data-exam-id="${examId}"]`);
-                if (!input) return;
+            applyBulkSelection(count);
 
-                if (!checkbox.checked) {
-                    checkbox.checked = true;
-                    input.disabled = false;
-                }
-
-                const maxQ = parseInt(input.dataset.maxQuestions) || count;
-                input.value = Math.min(count, maxQ);
-
-                handleExamSelection(input);
-            });
+            // Reset smart slider since per-exam overrides it
+            if (smartFillSlider) {
+                smartFillSlider.value = 1;
+                smartSliderDisplay.textContent = 'Select';
+                if (smartPreviewContainer) smartPreviewContainer.classList.add('hidden');
+            }
 
             showToast(`Set ${count} question(s) for all exams`);
+        });
+    }
+
+    // ====== Smart Fill Slider ======
+
+    // Update smart slider bounds after exams load
+    function updateSmartSliderBounds() {
+        if (!smartFillSlider) return;
+        const allInputs = document.querySelectorAll('.exam-input');
+        if (allInputs.length === 0) {
+            smartFillSlider.max = 500;
+            smartMinMarker.style.display = 'none';
+            smartSliderHint.classList.add('hidden');
+            if (smartSliderMaxLabel) smartSliderMaxLabel.textContent = '500';
+            return;
+        }
+
+        const examCount = allInputs.length;
+        let totalMax = 0;
+        allInputs.forEach(inp => { totalMax += parseInt(inp.dataset.maxQuestions) || 0; });
+
+        smartFillSlider.max = totalMax;
+        if (smartSliderMaxLabel) smartSliderMaxLabel.textContent = totalMax;
+
+        // Position the minimum marker
+        const pct = ((examCount - 1) / (totalMax - 1)) * 100;
+        smartMinMarker.style.left = pct + '%';
+        smartMinMarker.style.display = 'block';
+
+        // Show hint
+        if (smartMinLabel) smartMinLabel.textContent = examCount;
+        smartSliderHint.classList.remove('hidden');
+    }
+
+    // Distribution algorithm
+    function calculateDistribution(total) {
+        const allInputs = document.querySelectorAll('.exam-input');
+        const exams = [];
+        const subjects = {};
+
+        allInputs.forEach(input => {
+            const subject = input.dataset.subject || 'General';
+            const dateStr = input.dataset.updateDate || '';
+            const date = new Date(dateStr);
+            const ts = isNaN(date.getTime()) ? 0 : date.getTime();
+
+            const entry = {
+                id: input.dataset.examId,
+                title: input.dataset.examTitle,
+                subject,
+                ts,
+                maxQ: parseInt(input.dataset.maxQuestions) || 0,
+                assigned: 0,
+                input
+            };
+            exams.push(entry);
+
+            if (!subjects[subject]) subjects[subject] = [];
+            subjects[subject].push(entry);
+        });
+
+        if (exams.length === 0) return [];
+
+        // Step 1: Minimum 1 per exam
+        exams.forEach(e => {
+            e.assigned = Math.min(1, e.maxQ);
+        });
+
+        let remaining = total - exams.reduce((s, e) => s + e.assigned, 0);
+        if (remaining <= 0) return exams;
+
+        const subjectBalance = smartSubjectBalance && smartSubjectBalance.checked;
+        const weightRecency = smartWeightRecency && smartWeightRecency.checked;
+
+        if (subjectBalance) {
+            // Distribute remaining based on subjects
+            const subjectNames = Object.keys(subjects);
+            let subPasses = 0;
+            while (remaining > 0 && subPasses < 100) {
+                let distributedInSubPass = false;
+                for (const subName of subjectNames) {
+                    if (remaining <= 0) break;
+                    // Find exam in this subject with most capacity
+                    const subExams = subjects[subName].filter(e => e.assigned < e.maxQ);
+                    if (subExams.length > 0) {
+                        // If weighting by recency, pick newest in subject, else round robin/cap
+                        subExams.sort((a, b) => weightRecency ? (b.ts - a.ts) : (b.maxQ - a.maxQ));
+                        subExams[0].assigned++;
+                        remaining--;
+                        distributedInSubPass = true;
+                    }
+                }
+                if (!distributedInSubPass) break;
+                subPasses++;
+            }
+        } else {
+            // Standard distribution with optional recency weight
+            const sorted = [...exams].sort((a, b) => {
+                if (weightRecency) {
+                    // Combine recency and capacity
+                    return (b.ts - a.ts) || (b.maxQ - a.maxQ);
+                }
+                return b.maxQ - a.maxQ;
+            });
+
+            let passes = 0;
+            while (remaining > 0 && passes < 1000) {
+                let distributed = false;
+                for (const e of sorted) {
+                    if (remaining <= 0) break;
+                    if (e.assigned < e.maxQ) {
+                        // If recency is on, maybe give more to newer ones in one go? 
+                        // For simplicity, we just use the sorted order.
+                        e.assigned++;
+                        remaining--;
+                        distributed = true;
+                    }
+                }
+                if (!distributed) break;
+                passes++;
+            }
+        }
+
+        return exams;
+    }
+
+    function updateSmartPreview(total) {
+        if (!smartPreviewContainer || !smartPreviewList) return;
+        
+        if (total < 1) {
+            smartPreviewContainer.classList.add('hidden');
+            return;
+        }
+
+        const distribution = calculateDistribution(total);
+        if (distribution.length === 0) {
+            smartPreviewContainer.classList.add('hidden');
+            return;
+        }
+
+        smartPreviewContainer.classList.remove('hidden');
+        smartPreviewList.innerHTML = distribution
+            .filter(e => e.assigned > 0)
+            .map(e => `
+                <div class="flex items-center justify-between border-b border-emerald-50 pb-1 last:border-0">
+                    <div class="flex flex-col">
+                        <span class="font-bold text-gray-700">${e.title}</span>
+                        <span class="text-[9px] text-gray-400">${e.subject}</span>
+                    </div>
+                    <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 font-bold rounded">${e.assigned} q</span>
+                </div>
+            `).join('');
+    }
+
+    function distributeQuestions(total) {
+        const distribution = calculateDistribution(total);
+        distribution.forEach(e => {
+            const checkbox = document.querySelector(`.exam-checkbox[data-exam-id="${e.id}"]`);
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                e.input.disabled = false;
+            }
+            e.input.value = e.assigned;
+            handleExamSelection(e.input);
+        });
+    }
+
+    if (smartFillSlider) {
+        smartFillSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            smartSliderDisplay.textContent = `${val} Total`;
+            updateSmartPreview(val);
+        });
+
+        // Add listeners for smart options to refresh preview
+        [smartWeightRecency, smartSubjectBalance].forEach(toggle => {
+            if (toggle) {
+                toggle.addEventListener('change', () => {
+                    const val = parseInt(smartFillSlider.value);
+                    if (val > 1) {
+                        updateSmartPreview(val);
+                    }
+                });
+            }
+        });
+
+        smartFillSlider.addEventListener('change', (e) => {
+            let val = parseInt(e.target.value);
+
+            if (selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked) {
+                showToast('Turn off "Select All Questions" first', 'error');
+                smartFillSlider.value = 1;
+                smartSliderDisplay.textContent = 'Select';
+                return;
+            }
+
+            const allCheckboxes = document.querySelectorAll('.exam-checkbox');
+            if (allCheckboxes.length === 0) {
+                showToast('No exams loaded yet', 'error');
+                smartFillSlider.value = 1;
+                smartSliderDisplay.textContent = 'Select';
+                return;
+            }
+
+            const examCount = allCheckboxes.length;
+
+            // Snap up to minimum if below
+            if (val < examCount) {
+                val = examCount;
+                smartFillSlider.value = val;
+                showToast(`Minimum is ${examCount} (1 per exam). Snapped up.`, 'error');
+            }
+
+            smartSliderDisplay.textContent = `${val} Total`;
+
+            // Reset the per-exam slider
+            if (bulkQuestionSlider) {
+                bulkQuestionSlider.value = 1;
+                sliderValueDisplay.textContent = 'Select';
+            }
+
+            distributeQuestions(val);
+            if (smartPreviewContainer) smartPreviewContainer.classList.add('hidden');
+            showToast(`Distributed ${val} questions across ${examCount} exams`);
         });
     }
 
@@ -573,10 +875,16 @@
             const isChecked = selectAllQuestionsCheckbox.checked;
 
             if (isChecked) {
-                // Disable bulk dropdown as they conflict
-                if (bulkQuestionCountSelect) {
-                    bulkQuestionCountSelect.disabled = true;
-                    bulkQuestionCountSelect.value = "";
+                // Disable both sliders as they conflict
+                if (bulkQuestionSlider) {
+                    bulkQuestionSlider.disabled = true;
+                    bulkQuestionSlider.value = 1;
+                    sliderValueDisplay.textContent = 'All Selected';
+                }
+                if (smartFillSlider) {
+                    smartFillSlider.disabled = true;
+                    smartFillSlider.value = 1;
+                    smartSliderDisplay.textContent = 'All Selected';
                 }
 
                 // Select all available questions for all exams
@@ -597,9 +905,14 @@
 
                 showToast('All available questions selected from all filtered exams');
             } else {
-                // Enable bulk dropdown
-                if (bulkQuestionCountSelect) {
-                    bulkQuestionCountSelect.disabled = false;
+                // Enable both sliders
+                if (bulkQuestionSlider) {
+                    bulkQuestionSlider.disabled = false;
+                    sliderValueDisplay.textContent = 'Select';
+                }
+                if (smartFillSlider) {
+                    smartFillSlider.disabled = false;
+                    smartSliderDisplay.textContent = 'Select';
                 }
 
                 // Clear all selections when "Select All" is turned off

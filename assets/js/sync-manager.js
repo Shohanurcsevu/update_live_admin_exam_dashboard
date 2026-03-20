@@ -84,12 +84,12 @@ class SyncManager {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     attempt_uuid: attempt.id,
-                    exam_id: attempt.exam_id,
-                    answers: attempt.answers,
-                    start_time: attempt.start_time,
-                    end_time: attempt.end_time,
-                    duration_used: attempt.duration_used,
-                    checksum: attempt.checksum
+                    exam_id: attempt.exam_id || 0,
+                    answers: attempt.answers || {},
+                    start_time: attempt.start_time || new Date().toISOString(),
+                    end_time: attempt.end_time || new Date().toISOString(),
+                    duration_used: attempt.duration_used || 0,
+                    checksum: attempt.checksum || ''
                 })
             });
 

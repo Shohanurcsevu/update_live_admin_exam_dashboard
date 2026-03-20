@@ -10,8 +10,19 @@ if (empty($data['id'])) {
 
 $id = intval($data['id']);
 $question_text = $data['question'];
-$options_json = json_encode($data['options']);
+$options = $data['options'];
 $answer = $data['answer'];
+
+// Sanitize Option E: If E is the answer, move to D. Always remove E.
+if (isset($options['E'])) {
+    if ($answer === 'E') {
+        $options['D'] = $options['E'];
+        $answer = 'D';
+    }
+    unset($options['E']);
+}
+
+$options_json = json_encode($options);
 $explanation = $data['explanation'];
 $priority = isset($data['priority']) ? max(0, intval($data['priority'])) : 0;
 

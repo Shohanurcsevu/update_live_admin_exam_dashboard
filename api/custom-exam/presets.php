@@ -27,26 +27,64 @@ switch ($method) {
 $conn->close();
 
 function handleGet($conn) {
-    $result = $conn->query("SELECT * FROM exam_presets ORDER BY updated_at DESC");
+    $type = !empty($_GET['type']) ? $_GET['type'] : 'lesson';
+    $stmt = $conn->prepare("SELECT * FROM exam_presets WHERE type = ? ORDER BY updated_at DESC");
+    $stmt->bind_param("s", $type);
+    $stmt->execute();
+    $result = $stmt->get_result();
     $presets = [];
     while ($row = $result->fetch_assoc()) {
         $lessons_data = json_decode($row['lessons_data'], true);
         $total_unseen = 0;
         
         if (!empty($lessons_data)) {
-            $lesson_ids = array_map(function($l) { return intval($l['lesson_id']); }, $lessons_data);
-            $ids_placeholder = implode(',', $lesson_ids);
+            $id_key = ($type === 'topic') ? 'topic_id' : 'lesson_id';
+            $id_column = ($type === 'topic') ? 'topic_id' : 'lesson_id';
             
-            // Get total unseen questions for these lessons
-            $unseen_res = $conn->query("
-                SELECT (COUNT(DISTINCT q.id) - COUNT(DISTINCT qa.question_id)) as unseen_count
-                FROM questions q
-                LEFT JOIN question_attempts qa ON q.id = qa.question_id
-                WHERE q.lesson_id IN ($ids_placeholder) AND q.is_deleted = 0 AND q.original_question_id IS NULL
-            ");
-            if ($unseen_res) {
-                $unseen_data = $unseen_res->fetch_assoc();
-                $total_unseen = intval($unseen_data['unseen_count']);
+            // HYDRATION: For topic presets, ensure each topic has lesson_id and subject_id
+            if ($type === 'topic') {
+                $hydration_needed = false;
+                foreach ($lessons_data as $l) {
+                    if (empty($l['lesson_id']) || empty($l['subject_id'])) {
+                        $hydration_needed = true;
+                        break;
+                    }
+                }
+
+                if ($hydration_needed) {
+                    foreach ($lessons_data as &$l) {
+                        if (!empty($l['topic_id']) && (empty($l['lesson_id']) || empty($l['subject_id']))) {
+                            $tid = intval($l['topic_id']);
+                            $lookup = $conn->query("SELECT lesson_id, subject_id FROM questions WHERE topic_id = $tid AND is_deleted = 0 LIMIT 1");
+                            if ($lookup && $row_ids = $lookup->fetch_assoc()) {
+                                $l['lesson_id'] = $row_ids['lesson_id'];
+                                $l['subject_id'] = $row_ids['subject_id'];
+                            }
+                        }
+                    }
+                    unset($l);
+                }
+            }
+
+            $ids = array_map(function($l) use ($id_key) { 
+                return isset($l[$id_key]) ? intval($l[$id_key]) : 0; 
+            }, $lessons_data);
+            $ids = array_filter($ids);
+            
+            if (!empty($ids)) {
+                $ids_placeholder = implode(',', $ids);
+                
+                // Get total unseen questions for these lessons/topics
+                $unseen_res = $conn->query("
+                    SELECT (COUNT(DISTINCT q.id) - COUNT(DISTINCT qa.question_id)) as unseen_count
+                    FROM questions q
+                    LEFT JOIN question_attempts qa ON q.id = qa.question_id
+                    WHERE q.$id_column IN ($ids_placeholder) AND q.is_deleted = 0 AND q.original_question_id IS NULL
+                ");
+                if ($unseen_res) {
+                    $unseen_data = $unseen_res->fetch_assoc();
+                    $total_unseen = intval($unseen_data['unseen_count']);
+                }
             }
         }
         
@@ -54,6 +92,7 @@ function handleGet($conn) {
         $row['total_unseen'] = $total_unseen;
         $presets[] = $row;
     }
+    $stmt->close();
     echo json_encode(['success' => true, 'data' => $presets]);
 }
 
@@ -68,9 +107,10 @@ function handlePost($conn) {
 
     $preset_name = trim($data['preset_name']);
     $lessons_data = json_encode($data['lessons_data']);
+    $type = !empty($data['type']) ? $data['type'] : 'lesson';
 
-    $stmt = $conn->prepare("INSERT INTO exam_presets (preset_name, lessons_data) VALUES (?, ?)");
-    $stmt->bind_param("ss", $preset_name, $lessons_data);
+    $stmt = $conn->prepare("INSERT INTO exam_presets (preset_name, lessons_data, type) VALUES (?, ?, ?)");
+    $stmt->bind_param("sss", $preset_name, $lessons_data, $type);
 
     if ($stmt->execute()) {
         $new_id = $conn->insert_id;
@@ -94,9 +134,10 @@ function handlePut($conn) {
     $id = intval($data['id']);
     $preset_name = trim($data['preset_name']);
     $lessons_data = json_encode($data['lessons_data']);
+    $type = !empty($data['type']) ? $data['type'] : 'lesson';
 
-    $stmt = $conn->prepare("UPDATE exam_presets SET preset_name = ?, lessons_data = ? WHERE id = ?");
-    $stmt->bind_param("ssi", $preset_name, $lessons_data, $id);
+    $stmt = $conn->prepare("UPDATE exam_presets SET preset_name = ?, lessons_data = ?, type = ? WHERE id = ?");
+    $stmt->bind_param("sssi", $preset_name, $lessons_data, $type, $id);
 
     if ($stmt->execute()) {
         $stmt->close();

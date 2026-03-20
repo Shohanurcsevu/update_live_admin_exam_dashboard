@@ -58,7 +58,8 @@ $ALLOWED_TABLES = [
     'performance', 'question_attempts', 'question_srs',
     'offline_exam_attempts', 'study_sessions', 'activity_log',
     'mistake_bank', 'flashcards', 'reading_logs', 'user_streaks',
-    'job_countdown', 'trivia_snapshots', 'bpm_logs',
+    'job_countdown', 'trivia_snapshots', 'bpm_logs', 'app_settings',
+    'active_exam_sessions', 'ai_instruction_presets', 'exam_presets', 'exam_setup_presets',
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -71,6 +72,30 @@ function respond_json($data) {
 function respond_error(string $msg, int $code = 400) {
     http_response_code($code);
     respond_json(['error' => $msg]);
+}
+
+function sync_table_columns(mysqli $conn, string $table, string $ddl) {
+    // Extract column definitions from DDL (lines starting with `...`)
+    preg_match_all('/^\s*`([^`]+)`\s+([^,]+)/m', $ddl, $matches);
+    if (empty($matches[1])) return;
+    
+    $ddl_cols = array_combine($matches[1], $matches[2]);
+
+    // Current columns in DB
+    $res = $conn->query("SHOW COLUMNS FROM `{$table}`");
+    $db_cols = [];
+    if ($res) {
+        while ($c = $res->fetch_assoc()) $db_cols[] = $c['Field'];
+        $res->free();
+    }
+
+    foreach ($ddl_cols as $col => $def) {
+        if (!in_array($col, $db_cols)) {
+            // Clean up definition (remove trailing commas if any, though regex handle it)
+            $clean_def = rtrim(trim($def), ',');
+            $conn->query("ALTER TABLE `{$table}` ADD COLUMN `{$col}` {$clean_def}");
+        }
+    }
 }
 
 function build_upsert_chunk(mysqli $conn, string $table, array $row, bool $overwrite): array {
@@ -119,21 +144,25 @@ if ($action === 'schema') {
     $created = [];
     $errors  = [];
 
+    $conn->query("SET FOREIGN_KEY_CHECKS = 0");
+
     foreach ($schemas as $table => $ddl) {
         if (empty($ddl)) continue;
 
-        $safe_ddl = preg_replace(
-            '/^CREATE TABLE\s+`/i',
-            'CREATE TABLE IF NOT EXISTS `',
-            $ddl
-        );
-
+        // 1. Ensure table exists
+        $safe_ddl = preg_replace('/^CREATE TABLE\s+`/i', 'CREATE TABLE IF NOT EXISTS `', $ddl);
         if ($conn->query($safe_ddl)) {
             $created[] = $table;
+            
+            // 2. Synchronize columns if table already existed 
+            // (CREATE TABLE IF NOT EXISTS doesn't add missing columns)
+            sync_table_columns($conn, $table, $ddl);
         } else {
             $errors[] = "[{$table}] " . $conn->error;
         }
     }
+
+    $conn->query("SET FOREIGN_KEY_CHECKS = 1");
 
     $conn->close();
     respond_json([
@@ -159,6 +188,14 @@ if ($action === 'schema') {
         respond_error('Missing or invalid "rows" field.');
     }
 
+    // Fetch available columns in the target table to handle schema mismatches
+    $target_cols = [];
+    $res = $conn->query("SHOW COLUMNS FROM `{$table}`");
+    if ($res) {
+        while ($c = $res->fetch_assoc()) $target_cols[] = $c['Field'];
+        $res->free();
+    }
+
     $conn->query("SET FOREIGN_KEY_CHECKS = 0");
     $conn->begin_transaction();
 
@@ -170,8 +207,33 @@ if ($action === 'schema') {
         foreach ($rows as $row) {
             if (empty($row) || !is_array($row)) continue;
 
+            // Handle schema mismatches: Add missing columns dynamically
+            $missing_cols = array_diff(array_keys($row), $target_cols);
+            if (!empty($missing_cols)) {
+                foreach ($missing_cols as $new_col) {
+                    $val = $row[$new_col];
+                    $type = 'LONGTEXT'; // Safe default for strings/complex data
+                    if (is_int($val))       $type = 'INT(11)';
+                    elseif (is_float($val)) $type = 'DECIMAL(15,2)';
+                    elseif (is_bool($val))  $type = 'TINYINT(1)';
+                    
+                    // Attempt to add the column so data isn't lost
+                    if ($conn->query("ALTER TABLE `{$table}` ADD COLUMN `{$new_col}` {$type} NULL")) {
+                        $target_cols[] = $new_col;
+                    }
+                }
+            }
+
+            // Filter row to only include columns that exist in the target table
+            $filtered_row = array_intersect_key($row, array_flip($target_cols));
+
+            if (empty($filtered_row)) {
+                $skipped++;
+                continue;
+            }
+
             try {
-                [$sql, $types, $values] = build_upsert_chunk($conn, $table, $row, $overwrite);
+                [$sql, $types, $values] = build_upsert_chunk($conn, $table, $filtered_row, $overwrite);
 
                 $stmt = $conn->prepare($sql);
                 if (!$stmt) throw new RuntimeException("Prepare failed: " . $conn->error);

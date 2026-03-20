@@ -70,6 +70,7 @@ function list_exams($conn) {
     }
 
     $where_clauses[] = "e.is_deleted = 0";
+    $where_clauses[] = "e.topic_id IS NOT NULL";
     $where_clauses[] = "e.exam_title NOT LIKE '%Challenge%'";
 
     $match_select = "";

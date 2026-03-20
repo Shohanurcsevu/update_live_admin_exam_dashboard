@@ -103,7 +103,7 @@
     function showToast(message, type = 'info') {
         const toastContainer = document.getElementById('toast-container');
         const toast = document.createElement('div');
-        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-amber-500' : 'bg-blue-500';
 
         toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg mb-2 transition-opacity duration-300`;
         toast.textContent = message;
@@ -560,6 +560,15 @@
 
             if (result.success) {
                 showToast('Exam created successfully!', 'success');
+
+                // --- Cache Invalidation ---
+                if (typeof CacheManager !== 'undefined') {
+                    CacheManager.clearGroup('dashboard');
+                    CacheManager.clearGroup('exam');
+                    CacheManager.clearGroup('custom-exam');
+                    CacheManager.clearGroup('analytics');
+                }
+
                 setTimeout(() => {
                     window.loadPage('custom-exams');
                 }, 1500);
@@ -1373,9 +1382,7 @@
         }
     });
 
-    // Select Preset Modal buttons
-    elements.selectPresetClose.addEventListener('click', closeSelectPresetModal);
-    elements.selectPresetCancel.addEventListener('click', closeSelectPresetModal);
+
 
     // Clear Selection button
     if (elements.clearSelectionBtn) {

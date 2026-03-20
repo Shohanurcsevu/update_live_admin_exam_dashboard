@@ -45,6 +45,15 @@ if (!function_exists('insert_questions')) {
                 return ['success' => false, 'message' => "Import failed: Question #" . ($index + 1) . " is missing a required field."];
             }
 
+            // Sanitize Option E: If E is the answer, move to D. Always remove E.
+            if (isset($q['options']['E'])) {
+                if ($q['answer'] === 'E') {
+                    $q['options']['D'] = $q['options']['E'];
+                    $q['answer'] = 'D';
+                }
+                unset($q['options']['E']);
+            }
+
             $options_json = json_encode($q['options']);
             $explanation = isset($q['explanation']) ? $q['explanation'] : '';
             $priority = isset($q['priority']) ? max(0, intval($q['priority'])) : 0;
