@@ -93,3 +93,20 @@
     pointer-events: none;
     z-index: 10;
 }
+
+/* Trophy Sparkle Animation */
+@keyframes trophy-sparkle {
+    0%, 100% {
+        filter: brightness(1) drop-shadow(0 0 2px currentColor);
+        transform: scale(1);
+    }
+    50% {
+        filter: brightness(1.2) drop-shadow(0 0 8px currentColor);
+        transform: scale(1.05) rotate(3deg);
+    }
+}
+
+.animate-sparkle {
+    animation: trophy-sparkle 2.5s infinite ease-in-out;
+    display: inline-block;
+}

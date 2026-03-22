@@ -1298,10 +1298,10 @@ const StudyTargetTracker = {
     ECG_RECOVERY_DURATION_MS: 10000,
 
     // Fatigue thresholds (ms)
-    FATIGUE_FADING_MS: 10 * 60 * 1000,   // 10 minutes
-    FATIGUE_CRITICAL_MS: 30 * 60 * 1000,   // 30 minutes
-    FATIGUE_FAILING_MS: 45 * 60 * 1000,   // 45 minutes
-    FATIGUE_DEAD_MS: 60 * 60 * 1000,   // 60 minutes
+    FATIGUE_FADING_MS: 20 * 60 * 1000,   // 20 minutes
+    FATIGUE_CRITICAL_MS: 60 * 60 * 1000,  // 60 minutes
+    FATIGUE_FAILING_MS: 90 * 60 * 1000,   // 90 minutes
+    FATIGUE_DEAD_MS: 120 * 60 * 1000,     // 120 minutes
 
     // Heart Rate Zones (mapped to study intensity)
     HEART_RATE_ZONES: [
@@ -1477,13 +1477,13 @@ const StudyTargetTracker = {
         } else {
             // New Flow State logic based on duration and number of active subjects
             const activeMins = (now - this.lastStudyChangeTime) / 60000;
-            if (activeMins > 45 && activeSubjects.length >= 2) {
+            if (activeMins > 90 && activeSubjects.length >= 2) {
                 statusLabel = 'Hyper Focus';
                 statusColorClass = 'text-indigo-600 bg-indigo-50 border-indigo-200 animate-pulse font-black';
-            } else if (activeMins > 20) {
+            } else if (activeMins > 40) {
                 statusLabel = 'Flow State';
                 statusColorClass = 'text-emerald-600 bg-emerald-50 border-emerald-200 font-bold';
-            } else if (activeMins > 5) {
+            } else if (activeMins > 10) {
                 statusLabel = 'Deep Work';
                 statusColorClass = 'text-blue-600 bg-blue-50 border-blue-200';
             } else {

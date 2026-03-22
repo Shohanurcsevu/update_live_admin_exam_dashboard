@@ -96,7 +96,7 @@
         class="flex items-center gap-2 md:gap-4 ml-auto border-l border-slate-100 pl-2 md:pl-4 flex-shrink-0 relative z-[110]">
         <!-- Daily Streak Counter (Restored IDs for compatibility) -->
         <div id="streak-counter"
-            class="hidden items-center px-2 py-1 bg-white hover:bg-slate-50 rounded-full border border-slate-200 shadow-sm cursor-pointer transition-all relative group"
+            class="flex items-center px-2 py-1 bg-white hover:bg-slate-50 rounded-full border border-slate-200 shadow-sm cursor-pointer transition-all relative group"
             title="Daily Streak">
             <div class="streak-ring-container scale-[0.85] origin-center -ml-1">
                 <svg class="streak-ring-svg" viewBox="0 0 36 36">
@@ -111,6 +111,20 @@
                     style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
             </div>
             <span id="streak-count" class="font-black text-sm text-slate-700 ml-0.5 mr-1">0</span>
+        </div>
+
+        <!-- NEW: Rank Trophy Section -->
+        <div id="header-trophy-container" 
+            class="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-100 shadow-sm transition-all hover:shadow-md cursor-help group relative"
+            title="Current Rank">
+            <span id="header-trophy-icon" class="material-symbols-outlined text-[20px] text-slate-400 transition-all duration-500"
+                style="font-variation-settings: 'FILL' 1;">trophy</span>
+            <span id="header-trophy-label" class="text-[10px] font-black uppercase tracking-widest text-slate-500">Unranked</span>
+            
+            <!-- Tooltip -->
+            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[120] whitespace-nowrap">
+                Current Tier: <span id="header-trophy-tier-name">Iron</span>
+            </div>
         </div>
 
         <!-- Search Toggle -->

@@ -1,0 +1,42 @@
+# ANTIGRAVITY RULES: WINDOWS DEVELOPMENT & CODE PRESERVATION
+
+## 1. WINDOWS SHELL EXECUTION (FORCE TERMINATION)
+- **ENV:** Windows (CMD/PowerShell)
+- **WRAPPER:** ALWAYS prepend shell executions with 'cmd /c' to ensure the process terminates correctly and sends an EOF signal.
+- **EXAMPLE:** Use 'cmd /c npm install' instead of 'npm install'.
+- **PURPOSE:** This prevents terminal sessions from hanging in a "Running..." state.
+
+## 2. NATIVE COMMAND TRANSLATION (NO LINUX-ISMS)
+- **RULE:** NEVER use Linux-style commands (grep, ls, rm -rf, export).
+- **MAPPING:** ALWAYS use native Windows equivalents:
+    - Use 'findstr' instead of 'grep'.
+    - Use 'dir' instead of 'ls'.
+    - Use 'del' or 'rmdir /s /q' instead of 'rm'.
+    - Use 'set' instead of 'export'.
+- **PATHING:** Use backslashes (`\`) for local file paths unless the specific tool (like PHP) requires forward slashes.
+
+## 3. "SURGERY THROUGH KEYHOLE" POLICY (COMPLEX LOGIC)
+- **RULE:** DO NOT run multi-line logic or complex piped commands directly in the terminal.
+- **PROCEDURE:** If a task requires more than two pipes or complex loops (e.g., database schema debugging, batch file modification):
+    1. Create a temporary script file (e.g., `debug_task.php` or `temp_script.py`).
+    2. Write the full logic into that file.
+    3. Execute the file via `cmd /c [runner] [file]`.
+    4. Delete the temporary file only after confirmation of success.
+
+- **DATABASE CLI RULE:** When writing or modifying database connection logic (like `db_connect.php`), ALWAYS include CLI detection using `php_sapi_name() === 'cli'`.
+- **REASON:** Terminal execution does not provide `$_SERVER['HTTP_HOST']`. CLI detection prevents 'No such host' errors by forcing 'localhost' settings during terminal runs.
+
+## 4. CODE PRESERVATION & INCREMENTAL MODIFICATION
+- **INTEGRITY:** NEVER delete existing logic, functions, or database connection patterns unless explicitly instructed to "refactor" or "remove."
+- **INCREMENTAL:** Prioritize adding/appending code over overwriting. If logic seems redundant, comment it out with a 'DEPRECATED' tag rather than deleting it.
+- **NO PLACEHOLDERS:** DO NOT use "// ... existing code remains here ...". Always provide full, mergeable snippets or the complete file to avoid breaking the project.
+- **DEPENDENCIES:** Maintain all 'include', 'require', and 'use' statements. If changing a function signature, create a 'v2' version to maintain backward compatibility.
+
+## 5. HONESTY & ACCURACY PROTOCOL (ZERO-FAKE POLICY)
+- **ANTI-HALLUCINATION:** If a command's syntax for Windows is uncertain, DO NOT guess. Verify against official documentation or admit uncertainty.
+- **ADMISSION OF RISK:** If a requested terminal command is too risky to run in a single line, you MUST refuse and insist on the "Temporary File" method.
+- **CONTEXTUAL TRUTH:** If you do not understand a block of existing code, ASK for clarification. Do not replace it with "plausible" generic logic.
+- **HONESTY:** Provide the most direct, technically accurate solution, even if it requires more steps (like creating a script) than the user's initial request.
+
+
+

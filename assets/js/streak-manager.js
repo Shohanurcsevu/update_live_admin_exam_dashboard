@@ -106,6 +106,48 @@ class StreakManager {
 
         // Update Tooltip with Progression
         this.updateTooltip(streak, counterEl);
+
+        // --- NEW: Trophy Logic ---
+        this.updateTrophyUI(streak);
+    }
+
+    updateTrophyUI(streak) {
+        const trophyContainer = document.getElementById('header-trophy-container');
+        const trophyIcon = document.getElementById('header-trophy-icon');
+        const trophyLabel = document.getElementById('header-trophy-label');
+        const trophyTierName = document.getElementById('header-trophy-tier-name');
+
+        if (!trophyContainer || !trophyIcon || !trophyLabel) return;
+
+        // Ensure visible
+        trophyContainer.classList.remove('hidden');
+        trophyContainer.classList.add('flex');
+
+        const tiers = this.getTiers();
+        let currentTier = { threshold: 0, name: 'Iron', color: '#94a3b8' }; // Default/Low Streak Tier
+        
+        for (const tier of tiers) {
+            if (streak >= tier.threshold) {
+                currentTier = tier;
+            } else {
+                break;
+            }
+        }
+
+        // Set Trophy Visuals
+        trophyIcon.style.color = currentTier.color;
+        trophyLabel.textContent = currentTier.name;
+        trophyLabel.style.color = currentTier.color;
+        if (trophyTierName) trophyTierName.textContent = currentTier.name;
+
+        // Apply specialized effects for high tiers
+        if (streak >= 154) {
+            trophyIcon.classList.add('animate-sparkle');
+            trophyContainer.classList.add('border-amber-200', 'bg-amber-50/50');
+        } else {
+            trophyIcon.classList.remove('animate-sparkle');
+            trophyContainer.classList.remove('border-amber-200', 'bg-amber-50/50');
+        }
     }
 
     updateTooltip(streak, counterEl) {
