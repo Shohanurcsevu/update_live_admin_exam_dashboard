@@ -124,7 +124,7 @@ class StreakManager {
         trophyContainer.classList.add('flex');
 
         const tiers = this.getTiers();
-        let currentTier = { threshold: 0, name: 'Iron', color: '#94a3b8' }; // Default/Low Streak Tier
+        let currentTier = { threshold: 0, name: 'Iron', color: '#71717a' }; // Default/Low Streak Tier
         
         for (const tier of tiers) {
             if (streak >= tier.threshold) {
