@@ -6,16 +6,25 @@ class StreakManager {
             last_activity_date: null
         };
         this.missionProgress = 0;
+        
+        // Streak Particles
         this.particles = [];
         this.canvas = null;
         this.ctx = null;
         this.animationId = null;
+
+        // Trophy Particles
+        this.trophyParticles = [];
+        this.trophyCanvas = null;
+        this.trophyCtx = null;
+        this.trophyAnimationId = null;
     }
 
     async init() {
         await this.fetchStreak();
         this.updateUI();
         this.initEmberParticles();
+        this.initTrophyParticles();
         this.startMissionTracking();
     }
 
@@ -362,6 +371,59 @@ class StreakManager {
         }
 
         this.animationId = requestAnimationFrame(() => this.animate());
+    }
+
+    // --- NEW: Trophy Ember System ---
+    initTrophyParticles() {
+        this.trophyCanvas = document.getElementById('trophy-ember-canvas');
+        if (!this.trophyCanvas) return;
+        this.trophyCtx = this.trophyCanvas.getContext('2d');
+        this.startTrophyParticles();
+    }
+
+    startTrophyParticles() {
+        if (this.trophyAnimationId) return;
+        this.animateTrophy();
+    }
+
+    createTrophyParticle() {
+        return {
+            x: Math.random() * this.trophyCanvas.width,
+            y: this.trophyCanvas.height,
+            size: Math.random() * 1.5 + 0.5, // Tiny embers
+            speedY: Math.random() * 0.8 + 0.3, // Rising speed
+            opacity: 1,
+            color: '#ff4d00' // Fixed Fire Color
+        };
+    }
+
+    animateTrophy() {
+        if (!this.trophyCtx) return;
+        this.trophyCtx.clearRect(0, 0, this.trophyCanvas.width, this.trophyCanvas.height);
+
+        // Emit particles
+        if (this.trophyParticles.length < 10 && Math.random() < 0.15) {
+            this.trophyParticles.push(this.createTrophyParticle());
+        }
+
+        for (let i = 0; i < this.trophyParticles.length; i++) {
+            const p = this.trophyParticles[i];
+            p.y -= p.speedY;
+            p.opacity -= 0.008; // Slower fade
+
+            this.trophyCtx.globalAlpha = p.opacity;
+            this.trophyCtx.fillStyle = p.color;
+            this.trophyCtx.beginPath();
+            this.trophyCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            this.trophyCtx.fill();
+
+            if (p.opacity <= 0) {
+                this.trophyParticles.splice(i, 1);
+                i--;
+            }
+        }
+
+        this.trophyAnimationId = requestAnimationFrame(() => this.animateTrophy());
     }
 }
 

@@ -118,6 +118,8 @@
             class="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-100 shadow-sm transition-all hover:shadow-md cursor-help group relative"
             title="Current Rank">
             <div class="relative flex items-center justify-center">
+                <canvas id="trophy-ember-canvas" width="40" height="60"
+                    style="position: absolute; top: -35px; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 5;"></canvas>
                 <span id="header-trophy-icon" class="material-symbols-outlined text-[20px] text-zinc-500 transition-all duration-500"
                     style="font-variation-settings: 'FILL' 1;">trophy</span>
                 <span id="header-trophy-flame" class="material-symbols-outlined absolute -top-1.5 text-[12px] opacity-0 transition-all duration-500 streak-flicker pointer-events-none"
