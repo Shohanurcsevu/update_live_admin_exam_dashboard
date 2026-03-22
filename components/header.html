@@ -127,9 +127,29 @@
             </div>
             <span id="header-trophy-label" class="text-[10px] font-black uppercase tracking-widest text-slate-500">Unranked</span>
             
-            <!-- Tooltip -->
-            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[120] whitespace-nowrap">
-                Current Tier: <span id="header-trophy-tier-name">Iron</span>
+            <!-- Enhanced Glassmorphic Tooltip -->
+            <div id="trophy-tooltip" class="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-56 p-4 rounded-2xl border border-white/20 shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 z-[100] glass-tooltip">
+                <div class="text-center">
+                    <span class="text-[9px] font-bold text-slate-400/80 uppercase tracking-widest block mb-1">Current Rank</span>
+                    <h4 id="header-trophy-tier-name" class="text-base font-black text-slate-800 leading-tight mb-3">IRON</h4>
+                    
+                    <!-- Progress Section -->
+                    <div class="space-y-2 mb-3">
+                        <div class="flex justify-between items-end text-[9px] font-bold uppercase tracking-tighter">
+                            <span class="text-slate-400">Progress</span>
+                            <span id="trophy-days-left" class="text-slate-600">7 Days to next</span>
+                        </div>
+                        <div class="h-1.5 w-full bg-slate-200/50 rounded-full overflow-hidden">
+                            <div id="trophy-progress-bar" class="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-1000 ease-out" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div id="trophy-next-reward" class="py-2 px-3 bg-white/40 rounded-xl border border-white/20 text-center">
+                        <p class="text-[10px] text-slate-600 font-medium leading-relaxed">
+                            Next Rank: <span id="trophy-next-tier" class="font-bold text-slate-800">YELLOW</span>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
 

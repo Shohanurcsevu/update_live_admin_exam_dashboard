@@ -117,3 +117,18 @@
     z-index: 10;
     /* Ensure it's above the trophy icon */
 }
+
+/* Glassmorphic Tooltip */
+.glass-tooltip {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Hide tooltip by default and handle hover */
+#header-trophy-container:hover .glass-tooltip {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+}

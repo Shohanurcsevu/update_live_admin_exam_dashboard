@@ -125,10 +125,15 @@ class StreakManager {
         const trophyIcon = document.getElementById('header-trophy-icon');
         const trophyLabel = document.getElementById('header-trophy-label');
         const trophyTierName = document.getElementById('header-trophy-tier-name');
-
+        const trophyFlame = document.getElementById('header-trophy-flame');
         
-        if (!trophyContainer) return;
+        // Tooltip detail elements
+        const progressBar = document.getElementById('trophy-progress-bar');
+        const daysLeftEl = document.getElementById('trophy-days-left');
+        const nextTierEl = document.getElementById('trophy-next-tier');
 
+        if (!trophyContainer) return;
+        
         // Ensure visible
         trophyContainer.classList.remove('hidden');
         trophyContainer.classList.add('flex');
@@ -142,9 +147,6 @@ class StreakManager {
                 currentTier = tier;
             }
         }
-
-        // Update basic UI
-        const trophyFlame = document.getElementById('header-trophy-flame');
 
         if (trophyLabel) trophyLabel.textContent = currentTier.name;
         if (trophyTierName) trophyTierName.textContent = currentTier.name;
@@ -172,6 +174,28 @@ class StreakManager {
             // All tiers now have an "igniting" flame
             trophyFlame.classList.add('streak-flicker');
         }
+
+        // --- NEW: Update Progress Bar & Tooltip Details ---
+        const nextInfo = this.getNextTierInfo(streak);
+        if (nextInfo && progressBar && daysLeftEl && nextTierEl) {
+            // Find current tier threshold (to calculate progress from 0% of current rank)
+            const currentThreshold = currentTier.threshold;
+            const nextThreshold = nextInfo.threshold;
+            
+            const totalRequired = nextThreshold - currentThreshold;
+            const currentlyDone = streak - currentThreshold;
+            const progressPercent = Math.min(100, Math.max(0, (currentlyDone / totalRequired) * 100));
+
+            progressBar.style.width = `${progressPercent}%`;
+            daysLeftEl.textContent = `${nextInfo.daysLeft} Day${nextInfo.daysLeft > 1 ? 's' : ''} to next`;
+            nextTierEl.textContent = nextInfo.name;
+        } else if (!nextInfo && progressBar) {
+            // Ultimate Rank Reached
+            progressBar.style.width = '100%';
+            if (daysLeftEl) daysLeftEl.textContent = 'MAX RANK';
+            if (nextTierEl) nextTierEl.textContent = 'LEGENDARY';
+        }
+
         // Remove any special container styling if not applicable
         trophyContainer.classList.remove('border-amber-200', 'bg-amber-50/50');
     }
