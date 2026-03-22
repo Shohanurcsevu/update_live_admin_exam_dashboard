@@ -3,6 +3,9 @@ function initializeExamPage() {
     const SUBJECT_API_URL = 'api/exam/subjects.php';
     const LESSON_API_URL = 'api/exam/lessons.php';
     const TOPIC_API_URL = 'api/exam/topics.php';
+    const PROMPT_API_URL = 'api/ai/ai-prompts.php';
+    const TOPIC_CREATE_API_URL = 'api/topic/topic.php';
+    const TOPIC_LESSON_API_URL = 'api/topic/lessons.php';
 
     // DOM Elements
     const createBtn = document.getElementById('create-exam-btn');
@@ -80,6 +83,33 @@ function initializeExamPage() {
     const aiProgressText = document.getElementById('ai-progress-text');
     const aiProgressPercent = document.getElementById('ai-progress-percent');
     let aiUploadedFiles = [];
+
+    // Prompt Preset Elements
+    const promptPresetSelect = document.getElementById('ai-prompt-preset');
+    const presetNewBtn = document.getElementById('preset-new-btn');
+    const presetEditBtn = document.getElementById('preset-edit-btn');
+    const presetDeleteBtn = document.getElementById('preset-delete-btn');
+    const promptEditorModal = document.getElementById('prompt-editor-modal');
+    const promptModalTitle = document.getElementById('prompt-modal-title');
+    const promptNameInput = document.getElementById('prompt-name-input');
+    const promptTextEditor = document.getElementById('prompt-text-editor');
+    const promptSaveBtn = document.getElementById('prompt-save-btn');
+    const promptCancelBtn = document.getElementById('prompt-cancel-btn');
+    const promptModalCloseBtn = document.getElementById('prompt-modal-close-btn');
+    let activePromptText = ''; // Loaded dynamically from DB
+    let editingPresetId = null; // null = creating new
+
+    // Topic Import Elements
+    const topicImportSection = document.getElementById('topic-import-section');
+    const topicImportCount = document.getElementById('topic-import-count');
+    const topicImportTableBody = document.getElementById('topic-import-table-body');
+    const topicImportAllBtn = document.getElementById('topic-import-all-btn');
+    const topicImportBtnText = document.getElementById('topic-import-btn-text');
+    const topicImportClearBtn = document.getElementById('topic-import-clear-btn');
+    const topicImportSubject = document.getElementById('topic-import-subject');
+    const topicImportLesson = document.getElementById('topic-import-lesson');
+    const topicImportApplyAllBtn = document.getElementById('topic-import-apply-all-btn');
+    let topicQueue = [];
 
     let examIdToDelete = null;
     let subjects = []; // Shared subjects for bulk categorization
@@ -1067,7 +1097,14 @@ function initializeExamPage() {
         if (!json) return;
         try {
             const data = JSON.parse(json);
-            const arrayData = Array.isArray(data) ? data : [data];
+            let arrayData = Array.isArray(data) ? data : [data];
+
+            // Detect flat question array: items have 'question' key but no 'data'/'Exam Title'
+            const isFlat = arrayData.length > 0 && arrayData[0].question && !arrayData[0].data && !arrayData[0]["Exam Title"];
+            if (isFlat) {
+                // Wrap flat questions into the expected section format
+                arrayData = [{ "Exam Title": "Imported Questions", "data": arrayData }];
+            }
 
             extractedSections = arrayData.map(item => ({
                 title: item["Exam Title"] || item["title"] || "Untitled Exam",
@@ -1080,6 +1117,19 @@ function initializeExamPage() {
             })).filter(s => s.questions.length > 0);
 
             if (!extractedSections.length) throw new Error("No valid exams/questions found.");
+
+            // Auto-detect topics from Exam Titles in the question data
+            if (!isFlat && extractedSections.length > 0) {
+                const detectedTopics = extractedSections.map(s => ({
+                    topic_name: s.title,
+                    page_from: '',
+                    page_to: ''
+                })).filter(t => t.topic_name && t.topic_name !== 'Untitled Exam' && t.topic_name !== 'Imported Questions');
+
+                if (detectedTopics.length > 0 && topicImportSection) {
+                    showTopicImport(detectedTopics);
+                }
+            }
 
             renderBulkTable();
             renderSections();
@@ -1115,7 +1165,355 @@ function initializeExamPage() {
     // ==========================================
     // AI SMART IMPORT HANDLERS
     // ==========================================
-    const AI_SCAN_PROMPT = `# GEM IDENTITY: BCS Unified Question Processor\n\nYou are an expert AI specialized in the faithful extraction and premium processing of BCS (Bangladesh Civil Service) and other competitive exam questions. Your core identity is built on a **ZERO-SKIP, ZERO-HALLUCINATION, and DATA-CLEANLINESS** policy.\n\n## 💎 CORE DIRECTIVES (PHASE 1: EXTRACTION)\n\n### 1. Hierarchy & Title Logic\n- **Topic vs. Rule Precedence**: Use the most specific header immediately preceding the questions. If a general topic is followed immediately by a specific rule or sub-topic, the **specific rule text** MUST be used as the \`Exam Title\`.\n- **Label Cleaning**: ❌ NEVER include numeric prefixes ("Rule-1:", "Use-4:", "অংশ-২:") in titles. Extract only the verbatim descriptive text.\n- **No Hallucination**: ❌ NEVER invent topic names. Use only verbatim text. If no header exists, use \`Exam Title: "Unknown"\`.\n\n### 2. Layout & Sequence (Z-Pattern)\n- **Multi-Column Processing**: Follow the **Z-pattern** (Complete entire TOP-to-BOTTOM of the left column before moving to the next column).\n- **Split Question Handling**: Merge questions cut off at column/page breaks with their continuation at the top of the next column/page.\n- **Zero-Skip Verification**: 🔍 Scan first, identify all independent question sets, calculate expected count, and NEVER finish until your JSON data count exactly matches.\n\n### 3. Data Cleanliness & Formatting\n- **Question Striping**: ❌ NEVER include the question number in the \`question\` field. Extract only the text.\n- **Language Integrity**: Question in Bangla → Bangla output | English → English output.\n- **Numerals**: Enforce consistent use of English numerals (0-9).\n- **Options Mapping**: Map Bangla labels (ক-ঘ) to English (A-D) while preserving text exactly.\n- **Answer Markers**: Convert visual markers (✓, underlines) to standard A/B/C/D labels.\n- **Premium Formatting**: Use \`<u>\`, \`<b>\`, \`<i>\` tags ONLY to preserve source formatting.\n- **Math Restriction**: ❌ NEVER use HTML tags for math. Use Unicode symbols only (e.g., x², √৫).\n- **Fractions**: Use superscript digits and a fraction slash (ᐟ). Example: ¹ᐟ², ³ᐟ⁴.\n\n## 🔬 INTELLIGENT ENHANCEMENT (PHASE 2: COMPLETION)\n- **Contextual Explanations**: Reference the specific rule or principle from the current Exam Title.\n- **Option Generation**: If a question has fewer than 4 options, generate plausible, subject-appropriate distractors.\n- **Legibility Rule**: ❌ NEVER skip blurry text. Use context and internal knowledge to complete fragmented sentences.\n\n## 📦 OUTPUT ARCHITECTURE (PHASE 3: JSON)\nOutput ONLY valid JSON. No markdown fences, no extra text. The format:\n[\n  {\n    "Exam Title": "Cleaned Topic Text",\n    "data": [\n      {\n        "question": "Verbatim text with <b>bold</b>, <i>italic</i>, <u>underlines</u> preserved",\n        "options": { "A": "...", "B": "...", "C": "...", "D": "..." },\n        "answer": "Letter",\n        "explanation": "Subject-specific logic referencing the title",\n        "priority": 0\n      }\n    ]\n  }\n]\n\n## ⚡ PRIORITY SCORING\nAssign priority (0-3): 0=Normal, 1=Low (1-2 times), 2=Medium (3-4 times), 3=High (4+ times or recent BCS).\n\n## ✅ FINAL SYSTEM AUDIT\n1. Are all "Rule-X/Use-X" prefixes stripped?\n2. Are question numbers removed from the question field?\n3. Does the total count match (Highest - Lowest + 1)?\n4. Does every question have a priority value (0-3)?\n\n**FINAL SUMMARY LINE**: Total questions extracted: X`;
+
+    // --- Prompt Presets CRUD ---
+    async function loadPromptPresets() {
+        try {
+            const resp = await fetch(`${PROMPT_API_URL}?action=list`);
+            const data = await resp.json();
+            if (!data.success || !data.presets?.length) {
+                promptPresetSelect.innerHTML = '<option value="">No presets found</option>';
+                return;
+            }
+            promptPresetSelect.innerHTML = data.presets.map(p =>
+                `<option value="${p.id}" ${p.is_default == 1 ? 'selected' : ''}>${p.name}${p.is_default == 1 ? ' ★' : ''}</option>`
+            ).join('');
+            // Auto-load the selected preset's text
+            await loadActivePrompt();
+        } catch (e) {
+            console.error('Failed to load prompt presets:', e);
+            promptPresetSelect.innerHTML = '<option value="">Error loading</option>';
+        }
+    }
+
+    async function loadActivePrompt() {
+        const id = promptPresetSelect.value;
+        if (!id) { activePromptText = ''; return; }
+        try {
+            const resp = await fetch(`${PROMPT_API_URL}?action=get&id=${id}`);
+            const data = await resp.json();
+            if (data.success && data.preset) {
+                activePromptText = data.preset.prompt_text;
+                // Show/hide delete button (hide for defaults)
+                if (presetDeleteBtn) {
+                    presetDeleteBtn.classList.toggle('hidden', data.preset.is_default == 1);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load prompt:', e);
+        }
+    }
+
+    function openPromptModal(mode, preset = null) {
+        if (mode === 'new') {
+            promptModalTitle.textContent = 'New Prompt Preset';
+            promptNameInput.value = '';
+            promptTextEditor.value = '';
+            editingPresetId = null;
+        } else {
+            promptModalTitle.textContent = 'Edit Prompt Preset';
+            promptNameInput.value = preset?.name || '';
+            promptTextEditor.value = preset?.prompt_text || '';
+            editingPresetId = preset?.id || null;
+        }
+        promptEditorModal.style.display = 'flex';
+    }
+
+    function closePromptModal() {
+        promptEditorModal.style.display = 'none';
+        editingPresetId = null;
+    }
+
+    // Event: Select change
+    if (promptPresetSelect) {
+        promptPresetSelect.addEventListener('change', loadActivePrompt);
+    }
+
+    // Event: New
+    if (presetNewBtn) {
+        presetNewBtn.addEventListener('click', () => openPromptModal('new'));
+    }
+
+    // Event: Edit
+    if (presetEditBtn) {
+        presetEditBtn.addEventListener('click', async () => {
+            const id = promptPresetSelect.value;
+            if (!id) { showToast('Select a preset first.', 'error'); return; }
+            try {
+                const resp = await fetch(`${PROMPT_API_URL}?action=get&id=${id}`);
+                const data = await resp.json();
+                if (data.success) openPromptModal('edit', data.preset);
+            } catch (e) {
+                showToast('Failed to load preset.', 'error');
+            }
+        });
+    }
+
+    // Event: Delete
+    if (presetDeleteBtn) {
+        presetDeleteBtn.addEventListener('click', async () => {
+            const id = promptPresetSelect.value;
+            if (!id) return;
+            const name = promptPresetSelect.options[promptPresetSelect.selectedIndex]?.text;
+            if (!confirm(`Delete preset "${name}"? This cannot be undone.`)) return;
+            try {
+                const resp = await fetch(`${PROMPT_API_URL}?action=delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: parseInt(id) })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('Preset deleted.');
+                    await loadPromptPresets();
+                } else {
+                    showToast(data.message || 'Delete failed.', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to delete preset.', 'error');
+            }
+        });
+    }
+
+    // Event: Save (create or update)
+    if (promptSaveBtn) {
+        promptSaveBtn.addEventListener('click', async () => {
+            const name = promptNameInput.value.trim();
+            const text = promptTextEditor.value.trim();
+            if (!name || !text) {
+                showToast('Name and prompt text are required.', 'error');
+                return;
+            }
+            const action = editingPresetId ? 'update' : 'create';
+            const body = editingPresetId
+                ? { id: editingPresetId, name, prompt_text: text }
+                : { name, prompt_text: text };
+            try {
+                promptSaveBtn.disabled = true;
+                promptSaveBtn.textContent = 'Saving...';
+                const resp = await fetch(`${PROMPT_API_URL}?action=${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(editingPresetId ? 'Preset updated!' : 'Preset created!');
+                    closePromptModal();
+                    await loadPromptPresets();
+                    // Select the newly created/updated preset
+                    if (data.id) promptPresetSelect.value = data.id;
+                    else if (editingPresetId) promptPresetSelect.value = editingPresetId;
+                    await loadActivePrompt();
+                } else {
+                    showToast(data.message || 'Save failed.', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to save preset.', 'error');
+            } finally {
+                promptSaveBtn.disabled = false;
+                promptSaveBtn.textContent = 'Save Preset';
+            }
+        });
+    }
+
+    // Event: Close modal
+    if (promptCancelBtn) promptCancelBtn.addEventListener('click', closePromptModal);
+    if (promptModalCloseBtn) promptModalCloseBtn.addEventListener('click', closePromptModal);
+
+    // Load presets on init
+    loadPromptPresets();
+
+    // ==========================================
+    // TOPIC IMPORT HANDLERS
+    // ==========================================
+
+    async function populateTopicSubjects(selector) {
+        try {
+            const resp = await fetch(SUBJECT_API_URL);
+            const result = await resp.json();
+            if (result.success) {
+                selector.innerHTML = '<option value="">Select Subject</option>';
+                result.data.forEach(s => {
+                    selector.innerHTML += `<option value="${s.id}">${s.subject_name}</option>`;
+                });
+            }
+        } catch (e) { console.error('Failed to load subjects for topic import', e); }
+    }
+
+    async function populateTopicLessons(subjectId, selector, lessonToSelect = null) {
+        selector.innerHTML = '<option value="">Loading...</option>';
+        selector.disabled = true;
+        if (!subjectId) {
+            selector.innerHTML = '<option value="">Select Subject First</option>';
+            return;
+        }
+        try {
+            const resp = await fetch(`${TOPIC_LESSON_API_URL}?subject_id=${subjectId}`);
+            const result = await resp.json();
+            if (result.success) {
+                selector.innerHTML = '<option value="">Select Lesson</option>';
+                result.data.forEach(l => {
+                    selector.innerHTML += `<option value="${l.id}" ${lessonToSelect == l.id ? 'selected' : ''}>${l.lesson_name}</option>`;
+                });
+                selector.disabled = false;
+            }
+        } catch (e) { console.error('Failed to load lessons', e); }
+    }
+
+    function showTopicImport(topics) {
+        topicQueue = topics.map(item => ({
+            name: item.topic_name || item.name || '',
+            page_from: item.page_from || item.start_page || '',
+            page_to: item.page_to || item.end_page || '',
+            subject_id: '',
+            lesson_id: '',
+            isIncluded: true
+        }));
+        topicImportCount.textContent = topicQueue.length;
+        topicImportSection.classList.remove('hidden');
+        populateTopicSubjects(topicImportSubject);
+        renderTopicImportTable();
+    }
+
+    async function renderTopicImportTable() {
+        topicImportTableBody.innerHTML = '';
+        // Fetch subjects once for all rows
+        let subjectsList = [];
+        try {
+            const resp = await fetch(SUBJECT_API_URL);
+            const result = await resp.json();
+            if (result.success) subjectsList = result.data;
+        } catch (e) { /* no subjects */ }
+
+        for (let i = 0; i < topicQueue.length; i++) {
+            const item = topicQueue[i];
+            const row = document.createElement('tr');
+            row.className = `hover:bg-slate-50 transition-all border-b border-slate-50 ${item.isIncluded ? '' : 'opacity-40 grayscale'}`;
+            row.innerHTML = `
+                <td class="py-2 px-2 text-center">
+                    <input type="checkbox" class="ti-check w-4 h-4 rounded border-slate-300 text-emerald-600" ${item.isIncluded ? 'checked' : ''}>
+                </td>
+                <td class="py-2 px-3">
+                    <input type="text" class="ti-name w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold focus:border-emerald-300 outline-none" value="${item.name}">
+                </td>
+                <td class="py-2 px-2">
+                    <input type="number" class="ti-from w-full px-1 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] text-center" value="${item.page_from}" placeholder="-">
+                </td>
+                <td class="py-2 px-2">
+                    <input type="number" class="ti-to w-full px-1 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] text-center" value="${item.page_to}" placeholder="-">
+                </td>
+                <td class="py-2 px-3">
+                    <select class="ti-subject w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] truncate">
+                        <option value="">Subject</option>
+                        ${subjectsList.map(s => `<option value="${s.id}" ${item.subject_id == s.id ? 'selected' : ''}>${s.subject_name}</option>`).join('')}
+                    </select>
+                </td>
+                <td class="py-2 px-3">
+                    <select class="ti-lesson w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] truncate" ${!item.subject_id ? 'disabled' : ''}>
+                        <option value="">Lesson</option>
+                    </select>
+                </td>
+                <td class="py-2 px-2 text-center">
+                    ${i > 0 ? `<button type="button" class="ti-same p-1 px-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition text-[10px] font-bold" title="Same as Above">↓</button>` : ''}
+                </td>
+            `;
+
+            const subSel = row.querySelector('.ti-subject');
+            const lesSel = row.querySelector('.ti-lesson');
+            const nameInput = row.querySelector('.ti-name');
+            const fromInput = row.querySelector('.ti-from');
+            const toInput = row.querySelector('.ti-to');
+            const checkBox = row.querySelector('.ti-check');
+            const sameBtn = row.querySelector('.ti-same');
+
+            if (item.subject_id) populateTopicLessons(item.subject_id, lesSel, item.lesson_id);
+
+            subSel.onchange = () => { item.subject_id = subSel.value; item.lesson_id = ''; populateTopicLessons(item.subject_id, lesSel); };
+            lesSel.onchange = () => { item.lesson_id = lesSel.value; };
+            nameInput.oninput = () => { item.name = nameInput.value; };
+            fromInput.oninput = () => { item.page_from = fromInput.value; };
+            toInput.oninput = () => { item.page_to = toInput.value; };
+            checkBox.onchange = () => {
+                item.isIncluded = checkBox.checked;
+                row.classList.toggle('opacity-40', !item.isIncluded);
+                row.classList.toggle('grayscale', !item.isIncluded);
+            };
+            if (sameBtn) {
+                sameBtn.onclick = () => {
+                    const prev = topicQueue[i - 1];
+                    item.subject_id = prev.subject_id;
+                    item.lesson_id = prev.lesson_id;
+                    subSel.value = item.subject_id;
+                    populateTopicLessons(item.subject_id, lesSel, item.lesson_id);
+                };
+            }
+
+            topicImportTableBody.appendChild(row);
+        }
+    }
+
+    async function processTopicImportAll() {
+        const toImport = topicQueue.filter(t => t.isIncluded && t.subject_id && t.lesson_id);
+        if (!toImport.length) {
+            showToast('No valid topics. Ensure Subject and Lesson are selected.', 'error');
+            return;
+        }
+        topicImportAllBtn.disabled = true;
+        let successCount = 0;
+        for (let i = 0; i < toImport.length; i++) {
+            const item = toImport[i];
+            topicImportBtnText.textContent = `Importing ${i + 1}/${toImport.length}...`;
+            try {
+                const resp = await fetch(`${TOPIC_CREATE_API_URL}?action=create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject_id: item.subject_id,
+                        lesson_id: item.lesson_id,
+                        topic_name: item.name,
+                        start_page: item.page_from || 1,
+                        end_page: item.page_to || 1,
+                        expected_exams: 30
+                    })
+                });
+                const result = await resp.json();
+                if (result.success) successCount++;
+            } catch (e) { console.error('Topic import failed:', item.name, e); }
+        }
+        topicImportAllBtn.disabled = false;
+        topicImportBtnText.textContent = 'Import All Topics';
+        showToast(`${successCount}/${toImport.length} topics imported!`);
+        if (typeof CacheManager !== 'undefined') {
+            CacheManager.clearGroup('topic');
+            CacheManager.clearGroup('exam');
+        }
+    }
+
+    // Topic Import Event Listeners
+    if (topicImportAllBtn) topicImportAllBtn.addEventListener('click', processTopicImportAll);
+    if (topicImportClearBtn) topicImportClearBtn.addEventListener('click', () => {
+        topicQueue = [];
+        topicImportSection.classList.add('hidden');
+    });
+    if (topicImportSubject) {
+        topicImportSubject.addEventListener('change', () => {
+            populateTopicLessons(topicImportSubject.value, topicImportLesson);
+        });
+    }
+    if (topicImportApplyAllBtn) {
+        topicImportApplyAllBtn.addEventListener('click', () => {
+            const subjectId = topicImportSubject.value;
+            const lessonId = topicImportLesson.value;
+            if (!subjectId) { showToast('Select a subject first.', 'error'); return; }
+            topicQueue.forEach(item => {
+                item.subject_id = subjectId;
+                item.lesson_id = lessonId;
+            });
+            renderTopicImportTable();
+            showToast('Applied to all topics.');
+        });
+    }
 
     function handleAIFiles(files) {
         const validFiles = Array.from(files).filter(f => f.type.startsWith('image/') || f.type === 'application/pdf');
@@ -1239,7 +1637,7 @@ function initializeExamPage() {
                         {
                             role: "user",
                             parts: [
-                                { text: AI_SCAN_PROMPT },
+                                { text: activePromptText || 'Extract all questions from this image as JSON.' },
                                 ...imageParts
                             ]
                         }
@@ -1281,19 +1679,57 @@ function initializeExamPage() {
                 aiProgressBar.style.width = '90%';
                 aiProgressPercent.textContent = '90%';
 
-                // Clean the response — strip markdown fences and keep only the JSON array content [...]
+                // Clean the response — strip markdown fences and extract valid JSON array(s)
                 let cleanedJson = rawText.trim();
-                const startIdx = cleanedJson.indexOf('[');
-                const endIdx = cleanedJson.lastIndexOf(']');
 
-                if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-                    cleanedJson = cleanedJson.substring(startIdx, endIdx + 1);
-                } else if (cleanedJson.startsWith('```')) {
-                    cleanedJson = cleanedJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+                // Strip markdown code fences first
+                cleanedJson = cleanedJson.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+
+                // Find ALL valid JSON arrays by bracket-matching
+                let topicJsonArr = null;
+                let questionJsonArr = null;
+                let allArrays = [];
+
+                for (let i = 0; i < cleanedJson.length; i++) {
+                    if (cleanedJson[i] === '[') {
+                        let depth = 0;
+                        for (let j = i; j < cleanedJson.length; j++) {
+                            if (cleanedJson[j] === '[') depth++;
+                            else if (cleanedJson[j] === ']') depth--;
+                            if (depth === 0) {
+                                const candidate = cleanedJson.substring(i, j + 1);
+                                try {
+                                    const parsed = JSON.parse(candidate);
+                                    if (Array.isArray(parsed) && parsed.length > 0) {
+                                        // Classify: topic list vs question list
+                                        const isTopicList = parsed.some(item => item.topic_name && !item.question && !item.data);
+                                        const isQuestionList = parsed.some(item => item.data || item.question || item.questions || item["Exam Title"]);
+                                        allArrays.push({ json: candidate, parsed, isTopicList, isQuestionList, length: candidate.length });
+                                    }
+                                } catch (e) { /* not valid JSON */ }
+                                i = j; // Skip past this bracket pair
+                                break;
+                            }
+                        }
+                    }
                 }
 
-                // Feed into the existing bulk import pipeline
-                handleBulkJSON(cleanedJson);
+                // Pick the best topic array and question array
+                const topicArr = allArrays.find(a => a.isTopicList);
+                const questionArr = allArrays.find(a => a.isQuestionList) || allArrays.reduce((best, a) => (!a.isTopicList && a.length > (best?.length || 0)) ? a : best, null);
+
+                // Show topic import section if topics found
+                if (topicArr) {
+                    showTopicImport(topicArr.parsed);
+                    showToast(`${topicArr.parsed.length} topics detected!`);
+                }
+
+                // Feed questions into the bulk import pipeline
+                if (questionArr) {
+                    handleBulkJSON(questionArr.json);
+                } else {
+                    showToast('No questions found in AI response.', 'error');
+                }
 
                 aiProgressText.textContent = 'Done! Questions loaded into queue.';
                 aiProgressBar.style.width = '100%';

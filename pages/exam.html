@@ -392,6 +392,27 @@
                         </button>
                     </div>
 
+                    <!-- Prompt Preset Selector -->
+                    <div id="ai-preset-bar" class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-violet-50/50 p-4 rounded-2xl border border-violet-100">
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                            <span class="material-symbols-outlined text-violet-400 text-lg flex-shrink-0">psychology</span>
+                            <select id="ai-prompt-preset" class="flex-1 min-w-0 bg-white border border-violet-200 rounded-xl px-3 py-2.5 text-xs font-bold text-violet-700 outline-none focus:ring-2 focus:ring-violet-200 transition-all shadow-sm truncate">
+                                <option value="">Loading presets...</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <button id="preset-new-btn" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-xl transition-all text-xs font-bold border border-emerald-100 flex items-center gap-1.5" title="New Preset">
+                                <span class="material-symbols-outlined text-sm">add</span> New
+                            </button>
+                            <button id="preset-edit-btn" class="px-3 py-2 bg-white hover:bg-violet-50 text-violet-600 rounded-xl transition-all text-xs font-bold border border-violet-200 flex items-center gap-1.5" title="Edit Selected">
+                                <span class="material-symbols-outlined text-sm">edit</span> Edit
+                            </button>
+                            <button id="preset-delete-btn" class="px-3 py-2 bg-white hover:bg-rose-50 text-rose-400 rounded-xl transition-all text-xs font-bold border border-rose-100 flex items-center gap-1.5 hidden" title="Delete Selected">
+                                <span class="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Drop Zone -->
                     <div id="ai-drop-zone"
                         class="relative border-2 border-dashed border-slate-200 hover:border-violet-300 rounded-3xl p-10 text-center cursor-pointer transition-all group hover:bg-violet-50/30">
@@ -430,6 +451,72 @@
                                 <div id="ai-progress-bar" class="h-full bg-violet-600 rounded-full transition-all duration-300" style="width: 0%"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Topic Import Section (shown after AI scan detects topics) -->
+                <div id="topic-import-section" class="hidden bg-white p-8 rounded-[32px] shadow-sm border border-emerald-100 space-y-6">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                                <span class="material-symbols-outlined text-2xl">topic</span>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-slate-800">Topic Import <span id="topic-import-count" class="text-xs font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 ml-2">0</span></h3>
+                                <p class="text-slate-400 text-sm font-medium">Import topics before loading exam questions</p>
+                            </div>
+                        </div>
+                        <button id="topic-import-clear-btn"
+                            class="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition-all text-xs font-bold">
+                            <span class="material-symbols-outlined text-sm">close</span> Dismiss
+                        </button>
+                    </div>
+
+                    <!-- Bulk categorization selectors -->
+                    <div class="flex flex-col sm:flex-row gap-3 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                        <div class="flex items-center gap-2 flex-1">
+                            <span class="material-symbols-outlined text-emerald-400 text-lg flex-shrink-0">school</span>
+                            <select id="topic-import-subject" class="flex-1 bg-white border border-emerald-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-200 transition-all">
+                                <option value="">Select Subject</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 flex-1">
+                            <span class="material-symbols-outlined text-emerald-400 text-lg flex-shrink-0">menu_book</span>
+                            <select id="topic-import-lesson" class="flex-1 bg-white border border-emerald-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-200 transition-all" disabled>
+                                <option value="">Select Subject First</option>
+                            </select>
+                        </div>
+                        <button id="topic-import-apply-all-btn"
+                            class="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-xl transition-all text-xs font-bold border border-emerald-200 flex items-center gap-1.5 flex-shrink-0">
+                            <span class="material-symbols-outlined text-sm">select_all</span> Apply to All
+                        </button>
+                    </div>
+
+                    <!-- Topic Table -->
+                    <div class="overflow-x-auto rounded-2xl border border-slate-100">
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px]">
+                                    <th class="py-2 px-2 w-8">✓</th>
+                                    <th class="py-2 px-3 text-left">Topic Name</th>
+                                    <th class="py-2 px-2 w-16">From</th>
+                                    <th class="py-2 px-2 w-16">To</th>
+                                    <th class="py-2 px-3 w-32">Subject</th>
+                                    <th class="py-2 px-3 w-32">Lesson</th>
+                                    <th class="py-2 px-2 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="topic-import-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Import Button -->
+                    <div class="flex justify-end">
+                        <button id="topic-import-all-btn"
+                            class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black shadow-xl shadow-emerald-100 transition-all flex items-center gap-2 transform active:scale-95">
+                            <span class="material-symbols-outlined text-lg">publish</span>
+                            <span id="topic-import-btn-text">Import All Topics</span>
+                        </button>
                     </div>
                 </div>
 
@@ -571,6 +658,57 @@
             <button id="close-preview-footer-btn"
                 class="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl shadow-slate-200">
                 Close Preview
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Prompt Editor Modal -->
+<div id="prompt-editor-modal"
+    class="fixed inset-0 z-[600] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all">
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-violet-50 text-violet-600 rounded-2xl flex items-center justify-center">
+                    <span class="material-symbols-outlined text-2xl">psychology</span>
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800" id="prompt-modal-title">Edit Prompt</h3>
+                    <p class="text-xs text-slate-500 font-medium">Customize AI scanning instructions</p>
+                </div>
+            </div>
+            <button id="prompt-modal-close-btn"
+                class="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Preset Name</label>
+                <input type="text" id="prompt-name-input"
+                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-violet-300 focus:bg-white transition-all"
+                    placeholder="e.g. BCS Unified, Standard MCQ, Textbook...">
+            </div>
+            <div>
+                <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Prompt Instructions</label>
+                <textarea id="prompt-text-editor"
+                    class="w-full h-[50vh] p-5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono text-slate-700 outline-none focus:border-violet-300 focus:bg-white transition-all resize-none leading-relaxed"
+                    placeholder="Enter your AI scanning instructions here..."></textarea>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 bg-white border-t border-gray-100 flex justify-end gap-3">
+            <button id="prompt-cancel-btn"
+                class="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all">
+                Cancel
+            </button>
+            <button id="prompt-save-btn"
+                class="px-8 py-3 bg-violet-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-violet-700 active:scale-95 transition-all shadow-xl shadow-violet-100">
+                Save Preset
             </button>
         </div>
     </div>
