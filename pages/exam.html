@@ -373,6 +373,67 @@
 
             <!-- Bulk JSON Import Section -->
             <div id="bulk-mode-content" class="hidden p-8 space-y-8 animate-fade-in">
+
+                <!-- AI Scan Section (NEW) -->
+                <div class="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-6">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-violet-50 text-violet-600 rounded-2xl flex items-center justify-center">
+                                <span class="material-symbols-outlined text-2xl">auto_awesome</span>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-slate-800">AI Scan <span class="text-xs font-black text-violet-500 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-100 ml-2">GEMINI</span></h3>
+                                <p class="text-slate-400 text-sm font-medium">Upload images or PDFs — AI will extract questions automatically</p>
+                            </div>
+                        </div>
+                        <button id="ai-clear-files-btn"
+                            class="hidden items-center gap-2 px-5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-2xl transition-all font-bold text-sm border border-rose-100">
+                            <span class="material-symbols-outlined text-lg">delete_sweep</span> Clear
+                        </button>
+                    </div>
+
+                    <!-- Drop Zone -->
+                    <div id="ai-drop-zone"
+                        class="relative border-2 border-dashed border-slate-200 hover:border-violet-300 rounded-3xl p-10 text-center cursor-pointer transition-all group hover:bg-violet-50/30">
+                        <input type="file" id="ai-file-input" accept="image/*,.pdf" multiple class="hidden">
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="w-16 h-16 bg-slate-100 group-hover:bg-violet-100 rounded-2xl flex items-center justify-center transition-all">
+                                <span class="material-symbols-outlined text-3xl text-slate-300 group-hover:text-violet-500 transition-all">cloud_upload</span>
+                            </div>
+                            <div>
+                                <p class="text-slate-600 font-bold">Drop images here or <label for="ai-file-input" class="text-violet-600 hover:text-violet-700 cursor-pointer underline underline-offset-2">browse files</label></p>
+                                <p class="text-slate-400 text-xs mt-1">Supports JPG, PNG, WebP, PDF • Multiple files</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Previews -->
+                    <div id="ai-preview-grid" class="hidden grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3"></div>
+
+                    <!-- Scan Button & Progress -->
+                    <div id="ai-scan-actions" class="hidden space-y-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <p id="ai-file-count" class="text-sm font-bold text-slate-500"></p>
+                            <button id="ai-scan-btn"
+                                class="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl font-black shadow-xl shadow-violet-100 transition-all flex items-center gap-2 transform active:scale-95">
+                                <span class="material-symbols-outlined text-lg">auto_awesome</span>
+                                <span id="ai-scan-btn-text">Scan with AI</span>
+                            </button>
+                        </div>
+                        <!-- Progress Bar -->
+                        <div id="ai-progress-container" class="hidden space-y-2">
+                            <div class="flex items-center justify-between">
+                                <p id="ai-progress-text" class="text-xs font-bold text-violet-600"></p>
+                                <p id="ai-progress-percent" class="text-xs font-black text-violet-600"></p>
+                            </div>
+                            <div class="w-full h-2 bg-violet-100 rounded-full overflow-hidden">
+                                <div id="ai-progress-bar" class="h-full bg-violet-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing JSON Import Section (PRESERVED) -->
                 <div class="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-6">
                     <div class="flex items-center justify-between gap-4">
                         <div class="flex items-center gap-4">

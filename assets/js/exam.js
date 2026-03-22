@@ -66,6 +66,21 @@ function initializeExamPage() {
     const resultsPlaceholder = document.getElementById('results-placeholder');
     const bulkResetBtn = document.getElementById('bulk-reset-btn');
 
+    // AI Scan Elements
+    const aiDropZone = document.getElementById('ai-drop-zone');
+    const aiFileInput = document.getElementById('ai-file-input');
+    const aiPreviewGrid = document.getElementById('ai-preview-grid');
+    const aiScanActions = document.getElementById('ai-scan-actions');
+    const aiScanBtn = document.getElementById('ai-scan-btn');
+    const aiScanBtnText = document.getElementById('ai-scan-btn-text');
+    const aiFileCount = document.getElementById('ai-file-count');
+    const aiClearFilesBtn = document.getElementById('ai-clear-files-btn');
+    const aiProgressContainer = document.getElementById('ai-progress-container');
+    const aiProgressBar = document.getElementById('ai-progress-bar');
+    const aiProgressText = document.getElementById('ai-progress-text');
+    const aiProgressPercent = document.getElementById('ai-progress-percent');
+    let aiUploadedFiles = [];
+
     let examIdToDelete = null;
     let subjects = []; // Shared subjects for bulk categorization
     extractedSections = []; // Queue for bulk import
@@ -1096,6 +1111,211 @@ function initializeExamPage() {
             }
         }
     });
+
+    // ==========================================
+    // AI SMART IMPORT HANDLERS
+    // ==========================================
+    const AI_SCAN_PROMPT = `# GEM IDENTITY: BCS Unified Question Processor\n\nYou are an expert AI specialized in the faithful extraction and premium processing of BCS (Bangladesh Civil Service) and other competitive exam questions. Your core identity is built on a **ZERO-SKIP, ZERO-HALLUCINATION, and DATA-CLEANLINESS** policy.\n\n## 💎 CORE DIRECTIVES (PHASE 1: EXTRACTION)\n\n### 1. Hierarchy & Title Logic\n- **Topic vs. Rule Precedence**: Use the most specific header immediately preceding the questions. If a general topic is followed immediately by a specific rule or sub-topic, the **specific rule text** MUST be used as the \`Exam Title\`.\n- **Label Cleaning**: ❌ NEVER include numeric prefixes ("Rule-1:", "Use-4:", "অংশ-২:") in titles. Extract only the verbatim descriptive text.\n- **No Hallucination**: ❌ NEVER invent topic names. Use only verbatim text. If no header exists, use \`Exam Title: "Unknown"\`.\n\n### 2. Layout & Sequence (Z-Pattern)\n- **Multi-Column Processing**: Follow the **Z-pattern** (Complete entire TOP-to-BOTTOM of the left column before moving to the next column).\n- **Split Question Handling**: Merge questions cut off at column/page breaks with their continuation at the top of the next column/page.\n- **Zero-Skip Verification**: 🔍 Scan first, identify all independent question sets, calculate expected count, and NEVER finish until your JSON data count exactly matches.\n\n### 3. Data Cleanliness & Formatting\n- **Question Striping**: ❌ NEVER include the question number in the \`question\` field. Extract only the text.\n- **Language Integrity**: Question in Bangla → Bangla output | English → English output.\n- **Numerals**: Enforce consistent use of English numerals (0-9).\n- **Options Mapping**: Map Bangla labels (ক-ঘ) to English (A-D) while preserving text exactly.\n- **Answer Markers**: Convert visual markers (✓, underlines) to standard A/B/C/D labels.\n- **Premium Formatting**: Use \`<u>\`, \`<b>\`, \`<i>\` tags ONLY to preserve source formatting.\n- **Math Restriction**: ❌ NEVER use HTML tags for math. Use Unicode symbols only (e.g., x², √৫).\n- **Fractions**: Use superscript digits and a fraction slash (ᐟ). Example: ¹ᐟ², ³ᐟ⁴.\n\n## 🔬 INTELLIGENT ENHANCEMENT (PHASE 2: COMPLETION)\n- **Contextual Explanations**: Reference the specific rule or principle from the current Exam Title.\n- **Option Generation**: If a question has fewer than 4 options, generate plausible, subject-appropriate distractors.\n- **Legibility Rule**: ❌ NEVER skip blurry text. Use context and internal knowledge to complete fragmented sentences.\n\n## 📦 OUTPUT ARCHITECTURE (PHASE 3: JSON)\nOutput ONLY valid JSON. No markdown fences, no extra text. The format:\n[\n  {\n    "Exam Title": "Cleaned Topic Text",\n    "data": [\n      {\n        "question": "Verbatim text with <b>bold</b>, <i>italic</i>, <u>underlines</u> preserved",\n        "options": { "A": "...", "B": "...", "C": "...", "D": "..." },\n        "answer": "Letter",\n        "explanation": "Subject-specific logic referencing the title",\n        "priority": 0\n      }\n    ]\n  }\n]\n\n## ⚡ PRIORITY SCORING\nAssign priority (0-3): 0=Normal, 1=Low (1-2 times), 2=Medium (3-4 times), 3=High (4+ times or recent BCS).\n\n## ✅ FINAL SYSTEM AUDIT\n1. Are all "Rule-X/Use-X" prefixes stripped?\n2. Are question numbers removed from the question field?\n3. Does the total count match (Highest - Lowest + 1)?\n4. Does every question have a priority value (0-3)?\n\n**FINAL SUMMARY LINE**: Total questions extracted: X`;
+
+    function handleAIFiles(files) {
+        const validFiles = Array.from(files).filter(f => f.type.startsWith('image/') || f.type === 'application/pdf');
+        if (validFiles.length === 0) {
+            showToast('No valid files. Please upload images or PDFs.', 'error');
+            return;
+        }
+        aiUploadedFiles = [];
+        aiPreviewGrid.innerHTML = '';
+        aiPreviewGrid.classList.remove('hidden');
+        aiScanActions.classList.remove('hidden');
+        aiClearFilesBtn.classList.remove('hidden');
+        aiClearFilesBtn.classList.add('flex');
+
+        validFiles.forEach((file, i) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64 = e.target.result;
+                const mimeType = file.type;
+                aiUploadedFiles.push({ base64, mimeType, name: file.name });
+
+                // Create preview thumbnail
+                const thumb = document.createElement('div');
+                thumb.className = 'relative w-full aspect-square rounded-2xl overflow-hidden border border-slate-200 shadow-sm group';
+                if (mimeType === 'application/pdf') {
+                    thumb.innerHTML = `<div class="w-full h-full bg-rose-50 flex flex-col items-center justify-center gap-1"><span class="material-symbols-outlined text-2xl text-rose-400">picture_as_pdf</span><span class="text-[9px] font-bold text-rose-400 truncate w-full text-center px-1">${file.name}</span></div>`;
+                } else {
+                    thumb.innerHTML = `<img src="${base64}" alt="${file.name}" class="w-full h-full object-cover">`;
+                }
+                // Remove button
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-xs';
+                removeBtn.innerHTML = '✕';
+                removeBtn.onclick = () => {
+                    aiUploadedFiles = aiUploadedFiles.filter(f => f.name !== file.name);
+                    thumb.remove();
+                    aiFileCount.textContent = `${aiUploadedFiles.length} file(s) ready`;
+                    if (aiUploadedFiles.length === 0) {
+                        aiPreviewGrid.classList.add('hidden');
+                        aiScanActions.classList.add('hidden');
+                        aiClearFilesBtn.classList.add('hidden');
+                        aiClearFilesBtn.classList.remove('flex');
+                    }
+                };
+                thumb.appendChild(removeBtn);
+                aiPreviewGrid.appendChild(thumb);
+                aiFileCount.textContent = `${aiUploadedFiles.length} file(s) ready`;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Drop Zone – click to browse
+    if (aiDropZone) {
+        aiDropZone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'LABEL' && e.target.tagName !== 'INPUT') {
+                aiFileInput.click();
+            }
+        });
+
+        // Drag & Drop
+        ['dragenter', 'dragover'].forEach(evt => {
+            aiDropZone.addEventListener(evt, (e) => { e.preventDefault(); aiDropZone.classList.add('border-violet-400', 'bg-violet-50/50'); });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            aiDropZone.addEventListener(evt, (e) => { e.preventDefault(); aiDropZone.classList.remove('border-violet-400', 'bg-violet-50/50'); });
+        });
+        aiDropZone.addEventListener('drop', (e) => {
+            handleAIFiles(e.dataTransfer.files);
+        });
+    }
+
+    if (aiFileInput) {
+        aiFileInput.addEventListener('change', (e) => handleAIFiles(e.target.files));
+    }
+
+    // Clear Files
+    if (aiClearFilesBtn) {
+        aiClearFilesBtn.addEventListener('click', () => {
+            aiUploadedFiles = [];
+            aiPreviewGrid.innerHTML = '';
+            aiPreviewGrid.classList.add('hidden');
+            aiScanActions.classList.add('hidden');
+            aiClearFilesBtn.classList.add('hidden');
+            aiClearFilesBtn.classList.remove('flex');
+            aiFileInput.value = '';
+            aiProgressContainer.classList.add('hidden');
+        });
+    }
+
+    // Scan with AI
+    if (aiScanBtn) {
+        aiScanBtn.addEventListener('click', async () => {
+            if (aiUploadedFiles.length === 0) {
+                showToast('Please upload files first.', 'error');
+                return;
+            }
+
+            aiScanBtn.disabled = true;
+            aiScanBtnText.textContent = 'Scanning...';
+            aiProgressContainer.classList.remove('hidden');
+            aiProgressBar.style.width = '0%';
+            aiProgressText.textContent = 'Preparing files...';
+            aiProgressPercent.textContent = '0%';
+
+            try {
+                // Build inline data parts from all uploaded files
+                const imageParts = aiUploadedFiles.map(f => ({
+                    inlineData: {
+                        mimeType: f.mimeType,
+                        data: f.base64.split(',')[1]
+                    }
+                }));
+
+                aiProgressText.textContent = 'Sending to Gemini AI...';
+                aiProgressBar.style.width = '30%';
+                aiProgressPercent.textContent = '30%';
+
+                const payload = {
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [
+                                { text: AI_SCAN_PROMPT },
+                                ...imageParts
+                            ]
+                        }
+                    ],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 65536
+                    }
+                };
+
+                const response = await fetch(AIService.API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                aiProgressText.textContent = 'Processing AI response...';
+                aiProgressBar.style.width = '70%';
+                aiProgressPercent.textContent = '70%';
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `API Error: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // Extract text from Gemini response
+                let rawText = '';
+                if (result.candidates && result.candidates[0]?.content?.parts) {
+                    rawText = result.candidates[0].content.parts.map(p => p.text || '').join('');
+                }
+
+                if (!rawText) {
+                    throw new Error('Gemini returned an empty response. Try clearer images.');
+                }
+
+                aiProgressText.textContent = 'Parsing extracted questions...';
+                aiProgressBar.style.width = '90%';
+                aiProgressPercent.textContent = '90%';
+
+                // Clean the response — strip markdown fences and keep only the JSON array content [...]
+                let cleanedJson = rawText.trim();
+                const startIdx = cleanedJson.indexOf('[');
+                const endIdx = cleanedJson.lastIndexOf(']');
+
+                if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                    cleanedJson = cleanedJson.substring(startIdx, endIdx + 1);
+                } else if (cleanedJson.startsWith('```')) {
+                    cleanedJson = cleanedJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+                }
+
+                // Feed into the existing bulk import pipeline
+                handleBulkJSON(cleanedJson);
+
+                aiProgressText.textContent = 'Done! Questions loaded into queue.';
+                aiProgressBar.style.width = '100%';
+                aiProgressPercent.textContent = '100%';
+                showToast('AI Scan complete! Questions extracted and loaded.', 'success');
+
+                setTimeout(() => {
+                    aiProgressContainer.classList.add('hidden');
+                }, 3000);
+
+            } catch (error) {
+                console.error('AI Scan Error:', error);
+                showToast(`AI Scan failed: ${error.message}`, 'error');
+                aiProgressText.textContent = 'Scan failed!';
+                aiProgressBar.style.width = '0%';
+                aiProgressPercent.textContent = '';
+            } finally {
+                aiScanBtn.disabled = false;
+                aiScanBtnText.textContent = 'Scan with AI';
+            }
+        });
+    }
 
     // Reset Bulk Import
     bulkResetBtn.onclick = () => {
