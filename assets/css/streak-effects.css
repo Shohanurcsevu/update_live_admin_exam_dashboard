@@ -110,3 +110,10 @@
     animation: trophy-sparkle 2.5s infinite ease-in-out;
     display: inline-block;
 }
+
+/* Trophy Flame Specifics */
+#header-trophy-flame {
+    transform-origin: bottom center;
+    z-index: 10;
+    /* Ensure it's above the trophy icon */
+}

@@ -117,37 +117,54 @@ class StreakManager {
         const trophyLabel = document.getElementById('header-trophy-label');
         const trophyTierName = document.getElementById('header-trophy-tier-name');
 
-        if (!trophyContainer || !trophyIcon || !trophyLabel) return;
+        
+        if (!trophyContainer) return;
 
         // Ensure visible
         trophyContainer.classList.remove('hidden');
         trophyContainer.classList.add('flex');
 
+        // Identify current tier
         const tiers = this.getTiers();
         let currentTier = { threshold: 0, name: 'Iron', color: '#71717a' }; // Default/Low Streak Tier
         
         for (const tier of tiers) {
             if (streak >= tier.threshold) {
                 currentTier = tier;
-            } else {
-                break;
             }
         }
 
-        // Set Trophy Visuals
-        trophyIcon.style.color = currentTier.color;
-        trophyLabel.textContent = currentTier.name;
-        trophyLabel.style.color = currentTier.color;
-        if (trophyTierName) trophyTierName.textContent = currentTier.name;
+        // Update basic UI
+        const trophyFlame = document.getElementById('header-trophy-flame');
 
-        // Apply specialized effects for high tiers
-        if (streak >= 154) {
-            trophyIcon.classList.add('animate-sparkle');
-            trophyContainer.classList.add('border-amber-200', 'bg-amber-50/50');
-        } else {
-            trophyIcon.classList.remove('animate-sparkle');
-            trophyContainer.classList.remove('border-amber-200', 'bg-amber-50/50');
+        if (trophyLabel) trophyLabel.textContent = currentTier.name;
+        if (trophyTierName) trophyTierName.textContent = currentTier.name;
+        
+        if (trophyIcon) {
+            trophyIcon.style.color = currentTier.color;
+            
+            // Add sparkle for higher tiers (threshold >= 14 or special names)
+            if (currentTier.threshold >= 14) {
+                trophyIcon.classList.add('animate-sparkle');
+            } else {
+                trophyIcon.classList.remove('animate-sparkle');
+            }
         }
+
+        // Update Flame Effect
+        if (trophyFlame) {
+            const fireColor = '#ff4d00'; // Fixed Electric Orange for the flame
+            trophyFlame.style.color = fireColor;
+            trophyFlame.style.opacity = '1';
+            
+            // Apply glow effect matching the fire color
+            trophyFlame.style.filter = `drop-shadow(0 0 5px ${fireColor})`;
+            
+            // All tiers now have an "igniting" flame
+            trophyFlame.classList.add('streak-flicker');
+        }
+        // Remove any special container styling if not applicable
+        trophyContainer.classList.remove('border-amber-200', 'bg-amber-50/50');
     }
 
     updateTooltip(streak, counterEl) {

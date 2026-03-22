@@ -117,8 +117,12 @@
         <div id="header-trophy-container" 
             class="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-100 shadow-sm transition-all hover:shadow-md cursor-help group relative"
             title="Current Rank">
-            <span id="header-trophy-icon" class="material-symbols-outlined text-[20px] text-zinc-500 transition-all duration-500"
-                style="font-variation-settings: 'FILL' 1;">trophy</span>
+            <div class="relative flex items-center justify-center">
+                <span id="header-trophy-icon" class="material-symbols-outlined text-[20px] text-zinc-500 transition-all duration-500"
+                    style="font-variation-settings: 'FILL' 1;">trophy</span>
+                <span id="header-trophy-flame" class="material-symbols-outlined absolute -top-1.5 text-[12px] opacity-0 transition-all duration-500 streak-flicker pointer-events-none"
+                    style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+            </div>
             <span id="header-trophy-label" class="text-[10px] font-black uppercase tracking-widest text-slate-500">Unranked</span>
             
             <!-- Tooltip -->
