@@ -124,9 +124,10 @@ function create_topic($conn) {
     $stmt = $conn->prepare("INSERT INTO topics (subject_id, lesson_id, topic_name, start_page, end_page, expected_exams) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("iisiii", $data['subject_id'], $data['lesson_id'], $data['topic_name'], $data['start_page'], $data['end_page'], $data['expected_exams']);
     if ($stmt->execute()) {
-         $message = "Topic '" . $data['topic_name'] . "' has been created.";
+        $new_id = $conn->insert_id;
+        $message = "Topic '" . $data['topic_name'] . "' has been created.";
         log_activity($conn, 'Topic Created', $message);
-        echo json_encode(['success' => true, 'message' => 'Topic created successfully.']);
+        echo json_encode(['success' => true, 'message' => 'Topic created successfully.', 'id' => $new_id]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to create topic.']);
     }

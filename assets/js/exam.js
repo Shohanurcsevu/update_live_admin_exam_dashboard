@@ -1477,6 +1477,8 @@ function initializeExamPage() {
         }
         topicImportAllBtn.disabled = true;
         let successCount = 0;
+        const importedMap = {}; // name -> {topic_id, subject_id, lesson_id}
+
         for (let i = 0; i < toImport.length; i++) {
             const item = toImport[i];
             topicImportBtnText.textContent = `Importing ${i + 1}/${toImport.length}...`;
@@ -1494,12 +1496,38 @@ function initializeExamPage() {
                     })
                 });
                 const result = await resp.json();
-                if (result.success) successCount++;
+                if (result.success) {
+                    successCount++;
+                    // Map the topic name to its new ID and categories (normalized name)
+                    const normalizedName = item.name.toLowerCase().trim();
+                    importedMap[normalizedName] = {
+                        topic_id: result.id || (result.data && result.data.id),
+                        subject_id: item.subject_id,
+                        lesson_id: item.lesson_id
+                    };
+                }
             } catch (e) { console.error('Topic import failed:', item.name, e); }
         }
+
+        // Auto-link imported topics to matching exam sections
+        if (successCount > 0) {
+            extractedSections.forEach(section => {
+                const sectionName = section.title.toLowerCase().trim();
+                if (importedMap[sectionName]) {
+                    const map = importedMap[sectionName];
+                    section.target.subject = map.subject_id;
+                    section.target.lesson = map.lesson_id;
+                    section.target.topic = map.topic_id;
+                }
+            });
+            renderBulkTable(); // Refresh the categorization dropdowns
+            renderSections();  // Refresh the exam queue UI
+        }
+
         topicImportAllBtn.disabled = false;
         topicImportBtnText.textContent = 'Import All Topics';
-        showToast(`${successCount}/${toImport.length} topics imported!`);
+        showToast(`${successCount}/${toImport.length} topics imported and linked!`);
+        
         if (typeof CacheManager !== 'undefined') {
             CacheManager.clearGroup('topic');
             CacheManager.clearGroup('exam');
