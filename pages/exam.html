@@ -57,6 +57,58 @@
         min-height: 400px;
         transition: opacity 0.3s ease;
     }
+    .json-editor-wrapper {
+        display: flex;
+        background: #f8fafc; /* bg-slate-50 */
+        border: 1px solid #f1f5f9; /* border-slate-100 */
+        border-radius: 1.5rem;
+        overflow: hidden;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+
+    .json-editor-wrapper:focus-within {
+        border-color: #93c5fd; /* focus:border-blue-300 */
+        background: white;
+        box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.1);
+    }
+
+    .line-numbers-gutter {
+        background: #f1f5f9; /* bg-slate-100 */
+        padding: 1.5rem 0.5rem 1.5rem 1rem;
+        text-align: right;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 11px;
+        color: #94a3b8;
+        border-right: 1px solid #e2e8f0;
+        user-select: none;
+        min-width: 3rem;
+        white-space: pre;
+        line-height: 1.625; /* Carefully matched with textarea */
+        overflow: hidden;
+    }
+
+    .line-numbers-gutter .line-number-error {
+        color: #e11d48;
+        font-weight: 900;
+        background: rgba(225, 29, 72, 0.1);
+        display: inline-block;
+        width: 100%;
+        border-radius: 4px;
+    }
+
+    #bulk-manual-json-input {
+        flex: 1;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 1.5rem !important;
+        line-height: 1.625;
+        white-space: pre;
+        overflow: auto;
+        font-size: 11px;
+        scrollbar-width: thin;
+    }
 </style>
 
 <!-- Main Content -->
@@ -477,12 +529,21 @@
                     </div>
 
                     <div class="relative group">
-                        <textarea id="bulk-manual-json-input"
-                            placeholder='[{"Exam Title": "BCS 45th Preliminary", "data": [...] }]'
-                            class="w-full h-80 p-6 bg-slate-50 border border-slate-100 rounded-3xl text-[11px] font-mono focus:bg-white focus:border-blue-300 outline-none transition-all resize-none shadow-inner"></textarea>
+                        <!-- Live JSON Validation Indicator -->
+                        <div id="json-validation-indicator" class="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-black uppercase tracking-wider transition-all duration-300 transform translate-y-2 opacity-0 -translate-x-2 z-20 pointer-events-none group-focus-within:translate-y-0 group-focus-within:opacity-100 placeholder-shown:opacity-0">
+                            <div id="json-validation-dot" class="w-2 h-2 rounded-full bg-slate-300"></div>
+                            <span id="json-validation-text" class="text-slate-500">Checking...</span>
+                        </div>
+
+                        <div class="json-editor-wrapper h-80 shadow-inner">
+                            <div id="json-line-numbers" class="line-numbers-gutter">1</div>
+                            <textarea id="bulk-manual-json-input"
+                                placeholder='[{"Exam Title": "BCS 45th Preliminary", "data": [...] }]'
+                                class="outline-none transition-all resize-none"></textarea>
+                        </div>
 
                         <button id="bulk-init-queue-btn"
-                            class="absolute bottom-6 right-6 px-8 py-3 bg-slate-900 hover:bg-black text-white rounded-2xl font-bold shadow-xl transition-all flex items-center gap-2 group-focus-within:scale-105 transform">
+                            class="absolute bottom-6 right-6 px-8 py-3 bg-slate-900 hover:bg-black text-white rounded-2xl font-bold shadow-xl transition-all flex items-center gap-2 group-focus-within:scale-105 transform z-10">
                             <span class="material-symbols-outlined text-sm">rocket_launch</span>
                             <span>Init Import Queue</span>
                         </button>

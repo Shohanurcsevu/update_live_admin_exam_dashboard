@@ -109,7 +109,28 @@ function initializeExamPage() {
     const topicImportSubject = document.getElementById('topic-import-subject');
     const topicImportLesson = document.getElementById('topic-import-lesson');
     const topicImportApplyAllBtn = document.getElementById('topic-import-apply-all-btn');
+    const jsonValidationIndicator = document.getElementById('json-validation-indicator');
+    const jsonValidationDot = document.getElementById('json-validation-dot');
+    const jsonValidationText = document.getElementById('json-validation-text');
+    const jsonLineNumbers = document.getElementById('json-line-numbers');
     let topicQueue = [];
+
+    let currentErrorLine = -1; // Track error line for gutter highlighting
+
+    function updateLineNumbers() {
+        if (!bulkManualJsonInput || !jsonLineNumbers) return;
+        const lines = bulkManualJsonInput.value.split('\n').length;
+        let html = '';
+        for (let i = 1; i <= lines; i++) {
+            if (i === currentErrorLine) {
+                html += `<span class="line-number-error">${i}</span>\n`;
+            } else {
+                html += i + '\n';
+            }
+        }
+        jsonLineNumbers.innerHTML = html;
+        jsonLineNumbers.scrollTop = bulkManualJsonInput.scrollTop;
+    }
 
     let examIdToDelete = null;
     let subjects = []; // Shared subjects for bulk categorization
@@ -224,6 +245,8 @@ function initializeExamPage() {
                         try {
                             JSON.parse(trimmed);
                             bulkManualJsonInput.value = trimmed;
+                            updateLineNumbers();
+                            validateLiveJSON();
                             showToast('Smart-pasted JSON from clipboard!');
                         } catch (e) { }
                     }
@@ -254,6 +277,131 @@ function initializeExamPage() {
             if (passMarkInput) passMarkInput.value = (newTotalMarks * 0.99).toFixed(2);
         }
     }
+
+    function validateLiveJSON() {
+        const rawVal = bulkManualJsonInput.value;
+        if (!rawVal.trim()) {
+            jsonValidationIndicator.classList.add('opacity-0');
+            currentErrorLine = -1;
+            updateLineNumbers();
+            return;
+        }
+
+        jsonValidationIndicator.classList.remove('opacity-0');
+        
+        // Reset styles first
+        jsonValidationIndicator.classList.remove('bg-emerald-50', 'border-emerald-200', 'bg-rose-50', 'border-rose-200', 'bg-slate-100', 'border-slate-200');
+        
+        try {
+            JSON.parse(rawVal);
+            // Valid
+            currentErrorLine = -1;
+            updateLineNumbers();
+            jsonValidationDot.className = 'w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+            jsonValidationText.className = 'text-[10px] font-black uppercase tracking-wider text-emerald-600';
+            jsonValidationText.textContent = 'Valid JSON';
+            jsonValidationIndicator.classList.add('bg-emerald-50', 'border-emerald-200');
+        } catch (e) {
+            let errorMsg = e.message;
+            let line = 1;
+            let pos = -1;
+            let hint = 'Check syntax';
+
+            const posMatch = errorMsg.match(/at position (\d+)/);
+            if (posMatch) {
+                pos = parseInt(posMatch[1]);
+                line = rawVal.substring(0, pos).split('\n').length;
+                const lastNewline = rawVal.lastIndexOf('\n', pos - 1);
+                const textBeforeOnLine = rawVal.substring(lastNewline + 1, pos).trim();
+                if (line > 1 && textBeforeOnLine.length === 0) {
+                    line--;
+                }
+            } else {
+                const lineColMatch = errorMsg.match(/at line (\d+) column (\d+)/);
+                if (lineColMatch) {
+                    line = parseInt(lineColMatch[1]);
+                    const col = parseInt(lineColMatch[2]);
+                    if (line > 1 && col <= 2) line--;
+                    pos = rawVal.split('\n').slice(0, line - 1).reduce((s, l) => s + l.length + 1, 0) + col - 1;
+                }
+            }
+
+            // Smart hint: analyze the character at the error position and surrounding context
+            if (pos >= 0 && pos <= rawVal.length) {
+                const charAtPos = rawVal[pos] || '';
+                // Look backward for context
+                let prevNonSpace = '';
+                for (let k = pos - 1; k >= 0; k--) {
+                    if (rawVal[k].trim()) { prevNonSpace = rawVal[k]; break; }
+                }
+
+                if (errorMsg.includes('Unexpected end')) {
+                    // Count brackets to determine what's unclosed
+                    let openBraces = 0, openBrackets = 0;
+                    for (let k = 0; k < rawVal.length; k++) {
+                        if (rawVal[k] === '{') openBraces++;
+                        else if (rawVal[k] === '}') openBraces--;
+                        else if (rawVal[k] === '[') openBrackets++;
+                        else if (rawVal[k] === ']') openBrackets--;
+                    }
+                    if (openBraces > 0 && openBrackets > 0) hint = 'Missing } and ]';
+                    else if (openBraces > 0) hint = 'Missing } (closing brace)';
+                    else if (openBrackets > 0) hint = 'Missing ] (closing bracket)';
+                    else hint = 'Incomplete — missing closing quote or value';
+                } else if (charAtPos === '"' && (prevNonSpace === '"' || prevNonSpace === '}' || prevNonSpace === ']' || /[a-z0-9]/i.test(prevNonSpace))) {
+                    hint = 'Missing , (comma) before this';
+                } else if (charAtPos === '{' || charAtPos === '[') {
+                    if (prevNonSpace === '"' || prevNonSpace === '}' || prevNonSpace === ']' || /[0-9]/.test(prevNonSpace)) {
+                        hint = 'Missing , (comma) before ' + charAtPos;
+                    } else {
+                        hint = 'Unexpected ' + charAtPos;
+                    }
+                } else if (charAtPos === '}' || charAtPos === ']') {
+                    if (prevNonSpace === ',') hint = 'Trailing , (comma) before ' + charAtPos;
+                    else hint = 'Extra ' + charAtPos + ' or unclosed block';
+                } else if (charAtPos === ':') {
+                    hint = 'Unexpected : — check key quoting';
+                } else if (charAtPos === ',') {
+                    hint = 'Unexpected , — check previous value';
+                } else if (/[a-zA-Z]/.test(charAtPos)) {
+                    const wordAfter = rawVal.substring(pos, pos + 10).match(/^[a-zA-Z]+/);
+                    const word = wordAfter ? wordAfter[0] : charAtPos;
+                    if (['true','false','null'].includes(word)) {
+                        hint = 'Missing , or : before ' + word;
+                    } else {
+                        hint = 'Unquoted key — wrap "' + word + '" in quotes';
+                    }
+                } else if (/[0-9]/.test(charAtPos)) {
+                    hint = 'Missing , (comma) or : (colon)';
+                } else {
+                    hint = 'Invalid character: ' + JSON.stringify(charAtPos);
+                }
+            } else {
+                // Fallback to message-based hints
+                if (errorMsg.includes('Unexpected token')) hint = 'Invalid character';
+                else if (errorMsg.includes('Unexpected end')) hint = 'Incomplete JSON';
+                else if (errorMsg.includes('Unexpected number')) hint = 'Missing , (comma)';
+                else if (errorMsg.includes('Unexpected string')) hint = 'Missing , (comma)';
+            }
+
+            currentErrorLine = line;
+            updateLineNumbers();
+            jsonValidationDot.className = 'w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]';
+            jsonValidationText.className = 'text-[10px] font-black uppercase tracking-wider text-rose-600';
+            jsonValidationText.textContent = `L${line}: ${hint}`;
+            jsonValidationIndicator.classList.add('bg-rose-50', 'border-rose-200');
+        }
+    }
+
+    // Event Listeners
+    bulkManualJsonInput.addEventListener('input', () => {
+        updateLineNumbers();
+        validateLiveJSON();
+    });
+
+    bulkManualJsonInput.addEventListener('scroll', () => {
+        if (jsonLineNumbers) jsonLineNumbers.scrollTop = bulkManualJsonInput.scrollTop;
+    });
 
     async function populateSubjects(selector) {
         try {
@@ -1151,6 +1299,8 @@ function initializeExamPage() {
             renderSections();
             showToast(`Queue Initialized: ${extractedSections.length} Exams detected.`);
             bulkManualJsonInput.value = ''; // Clear after successful parse
+            updateLineNumbers();
+            validateLiveJSON();
         } catch (e) {
             // Only show toast if it was a manual button click OR if the paste was clearly intended to be JSON
             if (json.trim().startsWith('[') || json.trim().startsWith('{')) {
@@ -1804,6 +1954,8 @@ function initializeExamPage() {
             'This will clear all pasted JSON and all exams in the current queue. Are you sure?',
             () => {
                 bulkManualJsonInput.value = '';
+                updateLineNumbers();
+                validateLiveJSON();
                 extractedSections = [];
                 renderSections();
                 renderBulkTable();
@@ -2250,6 +2402,10 @@ function initializeExamPage() {
     }
 
     // --- Initial Load ---
+    if (jsonValidationIndicator) {
+        updateLineNumbers();
+        validateLiveJSON();
+    }
     populateSubjects(subjectFilter);
     populateSubjects(modalSubjectSelector);
 }
