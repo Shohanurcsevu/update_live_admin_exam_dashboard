@@ -1097,10 +1097,26 @@ function initializeExamPage() {
         if (!json) return;
         try {
             const data = JSON.parse(json);
-            let arrayData = Array.isArray(data) ? data : [data];
+            let arrayData;
+            let isFlat = false;
+            let topicsAlreadyLoaded = false;
+
+            // Detect {topic_summary, question_stream} wrapper format
+            if (!Array.isArray(data) && (data.question_stream || data.topic_summary)) {
+                // Extract topics if present
+                if (data.topic_summary && Array.isArray(data.topic_summary) && data.topic_summary.length > 0 && topicImportSection) {
+                    showTopicImport(data.topic_summary);
+                    showToast(`${data.topic_summary.length} topics detected!`);
+                    topicsAlreadyLoaded = true;
+                }
+                // Use question_stream as the main data
+                arrayData = Array.isArray(data.question_stream) ? data.question_stream : [];
+            } else {
+                arrayData = Array.isArray(data) ? data : [data];
+            }
 
             // Detect flat question array: items have 'question' key but no 'data'/'Exam Title'
-            const isFlat = arrayData.length > 0 && arrayData[0].question && !arrayData[0].data && !arrayData[0]["Exam Title"];
+            isFlat = arrayData.length > 0 && arrayData[0].question && !arrayData[0].data && !arrayData[0]["Exam Title"];
             if (isFlat) {
                 // Wrap flat questions into the expected section format
                 arrayData = [{ "Exam Title": "Imported Questions", "data": arrayData }];
@@ -1118,8 +1134,8 @@ function initializeExamPage() {
 
             if (!extractedSections.length) throw new Error("No valid exams/questions found.");
 
-            // Auto-detect topics from Exam Titles in the question data
-            if (!isFlat && extractedSections.length > 0) {
+            // Auto-detect topics from Exam Titles (only if not already loaded from topic_summary)
+            if (!topicsAlreadyLoaded && !isFlat && extractedSections.length > 0) {
                 const detectedTopics = extractedSections.map(s => ({
                     topic_name: s.title,
                     page_from: '',
