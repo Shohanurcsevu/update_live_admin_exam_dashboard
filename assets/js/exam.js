@@ -410,12 +410,25 @@ function initializeExamPage() {
             icon.classList.add('animate-spin');
             text.textContent = 'Fixing...';
 
+            // Gather error context from the validator
+            const errorLine = currentErrorLine > 0 ? currentErrorLine : null;
+            const errorHint = jsonValidationText?.textContent || '';
+
+            let errorContext = '';
+            if (errorLine) {
+                const lines = brokenJson.split('\n');
+                const problemLine = lines[errorLine - 1] || '';
+                errorContext = `\n\nDiagnostics:\n- Error at Line ${errorLine}: ${errorHint}\n- Line content: ${problemLine.trim()}`;
+                if (errorLine > 1) errorContext += `\n- Previous line: ${(lines[errorLine - 2] || '').trim()}`;
+                if (errorLine < lines.length) errorContext += `\n- Next line: ${(lines[errorLine] || '').trim()}`;
+            }
+
             try {
                 const payload = {
                     contents: [{
                         role: 'user',
                         parts: [{
-                            text: `You are a JSON repair tool. Fix the following broken JSON and return ONLY the corrected JSON with no explanation, no markdown fences, no extra text. Preserve all original data, keys, values, and structure. Only fix syntax errors (missing commas, brackets, braces, quotes, colons, trailing commas, etc).\n\nBroken JSON:\n${brokenJson}`
+                            text: `You are a JSON repair tool. Fix the following broken JSON and return ONLY the corrected JSON with no explanation, no markdown fences, no extra text. Preserve all original data, keys, values, and structure. Only fix syntax errors (missing commas, brackets, braces, quotes, colons, trailing commas, etc).${errorContext}\n\nBroken JSON:\n${brokenJson}`
                         }]
                     }],
                     generationConfig: {
@@ -435,6 +448,12 @@ function initializeExamPage() {
                 }
 
                 const result = await response.json();
+                console.log('AI Fix Response:', result);
+
+                if (result.success === false) {
+                    throw new Error(result.message || 'AI Proxy Error');
+                }
+
                 let fixedText = '';
                 if (result.candidates && result.candidates[0]?.content?.parts) {
                     fixedText = result.candidates[0].content.parts.map(p => p.text || '').join('');
@@ -444,7 +463,8 @@ function initializeExamPage() {
                 fixedText = fixedText.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
 
                 if (!fixedText) {
-                    throw new Error('AI returned empty response');
+                    const finishReason = result.candidates?.[0]?.finishReason || 'UNKNOWN';
+                    throw new Error(`AI returned empty response (Reason: ${finishReason})`);
                 }
 
                 // Validate the fixed JSON

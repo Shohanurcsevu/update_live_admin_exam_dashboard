@@ -1,4 +1,8 @@
 <?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
 require_once 'config.php';
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
@@ -6,6 +10,7 @@ header("Access-Control-Allow-Methods: POST");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    ob_end_clean();
     echo json_encode(['success' => false, 'message' => 'Only POST requests are allowed.']);
     exit;
 }
@@ -13,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $input = json_decode(file_get_contents('php://input'), true);
 
 if (!$input || !isset($input['contents'])) {
+    ob_end_clean();
     echo json_encode(['success' => false, 'message' => 'Invalid request payload.']);
     exit;
 }
@@ -26,6 +32,14 @@ if (isset($input['generationConfig'])) {
     $payload['generationConfig'] = $input['generationConfig'];
 }
 
+// Add permissive safety settings to avoid accidental blocks during JSON repair
+$payload['safetySettings'] = [
+    ["category" => "HARM_CATEGORY_HARASSMENT", "threshold" => "BLOCK_NONE"],
+    ["category" => "HARM_CATEGORY_HATE_SPEECH", "threshold" => "BLOCK_NONE"],
+    ["category" => "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold" => "BLOCK_NONE"],
+    ["category" => "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold" => "BLOCK_NONE"]
+];
+
 $ch = curl_init(GEMINI_API_URL);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
@@ -33,19 +47,30 @@ curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'Content-Type: application/json'
 ]);
+curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 1 minute timeout for large JSON repairs
 
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
 if (curl_errno($ch)) {
+    ob_end_clean();
     echo json_encode(['success' => false, 'message' => 'CURL error: ' . curl_error($ch)]);
 } else {
+    ob_end_clean();
     if ($httpCode >= 200 && $httpCode < 300) {
-        echo $response;
+        if (empty($response)) {
+            echo json_encode(['success' => false, 'message' => 'Gemini returned an empty response body.', 'status' => $httpCode]);
+        } else {
+            echo $response;
+        }
     } else {
         $errorResponse = json_decode($response, true);
-        $errorMessage = $errorResponse['error']['message'] ?? 'Gemini API error (Status: ' . $httpCode . ')';
-        echo json_encode(['success' => false, 'message' => $errorMessage, 'debug' => $response]);
+        if (!$errorResponse) {
+            echo json_encode(['success' => false, 'message' => 'Gemini returned an error page (Status ' . $httpCode . ').', 'debug' => substr($response, 0, 500)]);
+        } else {
+            $errorMessage = $errorResponse['error']['message'] ?? 'Gemini API error (Status: ' . $httpCode . ')';
+            echo json_encode(['success' => false, 'message' => $errorMessage, 'debug' => $errorResponse]);
+        }
     }
 }
 
