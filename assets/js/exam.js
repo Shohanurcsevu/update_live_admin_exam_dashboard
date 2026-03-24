@@ -113,6 +113,7 @@ function initializeExamPage() {
     const jsonValidationDot = document.getElementById('json-validation-dot');
     const jsonValidationText = document.getElementById('json-validation-text');
     const jsonLineNumbers = document.getElementById('json-line-numbers');
+    const aiFixJsonBtn = document.getElementById('ai-fix-json-btn');
     let topicQueue = [];
 
     let currentErrorLine = -1; // Track error line for gutter highlighting
@@ -282,6 +283,7 @@ function initializeExamPage() {
         const rawVal = bulkManualJsonInput.value;
         if (!rawVal.trim()) {
             jsonValidationIndicator.classList.add('opacity-0');
+            if (aiFixJsonBtn) { aiFixJsonBtn.classList.add('hidden'); aiFixJsonBtn.classList.remove('flex'); }
             currentErrorLine = -1;
             updateLineNumbers();
             return;
@@ -297,6 +299,7 @@ function initializeExamPage() {
             // Valid
             currentErrorLine = -1;
             updateLineNumbers();
+            if (aiFixJsonBtn) { aiFixJsonBtn.classList.add('hidden'); aiFixJsonBtn.classList.remove('flex'); }
             jsonValidationDot.className = 'w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
             jsonValidationText.className = 'text-[10px] font-black uppercase tracking-wider text-emerald-600';
             jsonValidationText.textContent = 'Valid JSON';
@@ -386,11 +389,88 @@ function initializeExamPage() {
 
             currentErrorLine = line;
             updateLineNumbers();
+            if (aiFixJsonBtn) { aiFixJsonBtn.classList.remove('hidden'); aiFixJsonBtn.classList.add('flex'); }
             jsonValidationDot.className = 'w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]';
             jsonValidationText.className = 'text-[10px] font-black uppercase tracking-wider text-rose-600';
             jsonValidationText.textContent = `L${line}: ${hint}`;
             jsonValidationIndicator.classList.add('bg-rose-50', 'border-rose-200');
         }
+    }
+
+    // AI Fix JSON handler
+    if (aiFixJsonBtn) {
+        aiFixJsonBtn.addEventListener('click', async () => {
+            const brokenJson = bulkManualJsonInput.value;
+            if (!brokenJson.trim()) return;
+
+            const icon = document.getElementById('ai-fix-json-icon');
+            const text = document.getElementById('ai-fix-json-text');
+            aiFixJsonBtn.disabled = true;
+            icon.textContent = 'sync';
+            icon.classList.add('animate-spin');
+            text.textContent = 'Fixing...';
+
+            try {
+                const payload = {
+                    contents: [{
+                        role: 'user',
+                        parts: [{
+                            text: `You are a JSON repair tool. Fix the following broken JSON and return ONLY the corrected JSON with no explanation, no markdown fences, no extra text. Preserve all original data, keys, values, and structure. Only fix syntax errors (missing commas, brackets, braces, quotes, colons, trailing commas, etc).\n\nBroken JSON:\n${brokenJson}`
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.0,
+                        maxOutputTokens: 65536
+                    }
+                };
+
+                const response = await fetch(AIService.API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                let fixedText = '';
+                if (result.candidates && result.candidates[0]?.content?.parts) {
+                    fixedText = result.candidates[0].content.parts.map(p => p.text || '').join('');
+                }
+
+                // Strip markdown fences if present
+                fixedText = fixedText.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+
+                if (!fixedText) {
+                    throw new Error('AI returned empty response');
+                }
+
+                // Validate the fixed JSON
+                try {
+                    JSON.parse(fixedText);
+                    bulkManualJsonInput.value = fixedText;
+                    updateLineNumbers();
+                    validateLiveJSON();
+                    showToast('JSON fixed by AI!', 'success');
+                } catch (parseErr) {
+                    // AI returned invalid JSON too — try to use it anyway
+                    bulkManualJsonInput.value = fixedText;
+                    updateLineNumbers();
+                    validateLiveJSON();
+                    showToast('AI attempted fix but JSON may still have issues.', 'update');
+                }
+            } catch (err) {
+                console.error('AI Fix JSON Error:', err);
+                showToast('AI Fix failed: ' + err.message, 'error');
+            } finally {
+                aiFixJsonBtn.disabled = false;
+                icon.textContent = 'auto_fix_high';
+                icon.classList.remove('animate-spin');
+                text.textContent = 'AI Fix';
+            }
+        });
     }
 
     // Event Listeners

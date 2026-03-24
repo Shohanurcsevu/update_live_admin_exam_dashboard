@@ -534,6 +534,11 @@
                             <div id="json-validation-dot" class="w-2 h-2 rounded-full bg-slate-300"></div>
                             <span id="json-validation-text" class="text-slate-500">Checking...</span>
                         </div>
+                        <!-- AI Fix JSON Button (visible only on invalid JSON) -->
+                        <button id="ai-fix-json-btn" class="hidden absolute top-14 right-4 items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black uppercase tracking-wider transition-all duration-300 z-20 shadow-lg shadow-violet-200 cursor-pointer transform active:scale-95" title="Fix JSON with AI">
+                            <span class="material-symbols-outlined text-xs" id="ai-fix-json-icon">auto_fix_high</span>
+                            <span id="ai-fix-json-text">AI Fix</span>
+                        </button>
 
                         <div class="json-editor-wrapper h-80 shadow-inner">
                             <div id="json-line-numbers" class="line-numbers-gutter">1</div>
