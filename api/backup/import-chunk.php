@@ -59,7 +59,7 @@ $ALLOWED_TABLES = [
     'offline_exam_attempts', 'study_sessions', 'activity_log',
     'mistake_bank', 'flashcards', 'reading_logs', 'user_streaks',
     'job_countdown', 'trivia_snapshots', 'bpm_logs', 'app_settings',
-    'active_exam_sessions', 'ai_instruction_presets', 'exam_presets', 'exam_setup_presets',
+    'active_exam_sessions', 'ai_instruction_presets', 'ai_prompt_presets', 'exam_presets', 'exam_setup_presets',
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
