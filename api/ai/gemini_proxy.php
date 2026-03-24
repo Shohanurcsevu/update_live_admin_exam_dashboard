@@ -47,7 +47,7 @@ curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'Content-Type: application/json'
 ]);
-curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 1 minute timeout for large JSON repairs
+curl_setopt($ch, CURLOPT_TIMEOUT, 120); // 2 minutes for processing complex images
 
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

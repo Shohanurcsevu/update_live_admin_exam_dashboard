@@ -2017,7 +2017,8 @@ function initializeExamPage() {
                     ],
                     generationConfig: {
                         temperature: 0.1,
-                        maxOutputTokens: 65536
+                        maxOutputTokens: 65536,
+                        responseMimeType: "application/json"
                     }
                 };
 
@@ -2037,18 +2038,26 @@ function initializeExamPage() {
                 }
 
                 const result = await response.json();
+                console.log("AI Response Result:", result);
+
+                if (result.success === false) {
+                    throw new Error(result.message || "Proxy error occurred.");
+                }
 
                 // Extract and show Token Usage for Scan
                 updateTokenUsage(result.usageMetadata);
 
+                const candidate = result.candidates?.[0];
+                const finishReason = candidate?.finishReason || 'UNKNOWN';
+
                 // Extract text from Gemini response
                 let rawText = '';
-                if (result.candidates && result.candidates[0]?.content?.parts) {
-                    rawText = result.candidates[0].content.parts.map(p => p.text || '').join('');
+                if (candidate?.content?.parts) {
+                    rawText = candidate.content.parts.map(p => p.text || '').join('');
                 }
 
                 if (!rawText) {
-                    throw new Error('Gemini returned an empty response. Try clearer images.');
+                    throw new Error(`Gemini returned an empty response (Reason: ${finishReason}). Try clearer images or check safety filters.`);
                 }
 
                 aiProgressText.textContent = 'Parsing extracted questions...';
