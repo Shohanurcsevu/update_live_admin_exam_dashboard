@@ -114,6 +114,10 @@ function initializeExamPage() {
     const jsonValidationText = document.getElementById('json-validation-text');
     const jsonLineNumbers = document.getElementById('json-line-numbers');
     const aiFixJsonBtn = document.getElementById('ai-fix-json-btn');
+    const aiTokenTracker = document.getElementById('ai-token-tracker');
+    const tokenUsageDisplay = document.getElementById('token-usage-display');
+    const tokenSessionTotal = document.getElementById('token-session-total');
+    const aiTokenResetBtn = document.getElementById('ai-token-reset-btn');
     let topicQueue = [];
 
     let currentErrorLine = -1; // Track error line for gutter highlighting
@@ -284,6 +288,9 @@ function initializeExamPage() {
         if (!rawVal.trim()) {
             jsonValidationIndicator.classList.add('opacity-0');
             if (aiFixJsonBtn) { aiFixJsonBtn.classList.add('hidden'); aiFixJsonBtn.classList.remove('flex'); }
+            // Hide token tracker on clear — actually let's keep it until next valid check if we want persistent view, 
+            // but the user said "Real-Time Usage Display", so let's hide only if it makes sense.
+            // For now, let's keep the last usage visible until next attempt.
             currentErrorLine = -1;
             updateLineNumbers();
             return;
@@ -466,6 +473,9 @@ function initializeExamPage() {
                     const finishReason = result.candidates?.[0]?.finishReason || 'UNKNOWN';
                     throw new Error(`AI returned empty response (Reason: ${finishReason})`);
                 }
+
+                // Show Token Usage
+                updateTokenUsage(result.usageMetadata);
 
                 // Validate the fixed JSON
                 try {
@@ -1809,6 +1819,59 @@ function initializeExamPage() {
         });
     }
 
+    /**
+     * Smart Image Compression Utility
+     * Resizes and compresses images to speed up AI processing without losing text accuracy.
+     */
+    const SmartImageProcessor = {
+        async compress(file, maxWidth = 1600, quality = 0.8) {
+            // PDF handling is separate, return null to signal skipping
+            if (file.type === 'application/pdf') return null;
+
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        // Calculate new dimensions while maintaining aspect ratio
+                        if (width > height) {
+                            if (width > maxWidth) {
+                                height *= maxWidth / width;
+                                width = maxWidth;
+                            }
+                        } else {
+                            if (height > maxWidth) {
+                                width *= maxWidth / height;
+                                height = maxWidth;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Use white background for JPEGs (avoids black background on transparent PNGs)
+                        ctx.fillStyle = "#FFFFFF";
+                        ctx.fillRect(0, 0, width, height);
+                        
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Output in JPEG format with specified quality
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+    };
+
     function handleAIFiles(files) {
         const validFiles = Array.from(files).filter(f => f.type.startsWith('image/') || f.type === 'application/pdf');
         if (validFiles.length === 0) {
@@ -1822,21 +1885,35 @@ function initializeExamPage() {
         aiClearFilesBtn.classList.remove('hidden');
         aiClearFilesBtn.classList.add('flex');
 
-        validFiles.forEach((file, i) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const base64 = e.target.result;
-                const mimeType = file.type;
+        validFiles.forEach(async (file, i) => {
+            let base64 = '';
+            const mimeType = file.type;
+
+            try {
+                if (mimeType === 'application/pdf') {
+                    // PDFs cannot be compressed easily in browser without heavy libs, send as is
+                    const reader = new FileReader();
+                    base64 = await new Promise((resolve) => {
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(file);
+                    });
+                } else {
+                    // Smart Compression for Images
+                    base64 = await SmartImageProcessor.compress(file);
+                }
+
                 aiUploadedFiles.push({ base64, mimeType, name: file.name });
 
                 // Create preview thumbnail
                 const thumb = document.createElement('div');
-                thumb.className = 'relative w-full aspect-square rounded-2xl overflow-hidden border border-slate-200 shadow-sm group';
+                thumb.className = 'relative w-full aspect-square rounded-2xl overflow-hidden border border-slate-200 shadow-sm group animate-in zoom-in-50 duration-300';
+                
                 if (mimeType === 'application/pdf') {
                     thumb.innerHTML = `<div class="w-full h-full bg-rose-50 flex flex-col items-center justify-center gap-1"><span class="material-symbols-outlined text-2xl text-rose-400">picture_as_pdf</span><span class="text-[9px] font-bold text-rose-400 truncate w-full text-center px-1">${file.name}</span></div>`;
                 } else {
                     thumb.innerHTML = `<img src="${base64}" alt="${file.name}" class="w-full h-full object-cover">`;
                 }
+
                 // Remove button
                 const removeBtn = document.createElement('button');
                 removeBtn.className = 'absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-xs';
@@ -1855,8 +1932,10 @@ function initializeExamPage() {
                 thumb.appendChild(removeBtn);
                 aiPreviewGrid.appendChild(thumb);
                 aiFileCount.textContent = `${aiUploadedFiles.length} file(s) ready`;
-            };
-            reader.readAsDataURL(file);
+            } catch (err) {
+                console.error("File processing error:", err);
+                showToast(`Failed to process ${file.name}`, 'error');
+            }
         });
     }
 
@@ -1958,6 +2037,9 @@ function initializeExamPage() {
                 }
 
                 const result = await response.json();
+
+                // Extract and show Token Usage for Scan
+                updateTokenUsage(result.usageMetadata);
 
                 // Extract text from Gemini response
                 let rawText = '';
@@ -2112,6 +2194,63 @@ function initializeExamPage() {
             });
         });
     }
+
+    /**
+     * Updates the global token usage tracker at the top
+     * @param {Object} usageMetadata API usage metadata
+     */
+    function updateTokenUsage(usageMetadata, isInit = false) {
+        if (!usageMetadata || !aiTokenTracker || !tokenUsageDisplay) return;
+
+        const limit = 1048576; // 1.05M Context Window
+        const currentTotal = usageMetadata.totalTokenCount || 0;
+        const percent = ((currentTotal / limit) * 100).toFixed(2);
+        const remaining = (100 - parseFloat(percent)).toFixed(2);
+
+        // Update the per-request display
+        tokenUsageDisplay.innerHTML = `Used: ${percent}% | Free: ${remaining}% | ${(currentTotal / 1000).toFixed(1)}k / 1.05M`;
+        
+        // Handle Session Total
+        let sessionTotal = parseInt(localStorage.getItem('ai_token_session_total') || '0');
+        if (!isInit) {
+            sessionTotal += currentTotal;
+            localStorage.setItem('ai_token_session_total', sessionTotal);
+        }
+        
+        if (tokenSessionTotal) {
+            tokenSessionTotal.textContent = (sessionTotal / 1000).toFixed(1) + 'k';
+        }
+
+        // Save last metadata for persistence
+        localStorage.setItem('last_ai_token_usage', JSON.stringify(usageMetadata));
+        
+        aiTokenTracker.classList.remove('hidden');
+    }
+
+    // Reset Session Tokens
+    if (aiTokenResetBtn) {
+        aiTokenResetBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.setItem('ai_token_session_total', '0');
+            if (tokenSessionTotal) tokenSessionTotal.textContent = '0k';
+            Toast.show('Session total reset', 'info');
+        });
+    }
+
+    // Initialize state on page load
+    (function initAIState() {
+        const lastUsage = localStorage.getItem('last_ai_token_usage');
+        if (lastUsage) {
+            try {
+                const metadata = JSON.parse(lastUsage);
+                setTimeout(() => updateTokenUsage(metadata, true), 100);
+            } catch(e) { console.error("Failed to load token usage", e); }
+        } else {
+            // Even if no last usage, show the session total
+            const sessionTotal = parseInt(localStorage.getItem('ai_token_session_total') || '0');
+            if (tokenSessionTotal) tokenSessionTotal.textContent = (sessionTotal / 1000).toFixed(1) + 'k';
+        }
+    })();
 
     // --- Bulk Import Logic ---
 
