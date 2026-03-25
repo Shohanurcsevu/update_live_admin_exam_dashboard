@@ -36,12 +36,28 @@ const PrintEngine = {
         window.applyExamPreset = (type) => this.applyPreset(type);
     },
 
-    openModal(examId) {
+    openModal(examId, totalQuestions = 0) {
         this.selectedExamId = examId;
         const modal = document.getElementById('print-options-modal');
         const idSpan = document.getElementById('modal-exam-id');
+        const totalQsBadge = document.getElementById('print-total-qs-badge');
+        const limitInput = document.getElementById('print-limit-num');
 
         if (idSpan) idSpan.textContent = examId;
+        
+        if (totalQsBadge) {
+            if (totalQuestions > 0) {
+                totalQsBadge.textContent = `${totalQuestions} Qs`;
+                totalQsBadge.classList.remove('hidden');
+            } else {
+                totalQsBadge.classList.add('hidden');
+            }
+        }
+
+        if (limitInput) {
+            limitInput.value = ''; // Reset to default (all)
+        }
+
         if (modal) {
             modal.classList.remove('hidden');
             modal.classList.add('flex');

@@ -94,7 +94,11 @@ if (!empty($priorities)) {
 $question_sql .= " GROUP BY q.id";
 
 if ($num_questions > 0) {
-    $question_sql .= " ORDER BY RAND() LIMIT ?";
+    if (isset($_GET['sort']) && $_GET['sort'] === 'least_attempted') {
+        $question_sql .= " ORDER BY taken_count ASC, RAND() LIMIT ?";
+    } else {
+        $question_sql .= " ORDER BY RAND() LIMIT ?";
+    }
 }
 
 $stmt = $conn->prepare($question_sql);

@@ -207,7 +207,7 @@ function initializeTakeExamListPage() {
                                      <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Study Materials">
                                         <span class="material-symbols-outlined text-sm">menu_book</span>
                                      </button>
-                                     <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Print">
+                                     <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}" title="Print">
                                          <span class="material-symbols-outlined text-sm">print</span>
                                      </button>
                                      <button class="delete-exam-btn bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Delete">
@@ -258,9 +258,9 @@ function initializeTakeExamListPage() {
                                 <button class="study-exam-btn w-full border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">menu_book</span> Study
                                 </button>
-                                <button class="print-exam-btn w-full border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
-                                    <span class="material-symbols-outlined text-sm">print</span> Print
-                                </button>
+                                 <button class="print-exam-btn w-full border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}">
+                                     <span class="material-symbols-outlined text-sm">print</span> Print
+                                 </button>
                                 <button class="delete-exam-btn w-full bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">delete</span> Del
                                 </button>
@@ -779,7 +779,8 @@ function initializeTakeExamListPage() {
             handleStudyMaterials(examId, target);
         } else if (target.classList.contains('print-exam-btn')) {
             const examId = target.dataset.id;
-            handlePrintExam(examId);
+            const totalQuestions = target.dataset.questions;
+            handlePrintExam(examId, totalQuestions);
         } else if (target.classList.contains('delete-exam-btn')) {
             examIdToDelete = target.dataset.id;
             deleteModal.classList.remove('hidden');
@@ -842,22 +843,30 @@ function initializeTakeExamListPage() {
         if (e.key === 'Enter') savePreset();
     });
 
-    async function handlePrintExam(examId) {
+    async function handlePrintExam(examId, totalQuestions = 0) {
         if (!window.PrintEngine) {
             showToast('Print engine not loaded.');
             return;
         }
 
-        PrintEngine.openModal(examId);
+        PrintEngine.openModal(examId, totalQuestions);
 
         PrintEngine.onGenerate = async () => {
             const generateBtn = document.getElementById('generate-pdf-btn');
+            const limitInput = document.getElementById('print-limit-num');
+            const numQuestions = limitInput ? parseInt(limitInput.value) : 0;
+            
             const originalText = generateBtn.innerHTML;
             generateBtn.disabled = true;
             generateBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Loading Questions...';
 
             try {
-                const response = await fetch(`api/take-exam/start.php?exam_id=${examId}`);
+                let url = `api/take-exam/start.php?exam_id=${examId}`;
+                if (numQuestions > 0) {
+                    url += `&num_questions=${numQuestions}&sort=least_attempted`;
+                }
+
+                const response = await fetch(url);
                 const result = await response.json();
                 if (result.success) {
                     PrintEngine.generatePDF(result.data);
