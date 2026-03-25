@@ -1,0 +1,15 @@
+# Local configuration
+api/ai/config.local.php
+*.local.php
+.env
+
+# XAMPP / Local Server
+/tmp/
+/uploads/
+/backups/
+query_log.txt
+
+# Development
+.vscode/
+.gemini/
+.antigravity/
