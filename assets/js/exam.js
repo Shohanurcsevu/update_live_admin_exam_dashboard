@@ -2206,6 +2206,60 @@ function initializeExamPage() {
         });
     }
 
+    // --- AI Usage Stats Logic ---
+    const toggleAiUsageBtn = document.getElementById('toggle-ai-usage');
+    const aiUsageDashboard = document.getElementById('ai-usage-dashboard');
+    const aiUsageTableBody = document.getElementById('ai-usage-table-body');
+    let usageInterval = null;
+
+    function formatTokens(n) {
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+        return n;
+    }
+
+    function fetchUsageStats() {
+        if (!aiUsageDashboard || aiUsageDashboard.classList.contains('hidden')) return;
+
+        fetch('api/ai/usage_stats.php')
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    let html = '';
+                    for (const [id, stats] of Object.entries(result.data)) {
+                        const rpmColor = stats.rpm >= stats.rpm_limit ? 'text-red-500' : 'text-slate-600';
+                        const tpmColor = stats.tpm >= stats.tpm_limit ? 'text-red-500' : 'text-slate-600';
+                        const rpdColor = stats.rpd >= stats.rpd_limit ? 'text-red-500' : 'text-slate-600';
+
+                        html += `
+                            <tr class="border-t border-slate-50">
+                                <td class="py-2 text-[9px] text-slate-400 font-bold">${stats.label.split('(')[0].trim()}</td>
+                                <td class="py-2 text-center text-[10px] ${rpmColor}">${stats.rpm} / ${stats.rpm_limit}</td>
+                                <td class="py-2 text-center text-[10px] ${tpmColor}">${formatTokens(stats.tpm)} / ${formatTokens(stats.tpm_limit)}</td>
+                                <td class="py-2 text-center text-[10px] ${rpdColor}">${stats.rpd} / ${stats.rpd_limit}</td>
+                            </tr>
+                        `;
+                    }
+                    aiUsageTableBody.innerHTML = html;
+                }
+            })
+            .catch(err => console.error('Failed to fetch usage stats:', err));
+    }
+
+    if (toggleAiUsageBtn && aiUsageDashboard) {
+        toggleAiUsageBtn.addEventListener('click', () => {
+            aiUsageDashboard.classList.toggle('hidden');
+            if (!aiUsageDashboard.classList.contains('hidden')) {
+                fetchUsageStats();
+                if (!usageInterval) usageInterval = setInterval(fetchUsageStats, 10000); // 10s refresh
+            } else {
+                if (usageInterval) {
+                    clearInterval(usageInterval);
+                    usageInterval = null;
+                }
+            }
+        });
+    }
+
     // Reset Bulk Import
     bulkResetBtn.onclick = () => {
         showConfirmModal(

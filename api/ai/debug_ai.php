@@ -15,7 +15,6 @@ $ch = curl_init($listUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
 
 if ($httpCode === 200) {
     $data = json_decode($response, true);
@@ -49,7 +48,6 @@ foreach ($modelsToTest as $mName) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
     
     echo "HTTP Code: $httpCode\n";
     echo "Response: " . substr($response, 0, 200) . "...\n\n";

@@ -65,6 +65,20 @@ if (curl_errno($ch)) {
         if (empty($response)) {
             echo json_encode(['success' => false, 'message' => 'Gemini returned an empty response body.', 'status' => $httpCode]);
         } else {
+            // Log usage to database
+            $data = json_decode($response, true);
+            if ($data && isset($data['usageMetadata'])) {
+                require_once __DIR__ . '/../subject/db_connect.php';
+                $usage = $data['usageMetadata'];
+                $promptTokens = $usage['promptTokenCount'] ?? 0;
+                $candidatesTokens = $usage['candidatesTokenCount'] ?? 0;
+                $totalTokens = $usage['totalTokenCount'] ?? 0;
+                
+                $stmt = $conn->prepare("INSERT INTO ai_usage_log (model_name, prompt_tokens, completion_tokens, total_tokens) VALUES (?, ?, ?, ?)");
+                $stmt->bind_param("siii", $selectedModel, $promptTokens, $candidatesTokens, $totalTokens);
+                $stmt->execute();
+                $stmt->close();
+            }
             echo $response;
         }
     } else {
@@ -77,6 +91,4 @@ if (curl_errno($ch)) {
         }
     }
 }
-
-curl_close($ch);
 ?>
