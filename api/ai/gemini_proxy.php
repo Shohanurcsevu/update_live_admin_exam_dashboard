@@ -44,21 +44,49 @@ $payload['safetySettings'] = [
 $selectedModel = $input['model'] ?? GEMINI_MODEL;
 $api_url = get_gemini_api_url($selectedModel);
 
-$ch = curl_init($api_url);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'Content-Type: application/json'
-]);
-curl_setopt($ch, CURLOPT_TIMEOUT, 120); // 2 minutes for processing complex images
+$maxRetries = 3;
+$retryCount = 0;
+$response = '';
+$httpCode = 0;
+$curlError = 0;
+$errorMsg = '';
 
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+while ($retryCount < $maxRetries) {
+    if ($retryCount > 0) {
+        // Exponential backoff: 2s, 4s, 8s...
+        $waitTime = pow(2, $retryCount);
+        sleep($waitTime);
+    }
 
-if (curl_errno($ch)) {
+    $ch = curl_init($api_url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'X-Retry-Attempt: ' . $retryCount
+    ]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120); // 2 minutes for processing complex images
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_errno($ch);
+    $errorMsg = curl_error($ch);
+
+    // Determine if we should retry
+    // 429: Rate Limit, 500-504: Server Errors
+    $isRetriableStatus = ($httpCode == 429 || ($httpCode >= 500 && $httpCode <= 504));
+    
+    if (($curlError || $isRetriableStatus) && $retryCount < $maxRetries - 1) {
+        $retryCount++;
+        continue;
+    }
+    break;
+}
+
+if ($curlError) {
     ob_end_clean();
-    echo json_encode(['success' => false, 'message' => 'CURL error: ' . curl_error($ch)]);
+    echo json_encode(['success' => false, 'message' => 'CURL error: ' . $errorMsg . ' (Retries: ' . $retryCount . ')']);
 } else {
     ob_end_clean();
     if ($httpCode >= 200 && $httpCode < 300) {
@@ -84,10 +112,10 @@ if (curl_errno($ch)) {
     } else {
         $errorResponse = json_decode($response, true);
         if (!$errorResponse) {
-            echo json_encode(['success' => false, 'message' => 'Gemini returned an error page (Status ' . $httpCode . ').', 'debug' => substr($response, 0, 500)]);
+            echo json_encode(['success' => false, 'message' => 'Gemini returned an error page (Status ' . $httpCode . ').', 'debug' => substr($response, 0, 500), 'retries' => $retryCount]);
         } else {
             $errorMessage = $errorResponse['error']['message'] ?? 'Gemini API error (Status: ' . $httpCode . ')';
-            echo json_encode(['success' => false, 'message' => $errorMessage, 'debug' => $errorResponse]);
+            echo json_encode(['success' => false, 'message' => $errorMessage, 'debug' => $errorResponse, 'retries' => $retryCount]);
         }
     }
 }
