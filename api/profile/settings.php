@@ -52,7 +52,7 @@ if ($method === 'GET') {
     $value = $input['value'];
     
     // Whitelist keys to prevent arbitrary data being stored (security)
-    $allowed_keys = ['user_avatar', 'app_font', 'user_name', 'app_accent', 'ab_enabled', 'ab_interval_ms', 'ab_folder_name', 'app_sound_preference', 'study_mentor_sound_enabled'];
+    $allowed_keys = ['user_avatar', 'app_font', 'user_name', 'app_accent', 'ab_enabled', 'ab_interval_ms', 'ab_folder_name', 'app_sound_preference', 'study_mentor_sound_enabled', 'ai_model'];
     if (!in_array($key, $allowed_keys)) {
         http_response_code(403);
         echo json_encode(["success" => false, "message" => "Unauthorized key"]);

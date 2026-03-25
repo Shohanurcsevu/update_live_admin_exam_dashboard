@@ -77,6 +77,7 @@ function initializeExamPage() {
     const aiScanBtn = document.getElementById('ai-scan-btn');
     const aiScanBtnText = document.getElementById('ai-scan-btn-text');
     const aiFileCount = document.getElementById('ai-file-count');
+    const aiModelSelect = document.getElementById('ai-model-select');
     const aiClearFilesBtn = document.getElementById('ai-clear-files-btn');
     const aiProgressContainer = document.getElementById('ai-progress-container');
     const aiProgressBar = document.getElementById('ai-progress-bar');
@@ -2034,6 +2035,7 @@ function initializeExamPage() {
                 aiProgressPercent.textContent = '30%';
 
                 const payload = {
+                    model: aiModelSelect.value,
                     contents: [
                         {
                             role: "user",
@@ -2163,6 +2165,44 @@ function initializeExamPage() {
                 aiScanBtn.disabled = false;
                 aiScanBtnText.textContent = 'Scan with AI';
             }
+        });
+    }
+
+    // Model Persistence & Change Listener
+    if (aiModelSelect) {
+        // Load preference from DB
+        fetch('api/profile/settings.php?key=ai_model')
+            .then(res => res.json())
+            .then(result => {
+                if (result.success && result.data.ai_model) {
+                    aiModelSelect.value = result.data.ai_model;
+                } else {
+                    // Fallback to local storage if DB is empty (migration aid)
+                    const lastSelectedModel = localStorage.getItem('last_ai_model');
+                    if (lastSelectedModel) aiModelSelect.value = lastSelectedModel;
+                }
+            })
+            .catch(err => console.error('Failed to load AI model setting:', err));
+
+        aiModelSelect.addEventListener('change', () => {
+            const selectedModel = aiModelSelect.value;
+            // Save to DB
+            fetch('api/profile/settings.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'ai_model', value: selectedModel })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    showToast(`Model saved: ${aiModelSelect.options[aiModelSelect.selectedIndex].text}`);
+                    localStorage.setItem('last_ai_model', selectedModel); // Keep LS as backup
+                }
+            })
+            .catch(err => {
+                console.error('Failed to save AI model setting:', err);
+                showToast('Failed to save model to database', 'error');
+            });
         });
     }
 

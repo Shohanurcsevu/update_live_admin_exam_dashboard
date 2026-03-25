@@ -40,7 +40,11 @@ $payload['safetySettings'] = [
     ["category" => "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold" => "BLOCK_NONE"]
 ];
 
-$ch = curl_init(GEMINI_API_URL);
+// Determine which model to use (passed from frontend or default)
+$selectedModel = $input['model'] ?? GEMINI_MODEL;
+$api_url = get_gemini_api_url($selectedModel);
+
+$ch = curl_init($api_url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
