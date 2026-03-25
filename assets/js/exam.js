@@ -119,6 +119,7 @@ function initializeExamPage() {
     const tokenSessionTotal = document.getElementById('token-session-total');
     const aiTokenResetBtn = document.getElementById('ai-token-reset-btn');
     let topicQueue = [];
+    let lastTopicRenderId = 0; // Prevent overlapping async renders in topic table
 
     let currentErrorLine = -1; // Track error line for gutter highlighting
 
@@ -1351,7 +1352,7 @@ function initializeExamPage() {
     }
 
     // Bulk Import Listeners
-    function handleBulkJSON(json) {
+    function handleBulkJSON(json, skipTopicDetection = false) {
         if (!json) return;
         try {
             const data = JSON.parse(json);
@@ -1393,7 +1394,7 @@ function initializeExamPage() {
             if (!extractedSections.length) throw new Error("No valid exams/questions found.");
 
             // Auto-detect topics from Exam Titles (only if not already loaded from topic_summary)
-            if (!topicsAlreadyLoaded && !isFlat && extractedSections.length > 0) {
+            if (!skipTopicDetection && !topicsAlreadyLoaded && !isFlat && extractedSections.length > 0) {
                 const detectedTopics = extractedSections.map(s => ({
                     topic_name: s.title,
                     page_from: '',
@@ -1605,10 +1606,18 @@ function initializeExamPage() {
     // ==========================================
 
     async function populateTopicSubjects(selector) {
+        if (subjects && subjects.length > 0) {
+            selector.innerHTML = '<option value="">Select Subject</option>';
+            subjects.forEach(s => {
+                selector.innerHTML += `<option value="${s.id}">${s.subject_name}</option>`;
+            });
+            return;
+        }
         try {
             const resp = await fetch(SUBJECT_API_URL);
             const result = await resp.json();
             if (result.success) {
+                subjects = result.data; // Sync to global cache
                 selector.innerHTML = '<option value="">Select Subject</option>';
                 result.data.forEach(s => {
                     selector.innerHTML += `<option value="${s.id}">${s.subject_name}</option>`;
@@ -1653,14 +1662,29 @@ function initializeExamPage() {
     }
 
     async function renderTopicImportTable() {
+        const renderId = ++lastTopicRenderId;
+        topicImportTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-slate-400">Loading topics...</td></tr>';
+        
+        // Use pre-fetched subjects if available, otherwise fetch once
+        let subjectsList = subjects || [];
+        if (!subjectsList.length) {
+            try {
+                const resp = await fetch(SUBJECT_API_URL);
+                const result = await resp.json();
+                if (result.success) subjectsList = result.data;
+            } catch (e) { console.error('Subject fetch failed in topic render', e); }
+        }
+
+        // Check if this render is still valid
+        if (renderId !== lastTopicRenderId) return;
+
         topicImportTableBody.innerHTML = '';
-        // Fetch subjects once for all rows
-        let subjectsList = [];
-        try {
-            const resp = await fetch(SUBJECT_API_URL);
-            const result = await resp.json();
-            if (result.success) subjectsList = result.data;
-        } catch (e) { /* no subjects */ }
+        if (topicQueue.length === 0) {
+            topicImportTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400">No topics found</td></tr>';
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
 
         for (let i = 0; i < topicQueue.length; i++) {
             const item = topicQueue[i];
@@ -1725,7 +1749,11 @@ function initializeExamPage() {
                 };
             }
 
-            topicImportTableBody.appendChild(row);
+            fragment.appendChild(row);
+        }
+        
+        if (renderId === lastTopicRenderId) {
+            topicImportTableBody.appendChild(fragment);
         }
     }
 
@@ -2111,7 +2139,7 @@ function initializeExamPage() {
 
                 // Feed questions into the bulk import pipeline
                 if (questionArr) {
-                    handleBulkJSON(questionArr.json);
+                    handleBulkJSON(questionArr.json, !!topicArr);
                 } else {
                     showToast('No questions found in AI response.', 'error');
                 }
