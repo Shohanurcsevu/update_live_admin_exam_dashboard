@@ -201,7 +201,8 @@
             container.innerHTML = '<div class="py-2 text-sm text-gray-500 flex items-center"><span class="material-symbols-outlined animate-spin mr-2 text-xs">sync</span> Loading exams...</div>';
 
             if (!topic.exams) {
-                topic.exams = await fetchData(`${API_EXAMS}&topic_id=${topic.id}`);
+                // Add limit=100 and cache-busting _ timestamp
+                topic.exams = await fetchData(`${API_EXAMS}&topic_id=${topic.id}&limit=100&_=${Date.now()}`);
             }
 
             container.innerHTML = '';

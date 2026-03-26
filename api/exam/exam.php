@@ -26,7 +26,7 @@ function log_activity($conn, $type, $message) {
 }
 
 function list_exams($conn) {
-    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : (isset($_GET['topic_id']) ? 100 : 10);
     $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
 
     $where_clauses = [];
