@@ -76,49 +76,129 @@ $priorities = array_filter($priorities, function ($val) {
     return $val !== ''; });
 $priorities = array_unique(array_map('intval', $priorities));
 
-$question_sql = "SELECT q.id, q.subject_id, q.lesson_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority, q.original_question_id,
-                 COUNT(qa.selected_answer) as taken_count, 
-                 SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
-                 SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count
-                 FROM questions q
-                 LEFT JOIN question_attempts qa ON COALESCE(q.original_question_id, q.id) = qa.question_id
-                 WHERE q.exam_id = ? AND q.is_deleted = 0";
-
-
-
-if (!empty($priorities)) {
-    $placeholders = implode(',', array_fill(0, count($priorities), '?'));
-    $question_sql .= " AND q.priority IN ($placeholders)";
-}
-
-$question_sql .= " GROUP BY q.id";
-
+// --- NEW: Fair Selection Logic for Mixed Exams ---
+$is_diverse = false;
+$source_ids = [];
 if ($num_questions > 0) {
-    if (isset($_GET['sort']) && $_GET['sort'] === 'least_attempted') {
-        $question_sql .= " ORDER BY taken_count ASC, RAND() LIMIT ?";
-    } else {
-        $question_sql .= " ORDER BY RAND() LIMIT ?";
+    // Detect source diversity
+    $diverse_sql = "SELECT DISTINCT COALESCE(parent.exam_id, q.exam_id) as source_id 
+                    FROM questions q 
+                    LEFT JOIN questions parent ON q.original_question_id = parent.id 
+                    WHERE q.exam_id = ? AND q.is_deleted = 0";
+    $diverse_stmt = $conn->prepare($diverse_sql);
+    $diverse_stmt->bind_param("i", $exam_id);
+    $diverse_stmt->execute();
+    $diverse_res = $diverse_stmt->get_result();
+    $source_map = [];
+    while ($row = $diverse_res->fetch_assoc()) {
+        if ($row['source_id']) $source_map[$row['source_id']] = true;
     }
+    $source_ids = array_keys($source_map);
+    if (count($source_ids) > 1) {
+        $is_diverse = true;
+    }
+    $diverse_stmt->close();
 }
 
-$stmt = $conn->prepare($question_sql);
+if ($is_diverse) {
+    // 1. Calculate Fair Quota
+    $num_sources = count($source_ids);
+    $limit_per_source = ceil($num_questions / $num_sources);
 
-// Bind parameters dynamically
-$bind_types = "i";
-$bind_params = [$exam_id];
+    // 2. Build the Common Table Expression (CTE) for Fair Selection
+    // We use ROW_NUMBER() to rank questions WITHIN each source exam.
+    // Order: Unattempted (total_attempts=0) first, then Wrongly answered (wrong_count > 0) second, then Random.
+    $priority_filter = "";
+    if (!empty($priorities)) {
+        $priority_placeholders = implode(',', array_fill(0, count($priorities), '?'));
+        $priority_filter = " AND q.priority IN ($priority_placeholders)";
+    }
 
-if (!empty($priorities)) {
-    $bind_types .= str_repeat("i", count($priorities));
-    foreach ($priorities as $p)
-        $bind_params[] = $p;
-}
+    $partition_sql = "
+        WITH RankedQuestions AS (
+            SELECT 
+                q.id, q.subject_id, q.lesson_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority, q.original_question_id,
+                COALESCE(parent.exam_id, q.exam_id) as source_exam_id,
+                COUNT(qa.id) as taken_count,
+                SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
+                ROW_NUMBER() OVER (
+                    PARTITION BY COALESCE(parent.exam_id, q.exam_id) 
+                    ORDER BY 
+                        (CASE WHEN COUNT(qa.id) = 0 THEN 0 ELSE 1 END) ASC, -- Unattempted First
+                        SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) DESC, -- Failed Second
+                        RAND() -- Variety Third
+                ) as rn
+            FROM questions q
+            LEFT JOIN questions parent ON q.original_question_id = parent.id
+            LEFT JOIN question_attempts qa ON COALESCE(q.original_question_id, q.id) = qa.question_id
+            WHERE q.exam_id = ? AND q.is_deleted = 0 $priority_filter
+            GROUP BY q.id
+        )
+        SELECT * FROM RankedQuestions
+        WHERE rn <= ?
+        ORDER BY RAND()
+        LIMIT ?";
 
-if ($num_questions > 0) {
-    $bind_types .= "i";
+    $stmt = $conn->prepare($partition_sql);
+    $bind_types = "i";
+    $bind_params = [$exam_id];
+
+    if (!empty($priorities)) {
+        $bind_types .= str_repeat("i", count($priorities));
+        foreach ($priorities as $p) $bind_params[] = $p;
+    }
+
+    $bind_types .= "ii";
+    $bind_params[] = $limit_per_source;
     $bind_params[] = $num_questions;
+
+    $stmt->bind_param($bind_types, ...$bind_params);
+} else {
+    // Standard Global Selection
+    $question_sql = "SELECT q.id, q.subject_id, q.lesson_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority, q.original_question_id,
+                     COUNT(qa.selected_answer) as taken_count, 
+                     SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+                     SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count
+                     FROM questions q
+                     LEFT JOIN question_attempts qa ON COALESCE(q.original_question_id, q.id) = qa.question_id
+                     WHERE q.exam_id = ? AND q.is_deleted = 0";
+
+    if (!empty($priorities)) {
+        $placeholders = implode(',', array_fill(0, count($priorities), '?'));
+        $question_sql .= " AND q.priority IN ($placeholders)";
+    }
+
+    $question_sql .= " GROUP BY q.id";
+
+    // Standard ordering (Intelligent Prioritization built-in)
+    if ($num_questions > 0) {
+        $question_sql .= " ORDER BY ";
+        if (isset($_GET['sort']) && $_GET['sort'] === 'least_attempted') {
+            $question_sql .= "taken_count ASC, ";
+        } else {
+            $question_sql .= "(CASE WHEN COUNT(qa.selected_answer) = 0 THEN 0 ELSE 1 END) ASC, ";
+            $question_sql .= "wrong_count DESC, ";
+        }
+        $question_sql .= " RAND() LIMIT ?";
+    }
+
+    $stmt = $conn->prepare($question_sql);
+    $bind_types = "i";
+    $bind_params = [$exam_id];
+
+    if (!empty($priorities)) {
+        $bind_types .= str_repeat("i", count($priorities));
+        foreach ($priorities as $p) $bind_params[] = $p;
+    }
+
+    if ($num_questions > 0) {
+        $bind_types .= "i";
+        $bind_params[] = $num_questions;
+    }
+
+    $stmt->bind_param($bind_types, ...$bind_params);
 }
 
-$stmt->bind_param($bind_types, ...$bind_params);
 $stmt->execute();
 $result = $stmt->get_result();
 $questions = [];
@@ -127,7 +207,7 @@ while ($row = $result->fetch_assoc()) {
     $questions[] = $row;
 }
 
-echo json_encode(['success' => true, 'data' => ['details' => $exam_details, 'questions' => $questions]]);
+echo json_encode(['success' => true, 'data' => ['details' => $exam_details, 'questions' => $questions, 'mode' => $is_diverse ? 'fair_distribution' : 'standard']]);
 $stmt->close();
 $conn->close();
 ?>
