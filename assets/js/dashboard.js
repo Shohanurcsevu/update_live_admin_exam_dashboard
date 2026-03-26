@@ -822,7 +822,7 @@ function initializeDashboardPage() {
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2">
                         <button class="take-exam-btn flex-1 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors" data-id="${exam.id}">Take Exam</button>
-                        <button class="print-options-btn bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" data-id="${exam.id}" title="Print Options">
+                        <button class="print-options-btn bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" data-id="${exam.id}" data-total-questions="${exam.total_questions || 0}" title="Print Options">
                             <span class="material-symbols-outlined">print</span>
                         </button>
                         <button class="delete-exam-btn bg-red-100 text-red-700 hover:bg-red-200 font-semibold py-2 px-3 rounded-lg transition-colors" data-id="${exam.id}" title="Delete Exam"><span class="material-symbols-outlined">delete</span></button>
@@ -929,21 +929,30 @@ function initializeDashboardPage() {
     };
 
     // --- Print Logic Implementation ---
-    const openPrintModal = (id) => {
+    const openPrintModal = (id, totalQuestions = 0) => {
         PrintEngine.onGenerate = processAndPrint;
-        PrintEngine.openModal(id);
+        PrintEngine.openModal(id, totalQuestions);
     };
 
     async function processAndPrint() {
         const examId = PrintEngine.selectedExamId;
         if (!examId) return;
 
+        // Read limit from the modal input
+        const limitInput = document.getElementById('print-limit-num');
+        const numQuestions = limitInput ? parseInt(limitInput.value) : 0;
+
         generatePdfBtn.disabled = true;
         generatePdfBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Fetching Data...';
 
         try {
-            // Use CacheManager for short-term caching of the print data
-            const result = await CacheManager.fetchWithCache(`api/take-exam/start.php?exam_id=${examId}`, 1);
+            // Build the URL with limit and sorting (least attempted first)
+            let url = `api/take-exam/start.php?exam_id=${examId}`;
+            if (numQuestions > 0) {
+                url += `&num_questions=${numQuestions}&sort=least_attempted`;
+            }
+
+            const result = await CacheManager.fetchWithCache(url, 1);
 
             if (!result) throw new Error('Failed to fetch exam data');
 
@@ -1048,7 +1057,8 @@ function initializeDashboardPage() {
                 }
                 if (printOptionsBtn) {
                     const examId = printOptionsBtn.dataset.id;
-                    openPrintModal(examId);
+                    const totalQuestions = printOptionsBtn.dataset.totalQuestions || 0;
+                    openPrintModal(examId, totalQuestions);
                 }
             });
         }

@@ -151,7 +151,7 @@
                         <div class="flex gap-2">
                             ${actionBtn}
                             ${isDownloaded ? `
-                            <button onclick="window.openPrintModalOffline(${exam.id})" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" title="Print Options">
+                            <button onclick="window.openPrintModalOffline(${exam.id}, ${exam.total_questions || 0})" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" title="Print Options">
                                 <span class="material-symbols-outlined">print</span>
                             </button>` : ''}
                         </div>
@@ -176,6 +176,10 @@
         const examId = PrintEngine.selectedExamId;
         if (!examId) return;
 
+        // Read limit from modal input
+        const limitInput = document.getElementById('print-limit-num');
+        const numQuestions = limitInput ? parseInt(limitInput.value) : 0;
+
         const generateBtn = document.getElementById('generate-pdf-btn');
         if (generateBtn) {
             generateBtn.disabled = true;
@@ -187,8 +191,60 @@
             const exam = await idbManager.getById('exams', examId);
             if (!exam) throw new Error('Exam not found in local storage');
 
-            const questions = await idbManager.getByIndex('questions', 'exam_id', parseInt(examId));
+            let questions = await idbManager.getByIndex('questions', 'exam_id', parseInt(examId));
             if (!questions || questions.length === 0) throw new Error('Questions not found locally');
+
+            // Apply Fair Selection Logic if limit is set
+            if (numQuestions > 0 && numQuestions < questions.length) {
+                // 1. Detect Source Diversity
+                const sourceMap = new Map();
+                questions.forEach(q => {
+                    const sId = q.source_id || q.exam_id; // Fallback to exam_id if source_id is missing
+                    if (!sourceMap.has(sId)) sourceMap.set(sId, []);
+                    sourceMap.get(sId).push(q);
+                });
+
+                const sourceIds = Array.from(sourceMap.keys());
+                const sourceCount = sourceIds.length;
+
+                if (sourceCount > 1) {
+                    // --- MIXED EXAM: Fair Selection Mode ---
+                    console.log(`[Offline Print] Mixed Exam detected: ${sourceCount} sources. Formatting ${numQuestions} questions.`);
+                    
+                    const quota = Math.ceil(numQuestions / sourceCount);
+                    let finalPool = [];
+                    
+                    // Sort each source by attempts and pick quota
+                    sourceIds.forEach(sId => {
+                        const sourceQuestions = sourceMap.get(sId);
+                        
+                        // Intelligent Prioritization: Unattempted/Least Attempted First
+                        // Use attempt_count or fallback to random
+                        sourceQuestions.sort((a, b) => {
+                            const countA = a.attempt_count || 0;
+                            const countB = b.attempt_count || 0;
+                            if (countA !== countB) return countA - countB;
+                            return Math.random() - 0.5; // Random within same attempt count
+                        });
+
+                        finalPool = finalPool.concat(sourceQuestions.slice(0, quota));
+                    });
+
+                    // Final shuffle and hard limit
+                    finalPool.sort(() => Math.random() - 0.5);
+                    questions = finalPool.slice(0, numQuestions);
+                } else {
+                    // --- SINGLE SOURCE: Standard Mode ---
+                    // Still apply Intelligent Prioritization (least attempted first)
+                    questions.sort((a, b) => {
+                        const countA = a.attempt_count || 0;
+                        const countB = b.attempt_count || 0;
+                        if (countA !== countB) return countA - countB;
+                        return Math.random() - 0.5;
+                    });
+                    questions = questions.slice(0, numQuestions);
+                }
+            }
 
             // Map IDB question structure to what PrintEngine expects
             const formattedQuestions = questions.map(q => ({
@@ -202,13 +258,14 @@
                 details: {
                     exam_title: exam.exam_title,
                     full_marks: exam.total_marks,
-                    time: (exam.duration || 0) + " মিনিট"
+                    time: (exam.duration || 0) + " মিনিট",
+                    total_questions: questions.length
                 },
                 questions: formattedQuestions
             };
 
             PrintEngine.generatePDF(data);
-            if (window.showToast) showToast('Offline PDF generated successfully!');
+            if (window.showToast) showToast('Offline PDF generated successfully with prioritized questions!');
             PrintEngine.closeModal();
 
         } catch (error) {
@@ -223,9 +280,9 @@
     }
 
     // Expose print modal opener
-    window.openPrintModalOffline = (examId) => {
+    window.openPrintModalOffline = (examId, totalQuestions = 0) => {
         PrintEngine.onGenerate = processAndPrintOffline;
-        PrintEngine.openModal(examId);
+        PrintEngine.openModal(examId, totalQuestions);
     };
 
     /**
