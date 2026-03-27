@@ -520,20 +520,19 @@ function bulk_update_exams($conn) {
 }
 
 function mark_revised($conn) {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        echo json_encode(['success' => false, 'message' => 'POST method required.']);
-        return;
-    }
+    // Check for JSON input
+    $json = file_get_contents('php://input');
+    $data = json_decode($json, true);
     
-    $data = json_decode(file_get_contents('php://input'), true);
-    $id = isset($data['id']) ? intval($data['id']) : 0;
+    $id = isset($data['id']) ? intval($data['id']) : (isset($_GET['id']) ? intval($_GET['id']) : (isset($_POST['id']) ? intval($_POST['id']) : 0));
+    $untag_requested = isset($data['untag']) ? (bool)$data['untag'] : (isset($_GET['untag']) && $_GET['untag'] === 'true');
     
     if (!$id) {
         echo json_encode(['success' => false, 'message' => 'Invalid exam ID.']);
         return;
     }
 
-    $target = isset($_POST['target']) ? $_POST['target'] : (isset($_GET['target']) ? $_GET['target'] : 'today');
+    $target = isset($data['target']) ? $data['target'] : (isset($_POST['target']) ? $_POST['target'] : (isset($_GET['target']) ? $_GET['target'] : 'today'));
     $target_date = ($target === 'tomorrow') ? date('Y-m-d', strtotime('+1 day')) : date('Y-m-d');
     
     // Check current state
@@ -544,22 +543,35 @@ function mark_revised($conn) {
     $row = $result->fetch_assoc();
     $stmt->close();
 
-    $is_already_tagged = ($row && $row['last_revision_date'] === $target_date);
-    $new_date = $is_already_tagged ? null : $target_date;
-    $action = $is_already_tagged ? 'untagged' : 'tagged';
+    $current_date = $row ? $row['last_revision_date'] : null;
+    $is_already_tagged_this_date = ($current_date === $target_date);
+    
+    // Logic: if explicitly requested to untag, we set to null. 
+    // Otherwise, we toggle: if already tagged for THIS date, set to null. 
+    // If not tagged for this date (either null or DIFFERENT date), set to target_date.
+    if ($untag_requested) {
+        $new_date = null;
+        $is_untagging = true;
+    } else {
+        $new_date = $is_already_tagged_this_date ? null : $target_date;
+        $is_untagging = $is_already_tagged_this_date;
+    }
+    
+    $action = $is_untagging ? 'untagged' : 'tagged';
     
     $stmt = $conn->prepare("UPDATE exams SET last_revision_date = ? WHERE id = ?");
     $stmt->bind_param("si", $new_date, $id);
     
     if ($stmt->execute()) {
         $log_target = ($target === 'tomorrow') ? "tomorrow's" : "today's";
-        $log_msg = $is_already_tagged ? "Exam (ID: $id) un-tagged from $log_target revision." : "Exam (ID: $id) marked for $log_target revision.";
+        $log_msg = $is_untagging ? "Exam (ID: $id) un-tagged from $log_target revision." : "Exam (ID: $id) marked for $log_target revision.";
         log_activity($conn, 'Exam Revised', $log_msg);
         echo json_encode([
             'success' => true, 
-            'message' => $is_already_tagged ? 'Revision tag removed.' : "Exam marked for $log_target revision.",
+            'message' => $is_untagging ? 'Revision tag removed.' : "Exam marked for $log_target revision.",
             'action' => $action,
-            'target' => $target
+            'target' => $target,
+            'new_date' => $new_date
         ]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Update failed: ' . $conn->error]);

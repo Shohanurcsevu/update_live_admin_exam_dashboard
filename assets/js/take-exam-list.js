@@ -10,13 +10,24 @@ function initializeTakeExamListPage() {
     const totalCountEl = document.getElementById('total-count');
     const cardView = document.getElementById('exams-card-view');
 
+    const cache = new Map();
+    
     let currentPage = 1;
     const itemsPerPage = 20;
     let isFetching = false;
-    const todayDateStr = new Date().toISOString().split('T')[0];
+    
+    // Helper to get local date string YYYY-MM-DD
+    const getLocalDateStr = (date = new Date()) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const todayDateStr = getLocalDateStr();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowDateStr = tomorrow.toISOString().split('T')[0];
+    const tomorrowDateStr = getLocalDateStr(tomorrow);
     let currentPriorityDistribution = { "0": 0, "1": 0, "2": 0, "3": 0 };
 
     // --- Toast Function ---
@@ -303,6 +314,23 @@ function initializeTakeExamListPage() {
                                     <span class="material-symbols-outlined text-sm">delete</span> Delete Exam
                                 </button>
                             </div>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                            ${(exam.last_revision_date === todayDateStr) ? `
+                                <div class="flex items-center bg-indigo-100 text-indigo-700 rounded border border-indigo-200 overflow-hidden">
+                                    <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Revised Today</span>
+                                    <button class="untag-revision-btn px-1.5 py-0.5 bg-indigo-200 hover:bg-indigo-300 text-indigo-800 border-l border-indigo-300 transition-colors" data-id="${exam.id}" data-target="today" title="Remove Tag">
+                                        <span class="material-symbols-outlined text-xs leading-none">close</span>
+                                    </button>
+                                </div>
+                            ` : ''}
+                            ${(exam.last_revision_date === tomorrowDateStr) ? `
+                                <div class="flex items-center bg-teal-100 text-teal-700 rounded border border-teal-200 overflow-hidden">
+                                    <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Planned for Tomorrow</span>
+                                    <button class="untag-revision-btn px-1.5 py-0.5 bg-teal-200 hover:bg-teal-300 text-teal-800 border-l border-teal-300 transition-colors" data-id="${exam.id}" data-target="tomorrow" title="Remove Tag">
+                                        <span class="material-symbols-outlined text-xs leading-none">close</span>
+                                    </button>
+                                </div>
+                            ` : ''}</div>
                         </div>`;
                     cardView.innerHTML += card;
                 });
@@ -821,6 +849,8 @@ function initializeTakeExamListPage() {
             handlePrintExam(examId, totalQuestions);
         } else if (target.classList.contains('tag-revision-btn')) {
             markAsRevised(target.dataset.id, target, target.dataset.target || 'today');
+        } else if (target.classList.contains('untag-revision-btn')) {
+            markAsRevised(target.dataset.id, target, target.dataset.target || 'today', true); // Pass true for untagging
         } else if (target.classList.contains('delete-exam-btn')) {
             examIdToDelete = target.dataset.id;
             deleteModal.classList.remove('hidden');
@@ -828,7 +858,7 @@ function initializeTakeExamListPage() {
         }
     }
 
-    async function markAsRevised(examId, btn, targetDateType) {
+    async function markAsRevised(examId, btn, targetDateType, untag = false) {
         const originalHTML = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span>';
@@ -837,7 +867,7 @@ function initializeTakeExamListPage() {
             const response = await fetch('api/exam/exam.php?action=mark_revised', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: examId, target: targetDateType })
+                body: JSON.stringify({ id: examId, target: targetDateType, untag: untag })
             });
             const result = await response.json();
 
@@ -947,10 +977,14 @@ function initializeTakeExamListPage() {
                              b.className = b.className.replace(/bg-indigo-600 text-white border-indigo-600/, 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white');
                              const icon = b.querySelector('.material-symbols-outlined');
                              if (icon) icon.textContent = 'event_repeat';
+                             const span = b.querySelector('span:not(.material-symbols-outlined)');
+                             if (span) span.textContent = 'Today';
                         } else {
                              b.className = b.className.replace(/bg-teal-600 text-white border-teal-600/, 'border-2 border-teal-500 text-teal-600 hover:bg-teal-500 hover:text-white');
                              const icon = b.querySelector('.material-symbols-outlined');
                              if (icon) icon.textContent = 'next_plan';
+                             const span = b.querySelector('span:not(.material-symbols-outlined)');
+                             if (span) span.textContent = 'Tomorrow';
                         }
                     });
                 }
