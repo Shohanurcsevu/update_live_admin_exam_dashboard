@@ -92,7 +92,7 @@ while ($row = $result->fetch_assoc()) {
 }
 
 echo json_encode([
-    'success' => true, 
+    'success' => true,
     'data' => $exams,
     'pagination' => [
         'total' => $total_count,

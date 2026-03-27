@@ -124,13 +124,14 @@ if ($is_diverse) {
                 ROW_NUMBER() OVER (
                     PARTITION BY COALESCE(parent.exam_id, q.exam_id) 
                     ORDER BY 
-                        (CASE WHEN COUNT(qa.id) = 0 THEN 0 ELSE 1 END) ASC, -- Unattempted First
+                        (CASE WHEN COUNT(qa.selected_answer) = 0 THEN 0 ELSE 1 END) ASC, -- Unattempted First (Skips don't count)
                         SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) DESC, -- Failed Second
                         RAND() -- Variety Third
                 ) as rn
             FROM questions q
             LEFT JOIN questions parent ON q.original_question_id = parent.id
-            LEFT JOIN question_attempts qa ON COALESCE(q.original_question_id, q.id) = qa.question_id
+            LEFT JOIN questions root ON parent.original_question_id = root.id
+            LEFT JOIN question_attempts qa ON qa.question_id IN (q.id, q.original_question_id, parent.original_question_id)
             WHERE q.exam_id = ? AND q.is_deleted = 0 $priority_filter
             GROUP BY q.id
         )
@@ -159,9 +160,11 @@ if ($is_diverse) {
                      COUNT(qa.selected_answer) as taken_count, 
                      SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
                      SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count
-                     FROM questions q
-                     LEFT JOIN question_attempts qa ON COALESCE(q.original_question_id, q.id) = qa.question_id
-                     WHERE q.exam_id = ? AND q.is_deleted = 0";
+                      FROM questions q
+                      LEFT JOIN questions parent ON q.original_question_id = parent.id
+                      LEFT JOIN questions root ON parent.original_question_id = root.id
+                      LEFT JOIN question_attempts qa ON qa.question_id IN (q.id, q.original_question_id, parent.original_question_id)
+                      WHERE q.exam_id = ? AND q.is_deleted = 0";
 
     if (!empty($priorities)) {
         $placeholders = implode(',', array_fill(0, count($priorities), '?'));
@@ -171,15 +174,19 @@ if ($is_diverse) {
     $question_sql .= " GROUP BY q.id";
 
     // Standard ordering (Intelligent Prioritization built-in)
+    $question_sql .= " ORDER BY ";
+    if (isset($_GET['sort']) && $_GET['sort'] === 'least_attempted') {
+        $question_sql .= "taken_count ASC, ";
+    } else {
+        // ALWAYS prioritize unattempted, then failed, then random
+        $question_sql .= "(CASE WHEN COUNT(qa.selected_answer) = 0 THEN 0 ELSE 1 END) ASC, ";
+        $question_sql .= "wrong_count DESC, ";
+    }
+    
     if ($num_questions > 0) {
-        $question_sql .= " ORDER BY ";
-        if (isset($_GET['sort']) && $_GET['sort'] === 'least_attempted') {
-            $question_sql .= "taken_count ASC, ";
-        } else {
-            $question_sql .= "(CASE WHEN COUNT(qa.selected_answer) = 0 THEN 0 ELSE 1 END) ASC, ";
-            $question_sql .= "wrong_count DESC, ";
-        }
         $question_sql .= " RAND() LIMIT ?";
+    } else {
+        $question_sql .= " RAND()"; 
     }
 
     $stmt = $conn->prepare($question_sql);
