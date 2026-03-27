@@ -153,6 +153,20 @@
             </div>
         </div>
 
+        <!-- Revision Counter Badge -->
+        <div id="header-revision-counter" 
+            class="flex items-center gap-1.5 px-2 py-1 bg-white hover:bg-slate-50 rounded-xl border border-slate-100 shadow-sm transition-all hover:shadow-md cursor-pointer group relative hidden"
+            title="Today's Revisions">
+            <span class="material-symbols-outlined text-[18px] text-rose-500 group-hover:animate-bounce"
+                style="font-variation-settings: 'FILL' 1;">target</span>
+            <span id="header-revision-count" class="text-[11px] font-black text-slate-700">0</span>
+            
+            <!-- Tooltip -->
+            <div class="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[120] whitespace-nowrap">
+                Click to start revisions
+            </div>
+        </div>
+
         <!-- Search Toggle -->
         <button id="header-search-btn" class="text-slate-400 hover:text-indigo-600 transition-colors p-1"
             title="Quick Search (Ctrl+K)">

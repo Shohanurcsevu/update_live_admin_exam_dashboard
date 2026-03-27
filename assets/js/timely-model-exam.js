@@ -284,8 +284,11 @@
         hierarchyLoading.classList.add('hidden');
         hierarchyTree.classList.remove('hidden');
 
-        showToast('Exam list updated with new date filter');
+        showToast('Exam list updated');
     }
+
+    // Expose reload function to window for global untagging handler
+    window.reloadExamsWithDateFilter = reloadExamsWithDateFilter;
 
     // Remove unused hierarchy functions
     function renderHierarchy() { }
@@ -332,7 +335,7 @@
                         ${(exam.last_revision_date === todayDateStr && exam.created_at && !exam.created_at.startsWith(todayDateStr)) ? `
                             <div class="flex items-center bg-indigo-100 text-indigo-700 rounded border border-indigo-200 overflow-hidden">
                                 <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Already Added for Revision</span>
-                                <button class="untag-revision-btn px-1.5 py-0.5 bg-indigo-200 hover:bg-indigo-300 text-indigo-800 border-l border-indigo-300 transition-colors" data-id="${exam.id}" title="Remove Tag">
+                                <button class="untag-revision-btn px-1.5 py-0.5 bg-indigo-200 hover:bg-indigo-300 text-indigo-800 border-l border-indigo-300 transition-colors" data-id="${exam.id}" data-title="${exam.exam_title}" title="Remove Tag">
                                     <span class="material-symbols-outlined text-xs leading-none">close</span>
                                 </button>
                             </div>
@@ -340,7 +343,7 @@
                         ${(exam.last_revision_date === tomorrowDateStr) ? `
                             <div class="flex items-center bg-teal-100 text-teal-700 rounded border border-teal-200 overflow-hidden">
                                 <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Planned for Tomorrow</span>
-                                <button class="untag-revision-btn px-1.5 py-0.5 bg-teal-200 hover:bg-teal-300 text-teal-800 border-l border-teal-300 transition-colors" data-id="${exam.id}" title="Remove Tag">
+                                <button class="untag-revision-btn px-1.5 py-0.5 bg-teal-200 hover:bg-teal-300 text-teal-800 border-l border-teal-300 transition-colors" data-id="${exam.id}" data-title="${exam.exam_title}" title="Remove Tag">
                                     <span class="material-symbols-outlined text-xs leading-none">close</span>
                                 </button>
                             </div>
@@ -1072,32 +1075,7 @@
         });
     }
 
-    // Global event listener for untagging revision from this page
-    document.addEventListener('click', async (e) => {
-        const untagBtn = e.target.closest('.untag-revision-btn');
-        if (untagBtn) {
-            e.preventDefault();
-            const id = untagBtn.dataset.id;
-            
-            try {
-                const response = await fetch(`api/exam/exam.php?action=mark_revised&id=${id}`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast(result.message);
-                    // Reload exams immediately to update the list
-                    reloadExamsWithDateFilter();
-                } else {
-                    showToast(result.message, 'error');
-                }
-            } catch (error) {
-                console.error('Error untagging revision:', error);
-                showToast('Failed to remove tag.', 'error');
-            }
-        }
-    });
+    // Removed redundant local untagging listener - now handled globally in main.js
 
     // Step navigation event listeners
     nextToStep2Btn.addEventListener('click', () => showStep(2));

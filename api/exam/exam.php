@@ -18,6 +18,7 @@ switch ($action) {
     case 'mark_revised': mark_revised($conn); break;
     case 'bulk_mark_revised': bulk_mark_revised($conn); break;
     case 'get_suggestions': get_suggestions($conn); break;
+    case 'get_revision_count': get_revision_count($conn); break;
     default: echo json_encode(['success' => false, 'message' => 'Invalid action for exams.']); break;
 }
 
@@ -662,6 +663,35 @@ function get_suggestions($conn) {
 
     echo json_encode(array_values($exams));
 }
+
+function get_revision_count($conn) {
+    // Count exams tagged for today or tomorrow
+    $sql = "SELECT COUNT(*) as count 
+            FROM exams 
+            WHERE is_deleted = 0 
+            AND (last_revision_date = CURDATE() OR last_revision_date = DATE_ADD(CURDATE(), INTERVAL 1 DAY))";
+    
+    $result = $conn->query($sql);
+    $count = 0;
+    if ($result && $row = $result->fetch_assoc()) {
+        $count = intval($row['count']);
+    }
+    
+    echo json_encode(['success' => true, 'count' => $count]);
+}
+
+// Assuming there's a dispatcher handling actions, add 'get_revision_count' case there.
+// Example (not part of the provided content, but for context of the instruction):
+// if (isset($_GET['action'])) {
+//     $action = $_GET['action'];
+//     switch ($action) {
+//         // ... other cases
+//         case 'get_revision_count':
+//             get_revision_count($conn);
+//             break;
+//         // ...
+//     }
+// }
 
 $conn->close();
 ?>

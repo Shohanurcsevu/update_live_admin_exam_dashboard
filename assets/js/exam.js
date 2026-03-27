@@ -676,8 +676,14 @@ function initializeExamPage() {
             }
 
             if (result && result.success && result.data.length > 0) {
+                const todayVal = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const tomorrowVal = tomorrow.toLocaleDateString('en-CA');
+
                 const searchTerm = globalSearch ? globalSearch.value.trim() : "";
                 result.data.forEach(exam => {
+                    const isRevision = exam.last_revision_date === todayVal || exam.last_revision_date === tomorrowVal;
                     const isSelected = selectedExamIds.has(exam.id.toString());
                     // Search Match HTML
                     let matchHtml = "";
@@ -743,6 +749,10 @@ function initializeExamPage() {
                                     <button class="quick-look-btn p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" data-title="${exam.exam_title}" title="Quick Look">
                                         <span class="material-symbols-outlined text-lg">visibility</span>
                                     </button>
+                                    ${isRevision ? `
+                                    <button class="untag-revision-btn p-2 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" data-title="${exam.exam_title}" title="Remove Revision">
+                                        <span class="material-symbols-outlined text-lg">bookmark_remove</span>
+                                    </button>` : ''}
                                     <button class="edit-btn p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm" data-id="${exam.id}" title="Edit Exam">
                                         <span class="material-symbols-outlined text-lg">edit</span>
                                     </button>
@@ -799,6 +809,10 @@ function initializeExamPage() {
                                     <button class="quick-look-btn bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" data-title="${exam.exam_title}" title="Quick Look">
                                         <span class="material-symbols-outlined text-lg">visibility</span>
                                     </button>
+                                    ${isRevision ? `
+                                    <button class="untag-revision-btn bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" data-title="${exam.exam_title}" title="Remove Revision">
+                                        <span class="material-symbols-outlined text-lg">bookmark_remove</span>
+                                    </button>` : ''}
                                     <button class="edit-btn bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white p-2.5 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-xs" data-id="${exam.id}" title="Edit">
                                         <span class="material-symbols-outlined text-lg">edit</span>
                                     </button>

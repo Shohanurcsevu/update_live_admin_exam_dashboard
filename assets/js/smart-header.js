@@ -16,6 +16,7 @@ const SmartHeader = {
         this.updateDate();
         this.fetchWeather();
         this.fetchGoal();
+        this.fetchRevisionCount();
         this.startGlobalTimer();
         this.initEventListeners();
         this.initConnectivityListeners();
@@ -33,8 +34,13 @@ const SmartHeader = {
                 this.updateSolarBorder();
                 this.updateBackupStatus();
 
-                // Check for midnight to update date and goal
                 const now = new Date();
+                // Fetch revision count every minute
+                if (now.getSeconds() === 0) {
+                    this.fetchRevisionCount();
+                }
+
+                // Check for midnight to update date and goal
                 if (now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0) {
                     this.updateDate();
                     this.fetchGoal();
@@ -447,6 +453,36 @@ const SmartHeader = {
                 icon.textContent = 'timer';
                 icon.className = "material-symbols-outlined text-[14px] text-slate-300";
             }
+        }
+    },
+
+    async fetchRevisionCount() {
+        const badge = document.getElementById('header-revision-counter');
+        const countEl = document.getElementById('header-revision-count');
+        if (!badge || !countEl) return;
+
+        try {
+            const res = await fetch('api/exam/exam.php?action=get_revision_count');
+            const result = await res.json();
+
+            if (result.success && result.count > 0) {
+                countEl.textContent = result.count;
+                badge.classList.remove('hidden');
+                
+                // Add click listener if not already there
+                if (!badge.dataset.listenerAdded) {
+                    badge.addEventListener('click', () => {
+                        // Set the flag to enable revisions in Timely Creator
+                        localStorage.setItem('include_revisions_timely', 'true');
+                        if (window.loadPage) window.loadPage('timely-model-exam');
+                    });
+                    badge.dataset.listenerAdded = 'true';
+                }
+            } else {
+                badge.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error("Revision count fetch failed:", error);
         }
     },
 

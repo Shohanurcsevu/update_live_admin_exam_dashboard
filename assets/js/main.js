@@ -609,4 +609,47 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.loadPage(fallbackPage, '?' + fallbackParams.toString());
         }
     };
+
+    // --- Global Revision Un-tagging Handler ---
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.untag-revision-btn');
+        if (!btn) return;
+
+        const id = btn.dataset.id;
+        const examTitle = btn.dataset.title || 'this exam';
+        
+        try {
+            const response = await fetch(`api/exam/exam.php?action=mark_revised`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, target: 'none' })
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                window.showToast(`Revision tag removed for "${examTitle}"`, 'success');
+                
+                // Update Header Badge
+                if (typeof SmartHeader !== 'undefined' && SmartHeader.fetchRevisionCount) {
+                    SmartHeader.fetchRevisionCount();
+                }
+
+                // UI Feedback: Hide the button or refresh list
+                btn.classList.add('hidden');
+                
+                // If we are on a page with a refresh function, trigger it
+                if (typeof window.fetchAndDisplayExams === 'function') {
+                    window.fetchAndDisplayExams(false, true); // (keepPage=false, skipCache=true)
+                }
+                if (typeof window.reloadExamsWithDateFilter === 'function') {
+                    window.reloadExamsWithDateFilter();
+                }
+            } else {
+                window.showToast(result.message || 'Failed to remove revision tag', 'error');
+            }
+        } catch (error) {
+            console.error('Un-tag revision error:', error);
+            window.showToast('Network error while un-tagging revision', 'error');
+        }
+    });
 });

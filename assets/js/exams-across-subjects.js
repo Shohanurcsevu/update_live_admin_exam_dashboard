@@ -298,6 +298,11 @@
                         ${completeBadge}
                         ${(exam.last_revision_date === todayDateStr) ? '<span class="ml-2 px-1 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-200">Revised</span>' : ''}
                         ${(exam.last_revision_date === tomorrowDateStr) ? '<span class="ml-2 px-1 py-0.5 bg-teal-100 text-teal-700 rounded text-[9px] font-black uppercase tracking-tighter border border-teal-200">Planned</span>' : ''}
+                        ${(exam.last_revision_date === todayDateStr || exam.last_revision_date === tomorrowDateStr) ? `
+                        <button class="untag-revision-btn ml-2 p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center justify-center" 
+                                data-id="${exam.id}" data-title="${exam.exam_title}" title="Remove Revision" onclick="event.stopPropagation()">
+                            <span class="material-symbols-outlined text-sm">bookmark_remove</span>
+                        </button>` : ''}
                     </div>
                     <div class="text-sm text-gray-600">Available Questions: ${exam.total_questions}</div>
                 </div>
