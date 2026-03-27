@@ -67,6 +67,9 @@
     let currentStep = 1;
     let currentDateFilter = { from: '', to: '' };
     const todayDateStr = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = tomorrow.toISOString().split('T')[0];
 
     // Helper: Format date to YYYY-MM-DD
     function formatDate(date) {
@@ -308,6 +311,14 @@
                             <div class="flex items-center bg-indigo-100 text-indigo-700 rounded border border-indigo-200 overflow-hidden">
                                 <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Already Added for Revision</span>
                                 <button class="untag-revision-btn px-1.5 py-0.5 bg-indigo-200 hover:bg-indigo-300 text-indigo-800 border-l border-indigo-300 transition-colors" data-id="${exam.id}" title="Remove Tag">
+                                    <span class="material-symbols-outlined text-xs leading-none">close</span>
+                                </button>
+                            </div>
+                        ` : ''}
+                        ${(exam.last_revision_date === tomorrowDateStr) ? `
+                            <div class="flex items-center bg-teal-100 text-teal-700 rounded border border-teal-200 overflow-hidden">
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Planned for Tomorrow</span>
+                                <button class="untag-revision-btn px-1.5 py-0.5 bg-teal-200 hover:bg-teal-300 text-teal-800 border-l border-teal-300 transition-colors" data-id="${exam.id}" title="Remove Tag">
                                     <span class="material-symbols-outlined text-xs leading-none">close</span>
                                 </button>
                             </div>

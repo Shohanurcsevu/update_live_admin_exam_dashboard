@@ -533,7 +533,8 @@ function mark_revised($conn) {
         return;
     }
 
-    $today = date('Y-m-d');
+    $target = isset($_POST['target']) ? $_POST['target'] : (isset($_GET['target']) ? $_GET['target'] : 'today');
+    $target_date = ($target === 'tomorrow') ? date('Y-m-d', strtotime('+1 day')) : date('Y-m-d');
     
     // Check current state
     $stmt = $conn->prepare("SELECT last_revision_date FROM exams WHERE id = ?");
@@ -543,20 +544,22 @@ function mark_revised($conn) {
     $row = $result->fetch_assoc();
     $stmt->close();
 
-    $is_already_tagged = ($row && $row['last_revision_date'] === $today);
-    $new_date = $is_already_tagged ? null : $today;
+    $is_already_tagged = ($row && $row['last_revision_date'] === $target_date);
+    $new_date = $is_already_tagged ? null : $target_date;
     $action = $is_already_tagged ? 'untagged' : 'tagged';
     
     $stmt = $conn->prepare("UPDATE exams SET last_revision_date = ? WHERE id = ?");
     $stmt->bind_param("si", $new_date, $id);
     
     if ($stmt->execute()) {
-        $log_msg = $is_already_tagged ? "Exam (ID: $id) un-tagged from today's revision." : "Exam (ID: $id) marked for today's revision.";
+        $log_target = ($target === 'tomorrow') ? "tomorrow's" : "today's";
+        $log_msg = $is_already_tagged ? "Exam (ID: $id) un-tagged from $log_target revision." : "Exam (ID: $id) marked for $log_target revision.";
         log_activity($conn, 'Exam Revised', $log_msg);
         echo json_encode([
             'success' => true, 
-            'message' => $is_already_tagged ? 'Revision tag removed.' : 'Exam marked for today\'s revision.',
-            'action' => $action
+            'message' => $is_already_tagged ? 'Revision tag removed.' : "Exam marked for $log_target revision.",
+            'action' => $action,
+            'target' => $target
         ]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Update failed: ' . $conn->error]);

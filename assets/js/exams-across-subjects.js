@@ -60,6 +60,9 @@
     let currentStep = 1;
     const cache = new Map();
     const todayDateStr = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = tomorrow.toISOString().split('T')[0];
 
     // Helper: Show toast
     function showToast(message, type = 'success') {
@@ -293,6 +296,7 @@
                         <span class="font-semibold" style="color: ${isComplete == 1 ? colors.text : '#1f2937'}">${exam.exam_title}</span>
                         ${completeBadge}
                         ${(exam.last_revision_date === todayDateStr) ? '<span class="ml-2 px-1 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-200">Revised</span>' : ''}
+                        ${(exam.last_revision_date === tomorrowDateStr) ? '<span class="ml-2 px-1 py-0.5 bg-teal-100 text-teal-700 rounded text-[9px] font-black uppercase tracking-tighter border border-teal-200">Planned</span>' : ''}
                     </div>
                     <div class="text-sm text-gray-600">Available Questions: ${exam.total_questions}</div>
                 </div>

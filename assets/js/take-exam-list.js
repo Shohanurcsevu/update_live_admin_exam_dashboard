@@ -14,6 +14,9 @@ function initializeTakeExamListPage() {
     const itemsPerPage = 20;
     let isFetching = false;
     const todayDateStr = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = tomorrow.toISOString().split('T')[0];
     let currentPriorityDistribution = { "0": 0, "1": 0, "2": 0, "3": 0 };
 
     // --- Toast Function ---
@@ -179,12 +182,17 @@ function initializeTakeExamListPage() {
                         : `<div class="text-xs text-gray-400 mt-0.5">--</div>`;
 
                     // Desktop Table Row
+                    let rowClass = 'hover:bg-indigo-50/50';
+                    if (exam.last_revision_date === todayDateStr) rowClass = 'bg-indigo-50/70 hover:bg-indigo-100/70';
+                    else if (exam.last_revision_date === tomorrowDateStr) rowClass = 'bg-teal-50/70 hover:bg-teal-100/70';
+
                     const row = `
-                        <tr class="border-b border-gray-100 ${exam.last_revision_date === todayDateStr ? 'bg-indigo-50/70 hover:bg-indigo-100/70' : 'hover:bg-indigo-50/50'} transition-colors">
+                        <tr class="border-b border-gray-100 ${rowClass} transition-colors">
                             <td class="py-3 px-6 text-left font-semibold text-gray-800">
                                 <div class="flex items-center gap-2">
                                     ${exam.exam_title}
                                     ${exam.last_revision_date === todayDateStr ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[9px] font-black uppercase tracking-tighter">Revised</span>' : ''}
+                                    ${exam.last_revision_date === tomorrowDateStr ? '<span class="px-1.5 py-0.5 bg-teal-600 text-white rounded text-[9px] font-black uppercase tracking-tighter">Planned</span>' : ''}
                                 </div>
                             </td>
                             <td class="py-3 px-6 text-left text-gray-600">${exam.topic_name || 'N/A'}</td>
@@ -213,8 +221,11 @@ function initializeTakeExamListPage() {
                                      <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Study Materials">
                                         <span class="material-symbols-outlined text-sm">menu_book</span>
                                      </button>
-                                     <button class="tag-revision-btn ${exam.last_revision_date === todayDateStr ? 'bg-indigo-600 text-white border-indigo-600' : 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'} text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="${exam.last_revision_date === todayDateStr ? 'Already tagged for today' : 'Add to Today\'s Revision'}">
+                                     <button class="tag-revision-btn ${exam.last_revision_date === todayDateStr ? 'bg-indigo-600 text-white border-indigo-600' : 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'} text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-target="today" title="${exam.last_revision_date === todayDateStr ? 'Already tagged for today' : 'Add to Today\'s Revision'}">
                                          <span class="material-symbols-outlined text-sm">${exam.last_revision_date === todayDateStr ? 'event_available' : 'event_repeat'}</span>
+                                     </button>
+                                     <button class="tag-revision-btn ${exam.last_revision_date === tomorrowDateStr ? 'bg-teal-600 text-white border-teal-600' : 'border-2 border-teal-500 text-teal-600 hover:bg-teal-500 hover:text-white'} text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-target="tomorrow" title="${exam.last_revision_date === tomorrowDateStr ? 'Planned for tomorrow' : 'Plan for Tomorrow'}">
+                                         <span class="material-symbols-outlined text-sm">${exam.last_revision_date === tomorrowDateStr ? 'done_all' : 'next_plan'}</span>
                                      </button>
                                      <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}" title="Print">
                                          <span class="material-symbols-outlined text-sm">print</span>
@@ -228,13 +239,18 @@ function initializeTakeExamListPage() {
                     tableBody.innerHTML += row;
 
                     // Mobile Card
+                    let cardClass = 'bg-white border-gray-100';
+                    if (exam.last_revision_date === todayDateStr) cardClass = 'bg-indigo-50/50 border-indigo-200';
+                    else if (exam.last_revision_date === tomorrowDateStr) cardClass = 'bg-teal-50/50 border-teal-200';
+
                     const card = `
-                        <div class="${exam.last_revision_date === todayDateStr ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-gray-100'} p-4 rounded-2xl border shadow-sm space-y-3 relative overflow-hidden">
+                        <div class="${cardClass} p-4 rounded-2xl border shadow-sm space-y-3 relative overflow-hidden">
                             ${isTaken ? `<div class="absolute top-0 right-0 px-3 py-1 bg-green-500 text-white text-[9px] font-black uppercase tracking-tighter rounded-bl-xl shadow-sm">Taken (${exam.attempt_count})</div>` : ''}
                             <div>
                                 <h3 class="font-bold text-gray-900 leading-tight pr-12 flex items-center gap-2">
                                     ${exam.exam_title}
                                     ${exam.last_revision_date === todayDateStr ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[8px] font-black uppercase tracking-tighter">Revised</span>' : ''}
+                                    ${exam.last_revision_date === tomorrowDateStr ? '<span class="px-1.5 py-0.5 bg-teal-600 text-white rounded text-[8px] font-black uppercase tracking-tighter">Planned</span>' : ''}
                                 </h3>
                                 <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                     <span class="material-symbols-outlined text-xs">label</span>
@@ -257,7 +273,7 @@ function initializeTakeExamListPage() {
                                 </span>` : ''}
                             </div>
                             <div class="grid grid-cols-2 gap-2 pt-2">
-                                <button class="take-exam-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center" 
+                                <button class="take-exam-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1 col-span-2" 
                                     data-id="${exam.id}" 
                                     data-title="${exam.exam_title}" 
                                     data-duration="${exam.duration}" 
@@ -266,18 +282,25 @@ function initializeTakeExamListPage() {
                                     data-last-score="${exam.last_score || 0}"
                                     data-last-percentage="${exam.last_percentage || 0}"
                                     data-attempt-count="${exam.attempt_count || 0}"
-                                    data-total-marks="${exam.total_marks || 0}">Take</button>
-                                <button class="study-exam-btn w-full border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
+                                    data-total-marks="${exam.total_marks || 0}">
+                                    <span class="material-symbols-outlined text-sm">play_arrow</span> Take Exam
+                                </button>
+                                <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">menu_book</span> Study
                                 </button>
-                                <button class="tag-revision-btn w-full ${exam.last_revision_date === todayDateStr ? 'bg-indigo-600 text-white border-indigo-600' : 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'} text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
-                                    <span class="material-symbols-outlined text-sm">${exam.last_revision_date === todayDateStr ? 'event_available' : 'event_repeat'}</span> ${exam.last_revision_date === todayDateStr ? 'Tagged' : 'Tag Today'}
-                                </button>
-                                 <button class="print-exam-btn w-full border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}">
+                                <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}">
                                      <span class="material-symbols-outlined text-sm">print</span> Print
-                                 </button>
-                                <button class="delete-exam-btn w-full bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
-                                    <span class="material-symbols-outlined text-sm">delete</span> Del
+                                </button>
+                                <button class="tag-revision-btn ${exam.last_revision_date === todayDateStr ? 'bg-indigo-600 text-white border-indigo-600' : 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'} text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95" data-id="${exam.id}" data-target="today">
+                                    <span class="material-symbols-outlined text-sm">${exam.last_revision_date === todayDateStr ? 'event_available' : 'event_repeat'}</span>
+                                    <span>${exam.last_revision_date === todayDateStr ? 'Added' : 'Today'}</span>
+                                </button>
+                                <button class="tag-revision-btn ${exam.last_revision_date === tomorrowDateStr ? 'bg-teal-600 text-white border-teal-600' : 'border-2 border-teal-500 text-teal-600 hover:bg-teal-500 hover:text-white'} text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95" data-id="${exam.id}" data-target="tomorrow">
+                                    <span class="material-symbols-outlined text-sm">${exam.last_revision_date === tomorrowDateStr ? 'done_all' : 'next_plan'}</span>
+                                    <span>${exam.last_revision_date === tomorrowDateStr ? 'Planned' : 'Tomorrow'}</span>
+                                </button>
+                                <button class="delete-exam-btn col-span-2 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all mt-1" data-id="${exam.id}">
+                                    <span class="material-symbols-outlined text-sm">delete</span> Delete Exam
                                 </button>
                             </div>
                         </div>`;
@@ -797,7 +820,7 @@ function initializeTakeExamListPage() {
             const totalQuestions = target.dataset.questions;
             handlePrintExam(examId, totalQuestions);
         } else if (target.classList.contains('tag-revision-btn')) {
-            markAsRevisedToday(target.dataset.id, target);
+            markAsRevised(target.dataset.id, target, target.dataset.target || 'today');
         } else if (target.classList.contains('delete-exam-btn')) {
             examIdToDelete = target.dataset.id;
             deleteModal.classList.remove('hidden');
@@ -805,7 +828,7 @@ function initializeTakeExamListPage() {
         }
     }
 
-    async function markAsRevisedToday(examId, btn) {
+    async function markAsRevised(examId, btn, targetDateType) {
         const originalHTML = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span>';
@@ -814,7 +837,7 @@ function initializeTakeExamListPage() {
             const response = await fetch('api/exam/exam.php?action=mark_revised', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: examId })
+                body: JSON.stringify({ id: examId, target: targetDateType })
             });
             const result = await response.json();
 
@@ -823,26 +846,114 @@ function initializeTakeExamListPage() {
                 showToast(result.message, 'success');
                 
                 // Update ALL matching buttons (desktop + mobile) for this exam
-                document.querySelectorAll(`.tag-revision-btn[data-id="${examId}"]`).forEach(b => {
-                    if (isTagged) {
-                        b.className = b.className.replace('border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white', 'bg-indigo-600 text-white border-indigo-600');
-                        b.title = 'Already tagged for today';
-                        const icon = b.querySelector('.material-symbols-outlined');
-                        if (icon) icon.textContent = 'event_available';
-                        // Update mobile text if present
-                        const textNodes = Array.from(b.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
-                        textNodes.forEach(t => { if (t.textContent.trim() === 'Tag Today') t.textContent = ' Tagged'; });
-                    } else {
-                        b.className = b.className.replace('bg-indigo-600 text-white border-indigo-600', 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white');
-                        b.title = 'Add to Today\'s Revision';
-                        const icon = b.querySelector('.material-symbols-outlined');
-                        if (icon) icon.textContent = 'event_repeat';
-                        // Update mobile text if present
-                        const textNodes = Array.from(b.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
-                        textNodes.forEach(t => { if (t.textContent.trim() === 'Tagged') t.textContent = ' Tag Today'; });
+                document.querySelectorAll(`.tag-revision-btn[data-id="${examId}"][data-target="${targetDateType}"]`).forEach(b => {
+                    if (targetDateType === 'today') {
+                        if (isTagged) {
+                            b.className = b.className.replace(/border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white/, 'bg-indigo-600 text-white border-indigo-600');
+                            b.title = 'Already tagged for today';
+                            const icon = b.querySelector('.material-symbols-outlined');
+                            if (icon) icon.textContent = 'event_available';
+                            const span = b.querySelector('span:not(.material-symbols-outlined)');
+                            if (span) span.textContent = 'Added';
+                        } else {
+                            b.className = b.className.replace(/bg-indigo-600 text-white border-indigo-600/, 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white');
+                            b.title = 'Add to Today\'s Revision';
+                            const icon = b.querySelector('.material-symbols-outlined');
+                            if (icon) icon.textContent = 'event_repeat';
+                            const span = b.querySelector('span:not(.material-symbols-outlined)');
+                            if (span) span.textContent = 'Today';
+                        }
+                    } else if (targetDateType === 'tomorrow') {
+                        if (isTagged) {
+                            b.className = b.className.replace(/border-2 border-teal-500 text-teal-600 hover:bg-teal-500 hover:text-white/, 'bg-teal-600 text-white border-teal-600');
+                            b.title = 'Planned for tomorrow';
+                            const icon = b.querySelector('.material-symbols-outlined');
+                            if (icon) icon.textContent = 'done_all';
+                            const span = b.querySelector('span:not(.material-symbols-outlined)');
+                            if (span) span.textContent = 'Planned';
+                        } else {
+                            b.className = b.className.replace(/bg-teal-600 text-white border-teal-600/, 'border-2 border-teal-500 text-teal-600 hover:bg-teal-500 hover:text-white');
+                            b.title = 'Plan for Tomorrow';
+                            const icon = b.querySelector('.material-symbols-outlined');
+                            if (icon) icon.textContent = 'next_plan';
+                            const span = b.querySelector('span:not(.material-symbols-outlined)');
+                            if (span) span.textContent = 'Tomorrow';
+                        }
                     }
                     b.disabled = false;
                 });
+
+                // Correctly update parent row (desktop) and card (mobile) background
+                // Desktop row update
+                const tr = btn.closest('tr');
+                if (tr) {
+                    tr.classList.remove('bg-indigo-50/70', 'hover:bg-indigo-100/70', 'bg-teal-50/70', 'hover:bg-teal-100/70');
+                    if (isTagged) {
+                        if (targetDateType === 'today') {
+                            tr.classList.add('bg-indigo-50/70', 'hover:bg-indigo-100/70');
+                        } else {
+                            tr.classList.add('bg-teal-50/70', 'hover:bg-teal-100/70');
+                        }
+                    }
+                    
+                    // Update Row Badges (Revised/Planned)
+                    const titleDiv = tr.querySelector('td div.flex.items-center.gap-2');
+                    if (titleDiv) {
+                        // Remove existing badges
+                        titleDiv.querySelectorAll('span.bg-indigo-600, span.bg-teal-600').forEach(s => s.remove());
+                        if (isTagged) {
+                            const badge = document.createElement('span');
+                            badge.className = `px-1.5 py-0.5 ${targetDateType === 'today' ? 'bg-indigo-600' : 'bg-teal-600'} text-white rounded text-[9px] font-black uppercase tracking-tighter`;
+                            badge.textContent = targetDateType === 'today' ? 'Revised' : 'Planned';
+                            titleDiv.appendChild(badge);
+                        }
+                    }
+                }
+
+                // Mobile card update
+                const card = btn.closest('.rounded-2xl.border');
+                if (card) {
+                    card.classList.remove('bg-indigo-50/50', 'border-indigo-200', 'bg-teal-50/50', 'border-teal-200');
+                    if (isTagged) {
+                        if (targetDateType === 'today') {
+                            card.classList.add('bg-indigo-50/50', 'border-indigo-200');
+                        } else {
+                            card.classList.add('bg-teal-50/50', 'border-teal-200');
+                        }
+                    }
+
+                    // Update Card Badges
+                    const titleHead = card.querySelector('h3');
+                    if (titleHead) {
+                         titleHead.querySelectorAll('span.bg-indigo-600, span.bg-teal-600').forEach(s => s.remove());
+                         if (isTagged) {
+                            const badge = document.createElement('span');
+                            badge.className = `px-1.5 py-0.5 ${targetDateType === 'today' ? 'bg-indigo-600' : 'bg-teal-600'} text-white rounded text-[8px] font-black uppercase tracking-tighter`;
+                            badge.textContent = targetDateType === 'today' ? 'Revised' : 'Planned';
+                            titleHead.appendChild(badge);
+                         }
+                    }
+                }
+
+                // If just tagged one, un-tag the other? (Optional policy)
+                // Actually, the API doesn't un-tag the other unless we explicitly want it to.
+                // Standard behavior: only one date is allowed because we use a single column 'last_revision_date'. 
+                // So the other button SHOULD be reset to 'Tag Today/Tomorrow' automatically if we reload.
+                // To keep it simple, if tagging one succeeded, let's reset the other button visual if it was tagged.
+                const otherTarget = targetDateType === 'today' ? 'tomorrow' : 'today';
+                if (isTagged) {
+                    document.querySelectorAll(`.tag-revision-btn[data-id="${examId}"][data-target="${otherTarget}"]`).forEach(b => {
+                        if (otherTarget === 'today') {
+                             b.className = b.className.replace(/bg-indigo-600 text-white border-indigo-600/, 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white');
+                             const icon = b.querySelector('.material-symbols-outlined');
+                             if (icon) icon.textContent = 'event_repeat';
+                        } else {
+                             b.className = b.className.replace(/bg-teal-600 text-white border-teal-600/, 'border-2 border-teal-500 text-teal-600 hover:bg-teal-500 hover:text-white');
+                             const icon = b.querySelector('.material-symbols-outlined');
+                             if (icon) icon.textContent = 'next_plan';
+                        }
+                    });
+                }
             } else {
                 showToast(result.message || 'Failed to update revision status.');
                 btn.disabled = false;
