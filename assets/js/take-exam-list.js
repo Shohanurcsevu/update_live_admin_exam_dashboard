@@ -202,6 +202,7 @@ function initializeTakeExamListPage() {
                             <td class="py-3 px-6 text-left font-semibold text-gray-800">
                                 <div class="flex items-center gap-2">
                                     ${exam.exam_title}
+                                    ${parseInt(exam.revision_count) > 0 ? `<span class="ml-1.5 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-extrabold border border-purple-200" title="Revised ${exam.revision_count} times">${exam.revision_count}x</span>` : ''}
                                     ${exam.last_revision_date === todayDateStr ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[9px] font-black uppercase tracking-tighter">Revised</span>' : ''}
                                     ${exam.last_revision_date === tomorrowDateStr ? '<span class="px-1.5 py-0.5 bg-teal-600 text-white rounded text-[9px] font-black uppercase tracking-tighter">Planned</span>' : ''}
                                 </div>
@@ -260,6 +261,7 @@ function initializeTakeExamListPage() {
                             <div>
                                 <h3 class="font-bold text-gray-900 leading-tight pr-12 flex items-center gap-2">
                                     ${exam.exam_title}
+                                    ${parseInt(exam.revision_count) > 0 ? `<span class="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-extrabold border border-purple-200" title="Revised ${exam.revision_count} times">${exam.revision_count}x</span>` : ''}
                                     ${exam.last_revision_date === todayDateStr ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[8px] font-black uppercase tracking-tighter">Revised</span>' : ''}
                                     ${exam.last_revision_date === tomorrowDateStr ? '<span class="px-1.5 py-0.5 bg-teal-600 text-white rounded text-[8px] font-black uppercase tracking-tighter">Planned</span>' : ''}
                                 </h3>

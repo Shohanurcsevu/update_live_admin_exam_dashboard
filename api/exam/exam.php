@@ -18,6 +18,7 @@ switch ($action) {
     case 'mark_revised': mark_revised($conn); break;
     default: echo json_encode(['success' => false, 'message' => 'Invalid action for exams.']); break;
 }
+
 // Helper function to add to the activity log
 function log_activity($conn, $type, $message) {
     $stmt = $conn->prepare("INSERT INTO activity_log (activity_type, activity_message) VALUES (?, ?)");
@@ -140,7 +141,6 @@ function list_exams($conn) {
                    IFNULL(perf.total_attempts, 0) as total_attempts,
                    IFNULL(perf.pass_count, 0) as pass_count,
                    IFNULL(perf.pass_rate, 0) as pass_rate
-                   $match_select
             FROM exams e
             LEFT JOIN subjects s ON e.subject_id = s.id
             LEFT JOIN lessons l ON e.lesson_id = l.id
@@ -182,8 +182,8 @@ function list_exams($conn) {
                : 'e.id';
                
     $sort_direction = isset($_GET['sort_direction']) && strtoupper($_GET['sort_direction']) === 'ASC' 
-                      ? 'ASC' 
-                      : 'DESC';
+                       ? 'ASC' 
+                       : 'DESC';
 
     $sql .= " ORDER BY $sort_by $sort_direction";
     $sql .= " LIMIT ? OFFSET ?";
@@ -256,7 +256,6 @@ function list_exams($conn) {
 
 function get_exam($conn) {
     $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-    // MODIFIED: Use LEFT JOIN here as well to fetch details for custom exams
     $stmt = $conn->prepare("SELECT e.*, s.subject_name, l.lesson_name, t.topic_name 
                             FROM exams e
                             LEFT JOIN subjects s ON e.subject_id = s.id
@@ -303,20 +302,6 @@ function create_exam($conn) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
 }
-
-// function update_exam($conn) {
-//     $data = json_decode(file_get_contents('php://input'), true);
-//     $stmt = $conn->prepare("UPDATE exams SET subject_id = ?, lesson_id = ?, topic_id = ?, exam_title = ?, duration = ?, instructions = ?, total_marks = ?, pass_mark = ? WHERE id = ?");
-//     $stmt->bind_param("iiisissdi", $data['subject_id'], $data['lesson_id'], $data['topic_id'], $data['exam_title'], $data['duration'], $data['instructions'], $data['total_marks'], $data['pass_mark'], $data['id']);
-//     if ($stmt->execute()) {
-
-
-//         echo json_encode(['success' => true, 'message' => 'Exam updated successfully.']);
-//     } else {
-//         echo json_encode(['success' => false, 'message' => 'Failed to update exam.']);
-//     }
-//     $stmt->close();
-// }
 
 function update_exam($conn) {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -406,20 +391,6 @@ function update_exam($conn) {
     $stmt->close();
 }
 
-
-// function delete_exam($conn) {
-//     $data = json_decode(file_get_contents('php://input'), true);
-//     $id = intval($data['id']);
-//     $stmt = $conn->prepare("DELETE FROM exams WHERE id = ?");
-//     $stmt->bind_param("i", $id);
-//     if ($stmt->execute()) {
-//         echo json_encode(['success' => true, 'message' => 'Exam deleted successfully.']);
-//     } else {
-//         echo json_encode(['success' => false, 'message' => 'Failed to delete exam.']);
-//     }
-//     $stmt->close();
-// }
-
 function delete_exam($conn) {
     $data = json_decode(file_get_contents('php://input'), true);
 
@@ -470,7 +441,6 @@ function delete_exam($conn) {
 
     $stmt->close();
 }
-
 
 function bulk_update_exams($conn) {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -559,8 +529,14 @@ function mark_revised($conn) {
     
     $action = $is_untagging ? 'untagged' : 'tagged';
     
-    $stmt = $conn->prepare("UPDATE exams SET last_revision_date = ? WHERE id = ?");
-    $stmt->bind_param("si", $new_date, $id);
+    if ($is_untagging) {
+        $stmt = $conn->prepare("UPDATE exams SET last_revision_date = ? WHERE id = ?");
+        $stmt->bind_param("si", $new_date, $id);
+    } else {
+        // Tagging action: increment revision_count
+        $stmt = $conn->prepare("UPDATE exams SET last_revision_date = ?, revision_count = revision_count + 1 WHERE id = ?");
+        $stmt->bind_param("si", $new_date, $id);
+    }
     
     if ($stmt->execute()) {
         $log_target = ($target === 'tomorrow') ? "tomorrow's" : "today's";

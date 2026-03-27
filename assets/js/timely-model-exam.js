@@ -304,9 +304,9 @@
                        class="exam-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer" 
                        data-exam-id="${exam.id}"
                        ${isChecked ? 'checked' : ''}>
-                <div class="flex-1 cursor-pointer" onclick="this.previousElementSibling.click()">
                     <div class="font-semibold text-gray-800 flex items-center gap-2">
                         ${exam.exam_title}
+                        ${parseInt(exam.revision_count) > 0 ? `<span class="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-extrabold border border-purple-200" title="Revised ${exam.revision_count} times">${exam.revision_count}x</span>` : ''}
                         ${(exam.last_revision_date === todayDateStr && exam.created_at && !exam.created_at.startsWith(todayDateStr)) ? `
                             <div class="flex items-center bg-indigo-100 text-indigo-700 rounded border border-indigo-200 overflow-hidden">
                                 <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Already Added for Revision</span>

@@ -294,6 +294,7 @@
                 <div class="flex-1 cursor-pointer" onclick="this.previousElementSibling.click()">
                     <div class="flex items-center">
                         <span class="font-semibold" style="color: ${isComplete == 1 ? colors.text : '#1f2937'}">${exam.exam_title}</span>
+                        ${parseInt(exam.revision_count) > 0 ? `<span class="ml-2 px-1 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-extrabold border border-purple-200" title="Revised ${exam.revision_count} times">${exam.revision_count}x</span>` : ''}
                         ${completeBadge}
                         ${(exam.last_revision_date === todayDateStr) ? '<span class="ml-2 px-1 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-200">Revised</span>' : ''}
                         ${(exam.last_revision_date === tomorrowDateStr) ? '<span class="ml-2 px-1 py-0.5 bg-teal-100 text-teal-700 rounded text-[9px] font-black uppercase tracking-tighter border border-teal-200">Planned</span>' : ''}
