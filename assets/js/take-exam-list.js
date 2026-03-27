@@ -9,6 +9,11 @@ function initializeTakeExamListPage() {
     const currentCountEl = document.getElementById('current-count');
     const totalCountEl = document.getElementById('total-count');
     const cardView = document.getElementById('exams-card-view');
+    const bulkTagActions = document.getElementById('bulk-tag-actions');
+    const bulkTagTodayBtn = document.getElementById('bulk-tag-today-btn');
+    const bulkTagTomorrowBtn = document.getElementById('bulk-tag-tomorrow-btn');
+    
+    let currentExamIds = [];
 
     const cache = new Map();
     
@@ -178,7 +183,10 @@ function initializeTakeExamListPage() {
             if (!append) {
                 tableBody.innerHTML = '';
                 cardView.innerHTML = '';
+                currentExamIds = [];
             }
+            
+            const isFiltering = subjectFilter.value > 0 || lessonFilter.value > 0 || topicFilter.value > 0;
 
             if (result.success && result.data.length > 0) {
                 result.data.forEach(exam => {
@@ -249,6 +257,7 @@ function initializeTakeExamListPage() {
                             </td>
                         </tr>`;
                     tableBody.innerHTML += row;
+                    currentExamIds.push(exam.id); // Track visible IDs for bulk actions
 
                     // Mobile Card
                     let cardClass = 'bg-white border-gray-100';
@@ -347,6 +356,13 @@ function initializeTakeExamListPage() {
                 } else {
                     loadMoreBtn.classList.add('hidden');
                 }
+
+                // Show bulk tagging buttons only if filtering and we have results
+                if (isFiltering && currentExamIds.length > 0) {
+                    bulkTagActions.classList.remove('hidden');
+                } else {
+                    bulkTagActions.classList.add('hidden');
+                }
             } else if (!append) {
                 tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-12 text-gray-400 font-medium">No exams found for the selected filters.</td></tr>`;
                 cardView.innerHTML = `<div class="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl py-12 px-6 text-center text-gray-400 font-medium">No exams found for selection.</div>`;
@@ -399,6 +415,45 @@ function initializeTakeExamListPage() {
         currentPage++;
         fetchAndDisplayExams(true);
     });
+
+    if (bulkTagTodayBtn) {
+        bulkTagTodayBtn.addEventListener('click', () => bulkTagExams('today'));
+    }
+    if (bulkTagTomorrowBtn) {
+        bulkTagTomorrowBtn.addEventListener('click', () => bulkTagExams('tomorrow'));
+    }
+
+    async function bulkTagExams(target) {
+        if (!currentExamIds.length) return;
+        
+        const btn = target === 'today' ? bulkTagTodayBtn : bulkTagTomorrowBtn;
+        const originalHtml = btn.innerHTML;
+        const actionText = target === 'today' ? 'Today' : 'Tomorrow';
+        
+        btn.disabled = true;
+        btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-sm">sync</span> Processing...`;
+        
+        try {
+            const response = await fetch('api/exam/exam.php?action=bulk_mark_revised', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: currentExamIds, target: target })
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(`Successfully tagged ${result.affected} exams for ${actionText}.`, 'success');
+                fetchAndDisplayExams(false);
+            } else {
+                showToast(result.message || 'Bulk tagging failed.');
+            }
+        } catch (error) {
+            showToast('API communication error.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
 
     tableBody.addEventListener('click', (e) => handleListClick(e));
     cardView.addEventListener('click', (e) => handleListClick(e));

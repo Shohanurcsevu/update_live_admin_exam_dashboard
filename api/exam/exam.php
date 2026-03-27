@@ -16,6 +16,7 @@ switch ($action) {
     case 'delete': delete_exam($conn); break;
     case 'bulk_update': bulk_update_exams($conn); break;
     case 'mark_revised': mark_revised($conn); break;
+    case 'bulk_mark_revised': bulk_mark_revised($conn); break;
     default: echo json_encode(['success' => false, 'message' => 'Invalid action for exams.']); break;
 }
 
@@ -553,6 +554,54 @@ function mark_revised($conn) {
         echo json_encode(['success' => false, 'message' => 'Update failed: ' . $conn->error]);
     }
     $stmt->close();
+}
+
+function bulk_mark_revised($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    if (empty($data['ids']) || !is_array($data['ids'])) {
+        echo json_encode(['success' => false, 'message' => 'No exams selected for bulk revision.']);
+        return;
+    }
+
+    $ids = array_map('intval', $data['ids']);
+    $target = isset($data['target']) ? $data['target'] : 'today';
+    $target_date = ($target === 'tomorrow') ? date('Y-m-d', strtotime('+1 day')) : date('Y-m-d');
+    
+    $conn->begin_transaction();
+    try {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        // Increment revision_count only when we are ACTUALLY tagging for a new date (not just updating existing date)
+        $sql = "UPDATE exams 
+                SET last_revision_date = ?, 
+                    revision_count = revision_count + 1 
+                WHERE id IN ($placeholders) 
+                AND (last_revision_date IS NULL OR last_revision_date != ?)
+                AND is_deleted = 0";
+        
+        $stmt = $conn->prepare($sql);
+        
+        $types = "s" . str_repeat("i", count($ids)) . "s";
+        $params = array_merge([$target_date], $ids, [$target_date]);
+        
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to execute bulk revision tag.");
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+
+        $log_target = ($target === 'tomorrow') ? "tomorrow's" : "today's";
+        $message = "Bulk Revision: Tagged " . count($ids) . " exams (Newly tagged: $affected_rows) for $log_target revision.";
+        log_activity($conn, 'Bulk Exam Revised', $message);
+
+        $conn->commit();
+        echo json_encode(['success' => true, 'message' => "Successfully tagged $affected_rows exams for $log_target revision.", 'affected' => $affected_rows]);
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
 }
 
 $conn->close();

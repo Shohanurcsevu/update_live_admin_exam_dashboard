@@ -28,9 +28,16 @@
     <!-- Pagination Status (Top) -->
     <div
         class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-        <div id="pagination-status" class="text-sm font-medium text-indigo-900">
-            Showing <span id="current-count" class="font-bold">0</span> of <span id="total-count"
-                class="font-bold">0</span> exams
+        <div id="pagination-status" class="text-sm font-medium text-indigo-900 flex items-center justify-between w-full">
+            <span>Showing <span id="current-count" class="font-bold">0</span> of <span id="total-count" class="font-bold">0</span> exams</span>
+            <div id="bulk-tag-actions" class="hidden flex items-center gap-2">
+                <button id="bulk-tag-today-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-bold text-[11px] uppercase tracking-wider shadow-sm active:scale-95">
+                    <span class="material-symbols-outlined text-sm">event_repeat</span> Tag All for Today
+                </button>
+                <button id="bulk-tag-tomorrow-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-bold text-[11px] uppercase tracking-wider shadow-sm active:scale-95">
+                    <span class="material-symbols-outlined text-sm">next_plan</span> Tag All for Tomorrow
+                </button>
+            </div>
         </div>
     </div>
 
