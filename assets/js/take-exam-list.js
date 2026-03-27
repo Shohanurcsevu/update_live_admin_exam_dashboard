@@ -13,6 +13,7 @@ function initializeTakeExamListPage() {
     let currentPage = 1;
     const itemsPerPage = 20;
     let isFetching = false;
+    const todayDateStr = new Date().toISOString().split('T')[0];
     let currentPriorityDistribution = { "0": 0, "1": 0, "2": 0, "3": 0 };
 
     // --- Toast Function ---
@@ -207,6 +208,9 @@ function initializeTakeExamListPage() {
                                      <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Study Materials">
                                         <span class="material-symbols-outlined text-sm">menu_book</span>
                                      </button>
+                                     <button class="tag-revision-btn ${exam.last_revision_date === todayDateStr ? 'bg-indigo-600 text-white border-indigo-600' : 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'} text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="${exam.last_revision_date === todayDateStr ? 'Already tagged for today' : 'Add to Today\'s Revision'}">
+                                         <span class="material-symbols-outlined text-sm">${exam.last_revision_date === todayDateStr ? 'event_available' : 'event_repeat'}</span>
+                                     </button>
                                      <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}" title="Print">
                                          <span class="material-symbols-outlined text-sm">print</span>
                                      </button>
@@ -257,6 +261,9 @@ function initializeTakeExamListPage() {
                                     data-total-marks="${exam.total_marks || 0}">Take</button>
                                 <button class="study-exam-btn w-full border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">menu_book</span> Study
+                                </button>
+                                <button class="tag-revision-btn w-full ${exam.last_revision_date === todayDateStr ? 'bg-indigo-600 text-white border-indigo-600' : 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'} text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}">
+                                    <span class="material-symbols-outlined text-sm">${exam.last_revision_date === todayDateStr ? 'event_available' : 'event_repeat'}</span> ${exam.last_revision_date === todayDateStr ? 'Tagged' : 'Tag Today'}
                                 </button>
                                  <button class="print-exam-btn w-full border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-1 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}">
                                      <span class="material-symbols-outlined text-sm">print</span> Print
@@ -781,10 +788,50 @@ function initializeTakeExamListPage() {
             const examId = target.dataset.id;
             const totalQuestions = target.dataset.questions;
             handlePrintExam(examId, totalQuestions);
+        } else if (target.classList.contains('tag-revision-btn')) {
+            markAsRevisedToday(target.dataset.id, target);
         } else if (target.classList.contains('delete-exam-btn')) {
             examIdToDelete = target.dataset.id;
             deleteModal.classList.remove('hidden');
             deleteModal.classList.add('flex');
+        }
+    }
+
+    async function markAsRevisedToday(examId, btn) {
+        const originalHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span>';
+
+        try {
+            const response = await fetch('api/exam/exam.php?action=mark_revised', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: examId })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Exam added to today\'s revision!', 'success');
+                // Update ALL matching buttons (desktop + mobile) for this exam
+                document.querySelectorAll(`.tag-revision-btn[data-id="${examId}"]`).forEach(b => {
+                    b.className = b.className.replace(/border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white/, 'bg-indigo-600 text-white border-indigo-600');
+                    b.title = 'Already tagged for today';
+                    const icon = b.querySelector('.material-symbols-outlined');
+                    if (icon) icon.textContent = 'event_available';
+                    // Update mobile text if present
+                    const textNodes = Array.from(b.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
+                    textNodes.forEach(t => { if (t.textContent.trim() === 'Tag Today') t.textContent = ' Tagged'; });
+                    b.disabled = false;
+                });
+            } else {
+                showToast(result.message || 'Failed to tag exam.');
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        } catch (error) {
+            showToast('Network error while tagging exam.');
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
         }
     }
 

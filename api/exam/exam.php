@@ -15,6 +15,7 @@ switch ($action) {
     case 'update': update_exam($conn); break;
     case 'delete': delete_exam($conn); break;
     case 'bulk_update': bulk_update_exams($conn); break;
+    case 'mark_revised': mark_revised($conn); break;
     default: echo json_encode(['success' => false, 'message' => 'Invalid action for exams.']); break;
 }
 // Helper function to add to the activity log
@@ -50,17 +51,27 @@ function list_exams($conn) {
     }
     
     // Date filtering for Timely Model Exam Creator
-    // Note: Using updated_at since created_at column doesn't exist
     if (!empty($_GET['from']) && !empty($_GET['to'])) {
-        $where_clauses[] = "DATE(e.created_at) BETWEEN ? AND ?";
-        $params[] = $_GET['from'];
-        $params[] = $_GET['to'];
-        $types .= 'ss';
+        $include_tagged = (isset($_GET['include_tagged_revisions']) && $_GET['include_tagged_revisions'] === 'true') ? true : false;
+        
+        if ($include_tagged) {
+            $where_clauses[] = "(DATE(e.created_at) BETWEEN ? AND ? OR DATE(e.last_revision_date) BETWEEN ? AND ?)";
+            $params[] = $_GET['from'];
+            $params[] = $_GET['to'];
+            $params[] = $_GET['from'];
+            $params[] = $_GET['to'];
+            $types .= 'ssss';
+        } else {
+            $where_clauses[] = "DATE(e.created_at) BETWEEN ? AND ?";
+            $params[] = $_GET['from'];
+            $params[] = $_GET['to'];
+            $types .= 'ss';
+        }
     }
 
-
-    if (isset($_GET['include_revision']) && $_GET['include_revision'] === 'true') {
-        // Do nothing, show both
+    $is_timely_mode = (!empty($_GET['from']) && !empty($_GET['to']));
+    if ((isset($_GET['include_revision']) && $_GET['include_revision'] === 'true') || $is_timely_mode) {
+        // Show both revision and non-revision in Timely mode or if explicitly requested
     } else {
         $where_clauses[] = "e.is_revision = 0";
     }
@@ -506,6 +517,38 @@ function bulk_update_exams($conn) {
         $conn->rollback();
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
+}
+
+function mark_revised($conn) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'message' => 'POST method required.']);
+        return;
+    }
+    
+    $data = json_decode(file_get_contents('php://input'), true);
+    $id = isset($data['id']) ? intval($data['id']) : 0;
+    
+    if (!$id) {
+        echo json_encode(['success' => false, 'message' => 'Invalid exam ID.']);
+        return;
+    }
+
+    $today = date('Y-m-d');
+    $stmt = $conn->prepare("UPDATE exams SET last_revision_date = ? WHERE id = ?");
+    $stmt->bind_param("si", $today, $id);
+    
+    if ($stmt->execute()) {
+        if ($stmt->affected_rows > 0) {
+            log_activity($conn, 'Exam Revised', "Exam (ID: $id) marked for today's revision.");
+            echo json_encode(['success' => true, 'message' => 'Exam marked for today\'s revision.']);
+        } else {
+            // Already updated to today or no change needed, still count as success for UX
+            echo json_encode(['success' => true, 'message' => 'Exam is already marked for today.']);
+        }
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Update failed: ' . $conn->error]);
+    }
+    $stmt->close();
 }
 
 $conn->close();

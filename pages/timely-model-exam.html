@@ -174,9 +174,23 @@
 
     <!-- Step 1: Select Questions -->
     <div id="step-1-content" class="bg-white p-6 rounded-lg shadow-md">
-        <h3 class="text-xl font-bold text-gray-800 mb-4">Step 1: Select Questions from Exams</h3>
-        <p class="text-gray-600 mb-4">All exams created within the selected date range are displayed below. Select exams
-            (checkbox) and specify how many questions to randomly select from each.</p>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+            <div>
+                <h3 class="text-xl font-bold text-gray-800">Step 1: Select Questions from Exams</h3>
+                <p class="text-gray-600 mt-1">All exams created within the selected date range are displayed below. Select exams
+                    (checkbox) and specify how many questions to randomly select from each.</p>
+            </div>
+            <div class="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 shrink-0">
+                <label for="include-revisions-toggle" class="text-xs font-bold text-amber-800 cursor-pointer select-none flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-amber-600 text-base">event_repeat</span>
+                    Include Revisions
+                </label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="include-revisions-toggle" class="sr-only peer" checked>
+                    <div class="w-9 h-5 bg-gray-300 peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+            </div>
+        </div>
 
         <!-- Select Number of Questions -->
         <div class="mb-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200 space-y-3">

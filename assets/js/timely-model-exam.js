@@ -22,6 +22,7 @@
     const applyFilterBtn = document.getElementById('apply-date-filter');
     const resetDateFiltersBtn = document.getElementById('reset-date-filters');
     const presetButtons = document.querySelectorAll('.preset-btn');
+    const includeRevisionsToggle = document.getElementById('include-revisions-toggle');
 
     // Step containers
     const step1Content = document.getElementById('step-1-content');
@@ -65,6 +66,7 @@
     let selectedExams = {}; // { examId: { examTitle, maxQuestions, selectedCount } }
     let currentStep = 1;
     let currentDateFilter = { from: '', to: '' };
+    const todayDateStr = new Date().toISOString().split('T')[0];
 
     // Helper: Format date to YYYY-MM-DD
     function formatDate(date) {
@@ -158,13 +160,17 @@
             let url = `${API_EXAMS}&limit=100&exclude_custom=true&exclude_lesson_wise=true&exclude_topic_wise=true`;
             if (currentDateFilter.from && currentDateFilter.to) {
                 url += `&from=${currentDateFilter.from}&to=${currentDateFilter.to}`;
+                // Include tagged revisions if toggle is ON
+                if (includeRevisionsToggle && includeRevisionsToggle.checked) {
+                    url += '&include_tagged_revisions=true';
+                }
             }
 
             console.log('Fetching all exams from:', url);
             console.log('Date range:', currentDateFilter.from, 'to', currentDateFilter.to);
 
-            // Use fetchData helper to enable caching and reduce server hits
-            const exams = await fetchData(url);
+            // Use fetchData helper with skipCache set to true to ensure real-time revision updates
+            const exams = await fetchData(url, true);
 
             console.log('📊 Total exams received:', exams.length);
 
@@ -296,7 +302,10 @@
                        data-exam-id="${exam.id}"
                        ${isChecked ? 'checked' : ''}>
                 <div class="flex-1 cursor-pointer" onclick="this.previousElementSibling.click()">
-                    <div class="font-semibold text-gray-800">${exam.exam_title}</div>
+                    <div class="font-semibold text-gray-800">
+                        ${exam.exam_title}
+                        ${(exam.last_revision_date === todayDateStr && exam.created_at && !exam.created_at.startsWith(todayDateStr)) ? '<span class="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide border border-amber-200">Revised</span>' : ''}
+                    </div>
                     ${breadcrumb ? `<div class="text-xs text-gray-500 mt-1">${breadcrumb}</div>` : ''}
                     <div class="text-xs text-blue-600 mt-0.5 font-medium">Date: ${exam.updated_at ? exam.updated_at.split(' ')[0] : 'N/A'}</div>
                     <div class="text-sm text-gray-600">Available Questions: ${exam.total_questions}</div>
@@ -1004,6 +1013,13 @@
                 presetButtons[0].classList.add('bg-blue-600', 'hover:bg-blue-700');
             }
 
+            reloadExamsWithDateFilter();
+        });
+    }
+
+    // Include Revisions toggle listener
+    if (includeRevisionsToggle) {
+        includeRevisionsToggle.addEventListener('change', () => {
             reloadExamsWithDateFilter();
         });
     }
