@@ -302,9 +302,16 @@
                        data-exam-id="${exam.id}"
                        ${isChecked ? 'checked' : ''}>
                 <div class="flex-1 cursor-pointer" onclick="this.previousElementSibling.click()">
-                    <div class="font-semibold text-gray-800">
+                    <div class="font-semibold text-gray-800 flex items-center gap-2">
                         ${exam.exam_title}
-                        ${(exam.last_revision_date === todayDateStr && exam.created_at && !exam.created_at.startsWith(todayDateStr)) ? '<span class="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide border border-amber-200">Revised</span>' : ''}
+                        ${(exam.last_revision_date === todayDateStr && exam.created_at && !exam.created_at.startsWith(todayDateStr)) ? `
+                            <div class="flex items-center bg-indigo-100 text-indigo-700 rounded border border-indigo-200 overflow-hidden">
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Already Added for Revision</span>
+                                <button class="untag-revision-btn px-1.5 py-0.5 bg-indigo-200 hover:bg-indigo-300 text-indigo-800 border-l border-indigo-300 transition-colors" data-id="${exam.id}" title="Remove Tag">
+                                    <span class="material-symbols-outlined text-xs leading-none">close</span>
+                                </button>
+                            </div>
+                        ` : ''}
                     </div>
                     ${breadcrumb ? `<div class="text-xs text-gray-500 mt-1">${breadcrumb}</div>` : ''}
                     <div class="text-xs text-blue-600 mt-0.5 font-medium">Date: ${exam.updated_at ? exam.updated_at.split(' ')[0] : 'N/A'}</div>
@@ -1019,10 +1026,45 @@
 
     // Include Revisions toggle listener
     if (includeRevisionsToggle) {
+        // Restore from localStorage if exists
+        const savedToggle = localStorage.getItem('include_revisions_timely');
+        if (savedToggle !== null) {
+            includeRevisionsToggle.checked = savedToggle === 'true';
+        }
+
         includeRevisionsToggle.addEventListener('change', () => {
+            console.log('🔄 Include Revisions toggle changed:', includeRevisionsToggle.checked);
+            localStorage.setItem('include_revisions_timely', includeRevisionsToggle.checked);
             reloadExamsWithDateFilter();
         });
     }
+
+    // Global event listener for untagging revision from this page
+    document.addEventListener('click', async (e) => {
+        const untagBtn = e.target.closest('.untag-revision-btn');
+        if (untagBtn) {
+            e.preventDefault();
+            const id = untagBtn.dataset.id;
+            
+            try {
+                const response = await fetch(`api/exam/exam.php?action=mark_revised&id=${id}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(result.message);
+                    // Reload exams immediately to update the list
+                    reloadExamsWithDateFilter();
+                } else {
+                    showToast(result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error untagging revision:', error);
+                showToast('Failed to remove tag.', 'error');
+            }
+        }
+    });
 
     // Step navigation event listeners
     nextToStep2Btn.addEventListener('click', () => showStep(2));

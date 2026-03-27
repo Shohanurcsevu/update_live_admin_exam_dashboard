@@ -180,8 +180,13 @@ function initializeTakeExamListPage() {
 
                     // Desktop Table Row
                     const row = `
-                        <tr class="border-b border-gray-100 hover:bg-indigo-50/50 transition-colors">
-                            <td class="py-3 px-6 text-left font-semibold text-gray-800">${exam.exam_title}</td>
+                        <tr class="border-b border-gray-100 ${exam.last_revision_date === todayDateStr ? 'bg-indigo-50/70 hover:bg-indigo-100/70' : 'hover:bg-indigo-50/50'} transition-colors">
+                            <td class="py-3 px-6 text-left font-semibold text-gray-800">
+                                <div class="flex items-center gap-2">
+                                    ${exam.exam_title}
+                                    ${exam.last_revision_date === todayDateStr ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[9px] font-black uppercase tracking-tighter">Revised</span>' : ''}
+                                </div>
+                            </td>
                             <td class="py-3 px-6 text-left text-gray-600">${exam.topic_name || 'N/A'}</td>
                             <td class="py-3 px-6 text-center">
                                 <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">${exam.duration} min</span>
@@ -224,10 +229,13 @@ function initializeTakeExamListPage() {
 
                     // Mobile Card
                     const card = `
-                        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3 relative overflow-hidden">
+                        <div class="${exam.last_revision_date === todayDateStr ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-gray-100'} p-4 rounded-2xl border shadow-sm space-y-3 relative overflow-hidden">
                             ${isTaken ? `<div class="absolute top-0 right-0 px-3 py-1 bg-green-500 text-white text-[9px] font-black uppercase tracking-tighter rounded-bl-xl shadow-sm">Taken (${exam.attempt_count})</div>` : ''}
                             <div>
-                                <h3 class="font-bold text-gray-900 leading-tight pr-12">${exam.exam_title}</h3>
+                                <h3 class="font-bold text-gray-900 leading-tight pr-12 flex items-center gap-2">
+                                    ${exam.exam_title}
+                                    ${exam.last_revision_date === todayDateStr ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[8px] font-black uppercase tracking-tighter">Revised</span>' : ''}
+                                </h3>
                                 <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                     <span class="material-symbols-outlined text-xs">label</span>
                                     ${exam.topic_name || 'N/A'}
@@ -811,25 +819,37 @@ function initializeTakeExamListPage() {
             const result = await response.json();
 
             if (result.success) {
-                showToast('Exam added to today\'s revision!', 'success');
+                const isTagged = (result.action === 'tagged');
+                showToast(result.message, 'success');
+                
                 // Update ALL matching buttons (desktop + mobile) for this exam
                 document.querySelectorAll(`.tag-revision-btn[data-id="${examId}"]`).forEach(b => {
-                    b.className = b.className.replace(/border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white/, 'bg-indigo-600 text-white border-indigo-600');
-                    b.title = 'Already tagged for today';
-                    const icon = b.querySelector('.material-symbols-outlined');
-                    if (icon) icon.textContent = 'event_available';
-                    // Update mobile text if present
-                    const textNodes = Array.from(b.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
-                    textNodes.forEach(t => { if (t.textContent.trim() === 'Tag Today') t.textContent = ' Tagged'; });
+                    if (isTagged) {
+                        b.className = b.className.replace('border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white', 'bg-indigo-600 text-white border-indigo-600');
+                        b.title = 'Already tagged for today';
+                        const icon = b.querySelector('.material-symbols-outlined');
+                        if (icon) icon.textContent = 'event_available';
+                        // Update mobile text if present
+                        const textNodes = Array.from(b.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
+                        textNodes.forEach(t => { if (t.textContent.trim() === 'Tag Today') t.textContent = ' Tagged'; });
+                    } else {
+                        b.className = b.className.replace('bg-indigo-600 text-white border-indigo-600', 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white');
+                        b.title = 'Add to Today\'s Revision';
+                        const icon = b.querySelector('.material-symbols-outlined');
+                        if (icon) icon.textContent = 'event_repeat';
+                        // Update mobile text if present
+                        const textNodes = Array.from(b.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
+                        textNodes.forEach(t => { if (t.textContent.trim() === 'Tagged') t.textContent = ' Tag Today'; });
+                    }
                     b.disabled = false;
                 });
             } else {
-                showToast(result.message || 'Failed to tag exam.');
+                showToast(result.message || 'Failed to update revision status.');
                 btn.disabled = false;
                 btn.innerHTML = originalHTML;
             }
         } catch (error) {
-            showToast('Network error while tagging exam.');
+            showToast('Network error while updating revision status.');
             btn.disabled = false;
             btn.innerHTML = originalHTML;
         }

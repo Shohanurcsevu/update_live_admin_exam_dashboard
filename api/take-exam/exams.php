@@ -14,7 +14,8 @@ $sql = "SELECT
             (SELECT COUNT(*) FROM questions WHERE exam_id = e.id AND is_deleted = 0) as total_questions,
             p.last_score,
             (p.last_score / NULLIF(e.total_marks, 0)) * 100 as last_percentage,
-            p.total_attempts as attempt_count
+            p.total_attempts as attempt_count,
+            e.last_revision_date
         FROM exams e
         LEFT JOIN subjects s ON e.subject_id = s.id
         LEFT JOIN lessons l ON e.lesson_id = l.id

@@ -534,17 +534,30 @@ function mark_revised($conn) {
     }
 
     $today = date('Y-m-d');
+    
+    // Check current state
+    $stmt = $conn->prepare("SELECT last_revision_date FROM exams WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    $is_already_tagged = ($row && $row['last_revision_date'] === $today);
+    $new_date = $is_already_tagged ? null : $today;
+    $action = $is_already_tagged ? 'untagged' : 'tagged';
+    
     $stmt = $conn->prepare("UPDATE exams SET last_revision_date = ? WHERE id = ?");
-    $stmt->bind_param("si", $today, $id);
+    $stmt->bind_param("si", $new_date, $id);
     
     if ($stmt->execute()) {
-        if ($stmt->affected_rows > 0) {
-            log_activity($conn, 'Exam Revised', "Exam (ID: $id) marked for today's revision.");
-            echo json_encode(['success' => true, 'message' => 'Exam marked for today\'s revision.']);
-        } else {
-            // Already updated to today or no change needed, still count as success for UX
-            echo json_encode(['success' => true, 'message' => 'Exam is already marked for today.']);
-        }
+        $log_msg = $is_already_tagged ? "Exam (ID: $id) un-tagged from today's revision." : "Exam (ID: $id) marked for today's revision.";
+        log_activity($conn, 'Exam Revised', $log_msg);
+        echo json_encode([
+            'success' => true, 
+            'message' => $is_already_tagged ? 'Revision tag removed.' : 'Exam marked for today\'s revision.',
+            'action' => $action
+        ]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Update failed: ' . $conn->error]);
     }

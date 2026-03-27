@@ -59,6 +59,7 @@
     let selectedExams = {}; // { examId: { examTitle, maxQuestions, selectedCount } }
     let currentStep = 1;
     const cache = new Map();
+    const todayDateStr = new Date().toISOString().split('T')[0];
 
     // Helper: Show toast
     function showToast(message, type = 'success') {
@@ -291,6 +292,7 @@
                     <div class="flex items-center">
                         <span class="font-semibold" style="color: ${isComplete == 1 ? colors.text : '#1f2937'}">${exam.exam_title}</span>
                         ${completeBadge}
+                        ${(exam.last_revision_date === todayDateStr) ? '<span class="ml-2 px-1 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-200">Revised</span>' : ''}
                     </div>
                     <div class="text-sm text-gray-600">Available Questions: ${exam.total_questions}</div>
                 </div>
