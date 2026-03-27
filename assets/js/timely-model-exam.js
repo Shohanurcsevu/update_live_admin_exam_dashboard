@@ -60,8 +60,10 @@
     const prioritizeWeakAreas = document.getElementById('prioritize-weak-areas');
     const smartPreviewContainer = document.getElementById('smart-preview-container');
     const smartPreviewList = document.getElementById('smart-preview-list');
+    const suggestRevisionsBtn = document.getElementById('suggest-revisions-btn');
 
     // State
+    let suggestedExamMetadata = {}; // { id: { isStale, isLowScore, isWeakArea } }
     let hierarchyData = {};
     let selectedExams = {}; // { examId: { examTitle, maxQuestions, selectedCount } }
     let currentStep = 1;
@@ -208,6 +210,19 @@
                 if (selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked) {
                     updateSelectionSummary();
                 }
+
+                // If we have suggestions, ensure they are selected
+                Object.keys(suggestedExamMetadata).forEach(id => {
+                    const exam = exams.find(e => e.id == id);
+                    if (exam && !selectedExams[id]) {
+                        selectedExams[id] = {
+                            examTitle: exam.exam_title,
+                            maxQuestions: exam.total_questions,
+                            selectedCount: exam.total_questions // Default to all questions for suggestions
+                        };
+                    }
+                });
+                updateSelectionSummary();
             }
 
             // Update smart slider bounds after exams are rendered
@@ -306,6 +321,13 @@
                        ${isChecked ? 'checked' : ''}>
                     <div class="font-semibold text-gray-800 flex items-center gap-2">
                         ${exam.exam_title}
+                        ${suggestedExamMetadata[exam.id] ? `
+                            <div class="flex flex-wrap gap-1">
+                                ${suggestedExamMetadata[exam.id].isStale ? '<span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px] font-bold uppercase tracking-wide border border-orange-200">Stale (>30d)</span>' : ''}
+                                ${suggestedExamMetadata[exam.id].isLowScore ? '<span class="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-bold uppercase tracking-wide border border-red-200">Low Score (&lt;70%)</span>' : ''}
+                                ${suggestedExamMetadata[exam.id].isWeakArea ? '<span class="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide border border-amber-200">Weak Area</span>' : ''}
+                            </div>
+                        ` : ''}
                         ${parseInt(exam.revision_count) > 0 ? `<span class="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-extrabold border border-purple-200" title="Revised ${exam.revision_count} times">${exam.revision_count}x</span>` : ''}
                         ${(exam.last_revision_date === todayDateStr && exam.created_at && !exam.created_at.startsWith(todayDateStr)) ? `
                             <div class="flex items-center bg-indigo-100 text-indigo-700 rounded border border-indigo-200 overflow-hidden">
@@ -1091,6 +1113,63 @@
     });
     backToStep2Btn.addEventListener('click', () => showStep(2));
     generateExamBtn.addEventListener('click', generateExam);
+
+    if (suggestRevisionsBtn) {
+        suggestRevisionsBtn.addEventListener('click', handleSuggestRevisions);
+    }
+
+    async function handleSuggestRevisions() {
+        try {
+            suggestRevisionsBtn.disabled = true;
+            suggestRevisionsBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span> Suggesting...';
+
+            const response = await fetch('api/exam/exam.php?action=get_suggestions');
+            const suggestions = await response.json();
+
+            if (suggestions.length === 0) {
+                showToast('No revision suggestions found at this time.', 'info');
+                return;
+            }
+
+            // Update suggested metadata state
+            suggestedExamMetadata = {};
+            let earliestDate = new Date();
+            
+            suggestions.forEach(s => {
+                suggestedExamMetadata[s.id] = {
+                    isStale: s.reason.includes('stale'),
+                    isLowScore: s.reason.includes('low_score'),
+                    isWeakArea: s.reason.includes('weak_area')
+                };
+
+                // Track the earliest date to expand filter if needed
+                if (s.updated_at) {
+                    const uDate = new Date(s.updated_at.split(' ')[0]);
+                    if (uDate < earliestDate) earliestDate = uDate;
+                }
+            });
+
+            // If the earliest date is before our current range, expand it
+            const fromDate = new Date(currentDateFilter.from);
+            if (earliestDate < fromDate) {
+                const newFrom = earliestDate.toISOString().split('T')[0];
+                fromDateInput.value = newFrom;
+                currentDateFilter.from = newFrom;
+                showToast('Expanded date range to include revision suggestions.', 'info');
+            }
+
+            // Reload exams (this will trigger buildHierarchy -> loadAllExams)
+            await reloadExamsWithDateFilter();
+
+            showToast(`Found and selected ${suggestions.length} revision suggestions.`, 'success');
+        } catch (error) {
+            console.error('Error getting suggestions:', error);
+            showToast('Failed to get revision suggestions.', 'error');
+        } finally {
+            suggestRevisionsBtn.disabled = false;
+            suggestRevisionsBtn.innerHTML = '<span class="material-symbols-outlined text-sm">auto_awesome</span> Suggest Revisions';
+        }
+    }
 
     // Initialize - Restore from localStorage or set default to "Today"
     const savedFromDate = localStorage.getItem('filter_timely_from');

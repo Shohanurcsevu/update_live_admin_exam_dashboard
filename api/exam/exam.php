@@ -17,6 +17,7 @@ switch ($action) {
     case 'bulk_update': bulk_update_exams($conn); break;
     case 'mark_revised': mark_revised($conn); break;
     case 'bulk_mark_revised': bulk_mark_revised($conn); break;
+    case 'get_suggestions': get_suggestions($conn); break;
     default: echo json_encode(['success' => false, 'message' => 'Invalid action for exams.']); break;
 }
 
@@ -602,6 +603,64 @@ function bulk_mark_revised($conn) {
         $conn->rollback();
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
+}
+
+function get_suggestions($conn) {
+    $exams = []; // [id => ['id' => X, 'reasons' => [], 'updated_at' => Y]]
+
+    // 1. Stale Content: > 30 days since last revision (or created)
+    $stale_sql = "SELECT id, updated_at FROM exams 
+                  WHERE is_deleted = 0 
+                  AND is_revision = 0
+                  AND (last_revision_date < DATE_SUB(CURDATE(), INTERVAL 30 DAY) 
+                       OR (last_revision_date IS NULL AND created_at < DATE_SUB(CURDATE(), INTERVAL 30 DAY)))";
+    $stale_res = $conn->query($stale_sql);
+    while($row = $stale_res->fetch_assoc()) {
+        $id = intval($row['id']);
+        if (!isset($exams[$id])) {
+            $exams[$id] = ['id' => $id, 'reason' => [], 'updated_at' => $row['updated_at']];
+        }
+        $exams[$id]['reason'][] = 'stale';
+    }
+
+    // 2. Low Performance: Last score < 70%
+    $low_score_sql = "SELECT e.id, e.updated_at
+                      FROM exams e
+                      JOIN (
+                          SELECT p.exam_id, p.score_with_negative, ex.total_marks,
+                          (p.score_with_negative / NULLIF(ex.total_marks, 0)) * 100 as percentage
+                          FROM performance p
+                          JOIN exams ex ON p.exam_id = ex.id
+                          WHERE (p.exam_id, p.attempt_number) IN (
+                              SELECT exam_id, MAX(attempt_number) FROM performance GROUP BY exam_id
+                          )
+                      ) last_perf ON e.id = last_perf.exam_id
+                      WHERE e.is_deleted = 0 AND last_perf.percentage < 70";
+    $low_res = $conn->query($low_score_sql);
+    while($row = $low_res->fetch_assoc()) {
+        $id = intval($row['id']);
+        if (!isset($exams[$id])) {
+            $exams[$id] = ['id' => $id, 'reason' => [], 'updated_at' => $row['updated_at']];
+        }
+        $exams[$id]['reason'][] = 'low_score';
+    }
+
+    // 3. Weak Areas: Exams with at least one failed question attempt ever
+    $weak_sql = "SELECT DISTINCT e.id, e.updated_at
+                 FROM exams e
+                 JOIN questions q ON e.id = q.exam_id
+                 JOIN question_attempts qa ON q.id = qa.question_id
+                 WHERE e.is_deleted = 0 AND qa.is_correct = 0";
+    $weak_res = $conn->query($weak_sql);
+    while($row = $weak_res->fetch_assoc()) {
+        $id = intval($row['id']);
+        if (!isset($exams[$id])) {
+            $exams[$id] = ['id' => $id, 'reason' => [], 'updated_at' => $row['updated_at']];
+        }
+        $exams[$id]['reason'][] = 'weak_area';
+    }
+
+    echo json_encode(array_values($exams));
 }
 
 $conn->close();
