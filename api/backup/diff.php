@@ -27,6 +27,7 @@ if ($lastBackup) {
     $sql = "SELECT activity_type, activity_message, timestamp 
             FROM activity_log 
             WHERE timestamp > ? 
+            AND timestamp <= NOW()
             AND activity_type NOT IN ($ignoredSql)
             ORDER BY timestamp DESC";
             
