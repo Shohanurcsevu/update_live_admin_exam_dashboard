@@ -82,10 +82,28 @@
 })();
 
 window.triggerQuickBackup = async function () {
-    if (!window.autoBackupManager) return;
-    window.showToast('Starting backup...', 'info');
+    if (!window.autoBackupManager) {
+        if (typeof window.showToast === 'function') {
+            window.showToast('Auto-backup not configured. Go to Backup & Restore to set up.', 'warning');
+        }
+        return;
+    }
+    if (typeof window.showToast === 'function') {
+        window.showToast('Starting backup...', 'info');
+    }
     const res = await window.autoBackupManager.runBackupNow();
     if (res.success) {
+        // Ensure server-side timestamp is updated before refreshing the diff list
+        try { await fetch('api/backup/last-change.php', { method: 'POST' }); } catch (_) {}
+        if (typeof window.showToast === 'function') {
+            window.showToast('Backup complete! All changes synced.', 'success');
+        }
+        // Small delay to let server persist timestamp before diff.php re-queries
+        await new Promise(r => setTimeout(r, 300));
         window.loadPage('review-changes'); // Refresh list
+    } else {
+        if (typeof window.showToast === 'function') {
+            window.showToast('Backup failed: ' + (res.message || 'Unknown error'), 'error');
+        }
     }
 };

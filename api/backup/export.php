@@ -64,6 +64,15 @@ $tables = [
     'user_streaks',
     'job_countdown',
     'trivia_snapshots',
+    'app_settings',
+    'bpm_logs',
+    'active_exam_sessions',
+    'ai_instruction_presets',
+    'ai_prompt_presets',
+    'exam_presets',
+    'exam_setup_presets',
+    'ai_usage_log',
+    'todays_exams_list',
 ];
 
 foreach ($tables as $table) {

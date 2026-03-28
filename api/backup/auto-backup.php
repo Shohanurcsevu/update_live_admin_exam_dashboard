@@ -48,6 +48,7 @@ $tables = [
     'job_countdown', 'trivia_snapshots', 'bpm_logs',
     'active_exam_sessions', 'ai_instruction_presets', 'ai_prompt_presets', 'app_settings',
     'exam_presets', 'exam_setup_presets',
+    'ai_usage_log', 'todays_exams_list',
 ];
 
 $backup = [

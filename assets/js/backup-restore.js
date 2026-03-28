@@ -77,6 +77,8 @@
         { name: 'ai_prompt_presets', icon: 'settings_suggest', label: 'Prompt Presets' },
         { name: 'exam_presets', icon: 'settings_backup_restore', label: 'Exam Presets' },
         { name: 'exam_setup_presets', icon: 'tune', label: 'Setup Presets' },
+        { name: 'ai_usage_log', icon: 'receipt_long', label: 'AI Usage Log' },
+        { name: 'todays_exams_list', icon: 'list_alt', label: 'Today\'s Exams' },
     ];
 
     // ─── Init ─────────────────────────────────────────────────────────────────────

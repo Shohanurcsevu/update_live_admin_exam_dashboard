@@ -180,7 +180,14 @@ $table_order = [
     'job_countdown',
     'trivia_snapshots',
     'app_settings',
+    'bpm_logs',
+    'active_exam_sessions',
+    'ai_instruction_presets',
     'ai_prompt_presets',
+    'exam_presets',
+    'exam_setup_presets',
+    'ai_usage_log',
+    'todays_exams_list',
 ];
 
 // ─── Schema Bootstrap (v1.1+): Create Tables If They Don't Exist ─────────────
