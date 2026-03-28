@@ -6,7 +6,7 @@
 const SmartHeader = {
     timer: null,
     weatherCacheKey: 'smart_header_weather_cache',
-    weatherCacheDuration: 30 * 60 * 1000, // 30 minutes
+    weatherCacheDuration: 1 * 60 * 1000, // 1 minute
     defaultCity: 'Rajshahi',
     defaultCoords: { lat: 24.3745, lon: 88.6042 },
 
@@ -35,9 +35,10 @@ const SmartHeader = {
                 this.updateBackupStatus();
 
                 const now = new Date();
-                // Fetch revision count every minute
+                // Fetch revision count and weather every minute
                 if (now.getSeconds() === 0) {
                     this.fetchRevisionCount();
+                    this.fetchWeather();
                 }
 
                 // Check for midnight to update date and goal
