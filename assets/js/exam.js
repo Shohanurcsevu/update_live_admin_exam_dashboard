@@ -2044,33 +2044,90 @@ function initializeExamPage() {
                     }
                 }));
 
-                aiProgressText.textContent = 'Sending to Gemini AI...';
-                aiProgressBar.style.width = '30%';
-                aiProgressPercent.textContent = '30%';
+                let response;
+                if (aiModelSelect.value === 'tesseract-local') {
+                    // --- HYBRID FLOW: Tesseract OCR + Gemini Structuring ---
+                    aiProgressText.textContent = 'Performing Local OCR (Tesseract)...';
+                    aiProgressBar.style.width = '20%';
+                    aiProgressPercent.textContent = '20%';
 
-                const payload = {
-                    model: aiModelSelect.value,
-                    contents: [
-                        {
-                            role: "user",
-                            parts: [
-                                { text: activePromptText || 'Extract all questions from this image as JSON.' },
-                                ...imageParts
-                            ]
+                    let combinedOcrText = '';
+                    for (let i = 0; i < aiUploadedFiles.length; i++) {
+                        const file = aiUploadedFiles[i];
+                        aiProgressText.textContent = `OCR Processing image ${i + 1}/${aiUploadedFiles.length}...`;
+                        
+                        const ocrRes = await fetch('api/ai/ocr-tesseract.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image: file.base64, lang: 'eng+ben' })
+                        });
+
+                        const ocrData = await ocrRes.json();
+                        if (!ocrData.success) {
+                            throw new Error(`Tesseract failed on image ${i + 1}: ${ocrData.message}`);
                         }
-                    ],
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 65536,
-                        responseMimeType: "application/json"
+                        combinedOcrText += `\n--- PAGE ${i + 1} START ---\n${ocrData.text}\n--- PAGE ${i + 1} END ---\n`;
+                        
+                        const progress = 20 + ((i + 1) / aiUploadedFiles.length) * 30;
+                        aiProgressBar.style.width = `${progress}%`;
+                        aiProgressPercent.textContent = `${Math.round(progress)}%`;
                     }
-                };
 
-                const response = await fetch(AIService.API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                    aiProgressText.textContent = 'Structuring text with Gemini...';
+                    
+                    const payload = {
+                        model: 'gemini-1.5-flash', // Hardcode to flash for faster structuring
+                        contents: [
+                            {
+                                role: "user",
+                                parts: [
+                                    { text: (activePromptText || 'Extract all questions as JSON.') + "\n\nHere is the raw OCR text harvested from the images:\n" + combinedOcrText }
+                                ]
+                            }
+                        ],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 65536,
+                            responseMimeType: "application/json"
+                        }
+                    };
+
+                    response = await fetch(AIService.API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                } else {
+                    // --- DIRECT FLOW: Gemini Vision ---
+                    aiProgressText.textContent = 'Sending to Gemini AI...';
+                    aiProgressBar.style.width = '30%';
+                    aiProgressPercent.textContent = '30%';
+
+                    const payload = {
+                        model: aiModelSelect.value,
+                        contents: [
+                            {
+                                role: "user",
+                                parts: [
+                                    { text: activePromptText || 'Extract all questions from this image as JSON.' },
+                                    ...imageParts
+                                ]
+                            }
+                        ],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 65536,
+                            responseMimeType: "application/json"
+                        }
+                    };
+
+                    response = await fetch(AIService.API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
 
                 aiProgressText.textContent = 'Processing AI response...';
                 aiProgressBar.style.width = '70%';
