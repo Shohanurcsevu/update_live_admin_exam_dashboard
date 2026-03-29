@@ -64,6 +64,7 @@ const StudyTargetTracker = {
         11: "Zen Master",
         12: "Legacy Session"
     },
+    MILESTONE_PALETTE: ["#f94144","#f3722c","#f8961e","#f9844a","#f9c74f","#90be6d","#43aa8b","#4d908e","#577590","#277da1","#3f37c9","#f72585"],
 
     // Helper: Convert HEX to RGBA
     hexToRgba(hex, alpha = 1) {
@@ -480,6 +481,40 @@ const StudyTargetTracker = {
             const wasStudyingYesterday = this.yesterdaySessions.some(s => clientHour >= s.start_hour && clientHour <= s.end_hour);
             ghostMarker.style.borderLeft = wasStudyingYesterday ? '2px solid rgba(255,255,255,0.8)' : '1px dashed rgba(255,255,255,0.3)';
             ghostMarker.style.opacity = wasStudyingYesterday ? '0.6' : '0.2';
+
+            // --- 4. Next Milestone Ghost Projection (Predictive) ---
+            const nextM = Math.floor(this.studiedSeconds / 3600) + 1;
+            const remS = (nextM * 3600) - this.studiedSeconds;
+            const projH = clientHour + (remS / 3600);
+            const projPct = this.getRelativeTimelinePercent(projH);
+
+            let nextGhost = document.getElementById('timeline-next-ghost-milestone');
+            if (nextM <= 12 && projH <= 29) {
+                if (!nextGhost) {
+                    nextGhost = document.createElement('div');
+                    nextGhost.id = 'timeline-next-ghost-milestone';
+                    nextGhost.className = 'absolute top-0 w-px h-10 z-10 pointer-events-none';
+                    nowMarker.parentElement.appendChild(nextGhost);
+                }
+                const ghostColor = this.MILESTONE_PALETTE[(nextM - 1) % this.MILESTONE_PALETTE.length];
+                const icons = ['🥉', '🥈', '🥇', '🏅', '🎖️', '🏆', '🏵️', '💎', '👑', '🌟', '✨', '🔱'];
+                const icon = icons[(nextM - 1) % 12];
+                const inMins = Math.round(remS / 60);
+
+                nextGhost.style.left = `${projPct}%`;
+                nextGhost.style.borderLeft = `2px dashed ${ghostColor}`;
+                nextGhost.style.opacity = '0.45';
+                
+                nextGhost.innerHTML = `
+                    <div class="absolute whitespace-nowrap text-[8px] font-black italic left-[6px] top-1/2 -translate-y-1/2 bg-white/20 px-1.5 py-0.5 rounded-sm backdrop-blur-[2px]" 
+                         style="color: ${ghostColor}; border-left: 1px solid ${ghostColor}4D; pointer-events: none;">
+                        ${icon} NEXT: ${nextM}h · in ${inMins}m
+                    </div>
+                `;
+                nextGhost.classList.remove('hidden');
+            } else if (nextGhost) {
+                nextGhost.classList.add('hidden');
+            }
 
             // --- Milestone Glow Engine (Proximity & Reached) ---
             document.querySelectorAll('.timeline-milestone').forEach(ms => {
@@ -2337,23 +2372,24 @@ const StudyTargetTracker = {
             const title = this.MILESTONE_TITLES[ms.m] || `${ms.m}h Milestone`;
 
             const evolution = {
-                1: { icon: '🌱', hue: 100 },
-                2: { icon: '🌿', hue: 120 },
-                3: { icon: '🚩', hue: 210 },
-                4: { icon: '🕯️', hue: 45 },
-                5: { icon: '✨', hue: 180 },
-                6: { icon: '🔥', hue: 25 },
-                7: { icon: '🧨', hue: 0 },
-                8: { icon: '⚡', hue: 280 },
-                9: { icon: '🌀', hue: 320 },
-                10: { icon: '💠', hue: 195 },
-                11: { icon: '🌌', hue: 240 },
-                12: { icon: '🏆', hue: 45 }
+                1: { icon: '🥉', hue: 100 },
+                2: { icon: '🥈', hue: 120 },
+                3: { icon: '🥇', hue: 210 },
+                4: { icon: '🏅', hue: 45 },
+                5: { icon: '🎖️', hue: 180 },
+                6: { icon: '🏆', hue: 25 },
+                7: { icon: '🏵️', hue: 0 },
+                8: { icon: '💎', hue: 280 },
+                9: { icon: '👑', hue: 320 },
+                10: { icon: '🌟', hue: 195 },
+                11: { icon: '✨', hue: 240 },
+                12: { icon: '🔱', hue: 45 }
             };
 
             const tier = evolution[ms.m] || { icon: '🏆', hue: 25 };
-            const milestoneColor = `hsl(${tier.hue}, 80%, 50%)`;
-            const milestoneColorTransparent = `hsla(${tier.hue}, 80%, 50%, 0.1)`;
+            const palette = this.MILESTONE_PALETTE;
+            const milestoneColor = palette[(ms.m - 1) % palette.length];
+            const milestoneColorTransparent = `${milestoneColor}26`; // 15% opacity hex
 
             // Calculate precise time for the flag label
             const milH = Math.floor(ms.hourOfDay);
@@ -2370,7 +2406,7 @@ const StudyTargetTracker = {
             // 12.5px symmetrical offsets hit the bracket corner at exactly 45 degrees
             const flagPosClass = isOdd 
                 ? 'bottom-[calc(100%+18px)] right-[18px]' 
-                : 'top-[calc(100%+32px)] left-[18px]';
+                : 'top-[calc(100%+28px)] left-[28px]';
             const bridgeClass = isOdd ? 'bridge-odd' : 'bridge-even';
 
             marker.dataset.milestoneHour = ms.hourOfDay;
@@ -2386,7 +2422,7 @@ const StudyTargetTracker = {
                 <!-- Vertical marker bar with integrated bridge -->
                 <div class="timeline-milestone-bar w-[2px] h-full shadow-sm" style="background: ${milestoneColor}; pointer-events: auto; position: relative;">
                     <!-- Slanted HUD Connector (anchored from bar) -->
-                    <div class="milestone-bridge ${bridgeClass}" style="background: ${milestoneColor};"></div>
+                    <div class="milestone-bridge ${bridgeClass}"></div>
                 </div>
             `;
 
@@ -2928,14 +2964,16 @@ const StudyTargetTracker = {
                     top: 0;
                     right: 0;
                     width: 19.8px;
+                    background: var(--milestone-color);
                     transform: rotate(45deg);
                     transform-origin: right top;
                 }
                 .bridge-even {
                     bottom: 0;
                     left: 0;
-                    width: 31.3px;
-                    transform: rotate(63.4deg);
+                    width: 33.9px;
+                    background: var(--milestone-color);
+                    transform: rotate(45deg);
                     transform-origin: left bottom;
                 }
                 #timeline-now-clock::before {
