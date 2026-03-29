@@ -2349,8 +2349,8 @@ const StudyTargetTracker = {
             const isOdd = ms.m % 2 !== 0;
             // 12.5px symmetrical offsets hit the bracket corner at exactly 45 degrees
             const flagPosClass = isOdd 
-                ? 'bottom-[calc(100%+25px)] right-[25px]' 
-                : 'top-[calc(100%+25px)] left-[25px]';
+                ? 'bottom-[calc(100%+18px)] right-[18px]' 
+                : 'top-[calc(100%+18px)] left-[18px]';
             const bridgeClass = isOdd ? 'bridge-odd' : 'bridge-even';
 
             marker.innerHTML = `
@@ -2886,14 +2886,14 @@ const StudyTargetTracker = {
                 .bridge-odd {
                     top: 0;
                     right: 0;
-                    width: 30px;
+                    width: 21px;
                     transform: rotate(45deg);
                     transform-origin: right top;
                 }
                 .bridge-even {
                     bottom: 0;
                     left: 0;
-                    width: 30px;
+                    width: 21px;
                     transform: rotate(45deg);
                     transform-origin: left bottom;
                 }
