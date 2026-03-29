@@ -509,26 +509,27 @@ const StudyTargetTracker = {
                     <div class="absolute whitespace-nowrap text-[8px] font-black italic left-[6px] top-1/2 -translate-y-1/2 bg-white/40 px-1.5 py-0.5 rounded-sm backdrop-blur-[3px] flex flex-col items-start leading-tight text-black" 
                          style="border-left: 2px solid ${ghostColor}; pointer-events: none;">
                         <span>${icon} NEXT: ${nextM}h</span>
-                        <span class="text-[7px] font-bold mt-0.5 opacity-90">${inMins}m to go</span>
+                        <span class="text-[8px] font-black mt-0.5 opacity-95">${inMins}m to go</span>
                     </div>
                 `;
                 nextGhost.classList.remove('hidden');
 
-                // --- 5. Bridging Line (Visual Connector) ---
+                // --- 5. Bridging Ghost Block (The 'Gap' representation) ---
                 let ghostBridge = document.getElementById('timeline-ghost-bridge');
                 const gapWidth = projPct - nowPercent;
                 
-                if (gapWidth > 2) { 
+                if (gapWidth > 1) { 
                     if (!ghostBridge) {
                         ghostBridge = document.createElement('div');
                         ghostBridge.id = 'timeline-ghost-bridge';
-                        ghostBridge.className = 'absolute top-1/2 -translate-y-1/2 h-px z-0 pointer-events-none';
+                        ghostBridge.className = 'absolute top-0 z-0 pointer-events-none rounded-sm border-y border-dashed';
                         nowMarker.parentElement.appendChild(ghostBridge);
                     }
                     ghostBridge.style.left = `${nowPercent}%`;
                     ghostBridge.style.width = `${gapWidth}%`;
-                    ghostBridge.style.borderTop = `2px dashed ${ghostColor}66`; // Increased from 1px @ 44 alpha
-                    ghostBridge.innerHTML = ''; 
+                    ghostBridge.style.height = `20px`; // Match h-5 bar height
+                    ghostBridge.style.backgroundColor = `${ghostColor}14`; // ~8% opacity
+                    ghostBridge.style.borderColor = `${ghostColor}33`; // ~20% opacity
                     ghostBridge.classList.remove('hidden');
                 } else if (ghostBridge) {
                     ghostBridge.classList.add('hidden');
