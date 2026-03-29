@@ -481,6 +481,25 @@ const StudyTargetTracker = {
             ghostMarker.style.borderLeft = wasStudyingYesterday ? '2px solid rgba(255,255,255,0.8)' : '1px dashed rgba(255,255,255,0.3)';
             ghostMarker.style.opacity = wasStudyingYesterday ? '0.6' : '0.2';
 
+            // --- Milestone Glow Engine (Proximity & Reached) ---
+            document.querySelectorAll('.timeline-milestone').forEach(ms => {
+                const hour = parseFloat(ms.dataset.milestoneHour);
+                if (isNaN(hour)) return;
+
+                const diff = hour - clientHour;
+                const isReached = clientHour >= hour;
+                const isApproaching = diff > 0 && diff <= 0.5; // Within 30 mins
+
+                ms.classList.toggle('milestone-approaching', isApproaching);
+                ms.classList.toggle('milestone-reached', isReached);
+                
+                if (isApproaching) {
+                    // Dynamic pulse speed based on proximity (closer = faster)
+                    const pulseDur = 0.5 + (diff * 2); // 0.5s to 1.5s
+                    ms.style.setProperty('--proximity-pulse-dur', `${pulseDur}s`);
+                }
+            });
+
             // --- NEW: Target Projection Line (Fix: pass nowPercent to avoid DOM read blinking) ---
             this.renderPredictedFinish(nowPercent);
 
@@ -2333,7 +2352,8 @@ const StudyTargetTracker = {
             };
 
             const tier = evolution[ms.m] || { icon: '🏆', hue: 25 };
-            const accent = 'red';
+            const milestoneColor = `hsl(${tier.hue}, 80%, 50%)`;
+            const milestoneColorTransparent = `hsla(${tier.hue}, 80%, 50%, 0.1)`;
 
             // Calculate precise time for the flag label
             const milH = Math.floor(ms.hourOfDay);
@@ -2350,19 +2370,23 @@ const StudyTargetTracker = {
             // 12.5px symmetrical offsets hit the bracket corner at exactly 45 degrees
             const flagPosClass = isOdd 
                 ? 'bottom-[calc(100%+18px)] right-[18px]' 
-                : 'top-[calc(100%+18px)] left-[18px]';
+                : 'top-[calc(100%+32px)] left-[18px]';
             const bridgeClass = isOdd ? 'bridge-odd' : 'bridge-even';
+
+            marker.dataset.milestoneHour = ms.hourOfDay;
+            marker.style.setProperty('--milestone-color', milestoneColor);
+            marker.style.setProperty('--milestone-color-alpha', milestoneColorTransparent);
 
             marker.innerHTML = `
                 <div class="timeline-milestone-flag absolute whitespace-nowrap transition-all duration-300 timeline-milestone-flag-cyber ${flagPosClass}" 
-                        style="color: #ef4444;">
+                        style="color: ${milestoneColor};">
                     ${tier.icon} ${ms.m} - ${milTimeStr}<span class="milestone-label hidden ml-1.5 font-bold"> · ${title}</span>
                 </div>
                 
                 <!-- Vertical marker bar with integrated bridge -->
-                <div class="timeline-milestone-bar w-[2px] h-full shadow-sm" style="background: #ef4444; pointer-events: auto; position: relative;">
+                <div class="timeline-milestone-bar w-[2px] h-full shadow-sm" style="background: ${milestoneColor}; pointer-events: auto; position: relative;">
                     <!-- Slanted HUD Connector (anchored from bar) -->
-                    <div class="milestone-bridge ${bridgeClass}"></div>
+                    <div class="milestone-bridge ${bridgeClass}" style="background: ${milestoneColor};"></div>
                 </div>
             `;
 
@@ -2863,6 +2887,23 @@ const StudyTargetTracker = {
                     background-size: 8px 8px;
                     pointer-events: none;
                 }
+                /* NEW: Milestone Evolution Engine Styles */
+                @keyframes milestone-proximity-pulse {
+                    0% { box-shadow: 0 0 0 0 var(--milestone-color-alpha); }
+                    50% { box-shadow: 0 0 20px 10px var(--milestone-color-alpha); }
+                    100% { box-shadow: 0 0 0 0 var(--milestone-color-alpha); }
+                }
+                .milestone-approaching .timeline-milestone-bar {
+                    animation: milestone-proximity-pulse var(--proximity-pulse-dur, 1.5s) infinite ease-in-out;
+                }
+                .milestone-reached .timeline-milestone-bar {
+                    box-shadow: 0 0 15px var(--milestone-color-alpha) !important;
+                    filter: brightness(1.2);
+                }
+                .milestone-reached .timeline-milestone-flag-cyber::after {
+                    border-color: var(--milestone-color) !important;
+                    opacity: 1 !important;
+                }
                 .timeline-milestone-flag-cyber {
                     background: none !important;
                     border: none !important;
@@ -2886,15 +2927,15 @@ const StudyTargetTracker = {
                 .bridge-odd {
                     top: 0;
                     right: 0;
-                    width: 21px;
+                    width: 19.8px;
                     transform: rotate(45deg);
                     transform-origin: right top;
                 }
                 .bridge-even {
                     bottom: 0;
                     left: 0;
-                    width: 21px;
-                    transform: rotate(45deg);
+                    width: 31.3px;
+                    transform: rotate(63.4deg);
                     transform-origin: left bottom;
                 }
                 #timeline-now-clock::before {
