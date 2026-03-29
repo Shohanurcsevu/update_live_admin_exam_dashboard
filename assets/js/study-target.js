@@ -503,17 +503,40 @@ const StudyTargetTracker = {
 
                 nextGhost.style.left = `${projPct}%`;
                 nextGhost.style.borderLeft = `2px dashed ${ghostColor}`;
-                nextGhost.style.opacity = '0.45';
+                nextGhost.style.opacity = '0.65'; // Increased from 0.45
                 
                 nextGhost.innerHTML = `
-                    <div class="absolute whitespace-nowrap text-[8px] font-black italic left-[6px] top-1/2 -translate-y-1/2 bg-white/20 px-1.5 py-0.5 rounded-sm backdrop-blur-[2px]" 
-                         style="color: ${ghostColor}; border-left: 1px solid ${ghostColor}4D; pointer-events: none;">
-                        ${icon} NEXT: ${nextM}h · in ${inMins}m
+                    <div class="absolute whitespace-nowrap text-[8px] font-black italic left-[6px] top-1/2 -translate-y-1/2 bg-white/40 px-1.5 py-0.5 rounded-sm backdrop-blur-[3px] flex flex-col items-start leading-tight text-black" 
+                         style="border-left: 2px solid ${ghostColor}; pointer-events: none;">
+                        <span>${icon} NEXT: ${nextM}h</span>
+                        <span class="text-[7px] font-bold mt-0.5 opacity-90">${inMins}m to go</span>
                     </div>
                 `;
                 nextGhost.classList.remove('hidden');
-            } else if (nextGhost) {
-                nextGhost.classList.add('hidden');
+
+                // --- 5. Bridging Line (Visual Connector) ---
+                let ghostBridge = document.getElementById('timeline-ghost-bridge');
+                const gapWidth = projPct - nowPercent;
+                
+                if (gapWidth > 2) { 
+                    if (!ghostBridge) {
+                        ghostBridge = document.createElement('div');
+                        ghostBridge.id = 'timeline-ghost-bridge';
+                        ghostBridge.className = 'absolute top-1/2 -translate-y-1/2 h-px z-0 pointer-events-none';
+                        nowMarker.parentElement.appendChild(ghostBridge);
+                    }
+                    ghostBridge.style.left = `${nowPercent}%`;
+                    ghostBridge.style.width = `${gapWidth}%`;
+                    ghostBridge.style.borderTop = `2px dashed ${ghostColor}66`; // Increased from 1px @ 44 alpha
+                    ghostBridge.innerHTML = ''; 
+                    ghostBridge.classList.remove('hidden');
+                } else if (ghostBridge) {
+                    ghostBridge.classList.add('hidden');
+                }
+            } else {
+                if (nextGhost) nextGhost.classList.add('hidden');
+                const ghostBridge = document.getElementById('timeline-ghost-bridge');
+                if (ghostBridge) ghostBridge.classList.add('hidden');
             }
 
             // --- Milestone Glow Engine (Proximity & Reached) ---
