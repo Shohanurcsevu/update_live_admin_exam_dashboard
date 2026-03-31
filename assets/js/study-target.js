@@ -3829,71 +3829,38 @@ const StudyTargetTracker = {
     async updateDailyStreak() {
         const valueEl = document.getElementById('daily-streak-value');
         const badgeEl = document.getElementById('daily-streak-badge');
-        if (!valueEl || !badgeEl || !this.weeklyDebtData) return;
+        if (!valueEl || !badgeEl) return;
 
-        // Count consecutive days from most recent where seconds >= target
-        let streak = 0;
-        // Sort by day (1 = yesterday, 2 = day before, etc.)
-        const sortedDays = [...this.weeklyDebtData.days].sort((a, b) => a.day - b.day);
+        // UNIFIED: Read from streakManager (single source of truth backed by user_streaks DB)
+        // This ensures header and dashboard always show the same streak number
+        if (typeof streakManager === 'undefined') return;
 
-        for (const d of sortedDays) {
-            if (d.seconds >= this.DAILY_TARGET_SECONDS) {
-                streak++;
-            } else {
-                break; // Streak broken
-            }
-        }
-
-        // If all 7 days qualify, keep fetching further back to find true streak length
-        if (streak >= sortedDays.length) {
-            let nextDay = sortedDays.length + 1;
-            let keepGoing = true;
-            while (keepGoing) {
-                try {
-                    const date = this.getLogicalDate(-nextDay);
-                    const result = await CacheManager.fetchWithCache(
-                        `api/analytics/get-yesterday-progress.php?date=${date}`, 300
-                    );
-                    const seconds = (result && result.success) ? (result.yesterday_total_seconds || 0) : 0;
-                    if (seconds >= this.DAILY_TARGET_SECONDS) {
-                        streak++;
-                        nextDay++;
-                    } else {
-                        keepGoing = false;
-                    }
-                } catch (e) {
-                    keepGoing = false;
-                }
-            }
-        }
-
-        // Check if today is also on track (projected)
-        const now = new Date(Date.now() + this.serverClockOffset);
-        const rollover = new Date(now.getTime());
-        if (now.getHours() >= this.TIMELINE_START_HOUR) {
-            rollover.setDate(now.getDate() + 1);
-        }
-        rollover.setHours(this.TIMELINE_START_HOUR, 0, 0, 0);
-        const secondsLeft = Math.max(0, (rollover - now) / 1000);
-        const remaining = this.DAILY_TARGET_SECONDS - this.studiedSeconds;
-        const todayOnTrack = remaining <= 0 || (remaining / secondsLeft) < 1; // Can finish at 1:1 pace
+        const streak = streakManager.streakData.current_streak;
+        const riskInfo = streakManager.getStreakRiskInfo();
+        const freezeAvailable = streakManager.streakData.freeze_available;
 
         if (streak === 0) {
             valueEl.textContent = '0';
             valueEl.className = 'text-2xl font-black text-gray-400';
-            badgeEl.textContent = todayOnTrack ? 'Start one today!' : 'No streak';
+            badgeEl.textContent = 'Start a session!';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
-        } else {
+        } else if (riskInfo.status === 'safe') {
             valueEl.textContent = `🔥 ${streak}`;
             valueEl.className = 'text-2xl font-black text-orange-600';
-
-            if (todayOnTrack) {
-                badgeEl.textContent = `${streak + 1} if you finish today`;
-                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-orange-100 text-orange-600 w-fit uppercase tracking-tighter';
-            } else {
-                badgeEl.textContent = 'Streak at risk!';
-                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
-            }
+            badgeEl.textContent = '✅ Secured today';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+        } else if (riskInfo.status === 'at_risk') {
+            valueEl.textContent = `🔥 ${streak}`;
+            valueEl.className = 'text-2xl font-black text-amber-500';
+            const freezeNote = freezeAvailable ? ' (❄️ freeze ready)' : '';
+            badgeEl.textContent = `⚠️ ${riskInfo.hoursLeft}h left${freezeNote}`;
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter animate-pulse';
+        } else {
+            // broken or unknown — show current value, will reset on next activity
+            valueEl.textContent = `🔥 ${streak}`;
+            valueEl.className = 'text-2xl font-black text-rose-500';
+            badgeEl.textContent = freezeAvailable ? '❄️ Freeze will save you' : 'Streak at risk!';
+            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
         }
     },
 

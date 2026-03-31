@@ -208,7 +208,7 @@ class StreakManager {
 
         // Identify current tier
         const tiers = this.getTiers();
-        let currentTier = { threshold: 0, name: 'Iron', color: '#71717a' }; // Default/Low Streak Tier
+        let currentTier = { threshold: 0, name: 'Newcomer', color: '#71717a' }; // Default (below 7 days)
         
         for (const tier of tiers) {
             if (streak >= tier.threshold) {
@@ -308,7 +308,7 @@ class StreakManager {
         }
 
         if (nextTier) {
-            tooltip += `🎯 ${nextTier.daysLeft} days until ${nextTier.name} Tier`;
+            tooltip += `🎯 ${nextTier.daysLeft} days until "${nextTier.name}"`;
         } else {
             tooltip += `👑 ULTIMATE LEGEND STATUS REACHED!`;
         }
@@ -318,28 +318,24 @@ class StreakManager {
 
     getTiers() {
         return [
-            { threshold: 7, name: 'Yellow', color: '#facc15' },
-            { threshold: 14, name: 'Orange', color: '#f97316' },
-            { threshold: 21, name: 'Red', color: '#ef4444' },
-            { threshold: 28, name: 'Purple', color: '#a855f7' },
-            { threshold: 35, name: 'Blue', color: '#3b82f6' },
-            { threshold: 42, name: 'Emerald', color: '#10b981' },
-            { threshold: 49, name: 'Cyan', color: '#06b6d4' },
-            { threshold: 56, name: 'Rose', color: '#f43f5e' },
-            { threshold: 63, name: 'Indigo', color: '#6366f1' },
-            { threshold: 70, name: 'Violet', color: '#8b5cf6' },
-            { threshold: 77, name: 'Pink', color: '#ec4899' },
-            { threshold: 84, name: 'Sky', color: '#0ea5e9' },
-            { threshold: 91, name: 'Lime', color: '#84cc16' },
-            { threshold: 98, name: 'Amber', color: '#f59e0b' },
-            { threshold: 105, name: 'Teal', color: '#14b8a6' },
-            { threshold: 112, name: 'Fuchsia', color: '#d946ef' },
-            { threshold: 119, name: 'Slate', color: '#64748b' },
-            { threshold: 126, name: 'Lavender', color: '#a78bfa' },
-            { threshold: 133, name: 'Crimson', color: '#dc2626' },
-            { threshold: 140, name: 'Cobalt', color: '#2563eb' },
-            { threshold: 147, name: 'Forest', color: '#059669' },
-            { threshold: Infinity, name: 'Legendary Gold', color: '#facc15' }
+            { threshold: 7,   name: 'First Week',      color: '#facc15' },   // 🟡 Gold spark
+            { threshold: 14,  name: 'Committed',        color: '#f97316' },   // 🟠 Warm orange
+            { threshold: 21,  name: 'Three Weeks',      color: '#ef4444' },   // 🔴 Fire red
+            { threshold: 30,  name: 'Monthly Legend',    color: '#a855f7' },   // 🟣 Royal purple
+            { threshold: 40,  name: 'Relentless',        color: '#3b82f6' },   // 🔵 Electric blue
+            { threshold: 50,  name: 'Half Century',      color: '#10b981' },   // 🟢 Emerald
+            { threshold: 60,  name: 'Unstoppable',       color: '#06b6d4' },   // 🩵 Cyan
+            { threshold: 75,  name: 'Diamond',           color: '#818cf8' },   // 💎 Indigo
+            { threshold: 90,  name: 'Quarter Year',      color: '#ec4899' },   // 💖 Pink
+            { threshold: 100, name: 'Centurion',         color: '#eab308' },   // 🏅 True gold
+            { threshold: 120, name: 'Grandmaster',       color: '#dc2626' },   // ♦️ Deep crimson
+            { threshold: 150, name: 'Titan',             color: '#0ea5e9' },   // ⚡ Sky blue
+            { threshold: 180, name: 'Half Year',         color: '#14b8a6' },   // 🌊 Teal
+            { threshold: 200, name: 'Bicentennial',      color: '#d946ef' },   // 🔮 Fuchsia
+            { threshold: 250, name: 'Immortal',          color: '#6366f1' },   // 🪐 Deep indigo
+            { threshold: 300, name: 'Eternal',           color: '#059669' },   // 🌲 Forest
+            { threshold: 365, name: 'Full Year',         color: '#f59e0b' },   // ☀️ Solar gold
+            { threshold: Infinity, name: 'Legendary',    color: '#fbbf24' }    // 👑 Ultimate gold
         ];
     }
 
