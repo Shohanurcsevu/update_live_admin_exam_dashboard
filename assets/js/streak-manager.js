@@ -20,6 +20,16 @@ class StreakManager {
         this.trophyAnimationId = null;
     }
 
+    // Logical day starts at 5:00 AM (matches dashboard TIMELINE_START_HOUR)
+    // Activity before 5 AM counts as the previous calendar day
+    getLogicalDate() {
+        const now = new Date();
+        if (now.getHours() < 5) {
+            now.setDate(now.getDate() - 1);
+        }
+        return now.toISOString().split('T')[0];
+    }
+
     async init() {
         await this.fetchStreak();
         this.updateUI();
@@ -60,7 +70,7 @@ class StreakManager {
             if (result.success) {
                 const oldStreak = this.streakData.current_streak;
                 this.streakData.current_streak = result.data.current_streak;
-                this.streakData.last_activity_date = new Date().toISOString().split('T')[0];
+                this.streakData.last_activity_date = this.getLogicalDate();
 
                 this.updateUI();
 
@@ -203,7 +213,7 @@ class StreakManager {
     updateTooltip(streak, counterEl) {
         const nextTier = this.getNextTierInfo(streak);
         const lastActivity = this.streakData.last_activity_date;
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.getLogicalDate();
         const isActiveToday = lastActivity === today;
 
         let tooltip = `Streak: ${streak} days\n`;

@@ -9,7 +9,13 @@ require_once '../subject/db_connect.php';
 date_default_timezone_set('Asia/Dhaka');
 
 try {
-    $today = date('Y-m-d');
+    // Use 5 AM as the logical day boundary (matches dashboard's TIMELINE_START_HOUR)
+    // Activity before 5 AM counts as the previous logical day
+    $now = new DateTime('now', new DateTimeZone('Asia/Dhaka'));
+    if ((int)$now->format('H') < 5) {
+        $now->modify('-1 day');
+    }
+    $today = $now->format('Y-m-d');
 
     // Get current streak info (single record ID 1)
     $stmt = $conn->prepare("SELECT current_streak, longest_streak, last_activity_date FROM user_streaks WHERE id = 1");
@@ -33,7 +39,10 @@ try {
             $new_streak = $current_streak;
             $is_new_day = false;
         } else {
-            $yesterday = date('Y-m-d', strtotime('-1 day'));
+            // Logical yesterday = logical today - 1 day
+            $yesterdayDT = clone $now;
+            $yesterdayDT->modify('-1 day');
+            $yesterday = $yesterdayDT->format('Y-m-d');
             
             if ($last_date === $yesterday) {
                 // Continued streak
