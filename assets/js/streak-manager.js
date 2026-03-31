@@ -3,7 +3,10 @@ class StreakManager {
         this.streakData = {
             current_streak: 0,
             longest_streak: 0,
-            last_activity_date: null
+            last_activity_date: null,
+            freeze_available: 1,
+            last_freeze_date: null,
+            freeze_used_count: 0
         };
         this.missionProgress = 0;
         
@@ -36,6 +39,7 @@ class StreakManager {
         this.initEmberParticles();
         this.initTrophyParticles();
         this.startMissionTracking();
+        this.initHeatCalendar();
     }
 
     async fetchStreak() {
@@ -71,6 +75,7 @@ class StreakManager {
                 const oldStreak = this.streakData.current_streak;
                 this.streakData.current_streak = result.data.current_streak;
                 this.streakData.last_activity_date = this.getLogicalDate();
+                this.streakData.freeze_available = result.data.freeze_available;
 
                 this.updateUI();
 
@@ -78,10 +83,50 @@ class StreakManager {
                 if (result.data.is_new_day) {
                     this.showSuccessEffects(result.data.current_streak);
                 }
+
+                // Show freeze notification if a freeze was consumed
+                if (result.data.freeze_used) {
+                    this.showFreezeNotification(result.data.current_streak);
+                }
             }
         } catch (error) {
             console.error('Failed to record activity:', error);
         }
+    }
+
+    // Calculate streak risk status: safe, at_risk, or broken
+    getStreakRiskInfo() {
+        const lastActivity = this.streakData.last_activity_date;
+        const streak = this.streakData.current_streak;
+        if (!lastActivity || streak === 0) return { status: 'none', hoursLeft: 0 };
+
+        const today = this.getLogicalDate();
+        if (lastActivity === today) return { status: 'safe', hoursLeft: 0 };
+
+        // Calculate logical yesterday
+        const now = new Date();
+        const logicalNow = new Date(now);
+        if (logicalNow.getHours() < 5) {
+            logicalNow.setDate(logicalNow.getDate() - 1);
+        }
+        const yesterday = new Date(logicalNow);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        if (lastActivity === yesterdayStr) {
+            // Streak is at risk — calculate hours until next 5 AM deadline
+            const deadline = new Date(now);
+            if (now.getHours() >= 5) {
+                // Deadline is tomorrow at 5 AM
+                deadline.setDate(deadline.getDate() + 1);
+            }
+            deadline.setHours(5, 0, 0, 0);
+            const hoursLeft = Math.max(0, Math.round((deadline - now) / (1000 * 60 * 60)));
+            return { status: 'at_risk', hoursLeft };
+        }
+
+        // Last activity is older than yesterday — streak will reset on next record
+        return { status: 'broken', hoursLeft: 0 };
     }
 
     updateUI() {
@@ -94,9 +139,29 @@ class StreakManager {
         const streak = this.streakData.current_streak;
         countEl.textContent = streak;
 
+        // Check streak risk status
+        const riskInfo = this.getStreakRiskInfo();
+
         // Dynamic Colors & Animations
-        const color = this.getFlameColor(streak);
-        flameEl.style.color = color;
+        if (riskInfo.status === 'at_risk') {
+            // WARNING STATE: Amber pulsing flame
+            flameEl.style.color = '#f59e0b';
+            counterEl.classList.add('streak-at-risk');
+            flameEl.classList.add('streak-risk-pulse');
+            flameEl.classList.remove('streak-high-pulse');
+        } else {
+            const color = this.getFlameColor(streak);
+            flameEl.style.color = color;
+            counterEl.classList.remove('streak-at-risk');
+            flameEl.classList.remove('streak-risk-pulse');
+            
+            // High Streak Pulse (only when safe)
+            if (streak >= 7) {
+                flameEl.classList.add('streak-high-pulse');
+            } else {
+                flameEl.classList.remove('streak-high-pulse');
+            }
+        }
 
         // Always show the counter if initialized
         counterEl.classList.remove('hidden');
@@ -109,13 +174,6 @@ class StreakManager {
             flameEl.classList.remove('streak-flicker');
         }
 
-        // High Streak Pulse
-        if (streak >= 7) {
-            flameEl.classList.add('streak-high-pulse');
-        } else {
-            flameEl.classList.remove('streak-high-pulse');
-        }
-
         // Toggle Ember Particles for 30+ streaks
         if (streak >= 30) {
             this.startEmberParticles();
@@ -124,9 +182,9 @@ class StreakManager {
         }
 
         // Update Tooltip with Progression
-        this.updateTooltip(streak, counterEl);
+        this.updateTooltip(streak, counterEl, riskInfo);
 
-        // --- NEW: Trophy Logic ---
+        // --- Trophy Logic ---
         this.updateTrophyUI(streak);
     }
 
@@ -208,20 +266,45 @@ class StreakManager {
 
         // Remove any special container styling if not applicable
         trophyContainer.classList.remove('border-amber-200', 'bg-amber-50/50');
+
+        // --- Freeze Badge Update ---
+        const freezeBadge = document.getElementById('trophy-freeze-badge');
+        const freezeText = document.getElementById('trophy-freeze-text');
+        if (freezeBadge && freezeText) {
+            if (this.streakData.freeze_available) {
+                freezeBadge.className = 'flex items-center justify-center gap-1.5 py-1.5 px-3 mb-3 rounded-lg border text-[10px] font-bold uppercase tracking-tight bg-blue-50/60 border-blue-200/40 text-blue-600';
+                freezeText.textContent = 'Freeze Available';
+            } else {
+                freezeBadge.className = 'flex items-center justify-center gap-1.5 py-1.5 px-3 mb-3 rounded-lg border text-[10px] font-bold uppercase tracking-tight bg-slate-50/60 border-slate-200/40 text-slate-400';
+                freezeText.textContent = 'Freeze Used This Week';
+            }
+        }
     }
 
-    updateTooltip(streak, counterEl) {
+    updateTooltip(streak, counterEl, riskInfo = null) {
         const nextTier = this.getNextTierInfo(streak);
         const lastActivity = this.streakData.last_activity_date;
         const today = this.getLogicalDate();
         const isActiveToday = lastActivity === today;
+        const freezeAvailable = this.streakData.freeze_available;
 
         let tooltip = `Streak: ${streak} days\n`;
 
-        if (!isActiveToday) {
+        // Risk warning takes priority
+        if (riskInfo && riskInfo.status === 'at_risk') {
+            tooltip += `⚠️ STREAK AT RISK — ${riskInfo.hoursLeft}h remaining!\n`;
+            tooltip += `🔥 Start a session now to save your streak!\n`;
+        } else if (!isActiveToday) {
             tooltip += `🔥 COMPLETE A SESSION TO IGNITE TODAY!\n`;
         } else {
             tooltip += `✅ Streak secured for today!\n`;
+        }
+
+        // Freeze status
+        if (freezeAvailable) {
+            tooltip += `❄️ Streak Freeze: Available (1 miss forgiven)\n`;
+        } else {
+            tooltip += `❄️ Streak Freeze: Used this week\n`;
         }
 
         if (nextTier) {
@@ -293,6 +376,23 @@ class StreakManager {
                     origin: { y: 0.6 }
                 });
             }
+        }
+    }
+
+    showFreezeNotification(streak) {
+        // Show a toast notification that a freeze was consumed
+        if (typeof window.showToast === 'function') {
+            window.showToast(`❄️ Streak Freeze used! Your ${streak}-day streak was saved. No more freezes this week.`, 'info');
+        }
+        
+        // Blue snowflake confetti to visually confirm the freeze
+        if (typeof confetti !== 'undefined') {
+            confetti({
+                particleCount: 60,
+                spread: 50,
+                origin: { y: 0.6 },
+                colors: ['#60a5fa', '#93c5fd', '#bfdbfe', '#ffffff']
+            });
         }
     }
 
@@ -459,6 +559,110 @@ class StreakManager {
         }
 
         this.trophyAnimationId = requestAnimationFrame(() => this.animateTrophy());
+    }
+
+    // ─── Streak Heat Calendar ───
+    initHeatCalendar() {
+        const counter = document.getElementById('streak-counter');
+        const popup = document.getElementById('streak-heat-calendar');
+        if (!counter || !popup) return;
+
+        counter.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = popup.classList.contains('active');
+            if (isOpen) {
+                popup.classList.remove('active');
+                setTimeout(() => popup.classList.add('hidden'), 200);
+            } else {
+                popup.classList.remove('hidden');
+                // Force reflow before adding active class for animation
+                popup.offsetHeight;
+                popup.classList.add('active');
+                this.fetchAndRenderHeatCalendar();
+            }
+        });
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (!counter.contains(e.target)) {
+                popup.classList.remove('active');
+                setTimeout(() => popup.classList.add('hidden'), 200);
+            }
+        });
+    }
+
+    async fetchAndRenderHeatCalendar() {
+        try {
+            const response = await fetch('api/streak/get-history.php?days=91');
+            const result = await response.json();
+            if (result.success) {
+                this.renderHeatGrid(result.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch streak history:', error);
+        }
+    }
+
+    renderHeatGrid(historyData) {
+        const grid = document.getElementById('heat-grid');
+        const summary = document.getElementById('heat-cal-summary');
+        if (!grid) return;
+
+        // Build a date->hours lookup map
+        const dateMap = {};
+        historyData.forEach(d => { dateMap[d.date] = d.hours; });
+
+        // Generate 91 days (13 weeks) ending today
+        const today = new Date();
+        const cells = [];
+        let activeDays = 0;
+        let totalHours = 0;
+
+        // Find the start: go back to the nearest Monday, 13 weeks ago
+        const endDate = new Date(today);
+        const startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 90);
+        // Align to Monday
+        const dayOfWeek = startDate.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        startDate.setDate(startDate.getDate() + mondayOffset);
+
+        const current = new Date(startDate);
+        while (current <= endDate) {
+            const dateStr = current.toISOString().split('T')[0];
+            const hours = dateMap[dateStr] || 0;
+            const level = this.getHeatLevel(hours);
+            
+            if (hours > 0) {
+                activeDays++;
+                totalHours += hours;
+            }
+
+            cells.push({ date: dateStr, hours, level });
+            current.setDate(current.getDate() + 1);
+        }
+
+        // Render grid
+        grid.innerHTML = '';
+        cells.forEach(cell => {
+            const el = document.createElement('span');
+            el.className = `heat-cell heat-${cell.level}`;
+            el.title = `${cell.date}: ${cell.hours > 0 ? cell.hours + 'h studied' : 'No activity'}`;
+            grid.appendChild(el);
+        });
+
+        // Update summary
+        if (summary) {
+            summary.textContent = `${activeDays} active days · ${totalHours.toFixed(0)}h total`;
+        }
+    }
+
+    getHeatLevel(hours) {
+        if (hours <= 0) return 0;
+        if (hours < 1) return 1;
+        if (hours < 3) return 2;
+        if (hours < 5) return 3;
+        return 4;
     }
 }
 

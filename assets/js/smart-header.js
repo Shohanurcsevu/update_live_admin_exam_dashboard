@@ -27,6 +27,7 @@ const SmartHeader = {
 
     startGlobalTimer() {
         if (this.timer) clearInterval(this.timer);
+        this._streakDangerShown = false; // One-time flag per session
         this.timer = setInterval(() => {
             requestAnimationFrame(() => {
                 this.updateClock();
@@ -46,8 +47,29 @@ const SmartHeader = {
                     this.updateDate();
                     this.fetchGoal();
                 }
+
+                // Streak Danger Notification — check once per minute after 10 PM
+                if (now.getSeconds() === 30 && now.getHours() >= 22 && !this._streakDangerShown) {
+                    this.checkStreakDanger();
+                }
             });
         }, 1000);
+    },
+
+    checkStreakDanger() {
+        if (typeof streakManager === 'undefined') return;
+        const riskInfo = streakManager.getStreakRiskInfo();
+        const streak = streakManager.streakData.current_streak;
+        
+        if (riskInfo.status === 'at_risk' && streak > 0) {
+            this._streakDangerShown = true;
+            if (typeof window.showToast === 'function') {
+                window.showToast(
+                    `🔥 Your ${streak}-day streak expires in ${riskInfo.hoursLeft} hours! Start a quick session to keep it alive.`,
+                    'warning'
+                );
+            }
+        }
     },
 
     updateClock() {

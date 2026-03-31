@@ -8,17 +8,20 @@ require_once '../subject/db_connect.php';
 
 try {
     // Single record with ID 1
-    $stmt = $conn->prepare("SELECT current_streak, longest_streak, last_activity_date FROM user_streaks WHERE id = 1");
+    $stmt = $conn->prepare("SELECT current_streak, longest_streak, last_activity_date, freeze_available, last_freeze_date, freeze_used_count FROM user_streaks WHERE id = 1");
     $stmt->execute();
     $result = $stmt->get_result()->fetch_assoc();
 
     if (!$result) {
         // Initialize if not exists
-        $conn->query("INSERT INTO user_streaks (id, current_streak, longest_streak, last_activity_date) VALUES (1, 0, 0, NULL)");
+        $conn->query("INSERT INTO user_streaks (id, current_streak, longest_streak, last_activity_date, freeze_available) VALUES (1, 0, 0, NULL, 1)");
         $result = [
             'current_streak' => 0,
             'longest_streak' => 0,
-            'last_activity_date' => null
+            'last_activity_date' => null,
+            'freeze_available' => 1,
+            'last_freeze_date' => null,
+            'freeze_used_count' => 0
         ];
     }
 
@@ -27,7 +30,10 @@ try {
         'data' => [
             'current_streak' => intval($result['current_streak']),
             'longest_streak' => intval($result['longest_streak']),
-            'last_activity_date' => $result['last_activity_date']
+            'last_activity_date' => $result['last_activity_date'],
+            'freeze_available' => intval($result['freeze_available'] ?? 1),
+            'last_freeze_date' => $result['last_freeze_date'] ?? null,
+            'freeze_used_count' => intval($result['freeze_used_count'] ?? 0)
         ]
     ]);
 
