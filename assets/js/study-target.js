@@ -752,7 +752,7 @@ const StudyTargetTracker = {
             try { this.predictFocusCliff(); } catch (e) { console.warn('[ST] FocusCliff err:', e); }
             try { this.checkSubjectRotation(); } catch (e) { console.warn('[ST] Rotation err:', e); }
             try { this.updateCompletionOdds(); } catch (e) { console.warn('[ST] Odds err:', e); }
-            try { this.updateDailyStreak(); } catch (e) { console.warn('[ST] Streak err:', e); }
+            this.updateDailyStreak().catch(e => console.warn('[ST] Streak err:', e));
         }
 
         // High-frequency updates: run every second
@@ -3826,7 +3826,7 @@ const StudyTargetTracker = {
     },
 
     // ─── Stats Card: Daily Streak ───────────────────────────────────────────
-    updateDailyStreak() {
+    async updateDailyStreak() {
         const valueEl = document.getElementById('daily-streak-value');
         const badgeEl = document.getElementById('daily-streak-badge');
         if (!valueEl || !badgeEl || !this.weeklyDebtData) return;
@@ -3841,6 +3841,29 @@ const StudyTargetTracker = {
                 streak++;
             } else {
                 break; // Streak broken
+            }
+        }
+
+        // If all 7 days qualify, keep fetching further back to find true streak length
+        if (streak >= sortedDays.length) {
+            let nextDay = sortedDays.length + 1;
+            let keepGoing = true;
+            while (keepGoing) {
+                try {
+                    const date = this.getLogicalDate(-nextDay);
+                    const result = await CacheManager.fetchWithCache(
+                        `api/analytics/get-yesterday-progress.php?date=${date}`, 300
+                    );
+                    const seconds = (result && result.success) ? (result.yesterday_total_seconds || 0) : 0;
+                    if (seconds >= this.DAILY_TARGET_SECONDS) {
+                        streak++;
+                        nextDay++;
+                    } else {
+                        keepGoing = false;
+                    }
+                } catch (e) {
+                    keepGoing = false;
+                }
             }
         }
 

@@ -256,7 +256,8 @@ class StreakManager {
             if (streak < tier.threshold) {
                 return {
                     daysLeft: tier.threshold - streak,
-                    name: tier.name
+                    name: tier.name,
+                    threshold: tier.threshold
                 };
             }
         }
