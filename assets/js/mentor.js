@@ -852,6 +852,11 @@ class StudyMentor {
         // Increment session counter
         this.sessionChain.completedSessions++;
 
+        // Record streak activity — Pomodoro completions count toward daily streak
+        if (typeof streakManager !== 'undefined') {
+            streakManager.recordActivity();
+        }
+
         // Only show UI on dashboard
         if (this.isOnDashboard()) {
             // Celebrate!

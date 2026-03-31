@@ -495,12 +495,6 @@ const SmartHeader = {
             });
         }
 
-        const streakMini = document.getElementById('streak-counter-mini');
-        if (streakMini) {
-            streakMini.addEventListener('click', () => {
-                if (window.loadPage) window.loadPage('analytics');
-            });
-        }
 
         const soundToggle = document.getElementById('header-sound-toggle');
         if (soundToggle) {
