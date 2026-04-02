@@ -303,6 +303,48 @@ function initializeExamPage() {
         // Reset styles first
         jsonValidationIndicator.classList.remove('bg-emerald-50', 'border-emerald-200', 'bg-rose-50', 'border-rose-200', 'bg-slate-100', 'border-slate-200');
         
+        // Multi-JSON Validation Logic
+        let jsonBlocks = [];
+        let parseError = null;
+
+        try {
+            JSON.parse(rawVal);
+            jsonBlocks = [rawVal];
+        } catch (e) {
+            parseError = e;
+            jsonBlocks = extractJSONObjects(rawVal);
+        }
+
+        if (jsonBlocks.length > 1) {
+            // Multiple objects detected, validate each
+            let allValid = true;
+            let lastErr = null;
+            let errIdx = -1;
+
+            jsonBlocks.forEach((block, idx) => {
+                try { JSON.parse(block); }
+                catch (e) { allValid = false; lastErr = e; errIdx = idx; }
+            });
+
+            if (allValid) {
+                currentErrorLine = -1;
+                updateLineNumbers();
+                if (aiFixJsonBtn) { aiFixJsonBtn.classList.add('hidden'); aiFixJsonBtn.classList.remove('flex'); }
+                jsonValidationDot.className = 'w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+                jsonValidationText.className = 'text-[10px] font-black uppercase tracking-wider text-emerald-600';
+                jsonValidationText.textContent = `${jsonBlocks.length} Valid JSON Objects`;
+                jsonValidationIndicator.classList.add('bg-emerald-50', 'border-emerald-200');
+                return;
+            } else {
+                // Show error for the specific block
+                jsonValidationText.textContent = `Obj #${errIdx + 1}: ${lastErr.message}`;
+                jsonValidationIndicator.classList.add('bg-rose-50', 'border-rose-200');
+                // We don't easily know the line number within the textarea for the specific block error here 
+                // without more complex math, so we just flag it.
+                return;
+            }
+        }
+
         try {
             JSON.parse(rawVal);
             // Valid
@@ -1366,73 +1408,146 @@ function initializeExamPage() {
         });
     }
 
+    function extractJSONObjects(str) {
+        const objects = [];
+        let braceCount = 0;
+        let startIdx = -1;
+        let inString = false;
+        let escape = false;
+
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (char === '\\') {
+                escape = true;
+                continue;
+            }
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+
+            if (char === '{') {
+                if (braceCount === 0) startIdx = i;
+                braceCount++;
+            } else if (char === '}') {
+                braceCount--;
+                if (braceCount === 0 && startIdx !== -1) {
+                    objects.push(str.substring(startIdx, i + 1));
+                    startIdx = -1;
+                }
+            }
+        }
+        return objects;
+    }
+
     // Bulk Import Listeners
     function handleBulkJSON(json, skipTopicDetection = false) {
         if (!json) return;
+        
+        let jsonBlocks = [];
         try {
-            const data = JSON.parse(json);
-            let arrayData;
-            let isFlat = false;
-            let topicsAlreadyLoaded = false;
-
-            // Detect {topic_summary, question_stream} wrapper format
-            if (!Array.isArray(data) && (data.question_stream || data.topic_summary)) {
-                // Extract topics if present
-                if (data.topic_summary && Array.isArray(data.topic_summary) && data.topic_summary.length > 0 && topicImportSection) {
-                    showTopicImport(data.topic_summary);
-                    showToast(`${data.topic_summary.length} topics detected!`);
-                    topicsAlreadyLoaded = true;
-                }
-                // Use question_stream as the main data
-                arrayData = Array.isArray(data.question_stream) ? data.question_stream : [];
-            } else {
-                arrayData = Array.isArray(data) ? data : [data];
-            }
-
-            // Detect flat question array: items have 'question' key but no 'data'/'Exam Title'
-            isFlat = arrayData.length > 0 && arrayData[0].question && !arrayData[0].data && !arrayData[0]["Exam Title"];
-            if (isFlat) {
-                // Wrap flat questions into the expected section format
-                arrayData = [{ "Exam Title": "Imported Questions", "data": arrayData }];
-            }
-
-            extractedSections = arrayData.map(item => ({
-                title: item["Exam Title"] || item["title"] || "Untitled Exam",
-                questions: (item.data || item.questions || []).map(q => ({
-                    ...q,
-                    priority: parseInt(q.priority) || 0
-                })),
-                target: { subject: 0, lesson: 0, topic: 0 },
-                isExcluded: false
-            })).filter(s => s.questions.length > 0);
-
-            if (!extractedSections.length) throw new Error("No valid exams/questions found.");
-
-            // Auto-detect topics from Exam Titles (only if not already loaded from topic_summary)
-            if (!skipTopicDetection && !topicsAlreadyLoaded && !isFlat && extractedSections.length > 0) {
-                const detectedTopics = extractedSections.map(s => ({
-                    topic_name: s.title,
-                    page_from: '',
-                    page_to: ''
-                })).filter(t => t.topic_name && t.topic_name !== 'Untitled Exam' && t.topic_name !== 'Imported Questions');
-
-                if (detectedTopics.length > 0 && topicImportSection) {
-                    showTopicImport(detectedTopics);
-                }
-            }
-
-            renderBulkTable();
-            renderSections();
-            showToast(`Queue Initialized: ${extractedSections.length} Exams detected.`);
-            bulkManualJsonInput.value = ''; // Clear after successful parse
-            updateLineNumbers();
-            validateLiveJSON();
+            // Try parsing as a single object/array first
+            JSON.parse(json);
+            jsonBlocks = [json];
         } catch (e) {
-            // Only show toast if it was a manual button click OR if the paste was clearly intended to be JSON
-            if (json.trim().startsWith('[') || json.trim().startsWith('{')) {
-                showToast(`JSON Error: ${e.message}`, 'error');
-            }
+            // If it fails, try extracting multiple objects
+            jsonBlocks = extractJSONObjects(json);
         }
+
+        if (jsonBlocks.length === 0) {
+            if (json.trim().startsWith('[') || json.trim().startsWith('{')) {
+                showToast(`JSON Error: Invalid structure or unclosed braces.`, 'error');
+            }
+            return;
+        }
+
+        let allSections = [];
+        let allTopics = [];
+        let totalObjectsDetected = jsonBlocks.length;
+
+        jsonBlocks.forEach((block, blockIdx) => {
+            try {
+                const data = JSON.parse(block);
+                let arrayData;
+                let isFlat = false;
+                let blockTopics = [];
+
+                // Detect {topic_summary, question_stream} wrapper format
+                if (!Array.isArray(data) && (data.question_stream || data.topic_summary)) {
+                    if (data.topic_summary && Array.isArray(data.topic_summary)) {
+                        blockTopics = data.topic_summary;
+                    }
+                    arrayData = Array.isArray(data.question_stream) ? data.question_stream : [];
+                } else {
+                    arrayData = Array.isArray(data) ? data : [data];
+                }
+
+                // Detect flat question array
+                isFlat = arrayData.length > 0 && arrayData[0].question && !arrayData[0].data && !arrayData[0]["Exam Title"];
+                if (isFlat) {
+                    arrayData = [{ "Exam Title": `Imported Batch ${blockIdx + 1}`, "data": arrayData }];
+                }
+
+                const blockSections = arrayData.map(item => ({
+                    title: item["Exam Title"] || item["title"] || "Untitled Exam",
+                    questions: (item.data || item.questions || []).map(q => ({
+                        ...q,
+                        priority: parseInt(q.priority) || 0
+                    })),
+                    target: { subject: 0, lesson: 0, topic: 0 },
+                    isExcluded: false
+                })).filter(s => s.questions.length > 0);
+
+                allSections = allSections.concat(blockSections);
+                allTopics = allTopics.concat(blockTopics);
+
+                // Auto-detect topics from titles if block had no summary
+                if (!skipTopicDetection && blockTopics.length === 0 && !isFlat && blockSections.length > 0) {
+                    const detected = blockSections.map(s => ({
+                        topic_name: s.title,
+                        page_from: '',
+                        page_to: ''
+                    })).filter(t => t.topic_name && t.topic_name !== 'Untitled Exam');
+                    allTopics = allTopics.concat(detected);
+                }
+            } catch (e) {
+                console.error(`Error parsing JSON block ${blockIdx + 1}:`, e);
+            }
+        });
+
+        if (allSections.length === 0) {
+            showToast("No valid exams or questions found in the provided JSON.", "error");
+            return;
+        }
+
+        extractedSections = allSections;
+
+        // Show combined topic import if any topics were found/detected
+        if (allTopics.length > 0 && topicImportSection) {
+            // Unique by topic_name
+            const uniqueTopics = [];
+            const seen = new Set();
+            allTopics.forEach(t => {
+                if (!seen.has(t.topic_name)) {
+                    seen.add(t.topic_name);
+                    uniqueTopics.push(t);
+                }
+            });
+            showTopicImport(uniqueTopics);
+            showToast(`${uniqueTopics.length} topics detected across ${totalObjectsDetected} objects!`);
+        }
+
+        renderBulkTable();
+        renderSections();
+        showToast(`Queue Initialized: ${extractedSections.length} Exams from ${totalObjectsDetected} JSON objects.`);
+        bulkManualJsonInput.value = ''; // Clear after successful parse
+        updateLineNumbers();
+        validateLiveJSON();
     }
 
     bulkInitQueueBtn.onclick = () => {
