@@ -2600,11 +2600,6 @@ function initializeExamPage() {
                 <div class="divide-y divide-slate-100" id="bulk-table-body">
                 </div>
 
-                <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-center sm:justify-end">
-                    <button id="import-all-btn" class="w-full sm:w-auto px-10 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-100 transition-all flex items-center justify-center gap-2 transform active:scale-95">
-                        <span class="material-symbols-outlined text-lg">rocket_launch</span> Import All Exams
-                    </button>
-                </div>
             </div>
         `;
 
@@ -2720,8 +2715,6 @@ function initializeExamPage() {
 
             body.appendChild(row);
         });
-
-        document.getElementById('import-all-btn').onclick = processImportAll;
     }
 
     function renderSections() {
@@ -2841,6 +2834,20 @@ function initializeExamPage() {
                 renderSections();
             };
         });
+
+        // Add the global Import All button after ALL sections
+        const importBtnContainer = document.createElement('div');
+        importBtnContainer.className = 'py-10 flex justify-center';
+        importBtnContainer.innerHTML = `
+            <button id="import-all-btn" class="w-full sm:w-auto px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-[28px] font-black text-lg shadow-2xl shadow-blue-200 transition-all flex items-center justify-center gap-3 transform active:scale-95 group">
+                <span class="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">rocket_launch</span> 
+                Import All Detected Exams
+            </button>
+        `;
+        sectionsContainer.appendChild(importBtnContainer);
+        
+        const importAllBtn = document.getElementById('import-all-btn');
+        if (importAllBtn) importAllBtn.onclick = processImportAll;
     }
 
     async function processImportAll() {
