@@ -42,7 +42,7 @@ $conn = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 // On a fresh machine, the database won't exist yet.
 // Instead of die()-ing, we create it and reconnect automatically.
 if ($conn->connect_error && $is_localhost) {
-    // Step 1: Connect WITHOUT specifying a database`
+    // Step 1: Connect WITHOUT specifying a database
     $_boot = @new mysqli(DB_HOST, DB_USER, DB_PASS);
     if (!$_boot->connect_error) {
         // Step 2: Create the database
