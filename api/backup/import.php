@@ -11,8 +11,18 @@
  * conflict=overwrite → REPLACE INTO  (overwrites matching IDs)
  */
 
+// ─── Suppress PHP HTML errors (critical for fresh-machine imports) ───────────
+// XAMPP has display_errors=On by default, which outputs <br /><b>Warning</b>
+// HTML that corrupts JSON responses and causes "Unexpected token '<'" on client.
+error_reporting(E_ALL);
+ini_set('display_errors', '0');   // Never output errors as HTML
+ini_set('log_errors', '1');       // Log them to php_error.log instead
+
 set_time_limit(300);
 ini_set('memory_limit', '256M');
+
+// Start output buffering to catch ANY stray output before JSON
+ob_start();
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -20,6 +30,7 @@ header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    ob_end_clean();
     http_response_code(200);
     exit;
 }
@@ -30,7 +41,9 @@ $host = $_SERVER['HTTP_HOST'] ?? '';
 $is_localhost = (
     in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) || 
     $host === 'localhost' || 
-    preg_match('/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host)
+    strpos($host, 'localhost') !== false ||
+    preg_match('/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host) ||
+    strpos($host, '192.168.') === 0
 );
 // ─── Fresh-Machine Bootstrap ──────────────────────────────────────────────────
 // Only run this on localhost. On live servers, we rely on CPanel/Manual DB creation.
@@ -54,6 +67,8 @@ require_once '../subject/db_connect.php';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function respond(bool $success, string $message, array $extra = []): void {
+    // Discard any stray PHP output (warnings, notices) that would corrupt JSON
+    if (ob_get_level()) ob_end_clean();
     echo json_encode(array_merge(['success' => $success, 'message' => $message], $extra),
         JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     exit;

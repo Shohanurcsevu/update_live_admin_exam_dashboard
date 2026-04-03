@@ -7,8 +7,18 @@
  * POST ?action=data&table=NAME&conflict=skip|overwrite  → body: { "rows": [...] }
  */
 
+// ─── Suppress PHP HTML errors (critical for fresh-machine imports) ───────────
+// XAMPP has display_errors=On by default, which outputs <br /><b>Warning</b>
+// HTML that corrupts JSON responses and causes "Unexpected token '<'" on client.
+error_reporting(E_ALL);
+ini_set('display_errors', '0');   // Never output errors as HTML
+ini_set('log_errors', '1');       // Log them to php_error.log instead
+
 set_time_limit(120);
 ini_set('memory_limit', '64M');
+
+// Start output buffering to catch ANY stray output before JSON
+ob_start();
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -16,11 +26,13 @@ header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    ob_end_clean();
     http_response_code(200);
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    ob_end_clean();
     http_response_code(405);
     echo json_encode(['error' => 'Only POST requests are accepted.']);
     exit;
@@ -32,7 +44,9 @@ $host = $_SERVER['HTTP_HOST'] ?? '';
 $is_localhost = (
     in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) || 
     $host === 'localhost' || 
-    preg_match('/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host)
+    strpos($host, 'localhost') !== false ||
+    preg_match('/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host) ||
+    strpos($host, '192.168.') === 0
 );
 
 if ($is_localhost) {
@@ -67,6 +81,8 @@ $ALLOWED_TABLES = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function respond_json($data) {
+    // Discard any stray PHP output (warnings, notices) that would corrupt JSON
+    if (ob_get_level()) ob_end_clean();
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }

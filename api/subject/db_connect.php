@@ -1,4 +1,9 @@
 <?php
+// Suppress HTML error output — all API consumers expect pure JSON.
+// XAMPP ships with display_errors=On which corrupts JSON with <br /><b>Warning</b> HTML.
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 // Set headers for JSON response and CORS
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
@@ -33,9 +38,28 @@ if ($is_localhost) {
 // Create database connection
 $conn = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
-// Check connection
+// ─── Self-Healing: Auto-create DB on localhost if it doesn't exist ────────────
+// On a fresh machine, the database won't exist yet.
+// Instead of die()-ing, we create it and reconnect automatically.
+if ($conn->connect_error && $is_localhost) {
+    // Step 1: Connect WITHOUT specifying a database`
+    $_boot = @new mysqli(DB_HOST, DB_USER, DB_PASS);
+    if (!$_boot->connect_error) {
+        // Step 2: Create the database
+        $_boot->query(
+            "CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "`
+             CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+        );
+        $_boot->close();
+
+        // Step 3: Reconnect with the now-existing database
+        $conn = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    }
+    unset($_boot);
+}
+
+// Check connection (final check after self-heal attempt)
 if ($conn->connect_error) {
-    // On failure, return a clean JSON error to prevent "Unexpected end of JSON"
     header("Content-Type: application/json; charset=UTF-8");
     die(json_encode([
         "success" => false, 
@@ -48,4 +72,3 @@ if ($conn->connect_error) {
 // Set charset and timezone
 $conn->set_charset("utf8mb4");
 $conn->query("SET time_zone = '+06:00'");
-?>
