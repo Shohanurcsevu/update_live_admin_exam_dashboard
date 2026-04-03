@@ -79,8 +79,6 @@
         { name: 'exam_setup_presets', icon: 'tune', label: 'Setup Presets' },
         { name: 'ai_usage_log', icon: 'receipt_long', label: 'AI Usage Log' },
         { name: 'todays_exams_list', icon: 'list_alt', label: 'Today\'s Exams' },
-        { name: 'streak_activity_log', icon: 'local_fire_department', label: 'Streak Log' },
-        { name: 'study_pacts', icon: 'handshake', label: 'Study Pacts' },
     ];
 
     // ─── Init ─────────────────────────────────────────────────────────────────────

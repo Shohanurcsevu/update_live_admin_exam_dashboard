@@ -73,8 +73,6 @@ $tables = [
     'exam_setup_presets',
     'ai_usage_log',
     'todays_exams_list',
-    'streak_activity_log',
-    'study_pacts',
 ];
 
 foreach ($tables as $table) {
