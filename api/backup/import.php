@@ -188,6 +188,8 @@ $table_order = [
     'exam_setup_presets',
     'ai_usage_log',
     'todays_exams_list',
+    'streak_activity_log',
+    'study_pacts',
 ];
 
 // ─── Schema Bootstrap (v1.1+): Create Tables If They Don't Exist ─────────────
