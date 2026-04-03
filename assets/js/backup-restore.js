@@ -54,15 +54,7 @@
 
     let TABLES = [];  // Populated from stats.php — no hardcoded list!
 
-    // ─── Init ─────────────────────────────────────────────────────────────────────
-
-    function init() {
-        fetchTableMetaAndStats();  // Fetch tables from API, then render
-        bindExport();
-        bindImport();
-        bindModal();
-        bindDragDrop();
-    }
+    // ─── Init is defined at the bottom of this file (after all helpers) ────────
 
     // ─── Table List & Stats ───────────────────────────────────────────────────────
 
@@ -1070,8 +1062,7 @@
     // ─── Start ────────────────────────────────────────────────────────────────
 
     function init() {
-        renderTableList();
-        fetchRecordStats();
+        fetchTableMetaAndStats();  // Fetch tables from API, then render
         bindExport();
         bindImport();
         bindModal();
