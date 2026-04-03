@@ -64,19 +64,12 @@ if ($is_localhost) {
 }
 
 require_once '../subject/db_connect.php';
+require_once __DIR__ . '/backup-config.php';
 
-// ─── Allowed Tables (whitelist) ──────────────────────────────────────────────
+// ─── Allowed Tables (auto-detect + fallback) ─────────────────────────────────
+// Merge DB tables with fallback list so imports work on both fresh and existing machines.
 
-$ALLOWED_TABLES = [
-    'subjects', 'lessons', 'topics', 'exams', 'questions',
-    'performance', 'question_attempts', 'question_srs',
-    'offline_exam_attempts', 'study_sessions', 'activity_log',
-    'mistake_bank', 'flashcards', 'reading_logs', 'user_streaks',
-    'job_countdown', 'trivia_snapshots', 'bpm_logs', 'app_settings',
-    'active_exam_sessions', 'ai_instruction_presets', 'ai_prompt_presets', 'exam_presets', 'exam_setup_presets',
-    'ai_usage_log', 'todays_exams_list',
-    'streak_activity_log', 'study_pacts',
-];
+$ALLOWED_TABLES = array_unique(array_merge(get_backup_tables($conn), BACKUP_TABLES_FALLBACK));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

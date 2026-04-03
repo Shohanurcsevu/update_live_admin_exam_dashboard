@@ -16,6 +16,7 @@ header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
 require_once '../subject/db_connect.php';
+require_once __DIR__ . '/backup-config.php';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,17 +41,7 @@ function ab_fetch_create_table(mysqli $conn, string $table): string {
 
 // ─── Build Export Object ─────────────────────────────────────────────────────
 
-$tables = [
-    'subjects', 'lessons', 'topics', 'exams', 'questions',
-    'performance', 'question_attempts', 'question_srs',
-    'offline_exam_attempts', 'study_sessions', 'activity_log',
-    'mistake_bank', 'flashcards', 'reading_logs', 'user_streaks',
-    'job_countdown', 'trivia_snapshots', 'bpm_logs',
-    'active_exam_sessions', 'ai_instruction_presets', 'ai_prompt_presets', 'app_settings',
-    'exam_presets', 'exam_setup_presets',
-    'ai_usage_log', 'todays_exams_list',
-    'streak_activity_log', 'study_pacts',
-];
+$tables = get_backup_tables($conn);
 
 $backup = [
     'backup_version' => '1.1',

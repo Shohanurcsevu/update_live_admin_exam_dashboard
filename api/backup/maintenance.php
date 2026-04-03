@@ -15,25 +15,13 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 require_once '../subject/db_connect.php';
+require_once __DIR__ . '/backup-config.php';
 
-// ─── Tables eligible for date-based cleanup ──────────────────────────────────
+// ─── Tables from shared config ───────────────────────────────────────────────
 
-$CLEANUP_TABLES = [
-    'activity_log' => ['date_col' => 'timestamp', 'label' => 'Activity Log'],
-    // NOTE: question_attempts and study_sessions are NOT cleaned up because
-    // they feed analytics (revision recommendations, skip analysis, study time charts).
-];
+$ALL_TABLES = get_backup_tables($conn);
 
-$ALL_TABLES = [
-    'subjects', 'lessons', 'topics', 'exams', 'questions',
-    'performance', 'question_attempts', 'question_srs',
-    'offline_exam_attempts', 'study_sessions', 'activity_log',
-    'mistake_bank', 'flashcards', 'reading_logs', 'user_streaks',
-    'job_countdown', 'trivia_snapshots', 'app_settings', 'bpm_logs',
-    'active_exam_sessions', 'ai_instruction_presets', 'ai_prompt_presets', 'exam_presets', 'exam_setup_presets',
-    'ai_usage_log', 'todays_exams_list',
-    'streak_activity_log', 'study_pacts',
-];
+// CLEANUP_TABLES is defined in backup-config.php
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

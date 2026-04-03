@@ -50,44 +50,14 @@
     const modalCancel = $('br-modal-cancel');
     const modalConfirm = $('br-modal-confirm');
 
-    // ─── Table Definitions (matches backend order) ────────────────────────────────
+    // ─── Table Definitions (fetched dynamically from API) ───────────────────────
 
-    const TABLES = [
-        { name: 'subjects', icon: 'subject', label: 'Subjects' },
-        { name: 'lessons', icon: 'library_books', label: 'Lessons' },
-        { name: 'topics', icon: 'topic', label: 'Topics' },
-        { name: 'exams', icon: 'quiz', label: 'Exams' },
-        { name: 'questions', icon: 'help_center', label: 'Questions' },
-        { name: 'performance', icon: 'fact_check', label: 'Performance' },
-        { name: 'question_attempts', icon: 'edit_note', label: 'Q. Attempts' },
-        { name: 'question_srs', icon: 'history_edu', label: 'SRS Data' },
-        { name: 'offline_exam_attempts', icon: 'offline_pin', label: 'Offline Attempts' },
-        { name: 'study_sessions', icon: 'schedule', label: 'Study Sessions' },
-        { name: 'activity_log', icon: 'timeline', label: 'Activity Log' },
-        { name: 'mistake_bank', icon: 'psychology', label: 'Mistake Bank' },
-        { name: 'flashcards', icon: 'style', label: 'Flashcards' },
-        { name: 'reading_logs', icon: 'book', label: 'Reading Logs' },
-        { name: 'user_streaks', icon: 'local_fire_department', label: 'Streaks' },
-        { name: 'job_countdown', icon: 'timer', label: 'Job Countdown' },
-        { name: 'trivia_snapshots', icon: 'emoji_events', label: 'Trivia Scores' },
-        { name: 'app_settings', icon: 'settings', label: 'App Settings' },
-        { name: 'bpm_logs', icon: 'favorite', label: 'BPM History' },
-        { name: 'active_exam_sessions', icon: 'timer', label: 'Active Sessions' },
-        { name: 'ai_instruction_presets', icon: 'smart_toy', label: 'AI Presets' },
-        { name: 'ai_prompt_presets', icon: 'settings_suggest', label: 'Prompt Presets' },
-        { name: 'exam_presets', icon: 'settings_backup_restore', label: 'Exam Presets' },
-        { name: 'exam_setup_presets', icon: 'tune', label: 'Setup Presets' },
-        { name: 'ai_usage_log', icon: 'receipt_long', label: 'AI Usage Log' },
-        { name: 'todays_exams_list', icon: 'list_alt', label: 'Today\'s Exams' },
-        { name: 'streak_activity_log', icon: 'local_fire_department', label: 'Streak Activity' },
-        { name: 'study_pacts', icon: 'handshake', label: 'Study Pacts' },
-    ];
+    let TABLES = [];  // Populated from stats.php — no hardcoded list!
 
     // ─── Init ─────────────────────────────────────────────────────────────────────
 
     function init() {
-        renderTableList();
-        fetchRecordStats();
+        fetchTableMetaAndStats();  // Fetch tables from API, then render
         bindExport();
         bindImport();
         bindModal();
@@ -96,28 +66,59 @@
 
     // ─── Table List & Stats ───────────────────────────────────────────────────────
 
+    async function fetchTableMetaAndStats() {
+        // Show loading state
+        if (tableList) tableList.innerHTML = `
+            <div class="flex items-center justify-center gap-2 py-4 col-span-full">
+                <span class="material-symbols-outlined text-indigo-400 animate-spin">sync</span>
+                <span class="text-xs text-gray-400">Loading tables...</span>
+            </div>`;
+        if (statTables) statTables.textContent = '...';
+        if (statRecords) statRecords.textContent = '...';
+
+        try {
+            const res = await fetch('api/backup/stats.php', { cache: 'no-store' });
+            if (!res.ok) throw new Error(`Server error: ${res.status}`);
+            const data = await res.json();
+
+            // Use table_meta from API (auto-detected from DB)
+            if (data.table_meta && data.table_meta.length > 0) {
+                TABLES = data.table_meta;  // [{name, icon, label, rows}, ...]
+            }
+
+            // Update stats
+            if (statTables) statTables.textContent = data.tables ?? TABLES.length;
+            if (statRecords) statRecords.textContent = (data.total_records ?? 0).toLocaleString();
+            if (statsBar) statsBar.classList.remove('hidden');
+
+            // Render table list
+            renderTableList();
+        } catch (err) {
+            console.warn('Failed to fetch table stats:', err);
+            // Fallback — show error state
+            if (tableList) tableList.innerHTML = `
+                <div class="flex items-center justify-center gap-2 py-4 col-span-full">
+                    <span class="material-symbols-outlined text-red-400">warning</span>
+                    <span class="text-xs text-red-400">Could not load tables. Is the server running?</span>
+                </div>`;
+            if (statTables) statTables.textContent = '0';
+            if (statRecords) statRecords.textContent = '0';
+        }
+    }
+
     function renderTableList() {
+        if (!tableList || TABLES.length === 0) return;
+
         tableList.innerHTML = TABLES.map(t => `
             <div class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <span class="material-symbols-outlined text-indigo-400 text-sm">${t.icon}</span>
                 <span class="text-xs font-bold text-gray-700">${t.label}</span>
+                <span class="ml-auto text-[10px] text-gray-400">${(t.rows ?? 0).toLocaleString()}</span>
             </div>`).join('');
 
         if (statsBar) {
             statTables.textContent = TABLES.length;
             statsBar.classList.remove('hidden');
-        }
-    }
-
-    async function fetchRecordStats() {
-        try {
-            const res = await fetch('api/backup/stats.php', { cache: 'no-store' });
-            if (!res.ok) return;
-            const data = await res.json();
-            if (statTables) statTables.textContent = data.tables ?? TABLES.length;
-            if (statRecords) statRecords.textContent = (data.total_records ?? 0).toLocaleString();
-        } catch (_) {
-            // Silently fall back — stats bar just shows defaults
         }
     }
 

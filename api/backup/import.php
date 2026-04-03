@@ -61,8 +61,8 @@ if ($is_localhost) {
     unset($_boot);
 }
 
-// Now connect normally through db_connect.php (DB is guaranteed to exist above)
 require_once '../subject/db_connect.php';
+require_once __DIR__ . '/backup-config.php';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -175,37 +175,8 @@ if (!empty($backup['checksum'])) {
 $conflict = isset($_GET['conflict']) && $_GET['conflict'] === 'overwrite' ? 'overwrite' : 'skip';
 $overwrite = ($conflict === 'overwrite');
 
-// Tables in dependency order (parent tables first so FK constraints aren't violated)
-$table_order = [
-    'subjects',
-    'lessons',
-    'topics',
-    'exams',
-    'questions',
-    'performance',
-    'question_attempts',
-    'question_srs',
-    'offline_exam_attempts',
-    'study_sessions',
-    'activity_log',
-    'mistake_bank',
-    'flashcards',
-    'reading_logs',
-    'user_streaks',
-    'job_countdown',
-    'trivia_snapshots',
-    'app_settings',
-    'bpm_logs',
-    'active_exam_sessions',
-    'ai_instruction_presets',
-    'ai_prompt_presets',
-    'exam_presets',
-    'exam_setup_presets',
-    'ai_usage_log',
-    'todays_exams_list',
-    'streak_activity_log',
-    'study_pacts',
-];
+// Tables in dependency order (auto-detect + fallback for fresh machines)
+$table_order = array_unique(array_merge(get_backup_tables($conn), BACKUP_TABLES_FALLBACK));
 
 // ─── Schema Bootstrap (v1.1+): Create Tables If They Don't Exist ─────────────
 // Only runs when the backup contains a schema section (v1.1+).
