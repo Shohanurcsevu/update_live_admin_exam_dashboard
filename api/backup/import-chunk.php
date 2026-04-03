@@ -61,6 +61,7 @@ $ALLOWED_TABLES = [
     'job_countdown', 'trivia_snapshots', 'bpm_logs', 'app_settings',
     'active_exam_sessions', 'ai_instruction_presets', 'ai_prompt_presets', 'exam_presets', 'exam_setup_presets',
     'ai_usage_log', 'todays_exams_list',
+    'streak_activity_log', 'study_pacts',
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -177,6 +178,13 @@ if ($action === 'schema') {
     $table = $_GET['table'] ?? '';
     $conflict = ($_GET['conflict'] ?? 'skip') === 'overwrite' ? 'overwrite' : 'skip';
     $overwrite = ($conflict === 'overwrite');
+
+    // Always overwrite app_settings — these are user preferences (avatar, font, name, accent)
+    // that MUST transfer to the new machine. INSERT IGNORE would silently skip them
+    // if the target already has any matching setting_key entries.
+    if ($table === 'app_settings') {
+        $overwrite = true;
+    }
 
     if (!in_array($table, $ALLOWED_TABLES, true)) {
         $conn->close();
