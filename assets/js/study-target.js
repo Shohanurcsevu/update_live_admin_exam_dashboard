@@ -173,8 +173,8 @@ const StudyTargetTracker = {
     async fetchAllSubjects() {
         try {
             const result = await CacheManager.fetchWithCache('api/exam/subjects.php', 60);
-            if (result) {
-                this.allSubjects = result || [];
+            if (result && result.success) {
+                this.allSubjects = result.data || [];
             }
         } catch (error) {
             console.error("Error fetching all subjects:", error);
@@ -270,17 +270,18 @@ const StudyTargetTracker = {
                     // (already handled by last_active_timestamp sync above, but good to be explicit here)
                 }
 
+                // Store today's studied subjects (base list)
                 const dailyData = result.subjects || [];
 
-                // Merge dailyData into allSubjects
-                this.subjects = this.allSubjects.map(subj => {
-                    const daySubj = dailyData.find(d => d.subject_id == subj.id || d.subject_name === subj.subject_name);
+                // Enrich dailyData with persistent IDs from allSubjects if available
+                this.subjects = dailyData.map(d => {
+                    const sDef = (this.allSubjects || []).find(s => 
+                        s.id == d.subject_id || s.subject_name === d.subject_name
+                    );
                     return {
-                        subject_name: subj.subject_name,
-                        subject_id: subj.id,
-                        seconds: daySubj ? daySubj.seconds : 0,
-                        formatted: daySubj ? daySubj.formatted : '0m',
-                        session_count: daySubj ? daySubj.session_count : 0
+                        ...d,
+                        subject_id: sDef ? sDef.id : d.subject_id,
+                        // Fallback to name if ID missing, ensures logic doesn't break
                     };
                 });
 
@@ -778,6 +779,11 @@ const StudyTargetTracker = {
 
         // High-frequency updates: run every second
         try { this.updateVelocity(); } catch (e) { console.warn('[ST] Velocity err:', e); }
+
+        // Live Pulse for Velocity Trend (if data is loaded)
+        if (this.lastHeatmapGrid) {
+            try { this.renderVelocityTrend(this.lastHeatmapGrid); } catch (e) {}
+        }
         try { this.updateSessionEndurance(); } catch (e) { console.warn('[ST] Focus Volume err:', e); }
     },
 
@@ -3177,6 +3183,10 @@ const StudyTargetTracker = {
 
         const { grid, days, peak_hour, peak_minutes } = data;
         this.historicalPeakHour = peak_hour;
+        this.lastHeatmapGrid = grid && grid[6] ? grid[6] : null;
+
+        // NEW: Render Velocity Trend Line Chart (Today's row = grid[6])
+        if (this.lastHeatmapGrid) this.renderVelocityTrend(this.lastHeatmapGrid);
 
         // Update peak badge
         if (peakBadge && peak_hour !== undefined) {
@@ -3708,61 +3718,237 @@ const StudyTargetTracker = {
     // ─── Intelligence Feature 3: Smart Subject Rotation ─────────────────────
     checkSubjectRotation() {
         const cardEl = document.getElementById('subject-rotation-card');
+        const headerLabel = document.getElementById('rotation-header-label');
+        const balanceView = document.getElementById('rotation-balance-view');
+        const suggestionView = document.getElementById('rotation-suggestion-view');
+        const toggleBtn = document.getElementById('rotation-toggle-btn');
+        
         const nameEl = document.getElementById('rotation-subject-name');
         const reasonEl = document.getElementById('rotation-reason');
-        if (!cardEl || !nameEl || !reasonEl) return;
+        
+        if (!cardEl || !headerLabel || !balanceView || !suggestionView) return;
 
-        // Only show when actively studying
-        const isStudying = document.body.classList.contains('pomo-session-active');
-        if (!isStudying || !this.subjects || this.subjects.length < 2) {
-            cardEl.classList.add('hidden');
-            return;
-        }
+        const setView = (type) => {
+            if (type === 'suggestion') {
+                headerLabel.textContent = 'Switch To';
+                balanceView.classList.add('hidden');
+                suggestionView.classList.remove('hidden');
+                this._rotationViewState = 'suggestion';
+            } else {
+                headerLabel.textContent = 'Balance';
+                balanceView.classList.remove('hidden');
+                suggestionView.classList.add('hidden');
+                this._rotationViewState = 'balance';
+                this.renderSubjectBalance();
+            }
+        };
 
-        // Find current active subject (the one being studied right now)
+        // ─── Prepare Suggestion Data (always compute, even if not shown) ───
+        let hasSuggestion = false;
         const activeSubjects = this.subjects.filter(s => s.seconds > 0);
-        if (activeSubjects.length === 0) { cardEl.classList.add('hidden'); return; }
+        if (activeSubjects.length >= 2) {
+            const sorted = [...activeSubjects].sort((a, b) => b.seconds - a.seconds);
+            const topSubject = sorted[0];
+            const topMinutes = topSubject.seconds / 60;
 
-        // Sort by study time to find the most-studied subject today
-        const sorted = [...activeSubjects].sort((a, b) => b.seconds - a.seconds);
-        const topSubject = sorted[0];
+            if (topMinutes >= 90) {
+                const candidates = this.subjects.filter(s => {
+                    return s.subject_name !== topSubject.subject_name && s.seconds < topSubject.seconds;
+                });
 
-        // Only suggest rotation if the top subject has been studied > 90 minutes
-        const topMinutes = topSubject.seconds / 60;
-        if (topMinutes < 90) {
-            cardEl.classList.add('hidden');
+                if (candidates.length > 0) {
+                    const scored = candidates.map(c => ({
+                        subject_name: c.subject_name,
+                        score: (topSubject.seconds - c.seconds) / 60,
+                        todayMins: Math.round(c.seconds / 60)
+                    })).sort((a, b) => b.score - a.score);
+
+                    const best = scored[0];
+                    hasSuggestion = true;
+
+                    // Populate suggestion content (even if hidden)
+                    nameEl.textContent = best.subject_name;
+                    const topMins = Math.round(topMinutes);
+                    if (best.todayMins === 0) {
+                        reasonEl.textContent = `${topSubject.subject_name} at ${topMins}m · Start this`;
+                    } else {
+                        reasonEl.textContent = `${topSubject.subject_name} at ${topMins}m · This only ${best.todayMins}m`;
+                    }
+                }
+            }
+        }
+
+        this._hasSuggestion = hasSuggestion;
+
+        // ─── Toggle Button Click Handler (attach once) ───────────────────
+        if (!this._rotationToggleAdded && toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this._rotationViewState === 'balance' && this._hasSuggestion) {
+                    setView('suggestion');
+                } else {
+                    setView('balance');
+                }
+            });
+            this._rotationToggleAdded = true;
+        }
+
+        // ─── Initial View: Show balance by default ───────────────────────
+        // Only auto-flip on first load or if user hasn't manually toggled
+        if (!this._rotationViewState) {
+            setView('balance');
+        } else if (this._rotationViewState === 'balance') {
+            // Refresh the donut without flipping
+            this.renderSubjectBalance();
+        }
+    },
+
+    renderSubjectBalance() {
+        const canvas = document.getElementById('rotation-balance-canvas');
+        const metaEl = document.getElementById('rotation-balance-meta');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const size = 52;
+        canvas.width = size * 2; // HiDPI
+        canvas.height = size * 2;
+        ctx.scale(2, 2);
+        
+        const activeSubjects = this.subjects.filter(s => s.seconds > 10);
+        if (activeSubjects.length === 0) {
+            ctx.clearRect(0, 0, size, size);
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '8px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data', size / 2, size / 2 + 3);
+            if (metaEl) metaEl.innerHTML = '<span class="text-[9px] text-gray-400">No study data yet</span>';
             return;
         }
 
-        // Find the best candidate to switch to:
-        // Compare against today's subjects list
-        const candidates = this.subjects.filter(s => {
-            return s.name !== topSubject.name && s.seconds < topSubject.seconds;
+        const totalSeconds = activeSubjects.reduce((acc, s) => acc + s.seconds, 0);
+        const sorted = [...activeSubjects].sort((a, b) => b.seconds - a.seconds);
+
+        // Map database colors to Hex
+        const colorMap = {};
+        this.allSubjects.forEach(s => {
+            const hexMap = {
+                'indigo': '#6366f1', 'emerald': '#10b981', 'rose': '#f43f5e', 
+                'amber': '#f59e0b', 'violet': '#8b5cf6', 'sky': '#0ea5e9', 
+                'fuchsia': '#d946ef', 'orange': '#f97316', 'cyan': '#06b6d4', 
+                'teal': '#14b8a6', 'blue': '#3b82f6', 'pink': '#ec4899', 
+                'lime': '#84cc16', 'yellow': '#eab308', 'slate': '#64748b'
+            };
+            colorMap[s.subject_name] = hexMap[s.color_class] || '#6366f1';
         });
 
-        if (candidates.length === 0) { cardEl.classList.add('hidden'); return; }
+        const PALETTE = [
+            '#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6',
+            '#0ea5e9', '#d946ef', '#f97316', '#06b6d4', '#84cc16'
+        ];
 
-        // Score candidates: lower today-time = higher priority
-        const scored = candidates.map(c => {
-            return {
-                name: c.name,
-                score: (topSubject.seconds - c.seconds) / 60,
-                todayMins: Math.round(c.seconds / 60)
-            };
-        }).sort((a, b) => b.score - a.score);
+        // ─── Draw Donut Chart ────────────────────────────────────────────
+        ctx.clearRect(0, 0, size, size);
+        const cx = size / 2;
+        const cy = size / 2;
+        const outerR = (size / 2) - 2;
+        const innerR = outerR * 0.55; // Donut hole ratio
+        let startAngle = -Math.PI / 2; // Start from top
 
-        const best = scored[0];
-        cardEl.classList.remove('hidden');
-        nameEl.textContent = best.name;
+        this._rotationRegions = [];
 
-        const topMins = Math.round(topMinutes);
-        if (best.todayMins === 0) {
-            reasonEl.textContent = `${topSubject.name} at ${topMins}m · Start this`;
-        } else {
-            reasonEl.textContent = `${topSubject.name} at ${topMins}m · This only ${best.todayMins}m`;
+        sorted.forEach((s, idx) => {
+            const fraction = s.seconds / totalSeconds;
+            const sweep = fraction * Math.PI * 2;
+            const endAngle = startAngle + sweep;
+            const color = colorMap[s.subject_name] || PALETTE[idx % PALETTE.length];
+
+            // Draw arc segment
+            ctx.beginPath();
+            ctx.arc(cx, cy, outerR, startAngle, endAngle);
+            ctx.arc(cx, cy, innerR, endAngle, startAngle, true);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            // Thin separator line
+            ctx.beginPath();
+            ctx.moveTo(cx + innerR * Math.cos(startAngle), cy + innerR * Math.sin(startAngle));
+            ctx.lineTo(cx + outerR * Math.cos(startAngle), cy + outerR * Math.sin(startAngle));
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            this._rotationRegions.push({
+                startAngle,
+                endAngle,
+                name: s.subject_name,
+                percent: Math.round(fraction * 100),
+                mins: Math.round(s.seconds / 60)
+            });
+
+            startAngle = endAngle;
+        });
+
+        // Center text: total time
+        const totalMins = Math.round(totalSeconds / 60);
+        const th = Math.floor(totalMins / 60);
+        const tm = totalMins % 60;
+        const centerText = th > 0 ? `${th}h${tm > 0 ? tm : ''}` : `${tm}m`;
+        ctx.fillStyle = '#0e7490'; // cyan-700
+        ctx.font = 'bold 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(centerText, cx, cy);
+
+        // ─── Side Legend ─────────────────────────────────────────────────
+        if (metaEl) {
+            metaEl.innerHTML = '';
+            // Show top 4 subjects max to keep it compact
+            const legendItems = sorted.slice(0, 4);
+            legendItems.forEach((s, idx) => {
+                const color = colorMap[s.subject_name] || PALETTE[idx % PALETTE.length];
+                const mins = Math.round(s.seconds / 60);
+                const pct = Math.round((s.seconds / totalSeconds) * 100);
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-1 min-w-0';
+                row.innerHTML = `
+                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:${color}"></span>
+                    <span class="text-[8px] font-bold text-slate-600 truncate">${s.subject_name}</span>
+                    <span class="text-[8px] font-black text-slate-800 ml-auto flex-shrink-0">${pct}%</span>
+                `;
+                metaEl.appendChild(row);
+            });
+            if (sorted.length > 4) {
+                const more = document.createElement('div');
+                more.className = 'text-[7px] text-slate-400 font-bold';
+                more.textContent = `+${sorted.length - 4} more`;
+                metaEl.appendChild(more);
+            }
         }
-        reasonEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-cyan-100 text-cyan-600 w-fit uppercase tracking-tighter';
+
+        // Tooltip interaction
+        if (!this._rotationListenerAdded) {
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left - rect.width / 2;
+                const my = e.clientY - rect.top - rect.height / 2;
+                let angle = Math.atan2(my, mx);
+                if (angle < -Math.PI / 2) angle += Math.PI * 2;
+
+                const region = this._rotationRegions.find(r => {
+                    let sa = r.startAngle, ea = r.endAngle;
+                    return angle >= sa && angle < ea;
+                });
+                if (region) {
+                    canvas.title = `${region.name}: ${region.mins}m (${region.percent}%)`;
+                } else {
+                    canvas.title = 'Subject Balance';
+                }
+            });
+            this._rotationListenerAdded = true;
+        }
     },
+
 
     // ─── Stats Card: Completion Odds ────────────────────────────────────────
     updateCompletionOdds() {
@@ -4062,6 +4248,116 @@ const StudyTargetTracker = {
             const fatigueVal = Math.max(0, fatigueDropPercent);
             fatigueEl.textContent = `${fatigueVal.toFixed(1)}%`;
             fatigueEl.className = `text-[9px] font-black ${fatigueVal > 10 ? 'text-rose-500' : themeColorClass} opacity-80`;
+        }
+    },
+
+    // ─── Velocity Pulse Line Chart ───────────────────────────────────────────
+    renderVelocityTrend(todayGrid) {
+        const canvas = document.getElementById('velocity-trend-canvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d', { alpha: true });
+        const width = canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+        const height = canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        const w = width / window.devicePixelRatio;
+        const h = height / window.devicePixelRatio;
+
+        const now = new Date(Date.now() + (this.serverClockOffset || 0));
+        const currentHour = now.getHours();
+
+        // Re-align todayGrid (0-23) to logical 5AM cycle (0-23)
+        const ordered = [];
+        for (let i = 0; i < 24; i++) {
+            const h = (i + this.TIMELINE_START_HOUR) % 24;
+            ordered.push({ hour: h, mins: todayGrid[h] || 0 });
+        }
+
+        const maxMins = 60; // Max possible per hour
+        const getX = (i) => (i / 23) * w;
+        const getY = (mins) => h - (mins / maxMins) * h * 0.8 - 2; // Leave some margin
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw Area Gradient
+        const gradient = ctx.createLinearGradient(0, 0, 0, h);
+        gradient.addColorStop(0, 'rgba(217, 70, 239, 0.15)');
+        gradient.addColorStop(1, 'rgba(217, 70, 239, 0)');
+
+        ctx.beginPath();
+        ctx.moveTo(getX(0), h);
+        
+        // Use Bezier for smooth curves
+        ctx.lineTo(getX(0), getY(ordered[0].mins));
+        for (let i = 0; i < ordered.length - 1; i++) {
+            const x1 = getX(i);
+            const y1 = getY(ordered[i].mins);
+            const x2 = getX(i + 1);
+            const y2 = getY(ordered[i + 1].mins);
+            const midX = (x1 + x2) / 2;
+            ctx.bezierCurveTo(midX, y1, midX, y2, x2, y2);
+        }
+        ctx.lineTo(w, h);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw Stroke Line
+        ctx.beginPath();
+        ctx.strokeStyle = '#d946ef'; // fuchsia-500
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.moveTo(getX(0), getY(ordered[0].mins));
+        for (let i = 0; i < ordered.length - 1; i++) {
+            const x1 = getX(i);
+            const y1 = getY(ordered[i].mins);
+            const x2 = getX(i + 1);
+            const y2 = getY(ordered[i + 1].mins);
+            const midX = (x1 + x2) / 2;
+            ctx.bezierCurveTo(midX, y1, midX, y2, x2, y2);
+        }
+        ctx.stroke();
+
+        // Highlight Current Hour
+        const currentIdx = ordered.findIndex(o => o.hour === currentHour);
+        if (currentIdx !== -1) {
+            const cx = getX(currentIdx);
+            const cy = getY(ordered[currentIdx].mins);
+
+            // Pulse effect
+            const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3 + pulse * 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(217, 70, 239, 0.2)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#d946ef';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // Tooltip Interaction
+        if (!this._velocityTrendListenerAdded) {
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = (e.clientX - rect.left) * (w / rect.width);
+                const idx = Math.round((mouseX / w) * 23);
+                
+                if (ordered[idx]) {
+                    const o = ordered[idx];
+                    const hDisp = o.hour % 12 || 12;
+                    const ampm = o.hour >= 12 ? 'pm' : 'am';
+                    canvas.title = `${hDisp}${ampm}: ${Math.round(o.mins)}m studied`;
+                }
+            });
+            this._velocityTrendListenerAdded = true;
         }
     }
 };

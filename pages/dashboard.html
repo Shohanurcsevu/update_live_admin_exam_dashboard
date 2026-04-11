@@ -169,19 +169,31 @@
                         </div>
 
                         <!-- Smart Subject Rotation -->
-                        <div id="subject-rotation-card" class="col-span-2 lg:col-span-1 bg-cyan-50/60 p-3 rounded-xl border border-cyan-100 flex flex-col justify-between min-h-[80px] hidden">
+                        <div id="subject-rotation-card" class="col-span-2 lg:col-span-1 bg-cyan-50/60 p-3 rounded-xl border border-cyan-100 flex flex-col justify-between min-h-[80px] transition-all duration-300">
                             <div class="flex justify-between items-center mb-1">
-                                <p class="text-[10px] font-black text-cyan-600 uppercase tracking-widest">Switch To</p>
-                                <span class="material-symbols-outlined text-[12px] text-cyan-400 tooltip-trigger"
+                                <p id="rotation-header-label" class="text-[10px] font-black text-cyan-600 uppercase tracking-widest">Balance</p>
+                                <span id="rotation-toggle-btn" class="material-symbols-outlined text-[12px] text-cyan-400 tooltip-trigger cursor-pointer hover:text-cyan-600 transition-colors"
                                       data-tooltip-title="Smart Rotation"
-                                      data-tooltip-desc="Suggests the optimal next subject to switch to based on diminishing returns."
+                                      data-tooltip-desc="Click to toggle between Subject Balance and Rotation Suggestion."
                                       data-tooltip-color="#0891b2">swap_horiz</span>
                             </div>
-                            <div id="rotation-subject-name" class="text-sm font-black text-cyan-900 truncate">
-                                --
+                            
+                            <!-- State 1: Balance Graph (Default) -->
+                            <div id="rotation-balance-view" class="flex items-center gap-2 flex-1">
+                                <canvas id="rotation-balance-canvas" width="52" height="52" class="flex-shrink-0 cursor-help" style="width:52px;height:52px;"></canvas>
+                                <div id="rotation-balance-meta" class="flex flex-col gap-0.5 overflow-hidden flex-1 min-w-0">
+                                    <!-- Dynamic legend rows inserted here -->
+                                </div>
                             </div>
-                            <div id="rotation-reason" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-cyan-100 text-cyan-600 w-fit uppercase tracking-tighter">
-                                Monitoring
+
+                            <!-- State 2: Suggestion View (Triggered) -->
+                            <div id="rotation-suggestion-view" class="hidden flex flex-col justify-between h-full">
+                                <div id="rotation-subject-name" class="text-sm font-black text-cyan-900 truncate">
+                                    --
+                                </div>
+                                <div id="rotation-reason" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-cyan-100 text-cyan-600 w-fit uppercase tracking-tighter">
+                                    Monitoring
+                                </div>
                             </div>
                         </div>
 
@@ -253,7 +265,12 @@
                             </div>
                             
                             <div id="velocity-value" class="text-2xl font-black text-fuchsia-900 leading-none">
-                                --<span class="text-xs opacity-50 font-normal ml-1">m/hr</span>
+                                --<span class="text-xs opacity-50 font-normal ml-1">m/hr</span><span id="velocity-trend-arrow"></span>
+                            </div>
+
+                            <!-- Velocity Trend Line Chart -->
+                            <div class="h-10 my-1 relative">
+                                <canvas id="velocity-trend-canvas" class="w-full h-full opacity-80 cursor-crosshair"></canvas>
                             </div>
 
                             <!-- Compact horizontal behavioral row (No Labels) -->
