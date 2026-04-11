@@ -65,6 +65,14 @@ const StudyTargetTracker = {
         12: "Legacy Session"
     },
     MILESTONE_PALETTE: ["#f94144","#f3722c","#f8961e","#f9844a","#f9c74f","#90be6d","#43aa8b","#4d908e","#577590","#277da1","#3f37c9","#f72585"],
+    
+    // NEW: Subject Coverage Data
+    subjectCoverage: {
+        today: 0,
+        yesterday: 0,
+        thisMonth: 0,
+        totalSubjects: 0
+    },
 
     // Helper: Convert HEX to RGBA
     hexToRgba(hex, alpha = 1) {
@@ -214,9 +222,22 @@ const StudyTargetTracker = {
                 if (result.yesterday_seconds) {
                     this.yesterdayFullTotalSeconds = result.yesterday_seconds;
                 }
-                if (result.all_time_best_seconds !== undefined) {
+                if (result.all_time_best_seconds) {
                     this.allTimeBestSeconds = result.all_time_best_seconds;
                 }
+
+                // --- NEW: Handle Subject Coverage Data ---
+                if (result.today_subject_count !== undefined) {
+                    this.subjectCoverage = {
+                        today: result.today_subject_count,
+                        yesterday: result.yesterday_subject_count || 0,
+                        thisMonth: result.monthly_subject_count || 0,
+                        totalSubjects: result.total_system_subjects || 0
+                    };
+                    this.updateSubjectCoverage();
+                }
+
+                this.subjects = result.subjects || [];
 
                 // --- NEW: Sync Server Clock Offset ---
                 if (result.server_time) {
@@ -752,7 +773,7 @@ const StudyTargetTracker = {
             try { this.predictFocusCliff(); } catch (e) { console.warn('[ST] FocusCliff err:', e); }
             try { this.checkSubjectRotation(); } catch (e) { console.warn('[ST] Rotation err:', e); }
             try { this.updateCompletionOdds(); } catch (e) { console.warn('[ST] Odds err:', e); }
-            this.updateDailyStreak().catch(e => console.warn('[ST] Streak err:', e));
+            this.updateSubjectCoverage().catch(e => console.warn('[ST] Coverage err:', e));
         }
 
         // High-frequency updates: run every second
@@ -3826,42 +3847,43 @@ const StudyTargetTracker = {
     },
 
     // ─── Stats Card: Daily Streak ───────────────────────────────────────────
-    async updateDailyStreak() {
-        const valueEl = document.getElementById('daily-streak-value');
-        const badgeEl = document.getElementById('daily-streak-badge');
-        if (!valueEl || !badgeEl) return;
+    /**
+     * Updates the "Subject Coverage" card on the dashboard.
+     * Replaces the old Daily Streak logic.
+     */
+    async updateSubjectCoverage() {
+        const valueEl = document.getElementById('subject-coverage-value');
+        const badgeEl = document.getElementById('subject-coverage-badge');
+        const monthEl = document.getElementById('subject-coverage-month');
+        if (!valueEl || !badgeEl || !monthEl) return;
 
-        // UNIFIED: Read from streakManager (single source of truth backed by user_streaks DB)
-        // This ensures header and dashboard always show the same streak number
-        if (typeof streakManager === 'undefined') return;
+        const { today, yesterday, thisMonth, totalSubjects } = this.subjectCoverage;
 
-        const streak = streakManager.streakData.current_streak;
-        const riskInfo = streakManager.getStreakRiskInfo();
-        const freezeAvailable = streakManager.streakData.freeze_available;
+        // Display Today's Count
+        valueEl.textContent = today;
 
-        if (streak === 0) {
-            valueEl.textContent = '0';
-            valueEl.className = 'text-2xl font-black text-gray-400';
-            badgeEl.textContent = 'Start a session!';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
-        } else if (riskInfo.status === 'safe') {
-            valueEl.textContent = `🔥 ${streak}`;
-            valueEl.className = 'text-2xl font-black text-orange-600';
-            badgeEl.textContent = '✅ Secured today';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
-        } else if (riskInfo.status === 'at_risk') {
-            valueEl.textContent = `🔥 ${streak}`;
-            valueEl.className = 'text-2xl font-black text-amber-500';
-            const freezeNote = freezeAvailable ? ' (❄️ freeze ready)' : '';
-            badgeEl.textContent = `⚠️ ${riskInfo.hoursLeft}h left${freezeNote}`;
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter animate-pulse';
-        } else {
-            // broken or unknown — show current value, will reset on next activity
-            valueEl.textContent = `🔥 ${streak}`;
-            valueEl.className = 'text-2xl font-black text-rose-500';
-            badgeEl.textContent = freezeAvailable ? '❄️ Freeze will save you' : 'Streak at risk!';
-            badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
+        // Determine Trend Arrow & Color
+        let trendIcon = "trending_flat";
+        let trendColor = "text-amber-500";
+        let trendText = today === yesterday ? "Same as yesterday" : (today > yesterday ? "Increasing diversity" : "Below yesterday");
+
+        if (today > yesterday) {
+            trendIcon = "trending_up";
+            trendColor = "text-emerald-600";
+        } else if (today < yesterday) {
+            trendIcon = "trending_down";
+            trendColor = "text-rose-500";
         }
+
+        // Update Badge
+        badgeEl.innerHTML = `<span class="material-symbols-outlined align-middle mr-0.5" style="font-size: 10px;">${trendIcon}</span> ${trendText}`;
+        badgeEl.className = `text-[8px] font-bold px-1.5 py-0.5 rounded-sm w-fit uppercase tracking-tighter transition-all duration-300 ${
+            today > yesterday ? "bg-emerald-100 text-emerald-600" : (today < yesterday ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-600")
+        }`;
+
+        // Update Monthly Progress
+        const coveragePercent = totalSubjects > 0 ? Math.round((thisMonth / totalSubjects) * 100) : 0;
+        monthEl.textContent = `${thisMonth}/${totalSubjects} Monthly (${coveragePercent}%)`;
     },
 
     // ─── Stats Card: Session Endurance ───────────────────────────────────────

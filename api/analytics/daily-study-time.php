@@ -292,6 +292,63 @@ try {
     // Ensure today's current total is also considered if it's the new record
     $all_time_best_seconds = max($all_time_best_seconds, $total_today_seconds);
 
+    // --- Added: Fetch Yesterday's Subject Count ---
+    $yesterday_subjects_sql = "
+        SELECT COUNT(DISTINCT subject_name) as count
+        FROM (
+            SELECT s.subject_name
+            FROM performance p
+            JOIN exams e ON p.exam_id = e.id
+            JOIN subjects s ON e.subject_id = s.id
+            WHERE p.attempt_time BETWEEN '$y_start_ts' AND '$y_end_ts'
+            
+            UNION ALL
+            
+            SELECT activity_message as subject_name
+            FROM activity_log
+            WHERE activity_type = 'pomodoro_session'
+            AND timestamp BETWEEN '$y_start_ts' AND '$y_end_ts'
+            AND (activity_details IS NULL OR activity_details = '' OR activity_details LIKE '%\"status\":\"completed\"%' OR activity_details NOT LIKE '%\"status\"%')
+        ) yesterday_combined
+    ";
+    $yesterday_subjects_res = $conn->query($yesterday_subjects_sql);
+    $yesterday_subject_count = ($yesterday_subjects_res && $row = $yesterday_subjects_res->fetch_assoc()) ? intval($row['count']) : 0;
+
+    // --- Added: Fetch Monthly Subject Count ---
+    $month_start = date('Y-m-01', strtotime($study_date)) . ' 05:00:00';
+    $monthly_subjects_sql = "
+        SELECT COUNT(DISTINCT subject_name) as count
+        FROM (
+            SELECT s.subject_name
+            FROM performance p
+            JOIN exams e ON p.exam_id = e.id
+            JOIN subjects s ON e.subject_id = s.id
+            WHERE p.attempt_time BETWEEN '$month_start' AND '$end_ts'
+            
+            UNION ALL
+            
+            SELECT activity_message as subject_name
+            FROM activity_log
+            WHERE activity_type = 'pomodoro_session'
+            AND timestamp BETWEEN '$month_start' AND '$end_ts'
+            AND (activity_details IS NULL OR activity_details = '' OR activity_details LIKE '%\"status\":\"completed\"%' OR activity_details NOT LIKE '%\"status\"%')
+        ) monthly_combined
+    ";
+    $monthly_subjects_res = $conn->query($monthly_subjects_sql);
+    $monthly_subject_count = ($monthly_subjects_res && $row = $monthly_subjects_res->fetch_assoc()) ? intval($row['count']) : 0;
+
+    // --- Added: Fetch Total Number of Subjects ---
+    $total_subjects_res = $conn->query("SELECT COUNT(*) as count FROM subjects");
+    $total_system_subjects = ($total_subjects_res && $row = $total_subjects_res->fetch_assoc()) ? intval($row['count']) : 0;
+
+    // Calculate today's subjects count (only those with at least one session or active)
+    $today_subject_count = 0;
+    foreach ($subjects as $s) {
+        if ($s['session_count'] > 0 || $s['seconds'] > 300) { // Count if session completed OR more than 5 mins studied
+            $today_subject_count++;
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'server_time' => time(),
@@ -304,6 +361,10 @@ try {
         'improvement_percent' => round($improvement, 1),
         'improvement_type' => $improvement_type,
         'subjects' => $subjects,
+        'today_subject_count' => $today_subject_count,
+        'yesterday_subject_count' => $yesterday_subject_count,
+        'monthly_subject_count' => $monthly_subject_count,
+        'total_system_subjects' => $total_system_subjects,
         'calc_idle_seconds' => $calc_idle_seconds,
         'last_active_timestamp' => $last_active_timestamp
     ]);

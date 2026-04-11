@@ -202,20 +202,23 @@
                             </div>
                         </div>
 
-                        <!-- Daily Streak -->
-                        <div id="daily-streak-card" class="col-span-2 lg:col-span-1 bg-orange-50/60 p-3 rounded-xl border border-orange-100 flex flex-col justify-between min-h-[80px]">
+                        <!-- Subject Coverage -->
+                        <div id="subject-coverage-card" class="col-span-2 lg:col-span-1 bg-amber-50/60 p-3 rounded-xl border border-amber-100 flex flex-col justify-between min-h-[80px] transition-all duration-300">
                             <div class="flex justify-between items-center mb-1">
-                                <p class="text-[10px] font-black text-orange-500 uppercase tracking-widest">Day Streak</p>
-                                <span class="material-symbols-outlined text-[12px] text-orange-400 tooltip-trigger"
-                                      data-tooltip-title="Daily Streak"
-                                      data-tooltip-desc="Consecutive days meeting your target, with a projection for today."
-                                      data-tooltip-color="#f97316">local_fire_department</span>
+                                <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest">Coverage</p>
+                                <span class="material-symbols-outlined text-[12px] text-amber-400 tooltip-trigger"
+                                      data-tooltip-title="Subject Coverage"
+                                      data-tooltip-desc="Number of unique subjects studied today with at least one complete session."
+                                      data-tooltip-color="#f59e0b">category</span>
                             </div>
-                            <div id="daily-streak-value" class="text-2xl font-black text-orange-900">
+                            <div id="subject-coverage-value" class="text-2xl font-black text-amber-900 leading-none">
                                 --
                             </div>
-                            <div id="daily-streak-badge" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-orange-100 text-orange-600 w-fit uppercase tracking-tighter">
-                                Loading
+                            <div class="flex justify-between items-end mt-1 pt-1 border-t border-amber-100/50">
+                                <div id="subject-coverage-badge" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter">
+                                    Analyzing
+                                </div>
+                                <div id="subject-coverage-month" class="text-[9px] font-black text-amber-700 opacity-80" title="Monthly Coverage">--</div>
                             </div>
                         </div>
 
