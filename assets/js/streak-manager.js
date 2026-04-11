@@ -136,11 +136,10 @@ class StreakManager {
 
         if (!counterEl || !countEl || !flameEl) return;
 
-        const streak = this.streakData.current_streak;
-        countEl.textContent = streak;
-
         // Check streak risk status
         const riskInfo = this.getStreakRiskInfo();
+        const streak = riskInfo.status === 'broken' ? 0 : this.streakData.current_streak;
+        countEl.textContent = streak;
 
         // Dynamic Colors & Animations
         if (riskInfo.status === 'at_risk') {
