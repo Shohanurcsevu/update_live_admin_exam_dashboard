@@ -94,6 +94,44 @@ class StreakManager {
         }
     }
 
+    async useFreeze() {
+        try {
+            // Check if already used today or not at risk etc. (optional, API handles it)
+            const response = await fetch('api/streak/use-freeze.php', {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                this.streakData.freeze_available = 0;
+                this.streakData.last_activity_date = result.data.last_activity_date;
+                this.streakData.freeze_used_count = result.data.freeze_used_count;
+
+                this.updateUI();
+
+                if (typeof window.showToast === 'function') {
+                    window.showToast('❄️ Streak Freeze activated! Your streak is safe for today.', 'success');
+                }
+
+                if (typeof confetti !== 'undefined') {
+                    confetti({
+                        particleCount: 100,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#60a5fa', '#93c5fd', '#bfdbfe', '#ffffff']
+                    });
+                }
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Failed to use freeze:', error);
+            if (typeof window.showToast === 'function') {
+                window.showToast('Error: ' + error.message, 'error');
+            }
+        }
+    }
+
     // Calculate streak risk status: safe, at_risk, or broken
     getStreakRiskInfo() {
         const lastActivity = this.streakData.last_activity_date;
@@ -269,13 +307,31 @@ class StreakManager {
         // --- Freeze Badge Update ---
         const freezeBadge = document.getElementById('trophy-freeze-badge');
         const freezeText = document.getElementById('trophy-freeze-text');
+        
         if (freezeBadge && freezeText) {
             if (this.streakData.freeze_available) {
-                freezeBadge.className = 'flex items-center justify-center gap-1.5 py-1.5 px-3 mb-3 rounded-lg border text-[10px] font-bold uppercase tracking-tight bg-blue-50/60 border-blue-200/40 text-blue-600';
-                freezeText.textContent = 'Freeze Available';
+                freezeBadge.className = 'flex flex-col items-center justify-center gap-2 py-2 px-3 mb-3 rounded-xl border bg-blue-50/60 border-blue-200/40 text-blue-600 shadow-inner group/freeze transition-all hover:bg-blue-100/70';
+                freezeBadge.innerHTML = `
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tight">
+                        <span class="animate-pulse">❄️</span>
+                        <span id="trophy-freeze-text">Freeze Available</span>
+                    </div>
+                    <button id="use-freeze-btn" class="w-full py-1.5 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] active:scale-95">
+                        Use Freeze Now
+                    </button>
+                `;
+
+                // Add Listener
+                const btn = document.getElementById('use-freeze-btn');
+                if (btn) {
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        this.useFreeze();
+                    };
+                }
             } else {
                 freezeBadge.className = 'flex items-center justify-center gap-1.5 py-1.5 px-3 mb-3 rounded-lg border text-[10px] font-bold uppercase tracking-tight bg-slate-50/60 border-slate-200/40 text-slate-400';
-                freezeText.textContent = 'Freeze Used This Week';
+                freezeBadge.innerHTML = '<span>❄️</span><span id="trophy-freeze-text">Freeze Used This Week</span>';
             }
         }
     }
