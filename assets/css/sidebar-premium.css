@@ -575,3 +575,26 @@
 #sidebar nav::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.2);
 }
+
+/* --- Rocket Launch Animation --- */
+.rocket-animate {
+    display: inline-block;
+    animation: rocket-thrust 0.4s infinite ease-in-out;
+    color: #fbbf24 !important; /* Gold flame color ALWAYS active */
+    filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.7));
+    transform: scale(1.1);
+    transition: all 0.3s ease;
+}
+
+@keyframes rocket-thrust {
+    0% { transform: translate(0, 0) scale(1.1); }
+    25% { transform: translate(-0.5px, 0.5px) scale(1.12); }
+    50% { transform: translate(0.5px, -0.5px) scale(1.08); }
+    75% { transform: translate(-0.5px, -0.5px) scale(1.12); }
+    100% { transform: translate(0, 0) scale(1.1); }
+}
+
+#sidebar-collapse-toggle:hover .rocket-animate {
+    filter: drop-shadow(0 0 15px rgba(251, 191, 36, 0.9));
+    transform: scale(1.2);
+}

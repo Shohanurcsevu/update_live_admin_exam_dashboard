@@ -9,12 +9,12 @@
 
     <div class="sidebar-header flex justify-center items-center relative">
         <div class="sidebar-logo-icon">
-            <span class="material-symbols-outlined text-white text-xl">rocket_launch</span>
+            <span class="material-symbols-outlined text-white text-xl">network_intel_node</span>
         </div>
         <span class="sidebar-logo-text">BCS</span>
         <button id="sidebar-collapse-toggle"
             class="p-1 hover:bg-white/10 rounded-lg transition-colors focus:outline-none">
-            <span class="material-symbols-outlined text-nav-text-muted">menu_open</span>
+            <span class="material-symbols-outlined text-nav-text-muted">menu</span>
         </button>
     </div>
 
@@ -22,11 +22,18 @@
         <ul class="space-y-1">
             <!-- Dashboard -->
             <li><a href="#" class="nav-link" data-page="dashboard">
-                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">dashboard</span></div>
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">bar_chart_4_bars</span></div>
                     <span class="nav-label">Dashboard</span>
                 </a>
             </li>
-
+            <li><a href="#" class="nav-link" data-page="exam">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">add</span></div>
+                    <span class="nav-label">Create Exam</span>
+                </a></li>
+            <li><a href="#" class="nav-link" data-page="take-exam-list">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">list_alt_check</span></div>
+                    <span class="nav-label">Take Exam</span>
+                </a></li>
             <!-- Curriculum Submenu -->
             <li class="has-submenu">
                 <a href="#" class="nav-link submenu-toggle" data-group="curriculum">
@@ -74,10 +81,14 @@
             </li>
 
             <!-- Top Level Items -->
-            <li><a href="#" class="nav-link" data-page="take-exam-list">
-                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">edit_document</span></div>
-                    <span class="nav-label">Take Exam</span>
+            <!-- <li><a href="#" class="nav-link" data-page="exam">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">add</span></div>
+                    <spa    n class="nav-label">Create Exam</span>
                 </a></li>
+            <li><a href="#" class="nav-link" data-page="take-exam-list">
+                    <div class="nav-icon-wrapper"><span class="material-symbols-outlined">list_alt_check</span></div>
+                    <span class="nav-label">Take Exam</span>
+                </a></li> -->
             <li><a href="#" class="nav-link" data-page="check-performance">
                     <div class="nav-icon-wrapper"><span class="material-symbols-outlined">fact_check</span></div>
                     <span class="nav-label">Performance</span>

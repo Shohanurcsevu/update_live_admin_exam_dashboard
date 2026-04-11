@@ -100,7 +100,13 @@ function initSidebarToggle() {
         if (!collapseToggle) return;
         const iconSpan = collapseToggle.querySelector('.material-symbols-outlined');
         if (iconSpan) {
-            iconSpan.textContent = collapsed ? 'rocket_launch' : 'menu';
+            if (collapsed) {
+                iconSpan.textContent = 'rocket_launch';
+                iconSpan.classList.add('rocket-animate');
+            } else {
+                iconSpan.textContent = 'menu';
+                iconSpan.classList.remove('rocket-animate');
+            }
         }
     }
 
