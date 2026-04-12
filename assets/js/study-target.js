@@ -3766,7 +3766,6 @@ const StudyTargetTracker = {
                     const best = scored[0];
                     hasSuggestion = true;
 
-                    // Populate suggestion content (even if hidden)
                     nameEl.textContent = best.subject_name;
                     const topMins = Math.round(topMinutes);
                     if (best.todayMins === 0) {
@@ -3794,13 +3793,57 @@ const StudyTargetTracker = {
         }
 
         // ─── Initial View: Show balance by default ───────────────────────
-        // Only auto-flip on first load or if user hasn't manually toggled
         if (!this._rotationViewState) {
             setView('balance');
         } else if (this._rotationViewState === 'balance') {
-            // Refresh the donut without flipping
             this.renderSubjectBalance();
         }
+    },
+
+    // ─── Radial Progress Rendering (Target Odds) ────────────────────────────
+    renderRadialOdds(odds, color) {
+        const canvas = document.getElementById('completion-odds-canvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        const centerX = w / 2;
+        const centerY = h / 2;
+        const radius = (w / 2) - 4;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Track
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Progress Arc
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + (Math.PI * 2 * (odds / 100));
+
+        const grad = ctx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, '#6366f1');
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Pulsing Dot at current progress
+        const dotX = centerX + radius * Math.cos(endAngle);
+        const dotY = centerY + radius * Math.sin(endAngle);
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
     },
 
     renderSubjectBalance() {
@@ -3969,18 +4012,20 @@ const StudyTargetTracker = {
         // Already completed
         if (remaining <= 0) {
             valueEl.textContent = '100%';
-            valueEl.className = 'text-2xl font-black text-emerald-600';
+            valueEl.className = 'text-2xl font-black text-emerald-600 leading-none';
             badgeEl.textContent = 'Target Complete!';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+            this.renderRadialOdds(100, '#10b981');
             return;
         }
 
         // No time left
         if (secondsLeft <= 0) {
             valueEl.textContent = '0%';
-            valueEl.className = 'text-2xl font-black text-rose-600';
+            valueEl.className = 'text-2xl font-black text-rose-600 leading-none';
             badgeEl.textContent = 'Day over';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter';
+            this.renderRadialOdds(0, '#f43f5e');
             return;
         }
 
@@ -4016,20 +4061,26 @@ const StudyTargetTracker = {
 
         valueEl.textContent = `${odds}%`;
 
-        // Color coding
+        // Color coding & Chart Rendering
+        let color = '#3b82f6';
         if (odds >= 70) {
-            valueEl.className = 'text-2xl font-black text-emerald-600';
+            valueEl.className = 'text-2xl font-black text-emerald-600 leading-none';
             badgeEl.textContent = 'On track';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
+            color = '#10b981';
         } else if (odds >= 40) {
-            valueEl.className = 'text-2xl font-black text-amber-600';
+            valueEl.className = 'text-2xl font-black text-amber-600 leading-none';
             badgeEl.textContent = 'Needs focus';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
+            color = '#f59e0b';
         } else {
-            valueEl.className = 'text-2xl font-black text-rose-600';
+            valueEl.className = 'text-2xl font-black text-rose-600 leading-none';
             badgeEl.textContent = 'At risk';
             badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter animate-pulse';
+            color = '#f43f5e';
         }
+
+        this.renderRadialOdds(odds, color);
     },
 
     // ─── Stats Card: Daily Streak ───────────────────────────────────────────
