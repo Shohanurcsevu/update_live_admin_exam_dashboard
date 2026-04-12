@@ -292,6 +292,51 @@ try {
     // Ensure today's current total is also considered if it's the new record
     $all_time_best_seconds = max($all_time_best_seconds, $total_today_seconds);
 
+    // --- Shared: Week boundary timestamps for weekly queries ---
+    $week_start_date = date('Y-m-d', strtotime($study_date . ' -6 days'));
+    $week_start_ts = "$week_start_date 05:00:00";
+
+    // --- Added: Fetch Weekly Volume (last 7 days of total study seconds) ---
+    $weekly_volume_sql = "
+        SELECT study_day, SUM(seconds) as day_total FROM (
+            SELECT DATE(DATE_SUB(attempt_time, INTERVAL 5 HOUR)) as study_day, time_used_seconds as seconds
+            FROM performance
+            WHERE attempt_time BETWEEN '$week_start_ts' AND '$end_ts'
+
+            UNION ALL
+
+            SELECT DATE(DATE_SUB(timestamp, INTERVAL 5 HOUR)) as study_day,
+                CASE
+                    WHEN activity_details LIKE '%duration%'
+                    THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.duration')) AS DECIMAL) * 60
+                    ELSE 25 * 60
+                END as seconds
+            FROM activity_log
+            WHERE activity_type = 'pomodoro_session'
+            AND timestamp BETWEEN '$week_start_ts' AND '$end_ts'
+        ) combined_vol
+        GROUP BY study_day
+        ORDER BY study_day
+    ";
+
+    $weekly_vol_res = $conn->query($weekly_volume_sql);
+    $vol_map = [];
+    if ($weekly_vol_res) {
+        while ($vr = $weekly_vol_res->fetch_assoc()) {
+            $vol_map[$vr['study_day']] = floatval($vr['day_total']);
+        }
+    }
+
+    $weekly_volume = [];
+    for ($i = 6; $i >= 0; $i--) {
+        $d = date('Y-m-d', strtotime($study_date . " -$i days"));
+        $weekly_volume[] = [
+            'date' => $d,
+            'day' => substr(date('D', strtotime($d)), 0, 2),
+            'seconds' => $vol_map[$d] ?? 0
+        ];
+    }
+
     // --- Fixed: Fetch Yesterday's Subject Count (consistent 5-min threshold) ---
     $yesterday_subjects_sql = "
         SELECT COUNT(*) as count FROM (
@@ -358,9 +403,6 @@ try {
     $total_system_subjects = ($total_subjects_res && $row = $total_subjects_res->fetch_assoc()) ? intval($row['count']) : 0;
 
     // --- Added: Fetch Weekly Coverage (last 7 days with consistent threshold) ---
-    $week_start_date = date('Y-m-d', strtotime($study_date . ' -6 days'));
-    $week_start_ts = "$week_start_date 05:00:00";
-
     $weekly_coverage_sql = "
         SELECT study_day, COUNT(*) as subject_count FROM (
             SELECT
@@ -445,6 +487,7 @@ try {
         'monthly_subject_count' => $monthly_subject_count,
         'total_system_subjects' => $total_system_subjects,
         'weekly_coverage' => $weekly_coverage,
+        'weekly_volume' => $weekly_volume,
         'calc_idle_seconds' => $calc_idle_seconds,
         'last_active_timestamp' => $last_active_timestamp
     ]);

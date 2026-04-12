@@ -35,6 +35,7 @@ const StudyTargetTracker = {
     yesterdaySessions: [],
     yesterdayFullTotalSeconds: 0, // NEW: Static benchmark for Focus Volume
     allTimeBestSeconds: 0, // NEW: Personal Record
+    weeklyVolume: [], // NEW: 7-day volume history for chart
     estimatedFinishTimestamp: null, // NEW: For timeline projection
     momentumScore: 0,
     serverClockOffset: 0,
@@ -225,6 +226,9 @@ const StudyTargetTracker = {
                 }
                 if (result.all_time_best_seconds) {
                     this.allTimeBestSeconds = result.all_time_best_seconds;
+                }
+                if (result.weekly_volume) {
+                    this.weeklyVolume = result.weekly_volume;
                 }
 
                 // --- NEW: Handle Subject Coverage Data ---
@@ -4227,58 +4231,178 @@ const StudyTargetTracker = {
         });
     },
 
-    // ─── Stats Card: Session Endurance ───────────────────────────────────────
+    // ─── Stats Card: Focus Volume (Redesigned) ──────────────────────────────
     updateSessionEndurance() {
         const valueEl = document.getElementById('session-endurance-value');
+        const trendEl = document.getElementById('session-endurance-trend');
+        const pctEl = document.getElementById('session-endurance-pct');
         const badgeEl = document.getElementById('session-endurance-badge');
         const topEl = document.getElementById('session-endurance-top');
-        if (!valueEl || !badgeEl) return;
-        
-        // Update Record if available
+        const canvas = document.getElementById('volume-weekly-canvas');
+        if (!valueEl) return;
+
+        const totalTodayMins = Math.round((this.studiedSeconds || 0) / 60);
+        const totalYesterdayMins = Math.round((this.yesterdayFullTotalSeconds || 0) / 60);
+
+        // Personal best display
         if (topEl && this.allTimeBestSeconds !== undefined) {
             const th = Math.floor(this.allTimeBestSeconds / 3600);
             const tm = Math.floor((this.allTimeBestSeconds % 3600) / 60);
-            topEl.textContent = `Top: ${th > 0 ? th + 'h ' + tm + 'm' : tm + 'm'}`;
+            topEl.textContent = `PR: ${th > 0 ? th + 'h ' + tm + 'm' : tm + 'm'}`;
         }
 
-        // Focus Volume: Today's total vs Yesterday's full STATIC total
-        let totalTodayMins = Math.round((this.studiedSeconds || 0) / 60);
-        let totalYesterdayMins = Math.round((this.yesterdayFullTotalSeconds || 0) / 60);
-
+        // Main value
         if (totalTodayMins === 0) {
             valueEl.textContent = '0m';
-            valueEl.className = 'text-2xl font-black text-gray-400';
-            badgeEl.textContent = 'No study volume yet';
-            badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-500 w-fit uppercase tracking-tighter';
-            return;
-        }
-
-        const h = Math.floor(totalTodayMins / 60);
-        const m = totalTodayMins % 60;
-        valueEl.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
-        valueEl.className = 'text-2xl font-black text-teal-600';
-
-        // Compare with yesterday's total
-        if (totalYesterdayMins > 0) {
-            const yh = Math.floor(totalYesterdayMins / 60);
-            const ym = totalYesterdayMins % 60;
-            const formattedYesterday = yh > 0 ? `${yh}h ${ym}m` : `${ym}m`;
-
-            const diff = totalTodayMins - totalYesterdayMins;
-            if (diff > 0) {
-                badgeEl.textContent = `+${diff}m vs ${formattedYesterday} · New PR!`;
-                badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter';
-            } else if (diff === 0) {
-                badgeEl.textContent = `Tied with ${formattedYesterday}`;
-                badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
-            } else {
-                badgeEl.textContent = `${diff}m vs ${formattedYesterday}`;
-                badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter';
-            }
+            valueEl.className = 'text-2xl font-black text-gray-400 leading-none';
         } else {
-            badgeEl.textContent = 'Volume Tracking Active';
-            badgeEl.className = 'text-[11px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-600 w-fit uppercase tracking-tighter';
+            const h = Math.floor(totalTodayMins / 60);
+            const m = totalTodayMins % 60;
+            valueEl.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+            valueEl.className = 'text-2xl font-black text-teal-900 leading-none';
         }
+
+        // Percentage vs yesterday badge
+        if (pctEl && totalYesterdayMins > 0) {
+            const pct = Math.min(999, Math.round((totalTodayMins / totalYesterdayMins) * 100));
+            pctEl.textContent = `${pct}%`;
+            pctEl.className = `text-[9px] font-black px-1.5 py-0.5 rounded-md transition-colors duration-300 ${
+                pct >= 100 ? 'text-emerald-700 bg-emerald-100/80' :
+                pct >= 50 ? 'text-teal-700 bg-teal-100/80' :
+                'text-rose-700 bg-rose-100/80'
+            }`;
+        } else if (pctEl) {
+            pctEl.textContent = '--';
+            pctEl.className = 'text-[9px] font-black text-gray-400 bg-gray-100/80 px-1.5 py-0.5 rounded-md';
+        }
+
+        // Trend arrow vs yesterday
+        if (trendEl) {
+            if (totalTodayMins === 0 && totalYesterdayMins === 0) {
+                trendEl.innerHTML = `<span class="material-symbols-outlined align-middle" style="font-size:10px">hourglass_empty</span> No data yet`;
+                trendEl.className = 'text-[9px] font-bold text-gray-400 mt-0.5 flex items-center gap-0.5';
+            } else {
+                const diff = totalTodayMins - totalYesterdayMins;
+                const fmtDiff = Math.abs(diff) >= 60 ? `${Math.floor(Math.abs(diff)/60)}h ${Math.abs(diff)%60}m` : `${Math.abs(diff)}m`;
+                if (diff > 0) {
+                    trendEl.innerHTML = `<span class="material-symbols-outlined align-middle" style="font-size:10px">arrow_upward</span> +${fmtDiff} vs yday`;
+                    trendEl.className = 'text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-0.5';
+                } else if (diff < 0) {
+                    trendEl.innerHTML = `<span class="material-symbols-outlined align-middle" style="font-size:10px">arrow_downward</span> -${fmtDiff} vs yday`;
+                    trendEl.className = 'text-[9px] font-bold text-rose-500 mt-0.5 flex items-center gap-0.5';
+                } else {
+                    trendEl.innerHTML = `<span class="material-symbols-outlined align-middle" style="font-size:10px">trending_flat</span> Tied with yday`;
+                    trendEl.className = 'text-[9px] font-bold text-teal-500 mt-0.5 flex items-center gap-0.5';
+                }
+            }
+        }
+
+        // Badge: dynamic state label
+        if (badgeEl) {
+            const bestMins = Math.round((this.allTimeBestSeconds || 0) / 60);
+            if (totalTodayMins >= bestMins && bestMins > 0) {
+                badgeEl.textContent = 'New PR!';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm w-fit uppercase tracking-tighter bg-emerald-100 text-emerald-600 transition-colors duration-300';
+            } else if (totalTodayMins >= totalYesterdayMins && totalYesterdayMins > 0) {
+                badgeEl.textContent = 'Ahead';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm w-fit uppercase tracking-tighter bg-teal-100 text-teal-600 transition-colors duration-300';
+            } else if (totalTodayMins > 0) {
+                badgeEl.textContent = 'Building';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm w-fit uppercase tracking-tighter bg-amber-100 text-amber-600 transition-colors duration-300';
+            } else {
+                badgeEl.textContent = 'Idle';
+                badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm w-fit uppercase tracking-tighter bg-gray-100 text-gray-400 transition-colors duration-300';
+            }
+        }
+
+        // 7-Day Volume Chart
+        if (canvas && this.weeklyVolume && this.weeklyVolume.length > 0) {
+            // Inject today's live seconds into the last data point
+            const chartData = this.weeklyVolume.map((d, i) => ({
+                ...d,
+                seconds: i === this.weeklyVolume.length - 1 ? (this.studiedSeconds || 0) : d.seconds
+            }));
+            this.renderVolumeChart(canvas, chartData);
+        }
+    },
+
+    /**
+     * Draws a premium 7-day area/bar chart on the Focus Volume card canvas.
+     */
+    renderVolumeChart(canvas, data) {
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        if (w === 0 || h === 0) return;
+
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, w, h);
+
+        const maxVal = Math.max(...data.map(d => d.seconds), 1);
+        const labelH = 9;
+        const chartH = h - labelH - 2;
+        const gap = Math.max(2, w * 0.02);
+        const barW = (w - gap * (data.length + 1)) / data.length;
+
+        data.forEach((d, i) => {
+            const x = gap + i * (barW + gap);
+            const mins = Math.round(d.seconds / 60);
+            const rawH = chartH * (d.seconds / maxVal);
+            const barH = d.seconds > 0 ? Math.max(3, rawH) : 2;
+            const y = chartH - barH;
+            const isToday = i === data.length - 1;
+
+            // --- Bar (rounded top corners) ---
+            ctx.beginPath();
+            const r = Math.min(2, barW / 4, barH / 2);
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + barW - r, y);
+            ctx.arcTo(x + barW, y, x + barW, y + r, r);
+            ctx.lineTo(x + barW, y + barH);
+            ctx.lineTo(x, y + barH);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+
+            if (d.seconds > 0) {
+                const grad = ctx.createLinearGradient(x, y, x, y + barH);
+                if (isToday) {
+                    grad.addColorStop(0, '#0d9488');
+                    grad.addColorStop(1, '#0f766e');
+                    ctx.shadowColor = 'rgba(13, 148, 136, 0.4)';
+                    ctx.shadowBlur = 4;
+                } else {
+                    grad.addColorStop(0, 'rgba(13, 148, 136, 0.5)');
+                    grad.addColorStop(1, 'rgba(15, 118, 110, 0.2)');
+                }
+                ctx.fillStyle = grad;
+            } else {
+                ctx.fillStyle = 'rgba(13, 148, 136, 0.08)';
+            }
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+            // --- Hours label inside today's bar ---
+            if (isToday && mins > 0 && barH > 12) {
+                const label = mins >= 60 ? `${Math.floor(mins/60)}h` : `${mins}m`;
+                ctx.fillStyle = '#fff';
+                ctx.font = `800 ${Math.min(8, barW * 0.55)}px Inter, system-ui, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, x + barW / 2, y + barH / 2);
+            }
+
+            // --- Day label ---
+            ctx.fillStyle = isToday ? '#134e4a' : 'rgba(19, 78, 74, 0.4)';
+            ctx.font = `700 ${Math.min(7, barW * 0.5)}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(d.day, x + barW / 2, chartH + 2);
+        });
     },
 
     // ─── Stats Card: Velocity ───────────────────────────────────────────────
