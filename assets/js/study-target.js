@@ -71,7 +71,8 @@ const StudyTargetTracker = {
         today: 0,
         yesterday: 0,
         thisMonth: 0,
-        totalSubjects: 0
+        totalSubjects: 0,
+        weeklyCoverage: []
     },
 
     // Helper: Convert HEX to RGBA
@@ -232,7 +233,8 @@ const StudyTargetTracker = {
                         today: result.today_subject_count,
                         yesterday: result.yesterday_subject_count || 0,
                         thisMonth: result.monthly_subject_count || 0,
-                        totalSubjects: result.total_system_subjects || 0
+                        totalSubjects: result.total_system_subjects || 0,
+                        weeklyCoverage: result.weekly_coverage || []
                     };
                     this.updateSubjectCoverage();
                 }
@@ -4083,44 +4085,146 @@ const StudyTargetTracker = {
         this.renderRadialOdds(odds, color);
     },
 
-    // ─── Stats Card: Daily Streak ───────────────────────────────────────────
+    // ─── Stats Card: Subject Coverage (Redesigned) ─────────────────────────
     /**
-     * Updates the "Subject Coverage" card on the dashboard.
-     * Replaces the old Daily Streak logic.
+     * Updates the redesigned "Subject Coverage" card with trend,
+     * percentage badge, and 7-day sparkline chart.
      */
     async updateSubjectCoverage() {
         const valueEl = document.getElementById('subject-coverage-value');
+        const trendEl = document.getElementById('subject-coverage-trend');
+        const pctEl = document.getElementById('subject-coverage-pct');
         const badgeEl = document.getElementById('subject-coverage-badge');
         const monthEl = document.getElementById('subject-coverage-month');
-        if (!valueEl || !badgeEl || !monthEl) return;
+        const canvas = document.getElementById('coverage-weekly-canvas');
+        if (!valueEl) return;
 
-        const { today, yesterday, thisMonth, totalSubjects } = this.subjectCoverage;
+        const { today, yesterday, thisMonth, totalSubjects, weeklyCoverage } = this.subjectCoverage;
 
-        // Display Today's Count
+        // Main count
         valueEl.textContent = today;
 
-        // Determine Trend Arrow & Color
-        let trendIcon = "trending_flat";
-        let trendColor = "text-amber-500";
-        let trendText = today === yesterday ? "Same as yesterday" : (today > yesterday ? "Increasing diversity" : "Below yesterday");
-
-        if (today > yesterday) {
-            trendIcon = "trending_up";
-            trendColor = "text-emerald-600";
-        } else if (today < yesterday) {
-            trendIcon = "trending_down";
-            trendColor = "text-rose-500";
+        // Today-vs-total percentage badge
+        if (pctEl && totalSubjects > 0) {
+            const pct = Math.min(100, Math.round((today / totalSubjects) * 100));
+            pctEl.textContent = `${pct}%`;
+            pctEl.className = `text-[9px] font-black px-1.5 py-0.5 rounded-md transition-colors duration-300 ${
+                pct >= 50 ? 'text-emerald-700 bg-emerald-100/80' :
+                pct >= 25 ? 'text-amber-700 bg-amber-100/80' :
+                'text-rose-700 bg-rose-100/80'
+            }`;
         }
 
-        // Update Badge
-        badgeEl.innerHTML = `<span class="material-symbols-outlined align-middle mr-0.5" style="font-size: 10px;">${trendIcon}</span> ${trendText}`;
-        badgeEl.className = `text-[8px] font-bold px-1.5 py-0.5 rounded-sm w-fit uppercase tracking-tighter transition-all duration-300 ${
-            today > yesterday ? "bg-emerald-100 text-emerald-600" : (today < yesterday ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-600")
-        }`;
+        // Trend arrow vs yesterday
+        if (trendEl) {
+            const diff = today - yesterday;
+            if (diff > 0) {
+                trendEl.innerHTML = `<span class="material-symbols-outlined align-middle" style="font-size:10px">arrow_upward</span> +${diff} vs yday`;
+                trendEl.className = 'text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-0.5';
+            } else if (diff < 0) {
+                trendEl.innerHTML = `<span class="material-symbols-outlined align-middle" style="font-size:10px">arrow_downward</span> ${diff} vs yday`;
+                trendEl.className = 'text-[9px] font-bold text-rose-500 mt-0.5 flex items-center gap-0.5';
+            } else {
+                trendEl.innerHTML = `<span class="material-symbols-outlined align-middle" style="font-size:10px">trending_flat</span> Same as yday`;
+                trendEl.className = 'text-[9px] font-bold text-amber-500 mt-0.5 flex items-center gap-0.5';
+            }
+        }
 
-        // Update Monthly Progress
-        const coveragePercent = totalSubjects > 0 ? Math.round((thisMonth / totalSubjects) * 100) : 0;
-        monthEl.textContent = `${thisMonth}/${totalSubjects} Monthly (${coveragePercent}%)`;
+        // Monthly summary
+        if (badgeEl && monthEl && totalSubjects > 0) {
+            const coveragePercent = Math.min(100, Math.round((thisMonth / totalSubjects) * 100));
+            monthEl.textContent = `${thisMonth}/${totalSubjects} \u00b7 ${coveragePercent}%`;
+
+            badgeEl.textContent = coveragePercent >= 80 ? 'Excellent' : coveragePercent >= 50 ? 'Good' : 'Building';
+            badgeEl.className = `text-[8px] font-bold px-1.5 py-0.5 rounded-sm w-fit uppercase tracking-tighter transition-colors duration-300 ${
+                coveragePercent >= 80 ? 'bg-emerald-100 text-emerald-600' :
+                coveragePercent >= 50 ? 'bg-amber-100 text-amber-600' :
+                'bg-rose-100 text-rose-500'
+            }`;
+        }
+
+        // 7-Day Coverage Chart
+        if (canvas && weeklyCoverage && weeklyCoverage.length > 0) {
+            this.renderCoverageChart(canvas, weeklyCoverage);
+        }
+    },
+
+    /**
+     * Draws a premium 7-day bar chart sparkline on the coverage card canvas.
+     */
+    renderCoverageChart(canvas, data) {
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        if (w === 0 || h === 0) return;
+
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, w, h);
+
+        const maxVal = Math.max(...data.map(d => d.count), 1);
+        const labelH = 9;
+        const chartH = h - labelH - 2;
+        const gap = Math.max(2, w * 0.02);
+        const barW = (w - gap * (data.length + 1)) / data.length;
+
+        data.forEach((d, i) => {
+            const x = gap + i * (barW + gap);
+            const rawH = chartH * (d.count / maxVal);
+            const barH = d.count > 0 ? Math.max(3, rawH) : 2;
+            const y = chartH - barH;
+            const isToday = i === data.length - 1;
+
+            // --- Bar (rounded top corners) ---
+            ctx.beginPath();
+            const r = Math.min(2, barW / 4, barH / 2);
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + barW - r, y);
+            ctx.arcTo(x + barW, y, x + barW, y + r, r);
+            ctx.lineTo(x + barW, y + barH);
+            ctx.lineTo(x, y + barH);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+
+            if (d.count > 0) {
+                const grad = ctx.createLinearGradient(x, y, x, y + barH);
+                if (isToday) {
+                    grad.addColorStop(0, '#f59e0b');
+                    grad.addColorStop(1, '#d97706');
+                    // Glow effect for today
+                    ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
+                    ctx.shadowBlur = 4;
+                } else {
+                    grad.addColorStop(0, 'rgba(245, 158, 11, 0.5)');
+                    grad.addColorStop(1, 'rgba(217, 119, 6, 0.2)');
+                }
+                ctx.fillStyle = grad;
+            } else {
+                ctx.fillStyle = 'rgba(217, 119, 6, 0.08)';
+            }
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+            // --- Count label inside today's bar ---
+            if (isToday && d.count > 0 && barH > 12) {
+                ctx.fillStyle = '#fff';
+                ctx.font = `800 ${Math.min(8, barW * 0.55)}px Inter, system-ui, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(d.count, x + barW / 2, y + barH / 2);
+            }
+
+            // --- Day label ---
+            ctx.fillStyle = isToday ? '#92400e' : 'rgba(146, 64, 14, 0.4)';
+            ctx.font = `700 ${Math.min(7, barW * 0.5)}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(d.day, x + barW / 2, chartH + 2);
+        });
     },
 
     // ─── Stats Card: Session Endurance ───────────────────────────────────────

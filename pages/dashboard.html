@@ -219,21 +219,32 @@
                             </div>
                         </div>
 
-                        <!-- Subject Coverage -->
-                        <div id="subject-coverage-card" class="col-span-2 lg:col-span-1 bg-amber-50/60 p-3 rounded-xl border border-amber-100 flex flex-col justify-between min-h-[80px] transition-all duration-300">
-                            <div class="flex justify-between items-center mb-1">
-                                <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest">Coverage</p>
+                        <!-- Subject Coverage (Redesigned) -->
+                        <div id="subject-coverage-card" class="col-span-2 lg:col-span-1 bg-gradient-to-br from-amber-50 to-orange-50/50 p-3 rounded-xl border border-amber-200/60 flex flex-col justify-between min-h-[80px] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-0.5">
+                                <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest">Coverage</p>
                                 <span class="material-symbols-outlined text-[12px] text-amber-400 tooltip-trigger"
                                       data-tooltip-title="Subject Coverage"
-                                      data-tooltip-desc="Number of unique subjects studied today with at least one complete session."
+                                      data-tooltip-desc="Unique subjects studied today. Requires a complete session or 5+ minutes of study."
                                       data-tooltip-color="#f59e0b">category</span>
                             </div>
-                            <div id="subject-coverage-value" class="text-2xl font-black text-amber-900 leading-none">
-                                --
+                            <div class="flex items-end justify-between">
+                                <div>
+                                    <div class="flex items-baseline gap-1">
+                                        <span id="subject-coverage-value" class="text-2xl font-black text-amber-900 leading-none">--</span>
+                                        <span class="text-[8px] font-bold text-amber-400 uppercase tracking-tight">subj</span>
+                                    </div>
+                                    <div id="subject-coverage-trend" class="text-[9px] font-bold text-amber-500 mt-0.5 flex items-center gap-0.5">--</div>
+                                </div>
+                                <div id="subject-coverage-pct" class="text-[9px] font-black text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-md">--%</div>
                             </div>
-                            <div class="flex justify-between items-end mt-1 pt-1 border-t border-amber-100/50">
+                            <!-- 7-Day Coverage Sparkline -->
+                            <div class="h-8 mt-1.5 relative">
+                                <canvas id="coverage-weekly-canvas" class="w-full h-full cursor-crosshair"></canvas>
+                            </div>
+                            <div class="flex justify-between items-end mt-1 pt-1 border-t border-amber-200/30">
                                 <div id="subject-coverage-badge" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter">
-                                    Analyzing
+                                    Monthly
                                 </div>
                                 <div id="subject-coverage-month" class="text-[9px] font-black text-amber-700 opacity-80" title="Monthly Coverage">--</div>
                             </div>

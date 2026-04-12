@@ -292,24 +292,40 @@ try {
     // Ensure today's current total is also considered if it's the new record
     $all_time_best_seconds = max($all_time_best_seconds, $total_today_seconds);
 
-    // --- Added: Fetch Yesterday's Subject Count ---
+    // --- Fixed: Fetch Yesterday's Subject Count (consistent 5-min threshold) ---
     $yesterday_subjects_sql = "
-        SELECT COUNT(DISTINCT subject_name) as count
-        FROM (
-            SELECT s.subject_name
-            FROM performance p
-            JOIN exams e ON p.exam_id = e.id
-            JOIN subjects s ON e.subject_id = s.id
-            WHERE p.attempt_time BETWEEN '$y_start_ts' AND '$y_end_ts'
-            
-            UNION ALL
-            
-            SELECT activity_message as subject_name
-            FROM activity_log
-            WHERE activity_type = 'pomodoro_session'
-            AND timestamp BETWEEN '$y_start_ts' AND '$y_end_ts'
-            AND (activity_details IS NULL OR activity_details = '' OR activity_details LIKE '%\"status\":\"completed\"%' OR activity_details NOT LIKE '%\"status\"%')
-        ) yesterday_combined
+        SELECT COUNT(*) as count FROM (
+            SELECT subject_name
+            FROM (
+                SELECT s.subject_name,
+                    CASE WHEN p.time_used_seconds > 0 THEN CEIL(p.time_used_seconds / 60) * 60 ELSE 0 END as seconds,
+                    1 as sessions
+                FROM performance p
+                JOIN exams e ON p.exam_id = e.id
+                JOIN subjects s ON e.subject_id = s.id
+                WHERE p.attempt_time BETWEEN '$y_start_ts' AND '$y_end_ts'
+
+                UNION ALL
+
+                SELECT al.activity_message as subject_name,
+                    CASE
+                        WHEN al.activity_details LIKE '%duration%'
+                        THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(al.activity_details, '$.duration')) AS DECIMAL) * 60
+                        ELSE 25 * 60
+                    END as seconds,
+                    CASE
+                        WHEN al.activity_details IS NULL OR al.activity_details = '' THEN 1
+                        WHEN al.activity_details LIKE '%\"status\":\"completed\"%' THEN 1
+                        WHEN al.activity_details NOT LIKE '%\"status\"%' THEN 1
+                        ELSE 0
+                    END as sessions
+                FROM activity_log al
+                WHERE al.activity_type = 'pomodoro_session'
+                AND al.timestamp BETWEEN '$y_start_ts' AND '$y_end_ts'
+            ) combined
+            GROUP BY subject_name
+            HAVING SUM(sessions) > 0 OR SUM(seconds) > 300
+        ) filtered
     ";
     $yesterday_subjects_res = $conn->query($yesterday_subjects_sql);
     $yesterday_subject_count = ($yesterday_subjects_res && $row = $yesterday_subjects_res->fetch_assoc()) ? intval($row['count']) : 0;
@@ -341,6 +357,69 @@ try {
     $total_subjects_res = $conn->query("SELECT COUNT(*) as count FROM subjects");
     $total_system_subjects = ($total_subjects_res && $row = $total_subjects_res->fetch_assoc()) ? intval($row['count']) : 0;
 
+    // --- Added: Fetch Weekly Coverage (last 7 days with consistent threshold) ---
+    $week_start_date = date('Y-m-d', strtotime($study_date . ' -6 days'));
+    $week_start_ts = "$week_start_date 05:00:00";
+
+    $weekly_coverage_sql = "
+        SELECT study_day, COUNT(*) as subject_count FROM (
+            SELECT
+                DATE(DATE_SUB(ts, INTERVAL 5 HOUR)) as study_day,
+                subject_name,
+                SUM(seconds) as total_seconds,
+                SUM(sessions) as session_count
+            FROM (
+                SELECT p.attempt_time as ts, s.subject_name,
+                    CASE WHEN p.time_used_seconds > 0 THEN CEIL(p.time_used_seconds / 60) * 60 ELSE 0 END as seconds,
+                    1 as sessions
+                FROM performance p
+                JOIN exams e ON p.exam_id = e.id
+                JOIN subjects s ON e.subject_id = s.id
+                WHERE p.attempt_time BETWEEN '$week_start_ts' AND '$end_ts'
+
+                UNION ALL
+
+                SELECT al.timestamp as ts, al.activity_message as subject_name,
+                    CASE
+                        WHEN al.activity_details LIKE '%duration%'
+                        THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(al.activity_details, '$.duration')) AS DECIMAL) * 60
+                        ELSE 25 * 60
+                    END as seconds,
+                    CASE
+                        WHEN al.activity_details IS NULL OR al.activity_details = '' THEN 1
+                        WHEN al.activity_details LIKE '%\"status\":\"completed\"%' THEN 1
+                        WHEN al.activity_details NOT LIKE '%\"status\"%' THEN 1
+                        ELSE 0
+                    END as sessions
+                FROM activity_log al
+                WHERE al.activity_type = 'pomodoro_session'
+                AND al.timestamp BETWEEN '$week_start_ts' AND '$end_ts'
+            ) combined
+            GROUP BY study_day, subject_name
+            HAVING session_count > 0 OR total_seconds > 300
+        ) filtered
+        GROUP BY study_day
+        ORDER BY study_day
+    ";
+
+    $weekly_coverage_res = $conn->query($weekly_coverage_sql);
+    $weekly_map = [];
+    if ($weekly_coverage_res) {
+        while ($wc_row = $weekly_coverage_res->fetch_assoc()) {
+            $weekly_map[$wc_row['study_day']] = intval($wc_row['subject_count']);
+        }
+    }
+
+    $weekly_coverage = [];
+    for ($i = 6; $i >= 0; $i--) {
+        $d = date('Y-m-d', strtotime($study_date . " -$i days"));
+        $weekly_coverage[] = [
+            'date' => $d,
+            'day' => substr(date('D', strtotime($d)), 0, 2),
+            'count' => $weekly_map[$d] ?? 0
+        ];
+    }
+
     // Calculate today's subjects count (only those with at least one session or active)
     $today_subject_count = 0;
     foreach ($subjects as $s) {
@@ -365,6 +444,7 @@ try {
         'yesterday_subject_count' => $yesterday_subject_count,
         'monthly_subject_count' => $monthly_subject_count,
         'total_system_subjects' => $total_system_subjects,
+        'weekly_coverage' => $weekly_coverage,
         'calc_idle_seconds' => $calc_idle_seconds,
         'last_active_timestamp' => $last_active_timestamp
     ]);
