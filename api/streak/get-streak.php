@@ -26,7 +26,11 @@ try {
             'freeze_used_count' => 0
         ];
     } else {
-        // --- STREAK VALIDATION LOGIC ---
+        // --- STREAK STATUS CALCULATION (READ-ONLY, NO MUTATIONS) ---
+        // IMPORTANT: This is a GET endpoint. It must NEVER reset/modify the streak.
+        // Streak resets are handled exclusively by record-activity.php when the user
+        // actually records a new activity. This prevents the race condition where
+        // simply loading the page would destroy a valid streak.
         $last_date = $result['last_activity_date'];
         
         if ($last_date) {
@@ -46,26 +50,19 @@ try {
 
             $current_streak = intval($result['current_streak']);
             $freeze_available = intval($result['freeze_available'] ?? 1);
-            $is_broken = false;
 
-            if ($last_date !== $today && $last_date !== $yesterday) {
-                // Gap detected
-                if ($last_date === $dayBeforeYesterday && $freeze_available > 0) {
-                    // Missed exactly 1 day (yesterday) but have a freeze available
-                    // Streak is "At Risk" for today, but NOT broken yet
-                    $is_broken = false;
-                } else {
-                    // Gap too large or no freeze
-                    $is_broken = true;
-                }
+            // Calculate status for frontend (informational only)
+            if ($last_date === $today) {
+                $result['streak_status'] = 'safe';
+            } elseif ($last_date === $yesterday) {
+                $result['streak_status'] = 'at_risk';
+            } elseif ($last_date === $dayBeforeYesterday && $freeze_available > 0) {
+                $result['streak_status'] = 'at_risk_freeze';
+            } else {
+                $result['streak_status'] = 'broken';
             }
-
-            if ($is_broken && $current_streak > 0) {
-                // Reset in database
-                $updateStmt = $conn->prepare("UPDATE user_streaks SET current_streak = 0 WHERE id = 1");
-                $updateStmt->execute();
-                $result['current_streak'] = 0;
-            }
+        } else {
+            $result['streak_status'] = 'none';
         }
     }
 

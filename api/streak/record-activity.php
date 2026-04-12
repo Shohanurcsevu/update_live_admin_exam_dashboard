@@ -52,9 +52,16 @@ try {
         }
 
         if ($last_date === $today) {
-            // Already recorded today
+            // Already recorded today — but still apply Monday freeze reset if needed
             $new_streak = $current_streak;
             $is_new_day = false;
+
+            // Persist freeze reset if it just happened
+            if ($dayOfWeek === 1 && $freeze_available !== intval($result['freeze_available'])) {
+                $stmt = $conn->prepare("UPDATE user_streaks SET freeze_available = ? WHERE id = 1");
+                $stmt->bind_param("i", $freeze_available);
+                $stmt->execute();
+            }
         } else {
             // Logical yesterday = logical today - 1 day
             $yesterdayDT = clone $now;
@@ -82,8 +89,10 @@ try {
 
             $new_longest = max($new_streak, $longest_streak);
             
-            $stmt = $conn->prepare("UPDATE user_streaks SET current_streak = ?, longest_streak = ?, last_activity_date = ?, freeze_available = ?, last_freeze_date = ?, freeze_used_count = ? WHERE id = 1");
+            // Safely handle NULL last_freeze_date to prevent 0000-00-00 in DB
             $freeze_date_to_save = $freeze_used ? $today : $last_freeze_date;
+            
+            $stmt = $conn->prepare("UPDATE user_streaks SET current_streak = ?, longest_streak = ?, last_activity_date = ?, freeze_available = ?, last_freeze_date = ?, freeze_used_count = ? WHERE id = 1");
             $stmt->bind_param("iissis", $new_streak, $new_longest, $today, $freeze_available, $freeze_date_to_save, $freeze_used_count);
             $stmt->execute();
             $is_new_day = true;

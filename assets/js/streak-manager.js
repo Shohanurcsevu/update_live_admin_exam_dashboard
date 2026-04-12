@@ -51,15 +51,23 @@ class StreakManager {
             if (result.success) {
                 this.streakData = result.data;
                 // Cache locally
-                await idbManager.setMetadata('streak_data', this.streakData);
+                try {
+                    await idbManager.setMetadata('streak_data', this.streakData);
+                } catch (cacheErr) {
+                    console.warn('Failed to cache streak data:', cacheErr);
+                }
             } else {
                 throw new Error(result.error);
             }
         } catch (error) {
             console.warn('Failed to fetch streak from API, using local cache:', error);
-            const cached = await idbManager.getMetadata('streak_data');
-            if (cached) {
-                this.streakData = cached;
+            try {
+                const cached = await idbManager.getMetadata('streak_data');
+                if (cached) {
+                    this.streakData = cached;
+                }
+            } catch (cacheErr) {
+                console.warn('Failed to read streak cache:', cacheErr);
             }
         }
     }
@@ -73,9 +81,25 @@ class StreakManager {
 
             if (result.success) {
                 const oldStreak = this.streakData.current_streak;
+                
+                // Fully sync all returned fields from server
                 this.streakData.current_streak = result.data.current_streak;
                 this.streakData.last_activity_date = this.getLogicalDate();
                 this.streakData.freeze_available = result.data.freeze_available;
+                
+                // Sync longest_streak if provided
+                if (result.data.longest_streak !== undefined) {
+                    this.streakData.longest_streak = result.data.longest_streak;
+                } else if (result.data.current_streak > (this.streakData.longest_streak || 0)) {
+                    this.streakData.longest_streak = result.data.current_streak;
+                }
+
+                // Update cache
+                try {
+                    await idbManager.setMetadata('streak_data', this.streakData);
+                } catch (cacheErr) {
+                    console.warn('Failed to update streak cache:', cacheErr);
+                }
 
                 this.updateUI();
 
@@ -88,10 +112,13 @@ class StreakManager {
                 if (result.data.freeze_used) {
                     this.showFreezeNotification(result.data.current_streak);
                 }
+                
+                return result;
             }
         } catch (error) {
             console.error('Failed to record activity:', error);
         }
+        return null;
     }
 
     async useFreeze() {
@@ -174,10 +201,13 @@ class StreakManager {
 
         if (!counterEl || !countEl || !flameEl) return;
 
-        // Check streak risk status
-        const riskInfo = this.getStreakRiskInfo();
-        const streak = riskInfo.status === 'broken' ? 0 : this.streakData.current_streak;
+        // Show actual streak count — even when 'broken', show the last known value
+        // The streak will reset server-side on next recordActivity(), not on display
+        const streak = this.streakData.current_streak;
         countEl.textContent = streak;
+
+        // Check streak risk status (for visual warnings, not count override)
+        const riskInfo = this.getStreakRiskInfo();
 
         // Dynamic Colors & Animations
         if (riskInfo.status === 'at_risk') {
