@@ -3877,8 +3877,8 @@ const StudyTargetTracker = {
         const totalSeconds = activeSubjects.reduce((acc, s) => acc + s.seconds, 0);
         const sorted = [...activeSubjects].sort((a, b) => b.seconds - a.seconds);
 
-        // Map database colors to Hex
-        const colorMap = {};
+        // Map database colors to Hex (stored on this for tooltip access)
+        this._balanceColorMap = {};
         this.allSubjects.forEach(s => {
             const hexMap = {
                 'indigo': '#6366f1', 'emerald': '#10b981', 'rose': '#f43f5e', 
@@ -3887,8 +3887,9 @@ const StudyTargetTracker = {
                 'teal': '#14b8a6', 'blue': '#3b82f6', 'pink': '#ec4899', 
                 'lime': '#84cc16', 'yellow': '#eab308', 'slate': '#64748b'
             };
-            colorMap[s.subject_name] = hexMap[s.color_class] || '#6366f1';
+            this._balanceColorMap[s.subject_name] = hexMap[s.color_class] || '#6366f1';
         });
+        const colorMap = this._balanceColorMap;
 
         const PALETTE = [
             '#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6',
@@ -3949,7 +3950,7 @@ const StudyTargetTracker = {
         ctx.textBaseline = 'middle';
         ctx.fillText(centerText, cx, cy);
 
-        // ─── Side Legend ─────────────────────────────────────────────────
+        // ─── Side Legend (show study time, not percentage) ─────────────
         if (metaEl) {
             metaEl.innerHTML = '';
             // Show top 4 subjects max to keep it compact
@@ -3957,13 +3958,15 @@ const StudyTargetTracker = {
             legendItems.forEach((s, idx) => {
                 const color = colorMap[s.subject_name] || PALETTE[idx % PALETTE.length];
                 const mins = Math.round(s.seconds / 60);
-                const pct = Math.round((s.seconds / totalSeconds) * 100);
+                const lh = Math.floor(mins / 60);
+                const lm = mins % 60;
+                const timeStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
                 const row = document.createElement('div');
                 row.className = 'flex items-center gap-1 min-w-0';
                 row.innerHTML = `
                     <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:${color}"></span>
                     <span class="text-[8px] font-bold text-slate-600 truncate">${s.subject_name}</span>
-                    <span class="text-[8px] font-black text-slate-800 ml-auto flex-shrink-0">${pct}%</span>
+                    <span class="text-[8px] font-black text-slate-800 ml-auto flex-shrink-0">${timeStr}</span>
                 `;
                 metaEl.appendChild(row);
             });
@@ -3975,25 +3978,65 @@ const StudyTargetTracker = {
             }
         }
 
-        // Tooltip interaction
+        // ─── Custom Tooltip for Donut Hover ──────────────────────────────
         if (!this._rotationListenerAdded) {
+            // Create floating tooltip element once
+            let tip = document.getElementById('balance-donut-tooltip');
+            if (!tip) {
+                tip = document.createElement('div');
+                tip.id = 'balance-donut-tooltip';
+                tip.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;padding:4px 8px;border-radius:6px;font:700 10px Inter,system-ui,sans-serif;color:#fff;background:rgba(15,23,42,0.9);backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.2);opacity:0;transition:opacity 0.15s;white-space:nowrap;';
+                document.body.appendChild(tip);
+            }
+
             canvas.addEventListener('mousemove', (e) => {
+                if (!this._rotationRegions || this._rotationRegions.length === 0) return;
                 const rect = canvas.getBoundingClientRect();
-                const mx = e.clientX - rect.left - rect.width / 2;
-                const my = e.clientY - rect.top - rect.height / 2;
-                let angle = Math.atan2(my, mx);
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const px = (e.clientX - rect.left) * scaleX / 2; // /2 for HiDPI scale
+                const py = (e.clientY - rect.top) * scaleY / 2;
+                const cx = canvas.width / 4; // center in logical coords (width/2 / hiDPI)
+                const cy = canvas.height / 4;
+                const dx = px - cx;
+                const dy = py - cy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const outerR = (Math.min(canvas.width, canvas.height) / 4) - 2;
+                const innerR = outerR * 0.55;
+
+                // Only show tooltip when hovering the donut ring area
+                if (dist < innerR || dist > outerR) {
+                    tip.style.opacity = '0';
+                    canvas.style.cursor = 'help';
+                    return;
+                }
+
+                // Calculate angle matching the drawing coordinate system
+                let angle = Math.atan2(dy, dx);
+                // Normalize to match our -PI/2 start: shift so top-center is 0
                 if (angle < -Math.PI / 2) angle += Math.PI * 2;
 
-                const region = this._rotationRegions.find(r => {
-                    let sa = r.startAngle, ea = r.endAngle;
-                    return angle >= sa && angle < ea;
-                });
+                const region = this._rotationRegions.find(r => angle >= r.startAngle && angle < r.endAngle);
+
                 if (region) {
-                    canvas.title = `${region.name}: ${region.mins}m (${region.percent}%)`;
+                    const rh = Math.floor(region.mins / 60);
+                    const rm = region.mins % 60;
+                    const timeLabel = rh > 0 ? `${rh}h ${rm}m` : `${rm}m`;
+                    tip.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${(this._balanceColorMap && this._balanceColorMap[region.name]) || '#6366f1'};margin-right:4px;vertical-align:middle;"></span>${region.name} · ${timeLabel} (${region.percent}%)`;
+                    tip.style.opacity = '1';
+                    tip.style.left = (e.clientX + 12) + 'px';
+                    tip.style.top = (e.clientY - 20) + 'px';
+                    canvas.style.cursor = 'pointer';
                 } else {
-                    canvas.title = 'Subject Balance';
+                    tip.style.opacity = '0';
+                    canvas.style.cursor = 'help';
                 }
             });
+
+            canvas.addEventListener('mouseleave', () => {
+                tip.style.opacity = '0';
+            });
+
             this._rotationListenerAdded = true;
         }
     },
