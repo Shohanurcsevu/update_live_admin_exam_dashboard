@@ -447,9 +447,9 @@ const StudyTargetTracker = {
         const remainingDayFraction = Math.max(0, Math.min(1, secondsUntilRollover / TOTAL_DAY_SECONDS));
         this._renderRadialRing('time-left-canvas', {
             progress: remainingDayFraction,
-            trackColor: 'rgba(234, 179, 8, 0.12)',
-            fillColor: '#eab308',
-            glowColor: 'rgba(234, 179, 8, 0.4)'
+            trackColor: 'rgba(20, 184, 166, 0.12)',
+            fillColor: '#14b8a6',
+            glowColor: 'rgba(20, 184, 166, 0.4)'
         });
         const tlPctEl = document.getElementById('time-left-pct');
         const tlBadgeEl = document.getElementById('time-left-badge');
@@ -461,7 +461,7 @@ const StudyTargetTracker = {
             const hoursLeft = secondsUntilRollover / 3600;
             if (hoursLeft <= 2) { tlBadgeEl.textContent = 'Closing'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter mt-1'; }
             else if (hoursLeft <= 6) { tlBadgeEl.textContent = 'Evening'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter mt-1'; }
-            else if (hoursLeft <= 12) { tlBadgeEl.textContent = 'Midday'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-yellow-100 text-yellow-700 w-fit uppercase tracking-tighter mt-1'; }
+            else if (hoursLeft <= 12) { tlBadgeEl.textContent = 'Midday'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-100 text-teal-700 w-fit uppercase tracking-tighter mt-1'; }
             else { tlBadgeEl.textContent = 'Day Active'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter mt-1'; }
         }
 
