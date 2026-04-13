@@ -443,9 +443,9 @@ const StudyTargetTracker = {
 
         // ─── Time Left Today Radial Ring ─────────────────────────────────
         const TOTAL_DAY_SECONDS = 24 * 3600;
-        const elapsedDayFraction = Math.max(0, Math.min(1, 1 - (secondsUntilRollover / TOTAL_DAY_SECONDS)));
+        const remainingDayFraction = Math.max(0, Math.min(1, secondsUntilRollover / TOTAL_DAY_SECONDS));
         this._renderRadialRing('time-left-canvas', {
-            progress: elapsedDayFraction,
+            progress: remainingDayFraction,
             trackColor: 'rgba(234, 179, 8, 0.12)',
             fillColor: '#eab308',
             glowColor: 'rgba(234, 179, 8, 0.4)'
@@ -453,8 +453,8 @@ const StudyTargetTracker = {
         const tlPctEl = document.getElementById('time-left-pct');
         const tlBadgeEl = document.getElementById('time-left-badge');
         if (tlPctEl) {
-            const pct = Math.round(elapsedDayFraction * 100);
-            tlPctEl.textContent = `${pct}% elapsed`;
+            const pct = Math.round(remainingDayFraction * 100);
+            tlPctEl.textContent = `${pct}% left`;
         }
         if (tlBadgeEl) {
             const hoursLeft = secondsUntilRollover / 3600;
