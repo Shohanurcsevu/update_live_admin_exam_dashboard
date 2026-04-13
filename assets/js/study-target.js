@@ -3853,192 +3853,59 @@ const StudyTargetTracker = {
     },
 
     renderSubjectBalance() {
-        const canvas = document.getElementById('rotation-balance-canvas');
         const metaEl = document.getElementById('rotation-balance-meta');
-        if (!canvas) return;
+        const totalTimeEl = document.getElementById('balance-total-time');
+        if (!metaEl) return;
 
-        const ctx = canvas.getContext('2d');
-        const size = 52;
-        canvas.width = size * 2; // HiDPI
-        canvas.height = size * 2;
-        ctx.scale(2, 2);
-        
         const activeSubjects = this.subjects.filter(s => s.seconds > 10);
         if (activeSubjects.length === 0) {
-            ctx.clearRect(0, 0, size, size);
-            ctx.fillStyle = '#cbd5e1';
-            ctx.font = '8px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('No data', size / 2, size / 2 + 3);
-            if (metaEl) metaEl.innerHTML = '<span class="text-[9px] text-gray-400">No study data yet</span>';
+            metaEl.innerHTML = '<span class="text-[9px] text-gray-400">No study data yet</span>';
+            if (totalTimeEl) totalTimeEl.textContent = '';
             return;
         }
 
         const totalSeconds = activeSubjects.reduce((acc, s) => acc + s.seconds, 0);
         const sorted = [...activeSubjects].sort((a, b) => b.seconds - a.seconds);
 
-        // Map database colors to Hex (stored on this for tooltip access)
-        this._balanceColorMap = {};
+        // Map database colors to Hex
+        const hexMap = {
+            'indigo': '#6366f1', 'emerald': '#10b981', 'rose': '#f43f5e', 
+            'amber': '#f59e0b', 'violet': '#8b5cf6', 'sky': '#0ea5e9', 
+            'fuchsia': '#d946ef', 'orange': '#f97316', 'cyan': '#06b6d4', 
+            'teal': '#14b8a6', 'blue': '#3b82f6', 'pink': '#ec4899', 
+            'lime': '#84cc16', 'yellow': '#eab308', 'slate': '#64748b'
+        };
+        const colorMap = {};
         this.allSubjects.forEach(s => {
-            const hexMap = {
-                'indigo': '#6366f1', 'emerald': '#10b981', 'rose': '#f43f5e', 
-                'amber': '#f59e0b', 'violet': '#8b5cf6', 'sky': '#0ea5e9', 
-                'fuchsia': '#d946ef', 'orange': '#f97316', 'cyan': '#06b6d4', 
-                'teal': '#14b8a6', 'blue': '#3b82f6', 'pink': '#ec4899', 
-                'lime': '#84cc16', 'yellow': '#eab308', 'slate': '#64748b'
-            };
-            this._balanceColorMap[s.subject_name] = hexMap[s.color_class] || '#6366f1';
+            colorMap[s.subject_name] = hexMap[s.color_class] || '#6366f1';
         });
-        const colorMap = this._balanceColorMap;
+        const PALETTE = ['#6366f1','#10b981','#f43f5e','#f59e0b','#8b5cf6','#0ea5e9','#d946ef','#f97316','#06b6d4','#84cc16'];
 
-        const PALETTE = [
-            '#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6',
-            '#0ea5e9', '#d946ef', '#f97316', '#06b6d4', '#84cc16'
-        ];
+        // Header total time
+        if (totalTimeEl) {
+            const totalMins = Math.round(totalSeconds / 60);
+            const th = Math.floor(totalMins / 60);
+            const tm = totalMins % 60;
+            totalTimeEl.textContent = th > 0 ? `${th}h ${tm}m` : `${tm}m`;
+        }
 
-        // ─── Draw Donut Chart ────────────────────────────────────────────
-        ctx.clearRect(0, 0, size, size);
-        const cx = size / 2;
-        const cy = size / 2;
-        const outerR = (size / 2) - 2;
-        const innerR = outerR * 0.55; // Donut hole ratio
-        let startAngle = -Math.PI / 2; // Start from top
-
-        this._rotationRegions = [];
-
+        // Render all subjects as rows
+        metaEl.innerHTML = '';
         sorted.forEach((s, idx) => {
-            const fraction = s.seconds / totalSeconds;
-            const sweep = fraction * Math.PI * 2;
-            const endAngle = startAngle + sweep;
             const color = colorMap[s.subject_name] || PALETTE[idx % PALETTE.length];
-
-            // Draw arc segment
-            ctx.beginPath();
-            ctx.arc(cx, cy, outerR, startAngle, endAngle);
-            ctx.arc(cx, cy, innerR, endAngle, startAngle, true);
-            ctx.closePath();
-            ctx.fillStyle = color;
-            ctx.fill();
-
-            // Thin separator line
-            ctx.beginPath();
-            ctx.moveTo(cx + innerR * Math.cos(startAngle), cy + innerR * Math.sin(startAngle));
-            ctx.lineTo(cx + outerR * Math.cos(startAngle), cy + outerR * Math.sin(startAngle));
-            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            this._rotationRegions.push({
-                startAngle,
-                endAngle,
-                name: s.subject_name,
-                percent: Math.round(fraction * 100),
-                mins: Math.round(s.seconds / 60)
-            });
-
-            startAngle = endAngle;
+            const mins = Math.round(s.seconds / 60);
+            const lh = Math.floor(mins / 60);
+            const lm = mins % 60;
+            const timeStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-1 min-w-0';
+            row.innerHTML = `
+                <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:${color}"></span>
+                <span class="text-[10px] font-bold text-slate-600 truncate flex-1">${s.subject_name}</span>
+                <span class="text-[9px] font-black text-slate-800 flex-shrink-0">${timeStr}</span>
+            `;
+            metaEl.appendChild(row);
         });
-
-        // Center text: total time
-        const totalMins = Math.round(totalSeconds / 60);
-        const th = Math.floor(totalMins / 60);
-        const tm = totalMins % 60;
-        const centerText = th > 0 ? `${th}h${tm > 0 ? tm : ''}` : `${tm}m`;
-        ctx.fillStyle = '#0e7490'; // cyan-700
-        ctx.font = 'bold 10px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(centerText, cx, cy);
-
-        // ─── Side Legend (show study time, not percentage) ─────────────
-        if (metaEl) {
-            metaEl.innerHTML = '';
-            // Show top 4 subjects max to keep it compact
-            const legendItems = sorted.slice(0, 4);
-            legendItems.forEach((s, idx) => {
-                const color = colorMap[s.subject_name] || PALETTE[idx % PALETTE.length];
-                const mins = Math.round(s.seconds / 60);
-                const lh = Math.floor(mins / 60);
-                const lm = mins % 60;
-                const timeStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
-                const row = document.createElement('div');
-                row.className = 'flex items-center gap-1 min-w-0';
-                row.innerHTML = `
-                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:${color}"></span>
-                    <span class="text-[8px] font-bold text-slate-600 truncate">${s.subject_name}</span>
-                    <span class="text-[8px] font-black text-slate-800 ml-auto flex-shrink-0">${timeStr}</span>
-                `;
-                metaEl.appendChild(row);
-            });
-            if (sorted.length > 4) {
-                const more = document.createElement('div');
-                more.className = 'text-[7px] text-slate-400 font-bold';
-                more.textContent = `+${sorted.length - 4} more`;
-                metaEl.appendChild(more);
-            }
-        }
-
-        // ─── Custom Tooltip for Donut Hover ──────────────────────────────
-        if (!this._rotationListenerAdded) {
-            // Create floating tooltip element once
-            let tip = document.getElementById('balance-donut-tooltip');
-            if (!tip) {
-                tip = document.createElement('div');
-                tip.id = 'balance-donut-tooltip';
-                tip.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;padding:4px 8px;border-radius:6px;font:700 10px Inter,system-ui,sans-serif;color:#fff;background:rgba(15,23,42,0.9);backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.2);opacity:0;transition:opacity 0.15s;white-space:nowrap;';
-                document.body.appendChild(tip);
-            }
-
-            canvas.addEventListener('mousemove', (e) => {
-                if (!this._rotationRegions || this._rotationRegions.length === 0) return;
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const px = (e.clientX - rect.left) * scaleX / 2; // /2 for HiDPI scale
-                const py = (e.clientY - rect.top) * scaleY / 2;
-                const cx = canvas.width / 4; // center in logical coords (width/2 / hiDPI)
-                const cy = canvas.height / 4;
-                const dx = px - cx;
-                const dy = py - cy;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                const outerR = (Math.min(canvas.width, canvas.height) / 4) - 2;
-                const innerR = outerR * 0.55;
-
-                // Only show tooltip when hovering the donut ring area
-                if (dist < innerR || dist > outerR) {
-                    tip.style.opacity = '0';
-                    canvas.style.cursor = 'help';
-                    return;
-                }
-
-                // Calculate angle matching the drawing coordinate system
-                let angle = Math.atan2(dy, dx);
-                // Normalize to match our -PI/2 start: shift so top-center is 0
-                if (angle < -Math.PI / 2) angle += Math.PI * 2;
-
-                const region = this._rotationRegions.find(r => angle >= r.startAngle && angle < r.endAngle);
-
-                if (region) {
-                    const rh = Math.floor(region.mins / 60);
-                    const rm = region.mins % 60;
-                    const timeLabel = rh > 0 ? `${rh}h ${rm}m` : `${rm}m`;
-                    tip.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${(this._balanceColorMap && this._balanceColorMap[region.name]) || '#6366f1'};margin-right:4px;vertical-align:middle;"></span>${region.name} · ${timeLabel} (${region.percent}%)`;
-                    tip.style.opacity = '1';
-                    tip.style.left = (e.clientX + 12) + 'px';
-                    tip.style.top = (e.clientY - 20) + 'px';
-                    canvas.style.cursor = 'pointer';
-                } else {
-                    tip.style.opacity = '0';
-                    canvas.style.cursor = 'help';
-                }
-            });
-
-            canvas.addEventListener('mouseleave', () => {
-                tip.style.opacity = '0';
-            });
-
-            this._rotationListenerAdded = true;
-        }
     },
 
 
