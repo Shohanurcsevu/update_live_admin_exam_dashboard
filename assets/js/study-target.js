@@ -420,6 +420,50 @@ const StudyTargetTracker = {
             timeLeftEl.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
+        // ─── Remaining Target Radial Ring ────────────────────────────────
+        this._renderRadialRing('remaining-target-canvas', {
+            progress: Math.min(1, this.studiedSeconds / this.DAILY_TARGET_SECONDS),
+            trackColor: 'rgba(59, 130, 246, 0.12)',
+            fillColor: '#3b82f6',
+            glowColor: 'rgba(59, 130, 246, 0.4)'
+        });
+        const remPctEl = document.getElementById('remaining-target-pct');
+        const remBadgeEl = document.getElementById('remaining-target-badge');
+        if (remPctEl) {
+            const pct = Math.min(100, Math.round((this.studiedSeconds / this.DAILY_TARGET_SECONDS) * 100));
+            remPctEl.textContent = `${pct}% done`;
+        }
+        if (remBadgeEl) {
+            const pct = Math.min(100, Math.round((this.studiedSeconds / this.DAILY_TARGET_SECONDS) * 100));
+            if (pct >= 100) { remBadgeEl.textContent = 'Completed'; remBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter mt-1'; }
+            else if (pct >= 50) { remBadgeEl.textContent = 'On Track'; remBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-600 w-fit uppercase tracking-tighter mt-1'; }
+            else if (pct > 0) { remBadgeEl.textContent = 'In Progress'; remBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter mt-1'; }
+            else { remBadgeEl.textContent = 'Not Started'; remBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-600 w-fit uppercase tracking-tighter mt-1'; }
+        }
+
+        // ─── Time Left Today Radial Ring ─────────────────────────────────
+        const TOTAL_DAY_SECONDS = 24 * 3600;
+        const elapsedDayFraction = Math.max(0, Math.min(1, 1 - (secondsUntilRollover / TOTAL_DAY_SECONDS)));
+        this._renderRadialRing('time-left-canvas', {
+            progress: elapsedDayFraction,
+            trackColor: 'rgba(234, 179, 8, 0.12)',
+            fillColor: '#eab308',
+            glowColor: 'rgba(234, 179, 8, 0.4)'
+        });
+        const tlPctEl = document.getElementById('time-left-pct');
+        const tlBadgeEl = document.getElementById('time-left-badge');
+        if (tlPctEl) {
+            const pct = Math.round(elapsedDayFraction * 100);
+            tlPctEl.textContent = `${pct}% elapsed`;
+        }
+        if (tlBadgeEl) {
+            const hoursLeft = secondsUntilRollover / 3600;
+            if (hoursLeft <= 2) { tlBadgeEl.textContent = 'Closing'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-600 w-fit uppercase tracking-tighter mt-1'; }
+            else if (hoursLeft <= 6) { tlBadgeEl.textContent = 'Evening'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-600 w-fit uppercase tracking-tighter mt-1'; }
+            else if (hoursLeft <= 12) { tlBadgeEl.textContent = 'Midday'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-yellow-100 text-yellow-700 w-fit uppercase tracking-tighter mt-1'; }
+            else { tlBadgeEl.textContent = 'Day Active'; tlBadgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-600 w-fit uppercase tracking-tighter mt-1'; }
+        }
+
         const firstActivityEl = document.getElementById('first-activity-time');
         if (firstActivityEl && this.firstStartTime) {
             const h = this.firstStartTime.getHours();
@@ -1333,7 +1377,67 @@ const StudyTargetTracker = {
         return `${m}m`;
     },
 
-    // ─── Feature: Rhythm Memory (Upgraded to Cloud Sync) ─────────────────────
+    // ─── Reusable Radial Ring Renderer ───────────────────────────────────────
+    _renderRadialRing(canvasId, opts) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        if (w === 0 || h === 0) return;
+
+        const size = Math.min(w, h);
+        ctx.clearRect(0, 0, w, h);
+
+        const cx = w / 2;
+        const cy = h / 2;
+        const radius = (size / 2) - 4;
+        const lineWidth = 4;
+        const startAngle = -Math.PI / 2;
+        const progress = Math.max(0, Math.min(1, opts.progress));
+
+        // Track (background ring)
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = opts.trackColor;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Fill arc (progress)
+        if (progress > 0.005) {
+            const endAngle = startAngle + (Math.PI * 2 * progress);
+            
+            // Glow
+            ctx.save();
+            ctx.shadowColor = opts.glowColor;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, startAngle, endAngle);
+            ctx.strokeStyle = opts.fillColor;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+
+            // Crisp arc on top
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, startAngle, endAngle);
+            ctx.strokeStyle = opts.fillColor;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        // Center percentage text
+        const pctText = Math.round(progress * 100) + '%';
+        ctx.fillStyle = opts.fillColor;
+        ctx.font = `800 ${Math.round(size * 0.26)}px Inter, system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pctText, cx, cy);
+    },
+
 
     async logBPMToDatabase(precomputedState) {
         // Allow low BPM if active (starting up from flatline)

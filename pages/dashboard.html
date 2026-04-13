@@ -270,32 +270,44 @@
               </div>
             </div>
             <!-- Remaining Target -->
-            <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
-              <p
-                class="text-[10px] font-black text-blue-400 uppercase tracking-widest"
-              >
-                Remaining Target
-              </p>
-              <p
-                id="target-remaining-hours"
-                class="text-xl font-black text-blue-600"
-              >
-                15.0h
-              </p>
+            <div class="col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-50 to-indigo-50/50 p-3 rounded-xl border border-blue-200/60 flex flex-col justify-between min-h-[80px] transition-all duration-300 overflow-hidden">
+              <div class="flex justify-between items-center mb-0.5">
+                <p class="text-[10px] font-black text-blue-500 uppercase tracking-widest">Remaining Target</p>
+                <span class="material-symbols-outlined text-[12px] text-blue-400 tooltip-trigger"
+                      data-tooltip-title="Remaining Target"
+                      data-tooltip-desc="Study hours remaining to hit today's goal. Ring shows % completed."
+                      data-tooltip-color="#3b82f6">track_changes</span>
+              </div>
+              <div class="flex items-start justify-between">
+                <div>
+                  <p id="target-remaining-hours" class="text-xl font-black text-blue-700 leading-none">15.0h</p>
+                  <p id="remaining-target-pct" class="text-[9px] font-bold text-blue-400 mt-0.5">0% done</p>
+                </div>
+                <canvas id="remaining-target-canvas" width="48" height="48" class="flex-shrink-0 mt-7"></canvas>
+              </div>
+              <div id="remaining-target-badge" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-blue-100 text-blue-600 w-fit uppercase tracking-tighter mt-1">
+                Not Started
+              </div>
             </div>
             <!-- Time Left Today -->
-            <div class="bg-yellow-50 p-3 rounded-xl border border-yellow-100">
-              <p
-                class="text-[10px] font-black text-yellow-600 uppercase tracking-widest"
-              >
-                Time Left Today
-              </p>
-              <p
-                id="target-time-left"
-                class="text-2xl font-black text-yellow-900"
-              >
-                00:00:00
-              </p>
+            <div class="col-span-2 lg:col-span-1 bg-gradient-to-br from-yellow-50 to-amber-50/50 p-3 rounded-xl border border-yellow-200/60 flex flex-col justify-between min-h-[80px] transition-all duration-300 overflow-hidden">
+              <div class="flex justify-between items-center mb-0.5">
+                <p class="text-[10px] font-black text-yellow-600 uppercase tracking-widest">Time Left Today</p>
+                <span class="material-symbols-outlined text-[12px] text-yellow-500 tooltip-trigger"
+                      data-tooltip-title="Time Left Today"
+                      data-tooltip-desc="Wall clock time remaining until 5 AM rollover. Ring shows how much of the day has passed."
+                      data-tooltip-color="#eab308">hourglass_top</span>
+              </div>
+              <div class="flex items-start justify-between">
+                <div>
+                  <p id="target-time-left" class="text-xl font-black text-yellow-800 leading-none">00:00:00</p>
+                  <p id="time-left-pct" class="text-[9px] font-bold text-yellow-500 mt-0.5">0% elapsed</p>
+                </div>
+                <canvas id="time-left-canvas" width="47" height="47" class="flex-shrink-0 mt-7"></canvas>
+              </div>
+              <div id="time-left-badge" class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm bg-yellow-100 text-yellow-700 w-fit uppercase tracking-tighter mt-1">
+                Day Active
+              </div>
             </div>
             <!-- Subject Coverage (Redesigned) -->
             <div
