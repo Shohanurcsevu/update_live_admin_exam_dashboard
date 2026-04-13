@@ -4256,9 +4256,9 @@ const StudyTargetTracker = {
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
 
-            // --- Count label inside today's bar ---
-            if (isToday && d.count > 0 && barH > 12) {
-                ctx.fillStyle = '#fff';
+            // --- Count label inside each bar ---
+            if (d.count > 0 && barH > 12) {
+                ctx.fillStyle = isToday ? '#fff' : 'rgba(255,255,255,0.9)';
                 ctx.font = `800 ${Math.min(8, barW * 0.55)}px Inter, system-ui, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -4429,10 +4429,10 @@ const StudyTargetTracker = {
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
 
-            // --- Hours label inside today's bar ---
-            if (isToday && mins > 0 && barH > 12) {
+            // --- Time label inside each bar ---
+            if (mins > 0 && barH > 12) {
                 const label = mins >= 60 ? `${Math.floor(mins/60)}h` : `${mins}m`;
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = isToday ? '#fff' : 'rgba(255,255,255,0.9)';
                 ctx.font = `800 ${Math.min(8, barW * 0.55)}px Inter, system-ui, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
