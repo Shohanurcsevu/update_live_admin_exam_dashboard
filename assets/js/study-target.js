@@ -421,8 +421,9 @@ const StudyTargetTracker = {
         }
 
         // ─── Remaining Target Radial Ring ────────────────────────────────
+        const remainingTargetFraction = Math.max(0, Math.min(1, remainingStudySeconds / this.DAILY_TARGET_SECONDS));
         this._renderRadialRing('remaining-target-canvas', {
-            progress: Math.min(1, this.studiedSeconds / this.DAILY_TARGET_SECONDS),
+            progress: remainingTargetFraction,
             trackColor: 'rgba(59, 130, 246, 0.12)',
             fillColor: '#3b82f6',
             glowColor: 'rgba(59, 130, 246, 0.4)'
@@ -430,8 +431,8 @@ const StudyTargetTracker = {
         const remPctEl = document.getElementById('remaining-target-pct');
         const remBadgeEl = document.getElementById('remaining-target-badge');
         if (remPctEl) {
-            const pct = Math.min(100, Math.round((this.studiedSeconds / this.DAILY_TARGET_SECONDS) * 100));
-            remPctEl.textContent = `${pct}% done`;
+            const donePct = Math.min(100, Math.round((this.studiedSeconds / this.DAILY_TARGET_SECONDS) * 100));
+            remPctEl.textContent = `${donePct}% done`;
         }
         if (remBadgeEl) {
             const pct = Math.min(100, Math.round((this.studiedSeconds / this.DAILY_TARGET_SECONDS) * 100));
@@ -453,8 +454,8 @@ const StudyTargetTracker = {
         const tlPctEl = document.getElementById('time-left-pct');
         const tlBadgeEl = document.getElementById('time-left-badge');
         if (tlPctEl) {
-            const pct = Math.round(remainingDayFraction * 100);
-            tlPctEl.textContent = `${pct}% left`;
+            const elapsedPct = 100 - Math.round(remainingDayFraction * 100);
+            tlPctEl.textContent = `${elapsedPct}% elapsed`;
         }
         if (tlBadgeEl) {
             const hoursLeft = secondsUntilRollover / 3600;
