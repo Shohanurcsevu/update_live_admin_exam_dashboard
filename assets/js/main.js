@@ -344,7 +344,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             'question-creator': 'assets/js/question-creator.js',
             'backup-restore': 'assets/js/backup-restore.js',
             'speed-trivia': 'assets/js/speed-trivia.js',
-            'review-changes': 'assets/js/review-changes.js'
+            'review-changes': 'assets/js/review-changes.js',
+            'fb-posts': 'assets/js/fb-posts.js'
         };
 
 
