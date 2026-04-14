@@ -57,12 +57,22 @@ while (true) {
                 
                 $text = $msg['text'] ?? '';
                 
-                if (strpos($text, '/study') === 0) {
+                if (strpos($text, '/study') === 0 || $text === "📚 Start Study") {
                     handleStudyCommand($conn, $tgToken, $chatId);
-                } elseif (strpos($text, '/stop') === 0) {
+                } elseif (strpos($text, '/stop') === 0 || $text === "🛑 Stop Session") {
                     handleStopCommand($conn, $tgToken, $chatId);
-                } elseif (strpos($text, '/status') === 0) {
+                } elseif (strpos($text, '/pause') === 0 || $text === "⏸ Pause") {
+                    handlePauseCommand($conn, $tgToken, $chatId);
+                } elseif (strpos($text, '/resume') === 0 || $text === "▶️ Resume") {
+                    handleResumeCommand($conn, $tgToken, $chatId);
+                } elseif (strpos($text, '/restart') === 0 || $text === "🔄 Restart Last") {
+                    handleRestartLastCommand($conn, $tgToken, $chatId);
+                } elseif (strpos($text, '/break') === 0 || $text === "☕ Start Break") {
+                    handleBreakCommand($conn, $tgToken, $chatId);
+                } elseif (strpos($text, '/status') === 0 || $text === "⏱ Status") {
                     handleStatusCommand($conn, $tgToken, $chatId);
+                } elseif (strpos($text, '/start') === 0) {
+                    sendTgMessage($tgToken, $chatId, "👋 *Welcome to Rethink Pomodoro!*\nUse the keyboard below to control your study sessions.");
                 }
             }
             
@@ -104,9 +114,10 @@ function sendTgMessage($token, $chatId, $text, $keyboard = null) {
         'text' => $text,
         'parse_mode' => 'Markdown'
     ];
-    if ($keyboard) {
-        $params['reply_markup'] = json_encode($keyboard);
+    if ($keyboard === null) {
+        $keyboard = getMainMenu();
     }
+    $params['reply_markup'] = json_encode($keyboard);
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -165,6 +176,92 @@ function handleStudyCommand($conn, $token, $chatId) {
 function handleStopCommand($conn, $token, $chatId) {
     $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
     sendTgMessage($token, $chatId, "🛑 *Session stopped.*");
+}
+
+/**
+ * Handle /pause command
+ */
+function handlePauseCommand($conn, $token, $chatId) {
+    // 1. Calculate and update remaining_seconds for the active session
+    $sql = "UPDATE study_sessions 
+            SET remaining_seconds = GREATEST(0, (duration_minutes * 60) - TIMESTAMPDIFF(SECOND, start_time, NOW())),
+                status = 'paused', 
+                last_heartbeat = NOW() 
+            WHERE status = 'active'
+            ORDER BY id DESC LIMIT 1";
+    
+    if ($conn->query($sql) && $conn->affected_rows > 0) {
+        sendTgMessage($token, $chatId, "⏸ *Session paused.*");
+    } else {
+        sendTgMessage($token, $chatId, "⚠️ No active session found to pause.");
+    }
+}
+
+/**
+ * Handle /resume command
+ */
+function handleResumeCommand($conn, $token, $chatId) {
+    // 2. Resume the latest paused session by shifting start_time forward
+    // start_time = start_time + (NOW - last_heartbeat)
+    $sql = "UPDATE study_sessions 
+            SET start_time = TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, last_heartbeat, NOW()), start_time), 
+                status = 'active', 
+                last_heartbeat = NOW() 
+            WHERE status = 'paused' 
+            ORDER BY id DESC LIMIT 1";
+    
+    if ($conn->query($sql) && $conn->affected_rows > 0) {
+        sendTgMessage($token, $chatId, "▶️ *Session resumed.*");
+    } else {
+        sendTgMessage($token, $chatId, "⚠️ No paused session found to resume.");
+    }
+}
+
+/**
+ * Handle /restart command - start new session with last used subject
+ */
+function handleRestartLastCommand($conn, $token, $chatId) {
+    $res = $conn->query("SELECT subject_id, subject_name FROM study_sessions 
+                         WHERE session_type = 'focus' AND subject_id IS NOT NULL 
+                         ORDER BY id DESC LIMIT 1");
+    
+    if ($row = $res->fetch_assoc()) {
+        $subjectId = $row['subject_id'];
+        $subjectName = $row['subject_name'];
+        
+        // Safety check for active session
+        $checkRes = $conn->query("SELECT subject_name FROM study_sessions WHERE status IN ('active', 'paused') LIMIT 1");
+        if ($activeRow = $checkRes->fetch_assoc()) {
+            $keyboard = ['inline_keyboard' => [[
+                ['text' => "✅ Yes, restart", 'callback_data' => "confirm_start_" . $subjectId],
+                ['text' => "❌ No", 'callback_data' => "cancel"]
+            ]]];
+            sendTgMessage($token, $chatId, "⚠️ *Conflict!*\nAn active session for *{$activeRow['subject_name']}* is running.\nRestart *{$subjectName}* anyway?", $keyboard);
+        } else {
+            startPomodoroSession($conn, $token, $chatId, $subjectId, $subjectName);
+        }
+    } else {
+        sendTgMessage($token, $chatId, "❌ *No history found.* Please start a session manually first.");
+    }
+}
+
+/**
+ * Handle /break command
+ */
+function handleBreakCommand($conn, $token, $chatId) {
+    // Abandon previous
+    $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
+    
+    $duration = 5; // 5 min break
+    $seconds = $duration * 60;
+    $stmt = $conn->prepare("INSERT INTO study_sessions (subject_id, subject_name, duration_minutes, remaining_seconds, status, start_time, last_heartbeat, session_type) VALUES (NULL, 'Break', ?, ?, 'active', NOW(), NOW(), 'break')");
+    $stmt->bind_param("ii", $duration, $seconds);
+    
+    if ($stmt->execute()) {
+        sendTgMessage($token, $chatId, "☕ *Break Started!*\n⏳ Duration: 5 min\nEnjoy your rest!");
+    } else {
+        sendTgMessage($token, $chatId, "❌ *Error starting break:* " . $conn->error);
+    }
 }
 
 /**
@@ -274,4 +371,20 @@ function startPomodoroSession($conn, $token, $chatId, $subjectId, $subjectName) 
     } else {
         sendTgMessage($token, $chatId, "❌ *Error starting session:* " . $conn->error);
     }
+}
+
+/**
+ * Get the persistent main menu keyboard
+ */
+function getMainMenu() {
+    return [
+        'keyboard' => [
+            [['text' => "📚 Start Study"], ['text' => "🛑 Stop Session"]],
+            [['text' => "⏸ Pause"], ['text' => "▶️ Resume"]],
+            [['text' => "🔄 Restart Last"], ['text' => "☕ Start Break"]],
+            [['text' => "⏱ Status"]]
+        ],
+        'resize_keyboard' => true,
+        'one_time_keyboard' => false
+    ];
 }
