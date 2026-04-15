@@ -30,9 +30,16 @@ try {
         if ($isActiveOrPaused || $isRecentlyCompleted) {
             $completedToday = 0;
             if ($row['subject_id']) {
-                $today = date('Y-m-d');
-                $today_start = $today . ' 00:00:00';
-                $today_end   = $today . ' 23:59:59';
+                $now = time();
+                $hour = intval(date('G', $now));
+                if ($hour < 5) {
+                    $studyDate = date('Y-m-d', strtotime('yesterday'));
+                } else {
+                    $studyDate = date('Y-m-d', $now);
+                }
+                
+                $today_start = $studyDate . ' 05:00:00';
+                $today_end   = date('Y-m-d', strtotime($studyDate . ' +1 day')) . ' 05:00:00';
                 $sessionSubjectId = intval($row['subject_id']);
 
                 $countSql = "SELECT COUNT(*) as total FROM activity_log 

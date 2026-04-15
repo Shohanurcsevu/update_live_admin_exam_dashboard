@@ -38,6 +38,12 @@ echo "Bot Token: " . substr($tgToken, 0, 10) . "...\n";
 echo "Watching Chat ID: $tgChatId\n";
 echo "Press Ctrl+C to stop.\n\n";
 
+// --- Nudge System State ---
+$nudgeActive = true;
+$nudgeInterval = 300; // Start with 5 minutes
+$lastNudgeTime = time();
+$isNagMode = false;
+
 $offset = 0;
 
 while (true) {
@@ -71,6 +77,10 @@ while (true) {
                     handleBreakCommand($conn, $tgToken, $chatId);
                 } elseif (strpos($text, '/status') === 0 || $text === "⏱ Status") {
                     handleStatusCommand($conn, $tgToken, $chatId);
+                } elseif (strpos($text, '/repeat') === 0 || $text === "🔄 Repeat Last") {
+                    handleRestartLastCommand($conn, $tgToken, $chatId);
+                } elseif (strpos($text, '/report') === 0 || $text === "📊 Progress Report") {
+                    handleProgressReport($conn, $tgToken, $chatId);
                 } elseif (strpos($text, '/start') === 0) {
                     sendTgMessage($tgToken, $chatId, "👋 *Welcome to Rethink Pomodoro!*\nUse the keyboard below to control your study sessions.");
                 }
@@ -84,6 +94,43 @@ while (true) {
                 
                 handleCallback($conn, $tgToken, $chatId, $cb);
             }
+        }
+    }
+    
+    // --- 3. Handle Automated Nudges ---
+    if ($nudgeActive) {
+        // Check for active sessions (Focus or Break)
+        $sessionRes = $conn->query("SELECT id FROM study_sessions WHERE status IN ('active', 'paused') LIMIT 1");
+        $hasActiveSession = ($sessionRes->num_rows > 0);
+
+        if (!$hasActiveSession) {
+            if (time() > ($lastNudgeTime + $nudgeInterval)) {
+                $quote = getRandomMotivation();
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [['text' => "📚 Start Study", 'callback_data' => "start_study_menu"]],
+                        [['text' => "⏳ Remind in 5m", 'callback_data' => "nudge_5m"], ['text' => "🛑 Stop Nudging", 'callback_data' => "nudge_stop"]]
+                    ]
+                ];
+                
+                sendTgMessage($tgToken, $tgChatId, "🔔 *Accountability Check*\n\n" . $quote, $keyboard);
+                
+                // Toggle Interval: 5m -> 1m -> 5m
+                if (!$isNagMode) {
+                    $nudgeInterval = 60; // Next is 1m nag
+                    $isNagMode = true;
+                } else {
+                    $nudgeInterval = 300; // Reset to 5m
+                    $isNagMode = false;
+                }
+                $lastNudgeTime = time();
+            }
+        } else {
+            // Keep resetting lastNudgeTime while session is active so the first nudge 
+            // happens 5m after the session actually ends.
+            $lastNudgeTime = time();
+            $nudgeInterval = 300;
+            $isNagMode = false;
         }
     }
     
@@ -175,7 +222,12 @@ function handleStudyCommand($conn, $token, $chatId) {
  */
 function handleStopCommand($conn, $token, $chatId) {
     $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
-    sendTgMessage($token, $chatId, "🛑 *Session stopped.*");
+    
+    if ($conn->affected_rows > 0) {
+        sendTgMessage($token, $chatId, "🛑 *Session stopped.*");
+    } else {
+        sendTgMessage($token, $chatId, "⚠️ *No session is currently running.* Please start a session first.");
+    }
 }
 
 /**
@@ -249,9 +301,21 @@ function handleRestartLastCommand($conn, $token, $chatId) {
  * Handle /break command
  */
 function handleBreakCommand($conn, $token, $chatId) {
-    // Abandon previous
-    $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
-    
+    // Check if a session is currently running
+    $checkRes = $conn->query("SELECT subject_name FROM study_sessions WHERE status IN ('active', 'paused') AND session_type = 'focus' LIMIT 1");
+    if ($activeRow = $checkRes->fetch_assoc()) {
+        sendTgMessage($token, $chatId, "⚠️ *Action Blocked!*\nYou are currently in a study session for *{$activeRow['subject_name']}*.\nFinish or Stop your session before taking a break.");
+        return;
+    }
+
+    // If it's a break that's already running, don't restart it
+    $breakRes = $conn->query("SELECT id FROM study_sessions WHERE status IN ('active', 'paused') AND session_type = 'break' LIMIT 1");
+    if ($breakRes->num_rows > 0) {
+        sendTgMessage($token, $chatId, "☕ *You are already on a break!*");
+        return;
+    }
+
+    // Success: Start break
     $duration = 5; // 5 min break
     $seconds = $duration * 60;
     $stmt = $conn->prepare("INSERT INTO study_sessions (subject_id, subject_name, duration_minutes, remaining_seconds, status, start_time, last_heartbeat, session_type) VALUES (NULL, 'Break', ?, ?, 'active', NOW(), NOW(), 'break')");
@@ -292,6 +356,117 @@ function handleStatusCommand($conn, $token, $chatId) {
     } else {
         sendTgMessage($token, $chatId, "🔌 *No active session.* Use /study to start one.");
     }
+}
+
+/**
+ * Handle /report command - show today's performance summary
+ */
+function handleProgressReport($conn, $token, $chatId) {
+    // 1. Get Logical Study Date (Rollover at 5 AM)
+    $now = time();
+    $hour = intval(date('G', $now));
+    if ($hour < 5) {
+        $studyDate = date('Y-m-d', strtotime('yesterday'));
+    } else {
+        $studyDate = date('Y-m-d', $now);
+    }
+    
+    $startTs = $studyDate . ' 05:00:00';
+    $endTs = date('Y-m-d', strtotime($studyDate . ' +1 day')) . ' 05:00:00';
+
+    // 2. Fetch Streak Data (id=1 as per get-streak.php)
+    $streak = 0;
+    $res = $conn->query("SELECT current_streak FROM user_streaks WHERE id = 1");
+    if ($row = $res->fetch_assoc()) {
+        $streak = intval($row['current_streak']);
+    }
+
+    // 3. Calculate Total Focus time (Exams + Pomodoros)
+    // Following logic from daily-study-time.php
+    $totalSeconds = 0;
+    
+    // A. From Exams
+    $sqlExams = "SELECT SUM(time_used_seconds) as total FROM performance WHERE attempt_time BETWEEN ? AND ?";
+    $stmtExams = $conn->prepare($sqlExams);
+    $stmtExams->bind_param("ss", $startTs, $endTs);
+    $stmtExams->execute();
+    if ($row = $stmtExams->get_result()->fetch_assoc()) {
+        $totalSeconds += intval($row['total']);
+    }
+
+    // B. From Completed Pomodoros
+    $sqlPomo = "SELECT SUM(
+                    CASE 
+                        WHEN activity_details LIKE '%duration%'
+                        THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.duration')) AS DECIMAL) * 60 
+                        ELSE 25 * 60 
+                    END
+                ) as total 
+                FROM activity_log 
+                WHERE activity_type = 'pomodoro_session' 
+                AND timestamp BETWEEN ? AND ?
+                AND (activity_details LIKE '%\"status\":\"completed\"%' OR activity_details IS NULL OR activity_details = '')";
+    $stmtPomo = $conn->prepare($sqlPomo);
+    $stmtPomo->bind_param("ss", $startTs, $endTs);
+    $stmtPomo->execute();
+    if ($row = $stmtPomo->get_result()->fetch_assoc()) {
+        $totalSeconds += intval($row['total']);
+    }
+
+    // C. Add Current Progress if session is active
+    $sqlActive = "SELECT 
+                    CASE 
+                        WHEN status = 'active' THEN (duration_minutes * 60 - remaining_seconds) + (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_heartbeat))
+                        ELSE (duration_minutes * 60 - remaining_seconds)
+                    END as active_seconds
+                FROM study_sessions
+                WHERE (status = 'active' OR status = 'paused') AND session_type = 'focus'
+                LIMIT 1";
+    if ($row = $conn->query($sqlActive)->fetch_assoc()) {
+        $totalSeconds += max(0, intval($row['active_seconds']));
+    }
+
+    // 4. Count Exams Taken Today
+    $sqlExamCount = "SELECT COUNT(*) as total FROM performance WHERE attempt_time BETWEEN ? AND ?";
+    $stmtEC = $conn->prepare($sqlExamCount);
+    $stmtEC->bind_param("ss", $startTs, $endTs);
+    $stmtEC->execute();
+    $examsDone = $stmtEC->get_result()->fetch_assoc()['total'];
+
+    // 5. Calculate Goal Progress (Benchmark: 12 Hours = 43200 seconds)
+    $goalSeconds = 12 * 3600;
+    $percent = min(100, round(($totalSeconds / $goalSeconds) * 100));
+    
+    // Visual Progress Bar
+    $barLength = 10;
+    $filledLength = round($percent / 10);
+    $bar = str_repeat("🟢", $filledLength) . str_repeat("⚪", $barLength - $filledLength);
+
+    // Formatting Time
+    $hours = floor($totalSeconds / 3600);
+    $mins = floor(($totalSeconds % 3600) / 60);
+    $timeStr = "{$hours}h {$mins}m";
+
+    // 6. Build Message
+    $report = "📊 *Today's Progress Report*\n";
+    $report .= "Date: _" . date('d M, Y') . "_\n\n";
+    
+    $report .= "🔥 *Streak:* {$streak} Days\n";
+    $report .= "⏱ *Focus Time:* {$timeStr}\n";
+    $report .= "🏁 *Daily Goal:* {$percent}%\n";
+    $report .= "`{$bar}`\n\n";
+    
+    $report .= "📝 *Exams Completed:* {$examsDone}\n\n";
+    
+    if ($percent >= 100) {
+        $report .= "🏆 *GENIUS STATUS:* Goal accomplished! You are unstoppable.";
+    } elseif ($percent >= 50) {
+        $report .= "⚡ *ON TRACK:* Great momentum. Keep pushing to 100%!";
+    } else {
+        $report .= "🔋 *GET STARTED:* The night is young. Time to lock in.";
+    }
+
+    sendTgMessage($token, $chatId, $report);
 }
 
 /**
@@ -347,6 +522,27 @@ function handleCallback($conn, $token, $chatId, $cb) {
             startPomodoroSession($conn, $token, $chatId, $subject_id, $subject['subject_name']);
             answerCallback($token, $cb['id'], "Session started!");
         }
+    } elseif ($data === 'repeat_last') {
+        handleRestartLastCommand($conn, $token, $chatId);
+        answerCallback($token, $cb['id']);
+    } elseif ($data === 'start_break') {
+        handleBreakCommand($conn, $token, $chatId);
+        answerCallback($token, $cb['id']);
+    } elseif ($data === 'start_study_menu') {
+        handleStudyCommand($conn, $token, $chatId);
+        answerCallback($token, $cb['id']);
+    } elseif ($data === 'nudge_5m') {
+        global $lastNudgeTime, $nudgeInterval, $isNagMode;
+        $lastNudgeTime = time();
+        $nudgeInterval = 300;
+        $isNagMode = false;
+        sendTgMessage($token, $chatId, "⏳ *Postponed.* I'll check on you in 5 minutes.");
+        answerCallback($token, $cb['id']);
+    } elseif ($data === 'nudge_stop') {
+        global $nudgeActive;
+        $nudgeActive = false;
+        sendTgMessage($token, $chatId, "🛑 *Nudges Disabled.* Tap /study whenever you're ready to lock in.");
+        answerCallback($token, $cb['id']);
     } elseif ($data === 'cancel') {
         sendTgMessage($token, $chatId, "🆗 *Action cancelled.*");
         answerCallback($token, $cb['id']);
@@ -382,9 +578,28 @@ function getMainMenu() {
             [['text' => "📚 Start Study"], ['text' => "🛑 Stop Session"]],
             [['text' => "⏸ Pause"], ['text' => "▶️ Resume"]],
             [['text' => "🔄 Restart Last"], ['text' => "☕ Start Break"]],
-            [['text' => "⏱ Status"]]
+            [['text' => "⏱ Status"], ['text' => "📊 Progress Report"]]
         ],
         'resize_keyboard' => true,
         'one_time_keyboard' => false
     ];
+}
+
+/**
+ * Curated Motivational Messages
+ */
+function getRandomMotivation() {
+    $quotes = [
+        "The pain of discipline is far less than the pain of regret.",
+        "Your future self is either thanking you or blaming you right now.",
+        "Focus is the new IQ. Lock in and stay consistent.",
+        "Success is what happens after you survive all your mistakes.",
+        "Don't stop when you're tired. Stop when you're DONE.",
+        "A year from now, you’ll wish you had started today.",
+        "The best way to predict your future is to create it.",
+        "Every focused minute counts towards your legacy.",
+        "Small steps every day lead to big results.",
+        "Results require action. Ideas are just the start."
+    ];
+    return $quotes[array_rand($quotes)];
 }

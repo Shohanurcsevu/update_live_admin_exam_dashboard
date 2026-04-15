@@ -11,10 +11,22 @@ date_default_timezone_set('Asia/Dhaka');
 try {
     // Build a 7-day × 24-hour grid of study minutes
     // Returns: { grid: [[0..23], ...7 days], days: ["Sat","Sun",...], peak_hour: 14 }
+    // Uses 5 AM logical day: DATE_SUB(ts, INTERVAL 5 HOUR) shifts timestamps
+    // so midnight-4:59 AM maps to the previous logical day.
+
+    // Calculate the logical "today" date (rolls back if before 5 AM)
+    $hour = intval(date('G'));
+    if ($hour < 5) {
+        $logicalToday = date('Y-m-d', strtotime('yesterday'));
+    } else {
+        $logicalToday = date('Y-m-d');
+    }
+    // Logical start = 7 days ago at 5:00 AM
+    $logicalStart = date('Y-m-d', strtotime($logicalToday . ' -6 days')) . ' 05:00:00';
 
     $sql = "
         SELECT 
-            DATE(ts) as study_date,
+            DATE(DATE_SUB(ts, INTERVAL 5 HOUR)) as study_date,
             HOUR(ts) as study_hour,
             SUM(duration_sec) / 60.0 as total_minutes
         FROM (
@@ -24,7 +36,7 @@ try {
                 p.time_used_seconds as duration_sec
             FROM performance p
             WHERE p.time_used_seconds > 0
-            AND p.attempt_time >= DATE_SUB(CURRENT_DATE, INTERVAL 6 DAY)
+            AND p.attempt_time >= '{$logicalStart}'
 
             UNION ALL
 
@@ -44,7 +56,7 @@ try {
                 END as duration_sec
             FROM activity_log al
             WHERE al.activity_type = 'pomodoro_session'
-            AND al.timestamp >= DATE_SUB(CURRENT_DATE, INTERVAL 6 DAY)
+            AND al.timestamp >= '{$logicalStart}'
         ) sessions
         GROUP BY study_date, study_hour
         ORDER BY study_date ASC, study_hour ASC
@@ -55,12 +67,12 @@ try {
         throw new Exception("Heatmap query failed: " . $conn->error);
     }
 
-    // Initialize 7-day grid (index 0 = 6 days ago, index 6 = today)
+    // Initialize 7-day grid using LOGICAL dates (5 AM rollover)
     $grid = [];
     $days = [];
     for ($i = 6; $i >= 0; $i--) {
-        $date = date('Y-m-d', strtotime("-{$i} days"));
-        $dayName = date('D', strtotime("-{$i} days")); // Mon, Tue, etc.
+        $date = date('Y-m-d', strtotime($logicalToday . " -{$i} days"));
+        $dayName = date('D', strtotime($logicalToday . " -{$i} days")); // Mon, Tue, etc.
         $days[] = $dayName;
         $grid[$date] = array_fill(0, 24, 0);
     }

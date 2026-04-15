@@ -73,17 +73,26 @@ try {
                     $durationMin = $durationToLog;
                     $timeNow = date('h:i A');
 
-                    // Count today's completed sessions for this subject
+                    // Count today's completed sessions for this subject (5 AM Rollover Logic)
                     $sessionNum = 1;
                     if ($row['subject_id']) {
-                        $today = date('Y-m-d');
+                        $now = time();
+                        $hour = intval(date('G', $now));
+                        if ($hour < 5) {
+                            $studyDate = date('Y-m-d', strtotime('yesterday'));
+                        } else {
+                            $studyDate = date('Y-m-d', $now);
+                        }
+
+                        $tStart = $studyDate . ' 05:00:00';
+                        $tEnd = date('Y-m-d', strtotime($studyDate . ' +1 day')) . ' 05:00:00';
+
                         $cStmt = $conn->prepare("SELECT COUNT(*) as total FROM activity_log 
                             WHERE activity_type = 'pomodoro_session'
                             AND timestamp BETWEEN ? AND ?
                             AND JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.subject_id')) = ?
                             AND (JSON_EXTRACT(activity_details, '$.status') IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(activity_details, '$.status')) = 'completed')");
-                        $tStart = $today . ' 00:00:00';
-                        $tEnd = $today . ' 23:59:59';
+                        
                         $sId = intval($row['subject_id']);
                         $cStmt->bind_param("ssi", $tStart, $tEnd, $sId);
                         $cStmt->execute();
@@ -101,9 +110,18 @@ try {
                     $ch = curl_init();
                     curl_setopt($ch, CURLOPT_URL, $tgUrl);
                     curl_setopt($ch, CURLOPT_POST, true);
+                    
+                    $keyboard = [
+                        'inline_keyboard' => [[
+                            ['text' => "🔄 Repeat Session", 'callback_data' => "repeat_last"],
+                            ['text' => "☕ Take a Break", 'callback_data' => "start_break"]
+                        ]]
+                    ];
+
                     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
                         'chat_id' => $tgChatId,
-                        'text' => $tgMessage
+                        'text' => $tgMessage,
+                        'reply_markup' => json_encode($keyboard)
                     ]));
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
