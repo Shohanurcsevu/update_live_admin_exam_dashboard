@@ -4,6 +4,8 @@ function initializeTakeExamListPage() {
     const subjectFilter = document.getElementById('subject-filter');
     const lessonFilter = document.getElementById('lesson-filter');
     const topicFilter = document.getElementById('topic-filter');
+    const dateFromFilter = document.getElementById('date-from-filter');
+    const dateToFilter = document.getElementById('date-to-filter');
     const clearFiltersBtn = document.getElementById('clear-filters-btn');
     const loadMoreBtn = document.getElementById('load-more-btn');
     const currentCountEl = document.getElementById('current-count');
@@ -174,6 +176,8 @@ function initializeTakeExamListPage() {
         if (subjectFilter.value > 0) params.append('subject_id', subjectFilter.value);
         if (lessonFilter.value > 0) params.append('lesson_id', lessonFilter.value);
         if (topicFilter.value > 0) params.append('topic_id', topicFilter.value);
+        if (dateFromFilter && dateFromFilter.value) params.append('date_from', dateFromFilter.value);
+        if (dateToFilter && dateToFilter.value) params.append('date_to', dateToFilter.value);
         url += params.toString();
 
         try {
@@ -186,7 +190,7 @@ function initializeTakeExamListPage() {
                 currentExamIds = [];
             }
             
-            const isFiltering = subjectFilter.value > 0 || lessonFilter.value > 0 || topicFilter.value > 0;
+            const isFiltering = subjectFilter.value > 0 || lessonFilter.value > 0 || topicFilter.value > 0 || (dateFromFilter && dateFromFilter.value) || (dateToFilter && dateToFilter.value);
 
             if (result.success && result.data.length > 0) {
                 result.data.forEach(exam => {
@@ -395,17 +399,37 @@ function initializeTakeExamListPage() {
         fetchAndDisplayExams(false);
     });
 
+    // Date filter listeners
+    if (dateFromFilter) {
+        dateFromFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_take_exam_date_from', dateFromFilter.value);
+            currentPage = 1;
+            fetchAndDisplayExams(false);
+        });
+    }
+    if (dateToFilter) {
+        dateToFilter.addEventListener('change', () => {
+            localStorage.setItem('filter_take_exam_date_to', dateToFilter.value);
+            currentPage = 1;
+            fetchAndDisplayExams(false);
+        });
+    }
+
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', () => {
             localStorage.removeItem('filter_take_exam_subject');
             localStorage.removeItem('filter_take_exam_lesson');
             localStorage.removeItem('filter_take_exam_topic');
+            localStorage.removeItem('filter_take_exam_date_from');
+            localStorage.removeItem('filter_take_exam_date_to');
 
             subjectFilter.value = '0';
             lessonFilter.innerHTML = '<option value="0">All Lessons</option>';
             lessonFilter.disabled = true;
             topicFilter.innerHTML = '<option value="0">All Topics</option>';
             topicFilter.disabled = true;
+            if (dateFromFilter) dateFromFilter.value = '';
+            if (dateToFilter) dateToFilter.value = '';
 
             fetchAndDisplayExams(false);
         });
@@ -1254,6 +1278,12 @@ function initializeTakeExamListPage() {
     });
 
     document.getElementById('cancel-active-btn').addEventListener('click', cancelActiveSession);
+
+    // Restore date filters from localStorage
+    const savedDateFrom = localStorage.getItem('filter_take_exam_date_from');
+    const savedDateTo = localStorage.getItem('filter_take_exam_date_to');
+    if (savedDateFrom && dateFromFilter) dateFromFilter.value = savedDateFrom;
+    if (savedDateTo && dateToFilter) dateToFilter.value = savedDateTo;
 
     // Initial Load
     populateSubjects();

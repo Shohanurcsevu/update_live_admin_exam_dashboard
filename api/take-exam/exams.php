@@ -55,6 +55,16 @@ if (!empty($_GET['topic_id'])) {
     $params[] = intval($_GET['topic_id']);
     $types .= 'i';
 }
+if (!empty($_GET['date_from'])) {
+    $where_clauses[] = "DATE(e.created_at) >= ?";
+    $params[] = $_GET['date_from'];
+    $types .= 's';
+}
+if (!empty($_GET['date_to'])) {
+    $where_clauses[] = "DATE(e.created_at) <= ?";
+    $params[] = $_GET['date_to'];
+    $types .= 's';
+}
 
 // --- Pagination Logic ---
 $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 20;

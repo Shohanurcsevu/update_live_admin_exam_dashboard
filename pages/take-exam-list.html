@@ -24,6 +24,25 @@
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm"
                 disabled></select></div>
     </div>
+    <!-- Date Range Filter -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-4 border rounded-lg bg-gradient-to-r from-indigo-50/60 to-purple-50/60 border-indigo-100">
+        <div>
+            <label for="date-from-filter" class="block text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-indigo-500 text-base">calendar_month</span>
+                From Date
+            </label>
+            <input type="date" id="date-from-filter"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm">
+        </div>
+        <div>
+            <label for="date-to-filter" class="block text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-indigo-500 text-base">event</span>
+                To Date
+            </label>
+            <input type="date" id="date-to-filter"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm">
+        </div>
+    </div>
 
     <!-- Pagination Status (Top) -->
     <div
