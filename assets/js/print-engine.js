@@ -273,8 +273,20 @@ const PrintEngine = {
         container.appendChild(omrWrapper);
 
         const originalTitle = document.title;
-        document.title = finalTitle;
-        setTimeout(() => { window.print(); setTimeout(() => { document.title = originalTitle; }, 2000); }, 500);
+        const now = new Date();
+        const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+        
+        let hh = now.getHours();
+        const ampm = hh >= 12 ? 'PM' : 'AM';
+        hh = hh % 12 || 12;
+        const timeStr = `${String(hh).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}${ampm}`;
+        
+        document.title = `${finalTitle} - ${set.name} - সেট-${set.num} - ${dateStr}_${timeStr}`;
+        
+        setTimeout(() => { 
+            window.print(); 
+            setTimeout(() => { document.title = originalTitle; }, 2000); 
+        }, 500);
     }
 };
 
