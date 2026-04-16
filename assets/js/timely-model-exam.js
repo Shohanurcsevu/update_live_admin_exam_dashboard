@@ -394,10 +394,8 @@
             input.disabled = !e.target.checked;
             if (e.target.checked) {
                 if (!input.value) {
-                    // Use bulk dropdown value if set, otherwise default to min(5, total)
-                    const bulkCount = parseInt(bulkQuestionCountSelect?.value) || 0;
-                    const defaultCount = bulkCount > 0 ? bulkCount : Math.min(5, exam.total_questions);
-                    input.value = Math.min(defaultCount, exam.total_questions);
+                    // Auto-fill with total available questions
+                    input.value = exam.total_questions;
                 }
                 handleExamSelection(input);
             } else {
