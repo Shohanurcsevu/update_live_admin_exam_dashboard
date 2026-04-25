@@ -53,6 +53,9 @@ function initializeTakeExamListPage() {
         setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s ease'; setTimeout(() => toast.remove(), 500); }, 3000);
     }
 
+    // Initialize OMR Engine
+    if (window.OmrEngine) OmrEngine.init(showToast);
+
     // --- Dropdown Population Logic ---
     async function populateSubjects() {
         try {
@@ -254,6 +257,9 @@ function initializeTakeExamListPage() {
                                      <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}" title="Print">
                                          <span class="material-symbols-outlined text-sm">print</span>
                                      </button>
+                                     <button class="omr-exam-btn border-2 border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}" title="OMR Entry (Keyboard Shortcuts)">
+                                         <span class="material-symbols-outlined text-sm">edit_note</span>
+                                     </button>
                                      <button class="delete-exam-btn bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Delete">
                                          <span class="material-symbols-outlined text-sm">delete</span>
                                      </button>
@@ -325,7 +331,10 @@ function initializeTakeExamListPage() {
                                     <span class="material-symbols-outlined text-sm">${exam.last_revision_date === tomorrowDateStr ? 'done_all' : 'next_plan'}</span>
                                     <span>${exam.last_revision_date === tomorrowDateStr ? 'Planned' : 'Tomorrow'}</span>
                                 </button>
-                                <button class="delete-exam-btn col-span-2 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all mt-1" data-id="${exam.id}">
+                                <button class="omr-exam-btn border-2 border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}">
+                                   <span class="material-symbols-outlined text-sm">edit_note</span> OMR Entry
+                                </button>
+                                <button class="delete-exam-btn bg-red-100 text-red-600 hover:bg-red-600 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">delete</span> Delete Exam
                                 </button>
                             </div>
@@ -936,6 +945,14 @@ function initializeTakeExamListPage() {
             examIdToDelete = target.dataset.id;
             deleteModal.classList.remove('hidden');
             deleteModal.classList.add('flex');
+        } else if (target.classList.contains('omr-exam-btn')) {
+            const examId = target.dataset.id;
+            const examTitle = target.dataset.title;
+            if (window.OmrEngine) {
+                OmrEngine.open(examId, examTitle);
+            } else {
+                showToast('OMR Engine not loaded.', 'error');
+            }
         }
     }
 

@@ -822,6 +822,9 @@ function initializeDashboardPage() {
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2">
                         <button class="take-exam-btn flex-1 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors" data-id="${exam.id}">Take Exam</button>
+                        <button class="omr-entry-btn bg-amber-100 text-amber-700 hover:bg-amber-200 font-semibold py-2 px-3 rounded-lg transition-colors" data-id="${exam.id}" data-title="${exam.exam_title}" data-total="${exam.total_questions || 0}" title="OMR Entry / Mark Practiced">
+                            <span class="material-symbols-outlined">edit_note</span>
+                        </button>
                         <button class="print-options-btn bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold py-2 px-3 rounded-lg transition-colors" data-id="${exam.id}" data-total-questions="${exam.total_questions || 0}" title="Print Options">
                             <span class="material-symbols-outlined">print</span>
                         </button>
@@ -969,6 +972,12 @@ function initializeDashboardPage() {
         }
     }
 
+    // --- OMR Entry (Delegated to OmrEngine) ---
+    if (window.OmrEngine) OmrEngine.init(showToast);
+    function openOmrModal(examId, examTitle) {
+        if (window.OmrEngine) OmrEngine.open(examId, examTitle);
+        else showToast('OMR Engine not loaded.', 'error');
+    }
     // --- Event Listeners & Initial Load ---
     function setupEventListeners() {
         if (subjectFilter) {
@@ -1046,6 +1055,7 @@ function initializeDashboardPage() {
                 const takeExamBtn = e.target.closest('.take-exam-btn');
                 const deleteExamBtn = e.target.closest('.delete-exam-btn');
                 const printOptionsBtn = e.target.closest('.print-options-btn');
+                const omrEntryBtn = e.target.closest('.omr-entry-btn');
 
                 if (takeExamBtn) {
                     const examId = takeExamBtn.dataset.id;
@@ -1059,6 +1069,11 @@ function initializeDashboardPage() {
                     const examId = printOptionsBtn.dataset.id;
                     const totalQuestions = printOptionsBtn.dataset.totalQuestions || 0;
                     openPrintModal(examId, totalQuestions);
+                }
+                if (omrEntryBtn) {
+                    const examId = omrEntryBtn.dataset.id;
+                    const examTitle = omrEntryBtn.dataset.title;
+                    openOmrModal(examId, examTitle);
                 }
             });
         }
