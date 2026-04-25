@@ -236,12 +236,13 @@
     // Create expandable section for grouped exams
     function createExpandableSection(title, exams, type) {
         const div = document.createElement('div');
-        div.className = 'mb-3';
+        div.className = 'mb-3 subject-section';
 
         const header = document.createElement('div');
         header.className = 'flex items-center p-3 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition';
         header.innerHTML = `
             <span class="material-symbols-outlined expand-icon text-gray-600 mr-2 transition-transform">chevron_right</span>
+            <input type="checkbox" class="subject-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer mr-3" title="Select all exams in this subject">
             <span class="material-symbols-outlined mr-2 text-blue-600">${getIcon(type)}</span>
             <span class="font-bold text-gray-800">${title}</span>
             <span class="ml-auto text-sm text-gray-600">${exams.length} exam${exams.length !== 1 ? 's' : ''}</span>
@@ -253,6 +254,35 @@
         exams.forEach(exam => {
             const examDiv = createExamItem(exam);
             content.appendChild(examDiv);
+        });
+
+        const subjectCheckbox = header.querySelector('.subject-checkbox');
+        
+        // Initial sync: Set subject checkbox state based on child exams
+        const initialAllChecked = exams.length > 0 && exams.every(exam => {
+            const selectAllChecked = selectAllQuestionsCheckbox && selectAllQuestionsCheckbox.checked;
+            return !!selectedExams[exam.id] || selectAllChecked;
+        });
+        subjectCheckbox.checked = initialAllChecked;
+
+        subjectCheckbox.addEventListener('click', (e) => e.stopPropagation());
+        subjectCheckbox.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const examCheckboxes = content.querySelectorAll('.exam-checkbox');
+            examCheckboxes.forEach(cb => {
+                const examId = cb.dataset.examId;
+                const input = content.querySelector(`.exam-input[data-exam-id="${examId}"]`);
+                if (cb.checked !== isChecked) {
+                    cb.checked = isChecked;
+                    input.disabled = !isChecked;
+                    if (isChecked) {
+                        input.value = input.dataset.maxQuestions;
+                    } else {
+                        input.value = '';
+                    }
+                    handleExamSelection(input);
+                }
+            });
         });
 
         header.addEventListener('click', () => {
@@ -401,6 +431,17 @@
             } else {
                 input.value = '';
                 handleExamSelection(input);
+            }
+
+            // Sync with subject-level checkbox
+            const section = div.closest('.subject-section');
+            if (section) {
+                const subCB = section.querySelector('.subject-checkbox');
+                if (subCB) {
+                    const allInSub = section.querySelectorAll('.exam-checkbox');
+                    const allChecked = Array.from(allInSub).every(c => c.checked);
+                    subCB.checked = allChecked;
+                }
             }
         });
 
