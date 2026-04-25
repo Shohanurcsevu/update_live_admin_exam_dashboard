@@ -888,6 +888,15 @@
             return acc;
         }, {});
 
+        // Helper: look up actual max questions from state.subjects
+        function getMaxQuestions(lessonId) {
+            for (const subject of state.subjects) {
+                const found = subject.lessons.find(l => String(l.lesson_id) === String(lessonId));
+                if (found) return parseInt(found.total_questions) || 999;
+            }
+            return 999;
+        }
+
         let html = '';
         for (const [subject, lessons] of Object.entries(grouped)) {
             html += `
@@ -897,15 +906,18 @@
                         <span class="text-[11px] font-black uppercase tracking-wider text-gray-500">${subject}</span>
                     </div>
                     <div class="divide-y divide-gray-50">
-                        ${lessons.map((l, index) => `
+                        ${lessons.map((l, index) => {
+                            const maxQ = getMaxQuestions(l.lesson_id);
+                            return `
                             <div class="flex items-center justify-between p-3 hover:bg-white transition-colors group">
                                 <div class="flex-1 min-w-0 pr-4">
                                     <p class="text-sm font-bold text-gray-700 truncate" title="${l.lesson_name}">${l.lesson_name}</p>
+                                    <p class="text-[10px] text-gray-400">max: ${maxQ}</p>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="flex items-center gap-2">
                                         <label class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Qty:</label>
-                                        <input type="number" value="${l.question_count}" min="1" max="999" 
+                                        <input type="number" value="${Math.min(l.question_count, maxQ)}" min="1" max="${maxQ}" 
                                             data-id="${l.lesson_id}"
                                             class="preset-lesson-qty w-14 px-2 py-1 border border-gray-200 rounded-lg text-center focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm">
                                     </div>
@@ -915,7 +927,7 @@
                                     </button>
                                 </div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
                 </div>
             `;
@@ -1044,7 +1056,7 @@
             const result = await response.json();
             if (result.success) {
                 closeSelectPresetModal();
-                loadPresets();
+                await loadPresets();
             } else {
                 showToast(result.message || 'Failed to update preset.', 'error');
             }
@@ -1074,6 +1086,10 @@
             return;
         }
 
+        // Prevent double-click
+        elements.presetModalSave.disabled = true;
+        elements.presetModalSave.textContent = 'Saving...';
+
         const isEdit = state.editingPresetId !== null;
         const lessonsData = state.editingLessons;
 
@@ -1098,13 +1114,16 @@
             if (result.success) {
                 showToast(isEdit ? 'Preset updated!' : 'Preset saved!', 'success');
                 closePresetModal();
-                loadPresets();
+                await loadPresets();
             } else {
                 showToast(result.message || 'Failed to save preset.', 'error');
             }
         } catch (error) {
             console.error('Error saving preset:', error);
             showToast('An error occurred while saving preset.', 'error');
+        } finally {
+            elements.presetModalSave.disabled = false;
+            elements.presetModalSave.textContent = isEdit ? 'Update Preset' : 'Save Preset';
         }
     }
 
@@ -1123,7 +1142,7 @@
 
             if (result.success) {
                 showToast('Preset deleted.', 'success');
-                loadPresets();
+                await loadPresets();
             } else {
                 showToast(result.message || 'Failed to delete preset.', 'error');
             }
@@ -1361,10 +1380,7 @@
     elements.presetModal.addEventListener('click', (e) => {
         if (e.target === elements.presetModal) closePresetModal();
     });
-    
-    elements.selectPresetModal.addEventListener('click', (e) => {
-        if (e.target === elements.selectPresetModal) closeSelectPresetModal();
-    });
+
 
     // Close modals on Escape key
     document.addEventListener('keydown', (e) => {

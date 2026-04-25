@@ -398,4 +398,11 @@
     .preset-card:hover .preset-actions {
         opacity: 1;
     }
+
+    /* Touch devices: always show edit/delete buttons since no hover */
+    @media (hover: none), (pointer: coarse) {
+        .preset-card .preset-actions {
+            opacity: 1;
+        }
+    }
 </style>
