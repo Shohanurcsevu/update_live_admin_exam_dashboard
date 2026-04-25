@@ -66,7 +66,7 @@ try {
         $question_count = intval($source['question_count']);
 
         if ($question_count > 0) {
-            $fetch_sql = "SELECT q.id, q.subject_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority, COUNT(qa.selected_answer) AS attempt_count 
+            $fetch_sql = "SELECT q.id, q.subject_id, q.topic_id, q.question, q.options, q.answer, q.explanation, q.priority, COUNT(qa.id) AS attempt_count 
                           FROM questions q 
                           LEFT JOIN question_attempts qa ON q.id = qa.question_id 
                           WHERE q.lesson_id = ? AND q.is_deleted = 0 AND q.original_question_id IS NULL";

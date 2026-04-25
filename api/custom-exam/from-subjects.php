@@ -52,6 +52,8 @@ try {
 
 
     // 3. Loop through the source lessons to fetch and insert questions.
+    $all_fetched_question_ids = [];
+
     foreach ($source_lessons as $source) {
         $source_lesson_id = intval($source['lesson_id']);
         $question_count = intval($source['question_count']);
@@ -67,6 +69,16 @@ try {
 
             $fetch_params = [$source_lesson_id];
             $fetch_types = "i";
+
+            // Cross-lesson deduplication
+            if (!empty($all_fetched_question_ids)) {
+                $placeholders = str_repeat('?,', count($all_fetched_question_ids) - 1) . '?';
+                $fetch_sql .= " AND q.id NOT IN ($placeholders)";
+                foreach ($all_fetched_question_ids as $id) {
+                    $fetch_params[] = $id;
+                    $fetch_types .= 'i';
+                }
+            }
 
             // Priority levels filter
             if (!empty($data['priority_levels'])) {
@@ -91,6 +103,8 @@ try {
             error_log("Found " . $questions_result->num_rows . " questions for lesson ID {$source_lesson_id}.");
 
             while ($q_row = $questions_result->fetch_assoc()) {
+                $all_fetched_question_ids[] = $q_row['id'];
+
                 // Update the bound variables
                 $q_subject_id = $q_row['subject_id'];
                 $q_lesson_id = $source_lesson_id;

@@ -868,7 +868,21 @@
         elements.presetNameInput.focus();
     }
 
-    // Render interactive lesson rows in the modal (Grouped by Subject)
+    // Update modal footer counters
+    function updateModalFooter() {
+        const countEl = document.getElementById('preset-modal-lesson-count');
+        const totalEl = document.getElementById('preset-modal-total-q');
+        if (countEl) countEl.textContent = state.editingLessons.length;
+        if (totalEl) {
+            const total = state.editingLessons.reduce((sum, l) => sum + (parseInt(l.question_count) || 0), 0);
+            totalEl.textContent = total;
+        }
+    }
+
+    // Track collapsed subject groups (persists across re-renders)
+    const collapsedGroups = new Set();
+
+    // Render interactive lesson rows in the modal (grouped by subject, draggable within groups)
     function renderEditingLessons() {
         if (state.editingLessons.length === 0) {
             elements.presetModalLessons.innerHTML = `
@@ -877,16 +891,9 @@
                     Add some from Step 1 or click "Add Current Selection".
                 </div>
             `;
+            updateModalFooter();
             return;
         }
-
-        // Grouping by subject
-        const grouped = state.editingLessons.reduce((acc, lesson) => {
-            const subj = lesson.subject_name || 'Other';
-            if (!acc[subj]) acc[subj] = [];
-            acc[subj].push(lesson);
-            return acc;
-        }, {});
 
         // Helper: look up actual max questions from state.subjects
         function getMaxQuestions(lessonId) {
@@ -897,24 +904,49 @@
             return 999;
         }
 
+        // Group by subject, preserving order within each group
+        const grouped = {};
+        const groupOrder = [];
+        state.editingLessons.forEach((l) => {
+            const subj = l.subject_name || 'Other';
+            if (!grouped[subj]) {
+                grouped[subj] = [];
+                groupOrder.push(subj);
+            }
+            grouped[subj].push(l);
+        });
+
         let html = '';
-        for (const [subject, lessons] of Object.entries(grouped)) {
+        for (const subject of groupOrder) {
+            const lessons = grouped[subject];
+            const subjectQTotal = lessons.reduce((sum, l) => sum + (parseInt(l.question_count) || 0), 0);
+            const isCollapsed = collapsedGroups.has(subject);
             html += `
-                <div class="bg-gray-50/50 rounded-xl border border-gray-100 overflow-hidden">
-                    <div class="bg-white px-4 py-2 border-b border-gray-50 flex items-center gap-2">
+                <div class="bg-gray-50/50 rounded-xl border border-gray-100 overflow-hidden mb-3">
+                    <div class="preset-group-header bg-white px-4 py-2.5 border-b border-gray-50 flex items-center gap-2 cursor-pointer select-none hover:bg-gray-50 transition-colors" data-subject="${subject}">
+                        <span class="material-symbols-outlined text-sm text-gray-400 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}" style="font-size: 18px;">chevron_right</span>
                         <span class="material-symbols-outlined text-sm text-gray-400">folder_open</span>
                         <span class="text-[11px] font-black uppercase tracking-wider text-gray-500">${subject}</span>
+                        <div class="ml-auto flex items-center gap-3">
+                            <span class="text-[10px] text-gray-400">${lessons.length} lessons</span>
+                            <span class="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">${subjectQTotal}q</span>
+                        </div>
                     </div>
-                    <div class="divide-y divide-gray-50">
-                        ${lessons.map((l, index) => {
+                    <div class="preset-group-container divide-y divide-gray-50 ${isCollapsed ? 'hidden' : ''}" data-subject="${subject}">
+                        ${lessons.map((l) => {
                             const maxQ = getMaxQuestions(l.lesson_id);
+                            const globalIdx = state.editingLessons.indexOf(l);
                             return `
-                            <div class="flex items-center justify-between p-3 hover:bg-white transition-colors group">
-                                <div class="flex-1 min-w-0 pr-4">
-                                    <p class="text-sm font-bold text-gray-700 truncate" title="${l.lesson_name}">${l.lesson_name}</p>
-                                    <p class="text-[10px] text-gray-400">max: ${maxQ}</p>
+                            <div class="preset-lesson-row flex items-center justify-between p-3 hover:bg-white transition-colors group"
+                                 draggable="true" data-global-index="${globalIdx}" data-lesson-id="${l.lesson_id}">
+                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                    <span class="drag-handle material-symbols-outlined text-gray-300 group-hover:text-gray-500 text-base flex-shrink-0" title="Drag to reorder">drag_indicator</span>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-bold text-gray-700 truncate" title="${l.lesson_name}">${l.lesson_name}</p>
+                                        <p class="text-[10px] text-gray-400">max: ${maxQ}</p>
+                                    </div>
                                 </div>
-                                <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-3 flex-shrink-0">
                                     <div class="flex items-center gap-2">
                                         <label class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Qty:</label>
                                         <input type="number" value="${Math.min(l.question_count, maxQ)}" min="1" max="${maxQ}" 
@@ -934,6 +966,92 @@
         }
 
         elements.presetModalLessons.innerHTML = html;
+        updateModalFooter();
+        initDragReorder();
+        initGroupCollapse();
+    }
+
+    // Initialize collapse/expand toggle on subject group headers
+    function initGroupCollapse() {
+        elements.presetModalLessons.querySelectorAll('.preset-group-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                // Don't toggle if clicking inside inputs
+                if (e.target.closest('input') || e.target.closest('button')) return;
+                
+                const subject = header.dataset.subject;
+                const container = header.parentElement.querySelector('.preset-group-container');
+                const chevron = header.querySelector('.material-symbols-outlined');
+                
+                if (collapsedGroups.has(subject)) {
+                    collapsedGroups.delete(subject);
+                    container.classList.remove('hidden');
+                    chevron.classList.add('rotate-90');
+                } else {
+                    collapsedGroups.add(subject);
+                    container.classList.add('hidden');
+                    chevron.classList.remove('rotate-90');
+                }
+            });
+        });
+    }
+
+    // Initialize HTML5 drag-and-drop reordering (scoped within each subject group)
+    function initDragReorder() {
+        const groups = document.querySelectorAll('.preset-group-container');
+        
+        groups.forEach(container => {
+            let draggedIndex = null;
+
+            container.addEventListener('dragstart', (e) => {
+                const row = e.target.closest('.preset-lesson-row');
+                if (!row) return;
+                draggedIndex = parseInt(row.dataset.globalIndex);
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', draggedIndex);
+            });
+
+            container.addEventListener('dragend', (e) => {
+                const row = e.target.closest('.preset-lesson-row');
+                if (row) row.classList.remove('dragging');
+                container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                draggedIndex = null;
+            });
+
+            container.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const row = e.target.closest('.preset-lesson-row');
+                if (!row) return;
+
+                container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                
+                const targetIndex = parseInt(row.dataset.globalIndex);
+                if (targetIndex !== draggedIndex) {
+                    row.classList.add('drag-over');
+                }
+            });
+
+            container.addEventListener('dragleave', (e) => {
+                const row = e.target.closest('.preset-lesson-row');
+                if (row) row.classList.remove('drag-over');
+            });
+
+            container.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const row = e.target.closest('.preset-lesson-row');
+                if (!row) return;
+
+                const targetIndex = parseInt(row.dataset.globalIndex);
+                if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+                // Reorder within state.editingLessons
+                const [moved] = state.editingLessons.splice(draggedIndex, 1);
+                state.editingLessons.splice(targetIndex, 0, moved);
+
+                renderEditingLessons();
+            });
+        });
     }
 
     // Add current Step 1 selection to the modal state
@@ -1203,6 +1321,7 @@
             const lessonId = parseInt(input.dataset.id);
             const val = parseInt(input.value) || 0;
             updatePresetLessonQty(lessonId, val);
+            updateModalFooter();
         }
     });
 

@@ -21,10 +21,10 @@ $sql = "SELECT
             q.id as question_id,
             q.priority,
             SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
-            COUNT(qa.selected_answer) as total_attempts
+            COUNT(qa.id) as total_attempts
 
         FROM questions q
-        LEFT JOIN question_attempts qa ON q.id = qa.question_id
+        LEFT JOIN question_attempts qa ON qa.question_id = COALESCE(q.original_question_id, q.id)
         WHERE $where_clause AND q.is_deleted = 0
         GROUP BY q.id
         ORDER BY 

@@ -61,15 +61,27 @@
                 </div>
             </div>
 
-            <div class="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-2xl">
-                <button id="preset-modal-cancel"
-                    class="px-6 py-2.5 text-gray-500 hover:text-gray-700 font-bold text-sm transition-all">
-                    Cancel
-                </button>
-                <button id="preset-modal-save"
-                    class="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-sm transition-all shadow-lg active:scale-95 uppercase tracking-wider">
-                    Save Preset
-                </button>
+            <div class="p-6 bg-gray-50 border-t border-gray-100 flex items-center justify-between rounded-b-2xl">
+                <div class="flex items-center gap-4 text-sm">
+                    <span class="flex items-center gap-1 text-gray-500">
+                        <span class="material-symbols-outlined text-sm">library_books</span>
+                        <span id="preset-modal-lesson-count" class="font-black text-gray-700">0</span> lessons
+                    </span>
+                    <span class="flex items-center gap-1 text-gray-500">
+                        <span class="material-symbols-outlined text-sm">quiz</span>
+                        <span id="preset-modal-total-q" class="font-black text-indigo-600">0</span> questions
+                    </span>
+                </div>
+                <div class="flex gap-3">
+                    <button id="preset-modal-cancel"
+                        class="px-6 py-2.5 text-gray-500 hover:text-gray-700 font-bold text-sm transition-all">
+                        Cancel
+                    </button>
+                    <button id="preset-modal-save"
+                        class="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-sm transition-all shadow-lg active:scale-95 uppercase tracking-wider">
+                        Save Preset
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -404,5 +416,33 @@
         .preset-card .preset-actions {
             opacity: 1;
         }
+    }
+
+    /* Drag-to-reorder styles */
+    .drag-handle {
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .preset-lesson-row.dragging {
+        opacity: 0.4;
+        background: #eef2ff !important;
+    }
+
+    .preset-lesson-row.drag-over {
+        border-top: 2px solid #6366f1;
+    }
+
+    .rotate-90 {
+        transform: rotate(90deg);
+    }
+
+    .preset-group-header:hover {
+        background-color: #f9fafb;
     }
 </style>

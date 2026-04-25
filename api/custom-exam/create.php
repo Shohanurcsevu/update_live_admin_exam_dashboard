@@ -72,7 +72,7 @@ try {
                                  COUNT(qa.id) as total_attempts,
                                  SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count
                           FROM questions q
-                          LEFT JOIN question_attempts qa ON q.id = qa.question_id
+                          LEFT JOIN question_attempts qa ON qa.question_id = COALESCE(q.original_question_id, q.id)
                           WHERE q.exam_id = ? AND q.is_deleted = 0";
 
             $fetch_params = [$source_exam_id];

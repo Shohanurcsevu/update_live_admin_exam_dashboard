@@ -56,12 +56,12 @@ $sql = "SELECT
             MAX(q.priority) as priority,
             SUM(CASE WHEN qa.is_correct = 0 AND qa.selected_answer IS NOT NULL THEN 1 ELSE 0 END) as wrong_count,
             SUM(CASE WHEN qa.selected_answer IS NULL AND qa.id IS NOT NULL THEN 1 ELSE 0 END) as unattempted_count,
-            COUNT(qa.selected_answer) as answered_count,
-            COUNT(qa.selected_answer) as total_attempts
+            COUNT(qa.id) as answered_count,
+            COUNT(qa.id) as total_attempts
 
         FROM questions q
         $srs_join
-        LEFT JOIN question_attempts qa ON q.id = qa.question_id
+        LEFT JOIN question_attempts qa ON qa.question_id = COALESCE(q.original_question_id, q.id)
         WHERE $where_clause
         GROUP BY q.question";
 
