@@ -30,13 +30,7 @@ function initializeDashboardPage() {
     const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
     const toastContainer = document.getElementById('toast-container');
 
-    console.log("[Dashboard] Elements check:", {
-        subjectFilter: !!subjectFilter,
-        lessonFilter: !!lessonFilter,
-        topicFilter: !!topicFilter,
-        clearFiltersBtn: !!clearFiltersBtn,
-        examCardsContainer: !!examCardsContainer
-    });
+    // Elements verified at runtime
 
     // Print Options: generatePdfBtn is used by processAndPrint() for loading state.
     // The print modal itself (open/close) is managed by PrintEngine.
@@ -66,7 +60,7 @@ function initializeDashboardPage() {
         if (!element) return;
         const end = parseInt(targetValue, 10);
         if (isNaN(end)) { element.textContent = targetValue; return; }
-        const duration = 1200;
+        const duration = 600;
         let startTime = null;
         function animation(currentTime) {
             if (startTime === null) startTime = currentTime;
@@ -90,14 +84,18 @@ function initializeDashboardPage() {
             animateCount(document.getElementById('total-questions'), metrics.questions);
 
             // Mistake Bank Stats
+            // Critical secondary stats (small payloads)
             fetchMistakeStats();
-            fetchStudyTimeStats(); // NEW: Study Time Stats
-            fetchAndRenderHeatmap();
-            fetchAndRenderDisciplineTracker();
-            fetchAndRenderBadges();
-            fetchAndRenderMasteryTrends(); // NEW: Mastery Trends
-            fetchAndDisplayRecommendations(); // NEW: Smart Recommendations
-            fetchSRSStats(); // NEW: SRS Stats
+            fetchStudyTimeStats();
+            fetchSRSStats();
+
+            // Defer heavy/non-critical widgets until after initial paint
+            setTimeout(() => {
+                fetchAndRenderHeatmap();
+                fetchAndRenderDisciplineTracker();
+                fetchAndRenderMasteryTrends();
+                fetchAndDisplayRecommendations();
+            }, 400);
         } catch (error) {
             console.error("[Dashboard] Error fetching metrics:", error);
             showToast('Failed to load some dashboard metrics.', 'error');
@@ -610,28 +608,29 @@ function initializeDashboardPage() {
 
     // --- Section 2: Exam Selection Logic ---
     async function populateDropdown(url, selector, placeholder, isDependent = false, valueToSelect = null) {
-        if (!selector) {
-            console.error(`[Dashboard] Selector for ${placeholder} not found!`);
-            return;
-        }
-        console.log(`[Dashboard] Populating ${placeholder} from ${url}`);
+        if (!selector) return;
         selector.innerHTML = `<option value="0">${placeholder}</option>`;
         if (isDependent) selector.disabled = true;
         try {
             const result = await CacheManager.fetchWithCache(url, 0.5, false, false);
             if (result && result.length > 0) {
+                // Build all options at once to avoid repeated reflows
+                const frag = document.createDocumentFragment();
                 result.forEach(item => {
-                    selector.innerHTML += `<option value="${item.id}">${item.subject_name || item.lesson_name || item.topic_name}</option>`;
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = item.subject_name || item.lesson_name || item.topic_name;
+                    frag.appendChild(opt);
                 });
+                selector.appendChild(frag);
 
-                // If a value was requested, select it
                 if (valueToSelect && valueToSelect !== '0') {
                     selector.value = valueToSelect;
                 }
 
                 if (isDependent) selector.disabled = false;
 
-                // Cascade: If we just populated a dropdown and it has a selected value, populate the NEXT one
+                // Cascade
                 if (selector === subjectFilter && selector.value !== '0') {
                     const savedLesson = localStorage.getItem('filter_dashboard_lesson');
                     await populateDropdown(`${LESSON_API_URL}?subject_id=${selector.value}`, lessonFilter, 'All Lessons', true, savedLesson);
@@ -717,7 +716,7 @@ function initializeDashboardPage() {
             }
         }
 
-        console.log(`Fetching exams: offset=${currentOffset}, limit=${PAGE_SIZE}, isLoadMore=${loadingMore}`);
+
 
         // 2. Fetch from API (Revalidate)
         try {
@@ -746,7 +745,6 @@ function initializeDashboardPage() {
 
                 // Handle Pagination UI
                 if (result.pagination) {
-                    console.log('Pagination info:', result.pagination);
                     if (result.pagination.hasMore) {
                         if (container) container.classList.remove('hidden');
                         currentOffset += PAGE_SIZE;
@@ -895,7 +893,6 @@ function initializeDashboardPage() {
         dashContainer.addEventListener('click', (e) => {
             const loadMoreEl = e.target.closest("#load-more-btn");
             if (loadMoreEl && !loadMoreEl.disabled) {
-                console.log("Dashboard Load More clicked, current offset:", currentOffset);
                 fetchAndDisplayExams(true);
             }
         });
@@ -982,7 +979,6 @@ function initializeDashboardPage() {
     function setupEventListeners() {
         if (subjectFilter) {
             subjectFilter.addEventListener('change', async () => {
-                console.log("Subject filter changed:", subjectFilter.value);
                 localStorage.setItem('filter_dashboard_subject', subjectFilter.value);
                 localStorage.removeItem('filter_dashboard_lesson');
                 localStorage.removeItem('filter_dashboard_topic');
@@ -1005,7 +1001,6 @@ function initializeDashboardPage() {
 
         if (lessonFilter) {
             lessonFilter.addEventListener('change', async () => {
-                console.log("Lesson filter changed:", lessonFilter.value);
                 localStorage.setItem('filter_dashboard_lesson', lessonFilter.value);
                 localStorage.removeItem('filter_dashboard_topic');
 
@@ -1023,7 +1018,6 @@ function initializeDashboardPage() {
 
         if (topicFilter) {
             topicFilter.addEventListener('change', () => {
-                console.log("Topic filter changed:", topicFilter.value);
                 localStorage.setItem('filter_dashboard_topic', topicFilter.value);
                 fetchAndDisplayExams(false);
             });
@@ -1031,7 +1025,6 @@ function initializeDashboardPage() {
 
         if (clearFiltersBtn) {
             clearFiltersBtn.addEventListener('click', () => {
-                console.log("Clearing filters...");
                 localStorage.removeItem('filter_dashboard_subject');
                 localStorage.removeItem('filter_dashboard_lesson');
                 localStorage.removeItem('filter_dashboard_topic');
@@ -1126,9 +1119,6 @@ function initializeDashboardPage() {
         const daily10Btn = document.getElementById('daily-10-btn');
         if (daily10Btn) {
             daily10Btn.addEventListener('click', () => {
-                console.log("Dashboard: Starting Daily 15 Quiz...");
-
-                // Visual feedback
                 const originalContent = daily10Btn.innerHTML;
                 daily10Btn.disabled = true;
                 daily10Btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-lg">sync</span> Preparing...`;
@@ -1136,7 +1126,6 @@ function initializeDashboardPage() {
                 if (window.loadPage) {
                     window.loadPage('take-offline-exam', `?mode=daily_15`);
                 } else {
-                    console.error("loadPage not found");
                     daily10Btn.disabled = false;
                     daily10Btn.innerHTML = originalContent;
                 }
@@ -1153,17 +1142,16 @@ function initializeDashboardPage() {
 
     async function fetchJobCountdown() {
         try {
-            const response = await fetch('api/dashboard/job_countdown.php');
-            const result = await response.json();
-            if (result.success && result.data) {
-                targetJobDeadline = result.data.deadline.split(' ')[0]; // Get only date part
+            // Cache for 30 min — changes rarely
+            const result = await CacheManager.fetchWithCache('api/dashboard/job_countdown.php', 30);
+            if (result && result.data) {
+                targetJobDeadline = result.data.deadline.split(' ')[0];
                 targetJobName = result.data.job_name;
                 targetJobDate = new Date(`${targetJobDeadline}T23:59:59`).getTime();
-
                 updateJobUI();
             }
         } catch (error) {
-            console.error("Error fetching job countdown:", error);
+            // Non-critical, fail silently
         }
     }
 
@@ -1186,15 +1174,9 @@ function initializeDashboardPage() {
         const nameInput = document.getElementById('modal-job-name');
         const dateInput = document.getElementById('modal-job-deadline');
 
-        console.log("[Dashboard] Setting up countdown modal...", { card, modal, form });
+        if (!card || !modal || !form) return;
 
-        if (!card || !modal || !form) {
-            console.error("[Dashboard] Missing modal elements:", { card, modal, form });
-            return;
-        }
-
-        card.addEventListener('click', (e) => {
-            console.log("[Dashboard] Countdown card clicked");
+        card.addEventListener('click', () => {
             nameInput.value = targetJobName;
             dateInput.value = targetJobDeadline;
             modal.classList.remove('hidden');
@@ -1249,6 +1231,12 @@ function initializeDashboardPage() {
     }
 
     function startCountdownTimers() {
+        // Guard: only one timer interval allowed
+        if (window._dashboardTimerInterval) {
+            clearInterval(window._dashboardTimerInterval);
+            window._dashboardTimerInterval = null;
+        }
+
         const dailyTimerEl = document.getElementById('daily-timer');
         const dailyProgressEl = document.getElementById('daily-progress');
         const jobTimerEl = document.getElementById('job-timer');
@@ -1256,7 +1244,6 @@ function initializeDashboardPage() {
         const yearProgressTextEl = document.getElementById('year-progress-text');
 
         if (!dailyTimerEl || !jobTimerEl || !yearTimerEl) {
-            console.warn("Countdown timer elements not found. Retrying in 100ms...");
             setTimeout(startCountdownTimers, 100);
             return;
         }
@@ -1322,13 +1309,15 @@ function initializeDashboardPage() {
         };
 
         updateTimers();
-        const timerInterval = setInterval(updateTimers, 1000);
+        window._dashboardTimerInterval = setInterval(updateTimers, 1000);
 
-        // Cleanup interval on page unload/navigation
-        const cleanup = () => clearInterval(timerInterval);
-        window.addEventListener('popstate', cleanup);
-        // Custom event for internal navigation if exists
-        document.addEventListener('pageBeforeChange', cleanup);
+        // Cleanup interval on navigation
+        const cleanup = () => {
+            clearInterval(window._dashboardTimerInterval);
+            window._dashboardTimerInterval = null;
+        };
+        window.addEventListener('popstate', cleanup, { once: true });
+        document.addEventListener('pageBeforeChange', cleanup, { once: true });
     }
 
     // --- SWR Support: Listen for revalidation events ---
@@ -1337,8 +1326,6 @@ function initializeDashboardPage() {
 
         const revalidateHandler = (e) => {
             const { url } = e.detail;
-            console.log(`%c[Dashboard] Refreshing UI for revalidated URL: ${url}`, 'color: #8b5cf6;');
-
             if (url.includes(METRICS_API_URL)) fetchAndDisplayMetrics(true);
             if (url.includes('api/mistakes/stats.php')) fetchMistakeStats(true);
             if (url.includes('api/analytics/daily-study-time.php')) fetchStudyTimeStats(true);
@@ -1346,13 +1333,11 @@ function initializeDashboardPage() {
             if (url.includes('mastery-trends.php')) fetchAndRenderMasteryTrends(true);
             if (url.includes('discipline-stats.php')) fetchAndRenderDisciplineTracker(true);
             if (url.includes('subject-stats.php')) fetchAndRenderHeatmap(true);
-            if (url.includes('badges.php')) fetchAndRenderBadges(true);
         };
 
         const visibilityHandler = () => {
             if (document.visibilityState === 'visible') {
-                console.log('%c[Dashboard] Tab focused - revalidating key metrics', 'color: #0d9488;');
-                fetchAndDisplayMetrics(); // This will trigger SWR checks for all metrics
+                fetchAndDisplayMetrics();
             }
         };
 
@@ -1371,29 +1356,25 @@ function initializeDashboardPage() {
     }
 
     async function initializePage() {
-        console.log("[Dashboard] Initializing page...");
+        // Critical: timers, event wiring, metrics, exams — all immediate
         startCountdownTimers();
         setupSWRListeners();
-        fetchAndDisplayMetrics();
-
         setupEventListeners();
         setupActionHub();
 
-        // Restore filters from localStorage
-        const savedSubject = localStorage.getItem('filter_dashboard_subject');
+        // Fire metrics + exams in parallel (both use cache-first)
+        fetchAndDisplayMetrics();
 
+        const savedSubject = localStorage.getItem('filter_dashboard_subject');
         try {
             if (savedSubject && savedSubject !== '0' && subjectFilter) {
-                console.log("[Dashboard] Restoring saved subject:", savedSubject);
                 await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects', false, savedSubject);
             } else if (subjectFilter) {
-                console.log("[Dashboard] No saved subject, populating default");
                 await populateDropdown(SUBJECT_API_URL, subjectFilter, 'All Subjects');
             }
         } catch (error) {
-            console.error("[Dashboard] Initial population failed:", error);
+            console.error("[Dashboard] Filter init failed:", error);
         } finally {
-            console.log("[Dashboard] Initial fetch and display exams");
             fetchAndDisplayExams();
         }
     }
