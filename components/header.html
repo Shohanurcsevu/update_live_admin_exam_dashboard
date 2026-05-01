@@ -227,6 +227,38 @@
             <span class="material-symbols-outlined text-xl">volume_up</span>
         </button>
 
+        <!-- Telegram Bot Runner (Toggle: Start/Stop) -->
+        <button id="header-bot-toggle" class="text-slate-400 hover:text-indigo-600 transition-colors p-1 relative group"
+            title="Launch Telegram Bot">
+            <span class="material-symbols-outlined text-xl" id="bot-icon">smart_toy</span>
+            <span id="bot-status-dot" class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-slate-300 border border-white shadow-sm transition-all duration-300"></span>
+            <!-- Tooltip -->
+            <div class="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[120] whitespace-nowrap">
+                <span id="bot-status-text">Launch Telegram Bot</span>
+            </div>
+        </button>
+        <style>
+            @keyframes bot-rainbow {
+                0%   { color: #6366f1; filter: drop-shadow(0 0 4px #6366f1); }
+                25%  { color: #06b6d4; filter: drop-shadow(0 0 4px #06b6d4); }
+                50%  { color: #10b981; filter: drop-shadow(0 0 4px #10b981); }
+                75%  { color: #f59e0b; filter: drop-shadow(0 0 4px #f59e0b); }
+                100% { color: #6366f1; filter: drop-shadow(0 0 4px #6366f1); }
+            }
+            @keyframes bot-bounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-2px); }
+            }
+            .bot-running-icon {
+                animation: bot-rainbow 2s ease-in-out infinite, bot-bounce 1s ease-in-out infinite;
+            }
+            .bot-running-dot {
+                background: #10b981 !important;
+                box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+                animation: pulse 1.5s ease-in-out infinite;
+            }
+        </style>
+
         <!-- Profile Image -->
         <div class="relative flex-shrink-0">
             <!-- Profile Avatar with Camera Overlay (Toggle Dropdown) -->

@@ -25,8 +25,10 @@ $stmt = $conn->prepare("SELECT setting_key, setting_value FROM app_settings WHER
 $stmt->execute();
 $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) {
-    if ($row['setting_key'] === 'telegram_bot_token') $tgToken = $row['setting_value'];
-    if ($row['setting_key'] === 'telegram_chat_id') $tgChatId = $row['setting_value'];
+    if ($row['setting_key'] === 'telegram_bot_token')
+        $tgToken = $row['setting_value'];
+    if ($row['setting_key'] === 'telegram_chat_id')
+        $tgChatId = $row['setting_value'];
 }
 
 if (!$tgToken || !$tgChatId) {
@@ -48,21 +50,22 @@ $offset = 0;
 
 while (true) {
     $updates = getTelegramUpdates($tgToken, $offset);
-    
+
     if ($updates && isset($updates['result'])) {
         foreach ($updates['result'] as $update) {
             $offset = $update['update_id'] + 1;
-            
+
             // 1. Handle Messages (Commands)
             if (isset($update['message'])) {
                 $msg = $update['message'];
                 $chatId = $msg['chat']['id'];
-                
+
                 // Only respond to the authorized chat ID
-                if ($chatId != $tgChatId) continue;
-                
+                if ($chatId != $tgChatId)
+                    continue;
+
                 $text = $msg['text'] ?? '';
-                
+
                 if (strpos($text, '/study') === 0 || $text === "📚 Start Study") {
                     handleStudyCommand($conn, $tgToken, $chatId);
                 } elseif (strpos($text, '/stop') === 0 || $text === "🛑 Stop Session") {
@@ -85,18 +88,19 @@ while (true) {
                     sendTgMessage($tgToken, $chatId, "👋 *Welcome to Rethink Pomodoro!*\nUse the keyboard below to control your study sessions.");
                 }
             }
-            
+
             // 2. Handle Callback Queries (Button Taps)
             if (isset($update['callback_query'])) {
                 $cb = $update['callback_query'];
                 $chatId = $cb['message']['chat']['id'];
-                if ($chatId != $tgChatId) continue;
-                
+                if ($chatId != $tgChatId)
+                    continue;
+
                 handleCallback($conn, $tgToken, $chatId, $cb);
             }
         }
     }
-    
+
     // --- 3. Handle Automated Nudges ---
     if ($nudgeActive) {
         // Check for active sessions (Focus or Break)
@@ -112,9 +116,9 @@ while (true) {
                         [['text' => "⏳ Remind in 5m", 'callback_data' => "nudge_5m"], ['text' => "🛑 Stop Nudging", 'callback_data' => "nudge_stop"]]
                     ]
                 ];
-                
+
                 sendTgMessage($tgToken, $tgChatId, "🔔 *Accountability Check*\n\n" . $quote, $keyboard);
-                
+
                 // Toggle Interval: 5m -> 1m -> 5m
                 if (!$isNagMode) {
                     $nudgeInterval = 60; // Next is 1m nag
@@ -133,14 +137,15 @@ while (true) {
             $isNagMode = false;
         }
     }
-    
+
     usleep(500000); // Poll every 500ms
 }
 
 /**
  * Fetch updates from Telegram
  */
-function getTelegramUpdates($token, $offset) {
+function getTelegramUpdates($token, $offset)
+{
     $url = "https://api.telegram.org/bot{$token}/getUpdates?offset={$offset}&timeout=30";
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -154,7 +159,8 @@ function getTelegramUpdates($token, $offset) {
 /**
  * Send a message to Telegram
  */
-function sendTgMessage($token, $chatId, $text, $keyboard = null) {
+function sendTgMessage($token, $chatId, $text, $keyboard = null)
+{
     $url = "https://api.telegram.org/bot{$token}/sendMessage";
     $params = [
         'chat_id' => $chatId,
@@ -165,7 +171,7 @@ function sendTgMessage($token, $chatId, $text, $keyboard = null) {
         $keyboard = getMainMenu();
     }
     $params['reply_markup'] = json_encode($keyboard);
-    
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -178,7 +184,8 @@ function sendTgMessage($token, $chatId, $text, $keyboard = null) {
 /**
  * Respond to callback query
  */
-function answerCallback($token, $callbackId, $text = "") {
+function answerCallback($token, $callbackId, $text = "")
+{
     $url = "https://api.telegram.org/bot{$token}/answerCallbackQuery";
     $params = [
         'callback_query_id' => $callbackId,
@@ -196,23 +203,36 @@ function answerCallback($token, $callbackId, $text = "") {
 /**
  * Handle /study command - list subjects
  */
-function handleStudyCommand($conn, $token, $chatId) {
-    $sql = "SELECT id, subject_name FROM subjects WHERE is_deleted = 0 ORDER BY subject_name ASC";
+function handleStudyCommand($conn, $token, $chatId)
+{
+    $sql = "SELECT id, subject_name FROM subjects WHERE is_deleted = 0 ORDER BY id ASC";
     $result = $conn->query($sql);
-    
+
     if ($result->num_rows === 0) {
         sendTgMessage($token, $chatId, "❌ No subjects found. Please add subjects first.");
         return;
     }
-    
+
     $buttons = [];
+    $currentRow = [];
     while ($row = $result->fetch_assoc()) {
-        $buttons[] = [[
+        $currentRow[] = [
             'text' => $row['subject_name'],
             'callback_data' => "start_" . $row['id']
-        ]];
+        ];
+        
+        // Arrange buttons in 2 columns
+        if (count($currentRow) === 2) {
+            $buttons[] = $currentRow;
+            $currentRow = [];
+        }
     }
     
+    // Catch any remaining single button
+    if (!empty($currentRow)) {
+        $buttons[] = $currentRow;
+    }
+
     $keyboard = ['inline_keyboard' => $buttons];
     sendTgMessage($token, $chatId, "📚 *Select a subject to start studying:*", $keyboard);
 }
@@ -220,9 +240,10 @@ function handleStudyCommand($conn, $token, $chatId) {
 /**
  * Handle /stop command
  */
-function handleStopCommand($conn, $token, $chatId) {
+function handleStopCommand($conn, $token, $chatId)
+{
     $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
-    
+
     if ($conn->affected_rows > 0) {
         sendTgMessage($token, $chatId, "🛑 *Session stopped.*");
     } else {
@@ -233,7 +254,8 @@ function handleStopCommand($conn, $token, $chatId) {
 /**
  * Handle /pause command
  */
-function handlePauseCommand($conn, $token, $chatId) {
+function handlePauseCommand($conn, $token, $chatId)
+{
     // 1. Calculate and update remaining_seconds for the active session
     $sql = "UPDATE study_sessions 
             SET remaining_seconds = GREATEST(0, (duration_minutes * 60) - TIMESTAMPDIFF(SECOND, start_time, NOW())),
@@ -241,7 +263,7 @@ function handlePauseCommand($conn, $token, $chatId) {
                 last_heartbeat = NOW() 
             WHERE status = 'active'
             ORDER BY id DESC LIMIT 1";
-    
+
     if ($conn->query($sql) && $conn->affected_rows > 0) {
         sendTgMessage($token, $chatId, "⏸ *Session paused.*");
     } else {
@@ -252,7 +274,8 @@ function handlePauseCommand($conn, $token, $chatId) {
 /**
  * Handle /resume command
  */
-function handleResumeCommand($conn, $token, $chatId) {
+function handleResumeCommand($conn, $token, $chatId)
+{
     // 2. Resume the latest paused session by shifting start_time forward
     // start_time = start_time + (NOW - last_heartbeat)
     $sql = "UPDATE study_sessions 
@@ -261,7 +284,7 @@ function handleResumeCommand($conn, $token, $chatId) {
                 last_heartbeat = NOW() 
             WHERE status = 'paused' 
             ORDER BY id DESC LIMIT 1";
-    
+
     if ($conn->query($sql) && $conn->affected_rows > 0) {
         sendTgMessage($token, $chatId, "▶️ *Session resumed.*");
     } else {
@@ -272,22 +295,27 @@ function handleResumeCommand($conn, $token, $chatId) {
 /**
  * Handle /restart command - start new session with last used subject
  */
-function handleRestartLastCommand($conn, $token, $chatId) {
+function handleRestartLastCommand($conn, $token, $chatId)
+{
     $res = $conn->query("SELECT subject_id, subject_name FROM study_sessions 
                          WHERE session_type = 'focus' AND subject_id IS NOT NULL 
                          ORDER BY id DESC LIMIT 1");
-    
+
     if ($row = $res->fetch_assoc()) {
         $subjectId = $row['subject_id'];
         $subjectName = $row['subject_name'];
-        
+
         // Safety check for active session
         $checkRes = $conn->query("SELECT subject_name FROM study_sessions WHERE status IN ('active', 'paused') LIMIT 1");
         if ($activeRow = $checkRes->fetch_assoc()) {
-            $keyboard = ['inline_keyboard' => [[
-                ['text' => "✅ Yes, restart", 'callback_data' => "confirm_start_" . $subjectId],
-                ['text' => "❌ No", 'callback_data' => "cancel"]
-            ]]];
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => "✅ Yes, restart", 'callback_data' => "confirm_start_" . $subjectId],
+                        ['text' => "❌ No", 'callback_data' => "cancel"]
+                    ]
+                ]
+            ];
             sendTgMessage($token, $chatId, "⚠️ *Conflict!*\nAn active session for *{$activeRow['subject_name']}* is running.\nRestart *{$subjectName}* anyway?", $keyboard);
         } else {
             startPomodoroSession($conn, $token, $chatId, $subjectId, $subjectName);
@@ -300,7 +328,8 @@ function handleRestartLastCommand($conn, $token, $chatId) {
 /**
  * Handle /break command
  */
-function handleBreakCommand($conn, $token, $chatId) {
+function handleBreakCommand($conn, $token, $chatId)
+{
     // Check if a session is currently running
     $checkRes = $conn->query("SELECT subject_name FROM study_sessions WHERE status IN ('active', 'paused') AND session_type = 'focus' LIMIT 1");
     if ($activeRow = $checkRes->fetch_assoc()) {
@@ -320,7 +349,7 @@ function handleBreakCommand($conn, $token, $chatId) {
     $seconds = $duration * 60;
     $stmt = $conn->prepare("INSERT INTO study_sessions (subject_id, subject_name, duration_minutes, remaining_seconds, status, start_time, last_heartbeat, session_type) VALUES (NULL, 'Break', ?, ?, 'active', NOW(), NOW(), 'break')");
     $stmt->bind_param("ii", $duration, $seconds);
-    
+
     if ($stmt->execute()) {
         sendTgMessage($token, $chatId, "☕ *Break Started!*\n⏳ Duration: 5 min\nEnjoy your rest!");
     } else {
@@ -331,37 +360,59 @@ function handleBreakCommand($conn, $token, $chatId) {
 /**
  * Handle /status command
  */
-function handleStatusCommand($conn, $token, $chatId) {
-    // For active sessions, calculate ground-truth remaining time using start_time.
-    // For paused sessions, use the stored remaining_seconds.
+function handleStatusCommand($conn, $token, $chatId)
+{
+    // 1. Get Logical Study Date (Rollover at 5 AM)
+    $now = time();
+    $hour = intval(date('G', $now));
+    $studyDate = ($hour < 5) ? date('Y-m-d', strtotime('yesterday')) : date('Y-m-d', $now);
+    $startTs = $studyDate . ' 05:00:00';
+    $endTs = date('Y-m-d', strtotime($studyDate . ' +1 day')) . ' 05:00:00';
+
+    // 2. Count sessions today
+    $countRes = $conn->prepare("SELECT COUNT(*) as total FROM study_sessions WHERE session_type = 'focus' AND start_time BETWEEN ? AND ?");
+    $countRes->bind_param("ss", $startTs, $endTs);
+    $countRes->execute();
+    $totalToday = $countRes->get_result()->fetch_assoc()['total'] ?? 0;
+
+    // 3. Get current session details
     $sql = "SELECT *, 
             TIMESTAMPDIFF(SECOND, start_time, NOW()) as elapsed 
             FROM study_sessions 
             WHERE status IN ('active', 'paused') 
             ORDER BY id DESC LIMIT 1";
-    
+
     $res = $conn->query($sql);
     if ($row = $res->fetch_assoc()) {
         $status = ucfirst($row['status']);
-        
+
         if ($row['status'] === 'active') {
             $realRemaining = ($row['duration_minutes'] * 60) - $row['elapsed'];
-            if ($realRemaining < 0) $realRemaining = 0;
+            if ($realRemaining < 0)
+                $realRemaining = 0;
         } else {
             $realRemaining = $row['remaining_seconds'];
         }
 
         $remain = floor($realRemaining / 60) . "m " . ($realRemaining % 60) . "s";
-        sendTgMessage($token, $chatId, "⏱ *Current Session:*\n📖 Subject: *{$row['subject_name']}*\n🔄 Status: {$status}\n⏳ Time Left: {$remain}");
+        $sessionNum = $totalToday; // Current one is included in count
+        
+        $msg = "⏱ *Current Status (Session #{$sessionNum})*\n";
+        $msg .= "📖 Subject: *{$row['subject_name']}*\n";
+        $msg .= "🔄 Status: {$status}\n";
+        $msg .= "⏳ Time Left: {$remain}";
+        
+        sendTgMessage($token, $chatId, $msg);
     } else {
-        sendTgMessage($token, $chatId, "🔌 *No active session.* Use /study to start one.");
+        sendTgMessage($token, $chatId, "🔌 *No active session.*\nToday's Total: {$totalToday} sessions.\nUse /study to start one.");
     }
 }
 
 /**
  * Handle /report command - show today's performance summary
  */
-function handleProgressReport($conn, $token, $chatId) {
+function handleProgressReport($conn, $token, $chatId)
+{
     // 1. Get Logical Study Date (Rollover at 5 AM)
     $now = time();
     $hour = intval(date('G', $now));
@@ -370,7 +421,7 @@ function handleProgressReport($conn, $token, $chatId) {
     } else {
         $studyDate = date('Y-m-d', $now);
     }
-    
+
     $startTs = $studyDate . ' 05:00:00';
     $endTs = date('Y-m-d', strtotime($studyDate . ' +1 day')) . ' 05:00:00';
 
@@ -384,7 +435,7 @@ function handleProgressReport($conn, $token, $chatId) {
     // 3. Calculate Total Focus time (Exams + Pomodoros)
     // Following logic from daily-study-time.php
     $totalSeconds = 0;
-    
+
     // A. From Exams
     $sqlExams = "SELECT SUM(time_used_seconds) as total FROM performance WHERE attempt_time BETWEEN ? AND ?";
     $stmtExams = $conn->prepare($sqlExams);
@@ -436,7 +487,7 @@ function handleProgressReport($conn, $token, $chatId) {
     // 5. Calculate Goal Progress (Benchmark: 12 Hours = 43200 seconds)
     $goalSeconds = 12 * 3600;
     $percent = min(100, round(($totalSeconds / $goalSeconds) * 100));
-    
+
     // Visual Progress Bar
     $barLength = 10;
     $filledLength = round($percent / 10);
@@ -450,14 +501,14 @@ function handleProgressReport($conn, $token, $chatId) {
     // 6. Build Message
     $report = "📊 *Today's Progress Report*\n";
     $report .= "Date: _" . date('d M, Y') . "_\n\n";
-    
+
     $report .= "🔥 *Streak:* {$streak} Days\n";
     $report .= "⏱ *Focus Time:* {$timeStr}\n";
     $report .= "🏁 *Daily Goal:* {$percent}%\n";
     $report .= "`{$bar}`\n\n";
-    
+
     $report .= "📝 *Exams Completed:* {$examsDone}\n\n";
-    
+
     if ($percent >= 100) {
         $report .= "🏆 *GENIUS STATUS:* Goal accomplished! You are unstoppable.";
     } elseif ($percent >= 50) {
@@ -472,44 +523,49 @@ function handleProgressReport($conn, $token, $chatId) {
 /**
  * Handle callback button taps
  */
-function handleCallback($conn, $token, $chatId, $cb) {
+function handleCallback($conn, $token, $chatId, $cb)
+{
     $data = $cb['data'];
-    
+
     if (strpos($data, 'start_') === 0) {
         $subject_id = str_replace('start_', '', $data);
-        
+
         // 1. Get subject name
         $stmt = $conn->prepare("SELECT subject_name FROM subjects WHERE id = ?");
         $stmt->bind_param("i", $subject_id);
         $stmt->execute();
         $res = $stmt->get_result();
         $subject = $res->fetch_assoc();
-        
+
         if (!$subject) {
             answerCallback($token, $cb['id'], "Subject not found.");
             return;
         }
-        
+
         $subjectName = $subject['subject_name'];
-        
+
         // 2. Check for active pomodoro (User's specific request)
         $checkRes = $conn->query("SELECT subject_name FROM study_sessions WHERE status IN ('active', 'paused') LIMIT 1");
         if ($activeRow = $checkRes->fetch_assoc()) {
             // Already a session running
-            $keyboard = ['inline_keyboard' => [[
-                ['text' => "✅ Yes, stop and start NEW", 'callback_data' => "confirm_start_" . $subject_id],
-                ['text' => "❌ No, keep current", 'callback_data' => "cancel"]
-            ]]];
-            
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => "✅ Yes, stop and start NEW", 'callback_data' => "confirm_start_" . $subject_id],
+                        ['text' => "❌ No, keep current", 'callback_data' => "cancel"]
+                    ]
+                ]
+            ];
+
             sendTgMessage($token, $chatId, "⚠️ *Conflict!*\nAn active session for *{$activeRow['subject_name']}* is already in progress.\nStart *{$subjectName}* anyway?", $keyboard);
             answerCallback($token, $cb['id']);
             return;
         }
-        
+
         // 3. No conflict, start session
         startPomodoroSession($conn, $token, $chatId, $subject_id, $subjectName);
         answerCallback($token, $cb['id'], "Session started!");
-        
+
     } elseif (strpos($data, 'confirm_start_') === 0) {
         $subject_id = str_replace('confirm_start_', '', $data);
         $stmt = $conn->prepare("SELECT subject_name FROM subjects WHERE id = ?");
@@ -517,7 +573,7 @@ function handleCallback($conn, $token, $chatId, $cb) {
         $stmt->execute();
         $res = $stmt->get_result();
         $subject = $res->fetch_assoc();
-        
+
         if ($subject) {
             startPomodoroSession($conn, $token, $chatId, $subject_id, $subject['subject_name']);
             answerCallback($token, $cb['id'], "Session started!");
@@ -552,16 +608,17 @@ function handleCallback($conn, $token, $chatId, $cb) {
 /**
  * Core logic to start a session in the DB
  */
-function startPomodoroSession($conn, $token, $chatId, $subjectId, $subjectName) {
+function startPomodoroSession($conn, $token, $chatId, $subjectId, $subjectName)
+{
     // Abandon previous
     $conn->query("UPDATE study_sessions SET status = 'abandoned' WHERE status IN ('active', 'paused')");
-    
+
     // Insert new
     $duration = 25; // Default 25 min
     $seconds = $duration * 60;
     $stmt = $conn->prepare("INSERT INTO study_sessions (subject_id, subject_name, duration_minutes, remaining_seconds, status, start_time, last_heartbeat, session_type) VALUES (?, ?, ?, ?, 'active', NOW(), NOW(), 'focus')");
     $stmt->bind_param("isii", $subjectId, $subjectName, $duration, $seconds);
-    
+
     if ($stmt->execute()) {
         sendTgMessage($token, $chatId, "🚀 *Pomodoro Started!*\n📖 Subject: *{$subjectName}*\n⏳ Duration: 25 min\n\nYour dashboard will sync automatically.");
     } else {
@@ -572,7 +629,8 @@ function startPomodoroSession($conn, $token, $chatId, $subjectId, $subjectName) 
 /**
  * Get the persistent main menu keyboard
  */
-function getMainMenu() {
+function getMainMenu()
+{
     return [
         'keyboard' => [
             [['text' => "📚 Start Study"], ['text' => "🛑 Stop Session"]],
@@ -588,7 +646,8 @@ function getMainMenu() {
 /**
  * Curated Motivational Messages
  */
-function getRandomMotivation() {
+function getRandomMotivation()
+{
     $quotes = [
         "The pain of discipline is far less than the pain of regret.",
         "Your future self is either thanking you or blaming you right now.",

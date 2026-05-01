@@ -23,6 +23,7 @@ const SmartHeader = {
 
         // Initial sync for focus timer if StudyMentor exists
         this.syncFocusTimer();
+        this.checkBotStatus();
     },
 
     startGlobalTimer() {
@@ -544,6 +545,81 @@ const SmartHeader = {
                     }
                 }
             });
+        }
+
+        // Bot Runner Toggle
+        const botToggle = document.getElementById('header-bot-toggle');
+        if (botToggle) {
+            botToggle.addEventListener('click', () => this.toggleBot());
+        }
+    },
+
+    async checkBotStatus() {
+        const dot = document.getElementById('bot-status-dot');
+        const icon = document.getElementById('bot-icon');
+        const statusText = document.getElementById('bot-status-text');
+        const toggleBtn = document.getElementById('header-bot-toggle');
+
+        try {
+            const res = await fetch('api/dashboard/run_bot.php?action=status');
+            const result = await res.json();
+            this.updateBotUI(result.running);
+        } catch (err) {
+            console.error("Bot status check failed:", err);
+        }
+    },
+
+    async toggleBot() {
+        const dot = document.getElementById('bot-status-dot');
+        const statusText = document.getElementById('bot-status-text');
+        const icon = document.getElementById('bot-icon');
+
+        // Check current state (optimistic UI)
+        const isRunning = icon && icon.classList.contains('bot-running-icon');
+        const action = isRunning ? 'stop' : 'start';
+
+        // Visual feedback: Transitioning
+        if (dot) dot.className = 'absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-white shadow-sm animate-pulse';
+        if (statusText) statusText.textContent = action === 'start' ? 'Launching...' : 'Stopping...';
+
+        try {
+            const res = await fetch(`api/dashboard/run_bot.php?action=${action}`);
+            const result = await res.json();
+
+            if (result.success) {
+                const newState = action === 'start';
+                this.updateBotUI(newState);
+                if (window.showToast) {
+                    window.showToast(newState ? '🤖 Telegram Bot started!' : '🛑 Telegram Bot stopped!', 'success');
+                }
+            } else {
+                this.updateBotUI(isRunning); // Revert
+                if (window.showToast) window.showToast(`Bot Error: ${result.message}`, 'error');
+            }
+        } catch (err) {
+            this.updateBotUI(isRunning); // Revert
+            if (window.showToast) window.showToast('Failed to reach bot API', 'error');
+        }
+    },
+
+    updateBotUI(isRunning) {
+        const dot = document.getElementById('bot-status-dot');
+        const icon = document.getElementById('bot-icon');
+        const statusText = document.getElementById('bot-status-text');
+        const toggleBtn = document.getElementById('header-bot-toggle');
+
+        if (!dot || !icon || !statusText || !toggleBtn) return;
+
+        if (isRunning) {
+            icon.classList.add('bot-running-icon');
+            dot.className = 'absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bot-running-dot border border-white shadow-sm';
+            statusText.textContent = 'Bot Running (Click to Stop)';
+            toggleBtn.title = 'Stop Telegram Bot';
+        } else {
+            icon.classList.remove('bot-running-icon');
+            dot.className = 'absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-slate-300 border border-white shadow-sm';
+            statusText.textContent = 'Bot Stopped (Click to Launch)';
+            toggleBtn.title = 'Launch Telegram Bot';
         }
     }
 };
