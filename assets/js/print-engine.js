@@ -10,6 +10,7 @@ const PrintEngine = {
     SET_NAMES: ['পদ্মা', 'মেঘনা', 'যমুনা', 'কর্ণফুলী', 'শাপলা', 'গোলাপ', 'জুঁই', 'রজনীগন্ধা'],
 
     selectedExamId: null,
+    selectedColor: 'random',
 
     init() {
         const modal = document.getElementById('print-options-modal');
@@ -34,6 +35,22 @@ const PrintEngine = {
 
         // Expose preset applier to window for onclick attributes
         window.applyExamPreset = (type) => this.applyPreset(type);
+
+        // Color picker swatch logic
+        const colorPicker = document.getElementById('print-color-picker');
+        if (colorPicker) {
+            colorPicker.addEventListener('click', (e) => {
+                const swatch = e.target.closest('.print-color-swatch');
+                if (!swatch) return;
+                // Remove ring from all swatches
+                colorPicker.querySelectorAll('.print-color-swatch').forEach(s => {
+                    s.classList.remove('ring-2', 'ring-indigo-500');
+                });
+                // Add ring to selected
+                swatch.classList.add('ring-2', 'ring-indigo-500');
+                this.selectedColor = swatch.dataset.color;
+            });
+        }
     },
 
     openModal(examId, totalQuestions = 0) {
@@ -143,7 +160,12 @@ const PrintEngine = {
      * @param {Object} data - Exam data (details + questions)
      */
     generatePDF(data) {
-        const bg = this.BG_COLORS[Math.floor(Math.random() * this.BG_COLORS.length)];
+        let bg;
+        if (this.selectedColor === 'random') {
+            bg = this.BG_COLORS[Math.floor(Math.random() * this.BG_COLORS.length)];
+        } else {
+            bg = this.selectedColor;
+        }
         const setNum = ['০১', '০২', '০৩', '০৪'][Math.floor(Math.random() * 4)];
         const setName = this.SET_NAMES[Math.floor(Math.random() * this.SET_NAMES.length)];
         const set = { num: setNum, name: setName };

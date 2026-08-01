@@ -290,6 +290,24 @@
                         </div>
                     </div>
 
+                    <!-- Paper Color Selector -->
+                    <div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3 px-1">Paper Color</span>
+                        <div class="flex flex-wrap gap-2.5 px-1" id="print-color-picker">
+                            <button type="button" class="print-color-swatch w-8 h-8 rounded-full border-2 border-slate-200 hover:scale-110 transition-all active:scale-95 ring-offset-2 bg-white" data-color="#FFFFFF" title="White (No Color)">
+                                <span class="material-symbols-outlined text-slate-300 text-xs flex items-center justify-center">block</span>
+                            </button>
+                            <button type="button" class="print-color-swatch w-8 h-8 rounded-full border-2 border-pink-200 hover:scale-110 transition-all active:scale-95 ring-offset-2" data-color="#FFD1DC" title="Pink" style="background-color:#FFD1DC"></button>
+                            <button type="button" class="print-color-swatch w-8 h-8 rounded-full border-2 border-yellow-200 hover:scale-110 transition-all active:scale-95 ring-offset-2" data-color="#FFF9C4" title="Yellow" style="background-color:#FFF9C4"></button>
+                            <button type="button" class="print-color-swatch w-8 h-8 rounded-full border-2 border-green-200 hover:scale-110 transition-all active:scale-95 ring-offset-2" data-color="#C8E6C9" title="Green" style="background-color:#C8E6C9"></button>
+                            <button type="button" class="print-color-swatch w-8 h-8 rounded-full border-2 border-orange-200 hover:scale-110 transition-all active:scale-95 ring-offset-2" data-color="#FFE5CC" title="Orange" style="background-color:#FFE5CC"></button>
+                            <button type="button" class="print-color-swatch w-8 h-8 rounded-full border-2 border-slate-200 hover:scale-110 transition-all active:scale-95 ring-offset-2" data-color="#E0E0E0" title="Gray" style="background-color:#E0E0E0"></button>
+                            <button type="button" class="print-color-swatch w-8 h-8 rounded-full border-2 border-dashed border-indigo-300 hover:scale-110 transition-all active:scale-95 ring-offset-2 bg-gradient-to-br from-pink-100 via-yellow-100 to-green-100 ring-2 ring-indigo-500" data-color="random" title="Random Color">
+                                <span class="material-symbols-outlined text-indigo-500 text-xs flex items-center justify-center">shuffle</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <div>
                         <label
                             class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-1">Special
