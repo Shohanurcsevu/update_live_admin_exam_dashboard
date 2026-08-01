@@ -248,6 +248,9 @@ function initializeTakeExamListPage() {
                                      <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" title="Study Materials">
                                         <span class="material-symbols-outlined text-sm">menu_book</span>
                                      </button>
+                                     <button class="view-questions-btn border-2 border-violet-500 text-violet-600 hover:bg-violet-500 hover:text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}" title="View Questions">
+                                        <span class="material-symbols-outlined text-sm">visibility</span>
+                                     </button>
                                      <button class="tag-revision-btn ${exam.last_revision_date === todayDateStr ? 'bg-indigo-600 text-white border-indigo-600' : 'border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'} text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all" data-id="${exam.id}" data-target="today" title="${exam.last_revision_date === todayDateStr ? 'Already tagged for today' : 'Add to Today\'s Revision'}">
                                          <span class="material-symbols-outlined text-sm">${exam.last_revision_date === todayDateStr ? 'event_available' : 'event_repeat'}</span>
                                      </button>
@@ -319,6 +322,9 @@ function initializeTakeExamListPage() {
                                 </button>
                                 <button class="study-exam-btn border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-500 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" data-id="${exam.id}">
                                     <span class="material-symbols-outlined text-sm">menu_book</span> Study
+                                </button>
+                                <button class="view-questions-btn border-2 border-violet-500 text-violet-600 hover:bg-violet-500 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" data-id="${exam.id}" data-title="${exam.exam_title}">
+                                    <span class="material-symbols-outlined text-sm">visibility</span> View Qs
                                 </button>
                                 <button class="print-exam-btn border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-500 hover:text-white text-[10px] font-black tracking-widest uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all" data-id="${exam.id}" data-questions="${exam.total_questions}">
                                      <span class="material-symbols-outlined text-sm">print</span> Print
@@ -930,6 +936,12 @@ function initializeTakeExamListPage() {
                 totalMarks: target.dataset.totalMarks
             };
             openSetupModal();
+        } else if (target.classList.contains('view-questions-btn')) {
+            const examId = target.dataset.id;
+            const examTitle = target.dataset.title || '';
+            if (window.loadPage) {
+                window.loadPage('questions-list', `?exam_id=${examId}&exam_title=${encodeURIComponent(examTitle)}`);
+            }
         } else if (target.classList.contains('study-exam-btn')) {
             const examId = target.dataset.id;
             handleStudyMaterials(examId, target);
