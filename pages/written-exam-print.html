@@ -1,0 +1,261 @@
+<!-- pages/written-exam-print.html -->
+<div id="wep-page" class="flex flex-col h-full overflow-hidden">
+
+  <!-- Screen controls (hidden when printing) -->
+  <div class="wep-screen-only flex-shrink-0 bg-white border-b border-gray-100 px-6 py-3 flex flex-wrap items-center gap-3">
+    <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+      <span class="material-symbols-outlined text-indigo-500">print</span>
+      Written Exam — Print Preview
+    </h1>
+    <div class="ml-auto flex items-center gap-3">
+      <!-- Options -->
+      <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+        <input type="checkbox" id="wep-show-marks" checked class="rounded text-indigo-600 border-gray-300">
+        Show marks
+      </label>
+      <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+        <input type="checkbox" id="wep-show-answers" class="rounded text-indigo-600 border-gray-300">
+        Show model answers
+      </label>
+      <button id="wep-print-btn" class="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-sm transition-colors">
+        <span class="material-symbols-outlined text-base">print</span>Print / Save PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview area (scroll on screen) -->
+  <div class="flex-1 overflow-y-auto bg-gray-200 py-6 px-4" id="wep-preview-area">
+    <div id="wep-loading" class="text-center py-16 text-gray-400">
+      <span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
+      <p class="mt-2">Loading exam…</p>
+    </div>
+
+    <!-- The actual printable sheet -->
+    <div id="wep-sheet" class="hidden bg-white shadow-xl mx-auto print:shadow-none print:mx-0" style="max-width:794px;padding:0">
+      <!-- Content injected by JS -->
+    </div>
+  </div>
+</div>
+
+<style>
+  /* ─── Printable exam styles ─────────────────────────────────────────────── */
+  #wep-sheet {
+    font-family: 'Noto Serif Bengali', 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    color: #000;
+    line-height: 1.6;
+  }
+
+  .wep-page {
+    width: 100%;
+    min-height: 29.7cm; /* A4 */
+    padding: 2cm 2.5cm;
+    box-sizing: border-box;
+    page-break-after: always;
+    position: relative;
+  }
+
+  /* Exam header */
+  .wep-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+  .wep-school-name { font-size: 15pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .wep-exam-title  { font-size: 13pt; font-weight: 700; margin-top: 4px; }
+  .wep-meta-row    { display: flex; justify-content: space-between; font-size: 11pt; margin-top: 6px; }
+
+  /* Section header */
+  .wep-section-header {
+    text-align: center; font-weight: 700; font-size: 12pt;
+    margin: 18px 0 8px;
+    border-top: 1px solid #000;
+    border-bottom: 1px solid #000;
+    padding: 4px 0;
+  }
+  .wep-section-inst { font-style: italic; font-size: 11pt; color: #333; margin-bottom:8px; }
+
+  /* Question */
+  .wep-question-block { margin-bottom: 18px; }
+  .wep-question-row   { display: flex; gap: 10px; align-items: flex-start; }
+  .wep-q-num  { font-weight: 700; white-space: nowrap; min-width: 2em; }
+  .wep-q-text { flex: 1; }
+  .wep-q-marks { white-space: nowrap; font-weight: 700; font-size: 11pt; margin-left: 8px; color:#333; }
+
+  /* Sub-question */
+  .wep-sub-list { margin-left: 2.2em; margin-top: 4px; }
+  .wep-sub-row  { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+  .wep-sub-label{ font-weight: 700; white-space: nowrap; min-width: 1.8em; }
+
+  /* Answer lines */
+  .wep-answer-lines { margin-left: 0; margin-top: 6px; }
+  .wep-line { border-bottom: 1px solid #999; height: 22px; margin-bottom: 2px; width: 100%; }
+
+  /* Model answer block (teacher copy) */
+  .wep-model-answer {
+    background: #fffde7; border-left: 4px solid #f9a825;
+    padding: 8px 12px; margin-top: 6px; font-size: 11pt;
+    color: #555; border-radius: 4px;
+  }
+
+  /* Images */
+  .wep-q-image { max-width: 100%; max-height: 200px; margin: 8px 0; border-radius:4px; }
+
+  /* Footer */
+  .wep-footer { position:absolute; bottom:1.2cm; left:2.5cm; right:2.5cm; border-top:1px solid #ccc; padding-top:6px; font-size:10pt; color:#555; display:flex; justify-content:space-between; }
+
+  /* ─── Print media rules ─────────────────────────────────────────────────── */
+  @media print {
+    .wep-screen-only { display: none !important; }
+    #wep-preview-area { overflow: visible; background: none; padding: 0; }
+    #wep-sheet { box-shadow: none; max-width: 100%; }
+    .wep-page { min-height: auto; }
+    .wep-page + .wep-page { page-break-before: always; }
+    @page { margin: 0; }
+  }
+</style>
+
+<script>
+function initializeWrittenExamPrint() {
+    const EB_API = 'api/written/exam_builder.php';
+    const urlParams = new URLSearchParams(window.location.search);
+    const examId = parseInt(urlParams.get('exam_id') || 0);
+
+    let examData = null;
+    let showMarks   = true;
+    let showAnswers = false;
+
+    document.getElementById('wep-print-btn').onclick = () => window.print();
+    document.getElementById('wep-show-marks').onchange   = e => { showMarks=e.target.checked;   rebuildSheet(); };
+    document.getElementById('wep-show-answers').onchange = e => { showAnswers=e.target.checked; rebuildSheet(); };
+
+    if (!examId) {
+        document.getElementById('wep-loading').innerHTML = '<p class="text-red-400">No exam_id provided.</p>';
+        return;
+    }
+
+    loadExam(examId);
+
+    async function loadExam(id) {
+        const res = await fetch(`${EB_API}?action=get_exam&exam_id=${id}`).then(r=>r.json());
+        document.getElementById('wep-loading').classList.add('hidden');
+        if (!res.success) { document.getElementById('wep-loading').innerHTML='<p class="text-red-400">'+escHtml(res.message)+'</p>'; document.getElementById('wep-loading').classList.remove('hidden'); return; }
+        examData = res.data;
+        document.getElementById('wep-sheet').classList.remove('hidden');
+        rebuildSheet();
+    }
+
+    function rebuildSheet() {
+        if (!examData) return;
+        const { exam, sections, questions } = examData;
+        const sheet = document.getElementById('wep-sheet');
+
+        let html = `<div class="wep-page">`;
+
+        // Header
+        html += `
+          <div class="wep-header">
+            <div class="wep-school-name">${escHtml(exam.exam_title||'Written Exam')}</div>
+            <div class="wep-meta-row">
+              <span>Subject: ${escHtml(exam.subject_name||'—')}</span>
+              <span>Total Marks: ${exam.total_marks||'—'}</span>
+              <span>Time: ${exam.duration ? exam.duration+' min' : '—'}</span>
+            </div>
+          </div>`;
+
+        if (exam.instructions) {
+            html += `<p style="font-style:italic;font-size:11pt;margin-bottom:12px;color:#444;">${escHtml(exam.instructions)}</p>`;
+        }
+
+        // Student info row
+        html += `
+          <div style="display:flex;gap:40px;margin-bottom:18px;">
+            <div style="flex:2;border-bottom:1px solid #000;padding-bottom:2px;">Name: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            <div style="flex:1;border-bottom:1px solid #000;padding-bottom:2px;">Roll: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            <div style="flex:1;border-bottom:1px solid #000;padding-bottom:2px;">Date: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+          </div>`;
+
+        // Group questions by section
+        const sectionMap = {};
+        const noSection   = [];
+        questions.forEach(q => {
+            if (q.section_id) {
+                if (!sectionMap[q.section_id]) sectionMap[q.section_id] = [];
+                sectionMap[q.section_id].push(q);
+            } else {
+                noSection.push(q);
+            }
+        });
+
+        let globalQNum = 1;
+
+        // Questions with no section
+        if (noSection.length) {
+            noSection.forEach(q => {
+                html += renderQuestion(q, globalQNum++);
+            });
+        }
+
+        // Sectioned questions
+        sections.forEach(sec => {
+            const qs = sectionMap[sec.id] || [];
+            if (!qs.length) return;
+            html += `<div class="wep-section-header">${escHtml(sec.section_title||'')}</div>`;
+            if (sec.section_instructions) html += `<div class="wep-section-inst">${escHtml(sec.section_instructions)}</div>`;
+            qs.forEach(q => { html += renderQuestion(q, globalQNum++); });
+        });
+
+        html += `
+          <div class="wep-footer">
+            <span>Question Paper — ${escHtml(exam.exam_title)}</span>
+            <span>Page 1</span>
+          </div>
+        </div>`;
+
+        sheet.innerHTML = html;
+    }
+
+    function renderQuestion(q, num) {
+        let html = `<div class="wep-question-block">`;
+        html += `<div class="wep-question-row">
+          <span class="wep-q-num">${num}.</span>
+          <span class="wep-q-text">${escHtml(q.question_text)}</span>
+          ${showMarks && q.marks ? `<span class="wep-q-marks">[${q.marks}]</span>` : ''}
+        </div>`;
+
+        if (q.image_path) html += `<img src="${escHtml(q.image_path)}" class="wep-q-image" alt="Question image">`;
+
+        if (showAnswers && q.model_answer) {
+            html += `<div class="wep-model-answer"><strong>Model Answer:</strong> ${escHtml(q.model_answer)}</div>`;
+        }
+
+        // Sub-questions or answer lines
+        if (q.sub_questions && q.sub_questions.length) {
+            html += `<div class="wep-sub-list">`;
+            q.sub_questions.forEach((sq, i) => {
+                const label = String.fromCharCode(97+i);
+                html += `<div class="wep-sub-row">
+                  <span class="wep-sub-label">(${label})</span>
+                  <div style="flex:1">
+                    <span>${escHtml(sq.sub_question_text)}</span>
+                    ${showMarks && sq.marks ? `<strong style="margin-left:8px;">[${sq.marks}]</strong>` : ''}
+                    ${sq.image_path ? `<img src="${escHtml(sq.image_path)}" class="wep-q-image">` : ''}
+                    ${showAnswers && sq.model_answer ? `<div class="wep-model-answer">${escHtml(sq.model_answer)}</div>` : ''}
+                    ${renderAnswerLines(sq.answer_space_lines || 4)}
+                  </div>
+                </div>`;
+            });
+            html += `</div>`;
+        } else {
+            html += renderAnswerLines(q.answer_space_lines || 8);
+        }
+
+        html += `</div>`;
+        return html;
+    }
+
+    function renderAnswerLines(count) {
+        count = Math.max(1, parseInt(count)||8);
+        return `<div class="wep-answer-lines">${'<div class="wep-line"></div>'.repeat(count)}</div>`;
+    }
+
+    function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+}
+initializeWrittenExamPrint();
+</script>

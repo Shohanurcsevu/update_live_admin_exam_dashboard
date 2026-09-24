@@ -345,7 +345,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             'backup-restore': 'assets/js/backup-restore.js',
             'speed-trivia': 'assets/js/speed-trivia.js',
             'review-changes': 'assets/js/review-changes.js',
-            'fb-posts': 'assets/js/fb-posts.js'
+            'fb-posts': 'assets/js/fb-posts.js',
+            'written-question-bank':  null,
+            'written-exam-builder':   null,
+            'written-exam-print':     null
         };
 
 

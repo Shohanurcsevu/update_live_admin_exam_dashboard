@@ -1,0 +1,749 @@
+<!-- pages/written-question-bank.html -->
+<div id="wqb-page" class="flex flex-col h-full overflow-hidden">
+
+  <!-- Header bar -->
+  <div class="flex-shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex flex-wrap items-center gap-3">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-indigo-500">edit_note</span>
+        Written Question Bank
+      </h1>
+      <p class="text-xs text-gray-400 mt-0.5">Create, manage, and search written questions</p>
+    </div>
+    <div class="ml-auto flex gap-2">
+      <button id="wqb-bulk-btn" class="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-xl transition-colors">
+        <span class="material-symbols-outlined text-base">format_list_bulleted_add</span>Bulk Add
+      </button>
+      <button id="wqb-add-btn" class="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+        <span class="material-symbols-outlined text-base">add</span>Add Question
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters row -->
+  <div class="flex-shrink-0 bg-gray-50 border-b border-gray-100 px-6 py-3 flex flex-wrap gap-2 items-center">
+    <input id="wqb-search" type="text" placeholder="Search questions..." class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+    <select id="wqb-filter-subject" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      <option value="">All Subjects</option>
+    </select>
+    <select id="wqb-filter-type" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      <option value="">All Types</option>
+      <option value="short_answer">Short Answer</option>
+      <option value="broad">Broad/Descriptive</option>
+      <option value="essay">Essay</option>
+      <option value="creative_cq">Creative/CQ</option>
+      <option value="fill_blank">Fill in the Blank</option>
+      <option value="math">Mathematical</option>
+      <option value="calculation">Calculation</option>
+      <option value="definition">Definition</option>
+      <option value="diagram">Diagram-based</option>
+      <option value="image_based">Image-based</option>
+      <option value="passage">Passage/Stem</option>
+      <option value="other">Other</option>
+    </select>
+    <select id="wqb-filter-diff" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      <option value="">All Difficulties</option>
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+    <button id="wqb-search-btn" class="px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">Search</button>
+    <button id="wqb-clear-btn" class="px-3 py-1.5 text-gray-500 text-sm rounded-lg hover:bg-gray-200 transition-colors">Clear</button>
+    <span id="wqb-total-badge" class="ml-auto text-xs text-gray-400"></span>
+  </div>
+
+  <!-- Question list -->
+  <div class="flex-1 overflow-y-auto px-6 py-4">
+    <div id="wqb-loading" class="text-center py-10 text-gray-400">
+      <span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
+      <p class="mt-2">Loading questions...</p>
+    </div>
+    <div id="wqb-empty" class="hidden text-center py-16 text-gray-400">
+      <span class="material-symbols-outlined text-5xl">quiz</span>
+      <p class="mt-2 font-medium">No questions yet</p>
+      <p class="text-sm">Click "Add Question" to get started</p>
+    </div>
+    <div id="wqb-list" class="space-y-3 hidden"></div>
+
+    <!-- Pagination -->
+    <div id="wqb-pagination" class="flex justify-center gap-2 mt-6 hidden">
+      <button id="wqb-prev" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-40" disabled>← Prev</button>
+      <span id="wqb-page-info" class="px-3 py-1.5 text-sm text-gray-600"></span>
+      <button id="wqb-next" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-40">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════ ADD/EDIT QUESTION MODAL ════════════════════════ -->
+<div id="wqb-modal" class="fixed inset-0 bg-black/50 z-[300] hidden flex items-start justify-center overflow-y-auto pt-10 pb-10">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col" style="max-height:90vh">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <h2 id="wqb-modal-title" class="text-lg font-bold text-gray-900">Add Written Question</h2>
+      <button id="wqb-modal-close" class="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <input type="hidden" id="wqb-edit-id">
+
+      <!-- Category row -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Subject</label>
+          <select id="wqb-m-subject" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="">-- Subject --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Lesson</label>
+          <select id="wqb-m-lesson" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" disabled>
+            <option value="">-- Lesson --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Topic</label>
+          <select id="wqb-m-topic" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" disabled>
+            <option value="">-- Topic --</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Type / Difficulty / Marks -->
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Question Type</label>
+          <select id="wqb-m-type" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="short_answer">Short Answer</option>
+            <option value="broad">Broad/Descriptive</option>
+            <option value="essay">Essay</option>
+            <option value="creative_cq">Creative/CQ</option>
+            <option value="fill_blank">Fill in the Blank</option>
+            <option value="math">Mathematical</option>
+            <option value="calculation">Calculation</option>
+            <option value="definition">Definition</option>
+            <option value="diagram">Diagram-based</option>
+            <option value="image_based">Image-based</option>
+            <option value="passage">Passage/Stem</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Difficulty</label>
+          <select id="wqb-m-diff" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Marks</label>
+          <input type="number" id="wqb-m-marks" value="1" min="0.5" step="0.5" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+        </div>
+      </div>
+
+      <!-- Language + Formula -->
+      <div class="flex gap-4 items-center">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Language</label>
+          <select id="wqb-m-lang" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="mixed" selected>Mixed</option>
+            <option value="bangla">Bangla</option>
+            <option value="english">English</option>
+          </select>
+        </div>
+        <label class="flex items-center gap-2 mt-4 cursor-pointer select-none">
+          <input type="checkbox" id="wqb-m-formula" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+          <span class="text-sm text-gray-700">Contains Math Formula</span>
+        </label>
+      </div>
+
+      <!-- Question text -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Question Text <span class="text-red-400">*</span></label>
+        <textarea id="wqb-m-text" rows="4" placeholder="Enter question text (Bangla/English supported)..."
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y"></textarea>
+      </div>
+
+      <!-- Image upload -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Question Image (optional)</label>
+        <div class="flex items-center gap-2">
+          <label class="cursor-pointer flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+            <span class="material-symbols-outlined text-base">upload</span>Upload Image
+            <input type="file" id="wqb-m-image-file" accept="image/*" class="hidden">
+          </label>
+          <img id="wqb-m-image-preview" src="" alt="preview" class="hidden max-h-20 rounded-lg border border-gray-200">
+          <button id="wqb-m-image-remove" class="hidden text-xs text-red-500 hover:text-red-700 font-semibold">Remove</button>
+        </div>
+        <input type="hidden" id="wqb-m-image-path">
+      </div>
+
+      <!-- Model Answer -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Model Answer (teacher use only — hidden on student PDF)</label>
+        <textarea id="wqb-m-answer" rows="3" placeholder="Enter model answer..."
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y bg-amber-50/40"></textarea>
+      </div>
+
+      <!-- Sub-questions toggle -->
+      <div class="border-t border-gray-100 pt-3">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" id="wqb-m-has-sub" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+          <span class="font-semibold text-sm text-gray-800">This question has sub-questions (a, b, c...)</span>
+        </label>
+      </div>
+
+      <!-- Sub-questions container -->
+      <div id="wqb-sub-container" class="hidden space-y-3">
+        <div id="wqb-sub-list" class="space-y-3"></div>
+        <button id="wqb-add-sub-btn" class="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 font-semibold transition-colors">
+          <span class="material-symbols-outlined text-base">add_circle</span>Add Sub-question
+        </button>
+        <p class="text-xs text-gray-400">Sub-questions will be labeled automatically: (a), (b), (c)...</p>
+      </div>
+    </div>
+
+    <div class="flex-shrink-0 border-t border-gray-100 px-6 py-4 flex gap-3 justify-end">
+      <button id="wqb-modal-cancel" class="px-5 py-2 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
+      <button id="wqb-modal-save" class="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">save</span>Save Question
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════ BULK ADD MODAL ════════════════════════ -->
+<div id="wqb-bulk-modal" class="fixed inset-0 bg-black/50 z-[300] hidden flex items-start justify-center overflow-y-auto pt-10 pb-10">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 flex flex-col" style="max-height:90vh">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <h2 class="text-lg font-bold text-gray-900">Bulk Add Written Questions</h2>
+      <button id="wqb-bulk-close" class="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div id="wqb-bulk-step1" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <p class="text-sm text-gray-600">Paste multiple questions below. Each question starts on a new line with a number (1. 2. 3.) or a dash (-).</p>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Subject</label>
+          <select id="wqb-bulk-subject" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="">-- Subject --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Default Type</label>
+          <select id="wqb-bulk-type" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="short_answer">Short Answer</option>
+            <option value="broad">Broad/Descriptive</option>
+            <option value="math">Mathematical</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Default Marks</label>
+          <input type="number" id="wqb-bulk-marks" value="2" min="0.5" step="0.5" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Paste Questions</label>
+        <textarea id="wqb-bulk-text" rows="12" placeholder="1. What is data communication?&#10;2. Explain the OSI model.&#10;3. Describe TCP/IP protocol stack.&#10;..."
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y font-mono"></textarea>
+      </div>
+      <div class="flex justify-end gap-3">
+        <button id="wqb-bulk-parse-btn" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors">
+          Parse & Review →
+        </button>
+      </div>
+    </div>
+
+    <!-- Review step -->
+    <div id="wqb-bulk-step2" class="hidden flex-1 overflow-y-auto px-6 py-4">
+      <p class="text-sm text-gray-600 mb-3">Review and edit parsed questions. Then click "Save All".</p>
+      <div id="wqb-bulk-preview" class="space-y-3"></div>
+      <div class="flex justify-between mt-4">
+        <button id="wqb-bulk-back-btn" class="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl">← Back</button>
+        <button id="wqb-bulk-save-btn" class="px-6 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl flex items-center gap-2">
+          <span class="material-symbols-outlined text-base">save</span>Save All Questions
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function initializeWrittenQuestionBank() {
+    const API  = 'api/written/questions.php';
+    const SAPI = 'api/exam/subjects.php';
+    const LAPI = 'api/exam/lessons.php';
+    const TAPI = 'api/exam/topics.php';
+    const IAPI = 'api/written/upload_image.php';
+
+    let currentPage = 1, totalPages = 1;
+    let editingId = null;
+    let subQCounter = 0;
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    loadSubjectOptions();
+    loadBankSubjectOptions();
+    loadQuestions();
+    bindEvents();
+
+    function bindEvents() {
+        document.getElementById('wqb-add-btn').onclick     = () => openModal();
+        document.getElementById('wqb-bulk-btn').onclick    = () => openBulkModal();
+        document.getElementById('wqb-modal-close').onclick = closeModal;
+        document.getElementById('wqb-modal-cancel').onclick= closeModal;
+        document.getElementById('wqb-modal-save').onclick  = saveQuestion;
+        document.getElementById('wqb-search-btn').onclick  = () => { currentPage=1; loadQuestions(); };
+        document.getElementById('wqb-clear-btn').onclick   = clearFilters;
+        document.getElementById('wqb-prev').onclick        = () => { if(currentPage>1){currentPage--;loadQuestions();} };
+        document.getElementById('wqb-next').onclick        = () => { if(currentPage<totalPages){currentPage++;loadQuestions();} };
+        document.getElementById('wqb-search').addEventListener('keydown', e => { if(e.key==='Enter'){ currentPage=1; loadQuestions(); }});
+        document.getElementById('wqb-m-subject').onchange  = e => loadLessons(e.target.value,'wqb-m-lesson','wqb-m-topic');
+        document.getElementById('wqb-m-lesson').onchange   = e => loadTopics(e.target.value,'wqb-m-topic');
+        document.getElementById('wqb-m-has-sub').onchange  = e => {
+            document.getElementById('wqb-sub-container').classList.toggle('hidden', !e.target.checked);
+        };
+        document.getElementById('wqb-add-sub-btn').onclick = () => addSubQuestion();
+        document.getElementById('wqb-m-image-file').onchange = handleImageUpload;
+        document.getElementById('wqb-m-image-remove').onclick = removeImage;
+        document.getElementById('wqb-bulk-close').onclick   = closeBulkModal;
+        document.getElementById('wqb-bulk-parse-btn').onclick= parseBulkQuestions;
+        document.getElementById('wqb-bulk-back-btn').onclick = () => {
+            document.getElementById('wqb-bulk-step1').classList.remove('hidden');
+            document.getElementById('wqb-bulk-step2').classList.add('hidden');
+        };
+        document.getElementById('wqb-bulk-save-btn').onclick = saveBulkQuestions;
+        // Close on backdrop
+        document.getElementById('wqb-modal').onclick = e => { if(e.target===document.getElementById('wqb-modal')) closeModal(); };
+        document.getElementById('wqb-bulk-modal').onclick = e => { if(e.target===document.getElementById('wqb-bulk-modal')) closeBulkModal(); };
+    }
+
+    // ── Subjects ──────────────────────────────────────────────────────────────
+    async function loadSubjectOptions() {
+        const res = await fetch(SAPI).then(r=>r.json());
+        const sel = document.getElementById('wqb-filter-subject');
+        const mSel= document.getElementById('wqb-m-subject');
+        if (res.success) {
+            res.data.forEach(s => {
+                const opt = `<option value="${s.id}">${s.subject_name}</option>`;
+                sel.innerHTML  += opt;
+                mSel.innerHTML += opt;
+            });
+        }
+    }
+
+    async function loadBankSubjectOptions() {
+        const res = await fetch(SAPI).then(r=>r.json());
+        const sel = document.getElementById('wqb-bulk-subject');
+        if (res.success) res.data.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.subject_name}</option>`);
+    }
+
+    async function loadLessons(subjectId, lessonSelId, topicSelId) {
+        const lSel = document.getElementById(lessonSelId);
+        const tSel = document.getElementById(topicSelId);
+        lSel.innerHTML = '<option value="">-- Lesson --</option>';
+        lSel.disabled = true;
+        tSel.innerHTML = '<option value="">-- Topic --</option>';
+        tSel.disabled = true;
+        if (!subjectId) return;
+        const res = await fetch(`${LAPI}?subject_id=${subjectId}`).then(r=>r.json());
+        if (res.success) {
+            res.data.forEach(l => lSel.innerHTML += `<option value="${l.id}">${l.lesson_name}</option>`);
+            lSel.disabled = false;
+        }
+    }
+
+    async function loadTopics(lessonId, topicSelId) {
+        const tSel = document.getElementById(topicSelId);
+        tSel.innerHTML = '<option value="">-- Topic --</option>'; tSel.disabled = true;
+        if (!lessonId) return;
+        const res = await fetch(`${TAPI}?lesson_id=${lessonId}`).then(r=>r.json());
+        if (res.success) { res.data.forEach(t => tSel.innerHTML += `<option value="${t.id}">${t.topic_name}</option>`); tSel.disabled = false; }
+    }
+
+    // ── Load questions ────────────────────────────────────────────────────────
+    async function loadQuestions() {
+        document.getElementById('wqb-loading').classList.remove('hidden');
+        document.getElementById('wqb-list').classList.add('hidden');
+        document.getElementById('wqb-empty').classList.add('hidden');
+
+        const params = new URLSearchParams({
+            action: 'list', page: currentPage, limit: 15,
+            search:   document.getElementById('wqb-search').value.trim(),
+            subject_id: document.getElementById('wqb-filter-subject').value,
+            question_type: document.getElementById('wqb-filter-type').value,
+            difficulty: document.getElementById('wqb-filter-diff').value,
+        });
+        const res = await fetch(`${API}?${params}`).then(r=>r.json());
+        document.getElementById('wqb-loading').classList.add('hidden');
+
+        if (!res.success || !res.data.length) {
+            document.getElementById('wqb-empty').classList.remove('hidden');
+            document.getElementById('wqb-total-badge').textContent = '0 questions';
+            document.getElementById('wqb-pagination').classList.add('hidden');
+            return;
+        }
+
+        totalPages = res.pages;
+        document.getElementById('wqb-total-badge').textContent = `${res.total} question${res.total!==1?'s':''}`;
+        renderQuestions(res.data);
+        updatePagination(res.page, res.pages);
+    }
+
+    function renderQuestions(questions) {
+        const list = document.getElementById('wqb-list');
+        list.innerHTML = '';
+        const typeLabels = {short_answer:'Short Answer',broad:'Broad',essay:'Essay',creative_cq:'Creative/CQ',fill_blank:'Fill Blank',math:'Math',calculation:'Calculation',definition:'Definition',diagram:'Diagram',image_based:'Image-based',passage:'Passage',other:'Other'};
+        const diffColor  = {easy:'bg-emerald-100 text-emerald-700',medium:'bg-amber-100 text-amber-700',hard:'bg-red-100 text-red-700'};
+
+        questions.forEach(q => {
+            const preview = q.question_text.length > 120 ? q.question_text.substring(0,120)+'…' : q.question_text;
+            const div = document.createElement('div');
+            div.className = 'bg-white border border-gray-100 rounded-xl p-4 hover:shadow-md transition-shadow group';
+            div.innerHTML = `
+              <div class="flex items-start gap-3">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm text-gray-800 font-medium leading-relaxed">${escHtml(preview)}</p>
+                  <div class="flex flex-wrap gap-2 mt-2 items-center">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">${typeLabels[q.question_type]||q.question_type}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${diffColor[q.difficulty]||''}">${q.difficulty}</span>
+                    <span class="text-xs text-gray-500 font-semibold">${q.marks} mark${q.marks!=1?'s':''}</span>
+                    ${q.sub_count>0?`<span class="text-xs text-purple-500 font-semibold">${q.sub_count} sub-q</span>`:''}
+                    ${q.subject_name?`<span class="text-xs text-gray-400">${escHtml(q.subject_name)}</span>`:''}
+                    ${q.has_formula?'<span class="text-xs text-orange-500">∑ formula</span>':''}
+                  </div>
+                </div>
+                <div class="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button class="wqb-edit-btn p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500" data-id="${q.id}" title="Edit">
+                    <span class="material-symbols-outlined text-base">edit</span>
+                  </button>
+                  <button class="wqb-del-btn p-1.5 rounded-lg hover:bg-red-50 text-red-400" data-id="${q.id}" title="Delete">
+                    <span class="material-symbols-outlined text-base">delete</span>
+                  </button>
+                </div>
+              </div>`;
+            div.querySelector('.wqb-edit-btn').onclick = () => editQuestion(q.id);
+            div.querySelector('.wqb-del-btn').onclick  = () => deleteQuestion(q.id);
+            list.appendChild(div);
+        });
+        list.classList.remove('hidden');
+    }
+
+    function updatePagination(page, pages) {
+        const pag = document.getElementById('wqb-pagination');
+        pag.classList.toggle('hidden', pages<=1);
+        document.getElementById('wqb-page-info').textContent = `Page ${page} of ${pages}`;
+        document.getElementById('wqb-prev').disabled = page<=1;
+        document.getElementById('wqb-next').disabled = page>=pages;
+    }
+
+    // ── Modal ─────────────────────────────────────────────────────────────────
+    function openModal(data=null) {
+        editingId = null;
+        document.getElementById('wqb-modal-title').textContent = data ? 'Edit Question' : 'Add Written Question';
+        document.getElementById('wqb-edit-id').value = '';
+        document.getElementById('wqb-m-text').value   = '';
+        document.getElementById('wqb-m-answer').value = '';
+        document.getElementById('wqb-m-marks').value  = 1;
+        document.getElementById('wqb-m-diff').value   = 'medium';
+        document.getElementById('wqb-m-type').value   = 'short_answer';
+        document.getElementById('wqb-m-lang').value   = 'mixed';
+        document.getElementById('wqb-m-formula').checked = false;
+        document.getElementById('wqb-m-has-sub').checked = false;
+        document.getElementById('wqb-sub-container').classList.add('hidden');
+        document.getElementById('wqb-sub-list').innerHTML = '';
+        document.getElementById('wqb-m-image-preview').classList.add('hidden');
+        document.getElementById('wqb-m-image-remove').classList.add('hidden');
+        document.getElementById('wqb-m-image-path').value = '';
+        document.getElementById('wqb-m-subject').value = '';
+        document.getElementById('wqb-m-lesson').value = '';
+        document.getElementById('wqb-m-lesson').disabled = true;
+        document.getElementById('wqb-m-topic').value = '';
+        document.getElementById('wqb-m-topic').disabled = true;
+
+        if (data) {
+            editingId = data.id;
+            document.getElementById('wqb-edit-id').value   = data.id;
+            document.getElementById('wqb-m-text').value    = data.question_text;
+            document.getElementById('wqb-m-answer').value  = data.model_answer||'';
+            document.getElementById('wqb-m-marks').value   = data.marks;
+            document.getElementById('wqb-m-diff').value    = data.difficulty;
+            document.getElementById('wqb-m-type').value    = data.question_type;
+            document.getElementById('wqb-m-lang').value    = data.language;
+            document.getElementById('wqb-m-formula').checked = !!parseInt(data.has_formula);
+            document.getElementById('wqb-m-subject').value = data.subject_id||'';
+            if (data.subject_id) loadLessons(data.subject_id,'wqb-m-lesson','wqb-m-topic').then(()=>{
+                setTimeout(()=>{ document.getElementById('wqb-m-lesson').value=data.lesson_id||''; if(data.lesson_id) loadTopics(data.lesson_id,'wqb-m-topic').then(()=>{ setTimeout(()=>{document.getElementById('wqb-m-topic').value=data.topic_id||'';},100); }); },100);
+            });
+            if (data.image_path) {
+                document.getElementById('wqb-m-image-path').value = data.image_path;
+                document.getElementById('wqb-m-image-preview').src = data.image_path;
+                document.getElementById('wqb-m-image-preview').classList.remove('hidden');
+                document.getElementById('wqb-m-image-remove').classList.remove('hidden');
+            }
+            if (data.sub_questions && data.sub_questions.length) {
+                document.getElementById('wqb-m-has-sub').checked = true;
+                document.getElementById('wqb-sub-container').classList.remove('hidden');
+                data.sub_questions.forEach(sq => addSubQuestion(sq));
+            }
+        }
+        document.getElementById('wqb-modal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('wqb-modal').classList.add('hidden'); }
+
+    async function editQuestion(id) {
+        const res = await fetch(`${API}?action=get&id=${id}`).then(r=>r.json());
+        if (res.success) openModal(res.data);
+        else window.showToast('Failed to load question.','error');
+    }
+
+    async function saveQuestion() {
+        const btn = document.getElementById('wqb-modal-save');
+        const text = document.getElementById('wqb-m-text').value.trim();
+        if (!text) { window.showToast('Question text required.','error'); return; }
+
+        btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">progress_activity</span> Saving…';
+
+        const subs = collectSubQuestions();
+        const payload = {
+            id:             editingId||undefined,
+            subject_id:     document.getElementById('wqb-m-subject').value,
+            lesson_id:      document.getElementById('wqb-m-lesson').value,
+            topic_id:       document.getElementById('wqb-m-topic').value,
+            question_text:  text,
+            question_type:  document.getElementById('wqb-m-type').value,
+            difficulty:     document.getElementById('wqb-m-diff').value,
+            marks:          parseFloat(document.getElementById('wqb-m-marks').value),
+            model_answer:   document.getElementById('wqb-m-answer').value.trim(),
+            image_path:     document.getElementById('wqb-m-image-path').value,
+            has_formula:    document.getElementById('wqb-m-formula').checked ? 1 : 0,
+            language:       document.getElementById('wqb-m-lang').value,
+            sub_questions:  document.getElementById('wqb-m-has-sub').checked ? subs : [],
+        };
+
+        const action = editingId ? 'update' : 'create';
+        const res = await fetch(`${API}?action=${action}`, {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        }).then(r=>r.json());
+
+        btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined text-base">save</span> Save Question';
+
+        if (res.success) {
+            window.showToast(editingId ? 'Question updated.' : 'Question created.', 'success');
+            closeModal(); loadQuestions();
+        } else {
+            window.showToast(res.message||'Save failed.','error');
+        }
+    }
+
+    async function deleteQuestion(id) {
+        if (!confirm('Delete this question? This cannot be undone.')) return;
+        const res = await fetch(`${API}?action=delete`, {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id})
+        }).then(r=>r.json());
+        if (res.success) { window.showToast('Deleted.','success'); loadQuestions(); }
+        else window.showToast(res.message||'Delete failed.','error');
+    }
+
+    // ── Sub-questions ─────────────────────────────────────────────────────────
+    function addSubQuestion(data=null) {
+        const idx = ++subQCounter;
+        const label = String.fromCharCode(96+idx); // a, b, c...
+        const div = document.createElement('div');
+        div.className = 'sub-q-item bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2';
+        div.dataset.idx = idx;
+        div.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-gray-500 w-6">(${label})</span>
+            <textarea class="sq-text flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-y" rows="2" placeholder="Sub-question text...">${escHtml(data?.sub_question_text||'')}</textarea>
+            <button class="sq-del p-1 text-red-400 hover:text-red-600 flex-shrink-0" title="Remove">
+              <span class="material-symbols-outlined text-base">remove_circle</span>
+            </button>
+          </div>
+          <div class="flex gap-3 ml-8">
+            <div class="flex-1">
+              <input type="number" class="sq-marks w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" placeholder="Marks" value="${data?.marks||1}" min="0.5" step="0.5">
+            </div>
+            <div class="flex-1">
+              <textarea class="sq-ans w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-y bg-amber-50/40 focus:outline-none" rows="2" placeholder="Model answer (optional)">${escHtml(data?.model_answer||'')}</textarea>
+            </div>
+          </div>`;
+        div.querySelector('.sq-del').onclick = () => { div.remove(); renumberSubQ(); };
+        document.getElementById('wqb-sub-list').appendChild(div);
+    }
+
+    function renumberSubQ() {
+        document.querySelectorAll('#wqb-sub-list .sub-q-item').forEach((el,i) => {
+            const label = String.fromCharCode(97+i);
+            el.querySelector('span.text-xs.font-bold').textContent = `(${label})`;
+        });
+    }
+
+    function collectSubQuestions() {
+        const items = document.querySelectorAll('#wqb-sub-list .sub-q-item');
+        const subs = [];
+        items.forEach((el,i) => {
+            const text = el.querySelector('.sq-text').value.trim();
+            if (!text) return;
+            subs.push({
+                sub_question_text: text,
+                marks:             parseFloat(el.querySelector('.sq-marks').value)||1,
+                model_answer:      el.querySelector('.sq-ans').value.trim(),
+                display_order:     i,
+            });
+        });
+        return subs;
+    }
+
+    // ── Image upload ──────────────────────────────────────────────────────────
+    async function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const fd = new FormData(); fd.append('image', file);
+        window.showToast('Uploading image…','info');
+        const res = await fetch(IAPI, {method:'POST', body:fd}).then(r=>r.json());
+        if (res.success) {
+            document.getElementById('wqb-m-image-path').value = res.path;
+            document.getElementById('wqb-m-image-preview').src = res.path;
+            document.getElementById('wqb-m-image-preview').classList.remove('hidden');
+            document.getElementById('wqb-m-image-remove').classList.remove('hidden');
+            window.showToast('Image uploaded.','success');
+        } else {
+            window.showToast(res.message||'Upload failed.','error');
+        }
+    }
+
+    function removeImage() {
+        document.getElementById('wqb-m-image-path').value = '';
+        document.getElementById('wqb-m-image-preview').src = '';
+        document.getElementById('wqb-m-image-preview').classList.add('hidden');
+        document.getElementById('wqb-m-image-remove').classList.add('hidden');
+        document.getElementById('wqb-m-image-file').value = '';
+    }
+
+    // ── Bulk add ──────────────────────────────────────────────────────────────
+    function openBulkModal() {
+        document.getElementById('wqb-bulk-modal').classList.remove('hidden');
+        document.getElementById('wqb-bulk-step1').classList.remove('hidden');
+        document.getElementById('wqb-bulk-step2').classList.add('hidden');
+        document.getElementById('wqb-bulk-text').value = '';
+    }
+    function closeBulkModal() { document.getElementById('wqb-bulk-modal').classList.add('hidden'); }
+
+    function parseBulkQuestions() {
+        const raw  = document.getElementById('wqb-bulk-text').value.trim();
+        if (!raw) { window.showToast('Paste some questions first.','error'); return; }
+        const defType  = document.getElementById('wqb-bulk-type').value;
+        const defMarks = parseFloat(document.getElementById('wqb-bulk-marks').value)||2;
+
+        // Parse: split by numbered lines or dashes
+        const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+        const questions = [];
+        let current = null;
+        for (const line of lines) {
+            const numbered = line.match(/^(\d+)[.)]\s+(.+)/);
+            const dashed   = line.match(/^[-*]\s+(.+)/);
+            if (numbered) {
+                if (current) questions.push(current);
+                current = { question_text: numbered[2], question_type: defType, marks: defMarks, model_answer: '', difficulty: 'medium' };
+            } else if (dashed) {
+                if (current) questions.push(current);
+                current = { question_text: dashed[1], question_type: defType, marks: defMarks, model_answer: '', difficulty: 'medium' };
+            } else if (current) {
+                current.question_text += '\n' + line;
+            }
+        }
+        if (current) questions.push(current);
+
+        if (!questions.length) { window.showToast('Could not parse any questions. Try numbered lines (1. 2. 3.).','error'); return; }
+
+        renderBulkPreview(questions);
+        document.getElementById('wqb-bulk-step1').classList.add('hidden');
+        document.getElementById('wqb-bulk-step2').classList.remove('hidden');
+    }
+
+    function renderBulkPreview(questions) {
+        const preview = document.getElementById('wqb-bulk-preview');
+        preview.innerHTML = '';
+        questions.forEach((q,i) => {
+            const div = document.createElement('div');
+            div.className = 'bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2';
+            div.dataset.idx = i;
+            div.innerHTML = `
+              <div class="flex gap-2 items-start">
+                <span class="text-sm font-bold text-gray-400 mt-1">${i+1}.</span>
+                <div class="flex-1 space-y-2">
+                  <textarea class="bp-text w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300 resize-y" rows="2">${escHtml(q.question_text)}</textarea>
+                  <div class="flex gap-2">
+                    <select class="bp-type border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                      <option value="short_answer" ${q.question_type==='short_answer'?'selected':''}>Short Answer</option>
+                      <option value="broad"        ${q.question_type==='broad'?'selected':''}>Broad</option>
+                      <option value="math"         ${q.question_type==='math'?'selected':''}>Math</option>
+                      <option value="other"        ${q.question_type==='other'?'selected':''}>Other</option>
+                    </select>
+                    <input type="number" class="bp-marks w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-xs" value="${q.marks}" min="0.5" step="0.5">
+                    <select class="bp-diff border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                      <option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option>
+                    </select>
+                    <button class="bp-del ml-auto text-red-400 hover:text-red-600 text-xs font-semibold px-2 py-1 rounded-lg hover:bg-red-50">Remove</button>
+                  </div>
+                  <textarea class="bp-ans w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-y bg-amber-50/40 focus:outline-none" rows="1" placeholder="Model answer (optional)"></textarea>
+                </div>
+              </div>`;
+            div.querySelector('.bp-del').onclick = () => div.remove();
+            preview.appendChild(div);
+        });
+    }
+
+    async function saveBulkQuestions() {
+        const rows = document.querySelectorAll('#wqb-bulk-preview [data-idx]');
+        const questions = [];
+        rows.forEach(div => {
+            const text = div.querySelector('.bp-text').value.trim();
+            if (!text) return;
+            questions.push({
+                question_text:  text,
+                question_type:  div.querySelector('.bp-type').value,
+                marks:          parseFloat(div.querySelector('.bp-marks').value)||1,
+                difficulty:     div.querySelector('.bp-diff').value,
+                model_answer:   div.querySelector('.bp-ans').value.trim(),
+            });
+        });
+        if (!questions.length) { window.showToast('No questions to save.','error'); return; }
+
+        const btn = document.getElementById('wqb-bulk-save-btn');
+        btn.disabled=true; btn.textContent='Saving…';
+        const payload = {
+            questions,
+            subject_id: document.getElementById('wqb-bulk-subject').value,
+        };
+        const res = await fetch(`${API}?action=bulk_create`, {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        }).then(r=>r.json());
+        btn.disabled=false; btn.innerHTML='<span class="material-symbols-outlined text-base">save</span> Save All Questions';
+
+        if (res.success) {
+            window.showToast(`${res.count} questions saved!`,'success');
+            closeBulkModal(); loadQuestions();
+        } else {
+            window.showToast(res.message||'Save failed.','error');
+        }
+    }
+
+    function clearFilters() {
+        document.getElementById('wqb-search').value = '';
+        document.getElementById('wqb-filter-subject').value = '';
+        document.getElementById('wqb-filter-type').value = '';
+        document.getElementById('wqb-filter-diff').value = '';
+        currentPage = 1; loadQuestions();
+    }
+
+    function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+}
+
+initializeWrittenQuestionBank();
+</script>
