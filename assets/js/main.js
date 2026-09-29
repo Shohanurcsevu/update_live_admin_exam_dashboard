@@ -313,6 +313,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await fetch(`${url}?v=${new Date().getTime()}`);
             if (!response.ok) throw new Error(`Failed to fetch ${url}`);
             element.innerHTML = await response.text();
+            // Re-evaluate any scripts that may be embedded in the component HTML
+            element.querySelectorAll('script').forEach(oldScript => {
+                const newScript = document.createElement('script');
+                Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                newScript.textContent = oldScript.textContent;
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
         } catch (error) {
             console.error(error);
             element.innerHTML = `<p class="text-red-500 text-center">Error loading component.</p>`;
@@ -346,9 +353,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             'speed-trivia': 'assets/js/speed-trivia.js',
             'review-changes': 'assets/js/review-changes.js',
             'fb-posts': 'assets/js/fb-posts.js',
-            'written-question-bank':  null,
-            'written-exam-builder':   null,
-            'written-exam-print':     null
+            'written-question-bank':  'assets/js/written-question-bank.js',
+            'written-exam-builder':   'assets/js/written-exam-builder.js',
+            'written-exam-print':     'assets/js/written-exam-print.js'
         };
 
 

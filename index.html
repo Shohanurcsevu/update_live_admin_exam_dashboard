@@ -55,6 +55,19 @@
     <!-- Early font & avatar restore from DB/LocalStorage to prevent FOUC -->
     <script>
         (async () => {
+            // Invalidate stale caches on version upgrade
+            if (localStorage.getItem('app_cache_version') !== 'v20') {
+                if ('caches' in window) {
+                    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
+                }
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(regs => {
+                        for (let reg of regs) reg.update();
+                    });
+                }
+                localStorage.setItem('app_cache_version', 'v20');
+            }
+
             // 1. Initial Quick Load from LocalStorage
             let f = localStorage.getItem('app-font');
             let a = localStorage.getItem('user_avatar');
@@ -784,7 +797,7 @@
     <script src="assets/js/sidebar.js"></script>
     <script src="assets/js/smart-header.js"></script>
     <script src="assets/js/command-palette.js"></script>
-    <script src="assets/js/main.js"></script>
+    <script src="assets/js/main.js?v=20"></script>
     <script src="assets/js/mentor.js"></script>
 </body>
 

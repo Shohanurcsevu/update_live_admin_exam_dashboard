@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rethink-exam-v18';
+const CACHE_NAME = 'rethink-exam-v20';
 const PRE_CACHE_ASSETS = [
     './',
     './index.html',
@@ -13,12 +13,18 @@ const PRE_CACHE_ASSETS = [
     './assets/js/offline-exams.js',
     './assets/js/offline-exam-engine.js',
     './assets/js/performance-review.js',
+    './assets/js/written-exam-builder.js',
+    './assets/js/written-question-bank.js',
+    './assets/js/written-exam-print.js',
     './components/header.html',
     './components/sidebar.html',
     './pages/dashboard.html',
     './pages/offline-exams.html',
     './pages/take-offline-exam.html',
-    './pages/performance-review.html'
+    './pages/performance-review.html',
+    './pages/written-exam-builder.html',
+    './pages/written-question-bank.html',
+    './pages/written-exam-print.html'
 ];
 
 const EXTERNAL_ASSETS = [
@@ -78,16 +84,15 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch Event
+// Fetch Event: Network-First with Cache Fallback
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
         return;
     }
 
     event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            // Cache-First with Network Fallback & Update
-            const networkFetch = fetch(event.request).then((networkResponse) => {
+        fetch(event.request)
+            .then((networkResponse) => {
                 if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 0)) {
                     const responseToCache = networkResponse.clone();
                     caches.open(CACHE_NAME).then((cache) => {
@@ -95,14 +100,10 @@ self.addEventListener('fetch', (event) => {
                     });
                 }
                 return networkResponse;
-            }).catch((error) => {
-                // Return cached response if network fails, OR throw if nothing
-                if (cachedResponse) return cachedResponse;
-                throw error;
-            });
-
-            return cachedResponse || networkFetch;
-        })
+            })
+            .catch(() => {
+                return caches.match(event.request);
+            })
     );
 });
 
