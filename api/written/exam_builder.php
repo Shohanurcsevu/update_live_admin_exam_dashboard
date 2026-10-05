@@ -15,6 +15,7 @@ switch ($action) {
     case 'create_exam':         eb_create_exam($conn);          break;
     case 'update_exam':         eb_update_exam($conn);          break;
     case 'get_exam':            eb_get_exam($conn);             break;
+    case 'delete_exam':         eb_delete_exam($conn);          break;
     case 'add_section':         eb_add_section($conn);          break;
     case 'update_section':      eb_update_section($conn);       break;
     case 'delete_section':      eb_delete_section($conn);       break;
@@ -345,4 +346,26 @@ function insert_exam_sub_questions($conn, $eq_id, $sub_qs) {
         $s->bind_param('isdsiisi', $eq_id,$text,$marks,$img,$hf,$order,$ans_space,$ans_lines);
         $s->execute(); $s->close();
     }
+}
+
+/* ─── DELETE EXAM (soft-delete) ─────────────────────────────────────────────── */
+function eb_delete_exam($conn) {
+    $d = json_decode(file_get_contents('php://input'), true) ?? [];
+    $exam_id = intval($d['exam_id'] ?? 0);
+    if (!$exam_id) { eb_json(['success'=>false,'message'=>'exam_id required.']); return; }
+
+    // Verify it exists
+    $chk = $conn->prepare("SELECT id FROM exams WHERE id=? AND is_deleted=0");
+    $chk->bind_param('i',$exam_id); $chk->execute();
+    if (!$chk->get_result()->fetch_assoc()) { $chk->close(); eb_json(['success'=>false,'message'=>'Exam not found.']); return; }
+    $chk->close();
+
+    // Soft-delete: set is_deleted = 1
+    $u = $conn->prepare("UPDATE exams SET is_deleted=1 WHERE id=?");
+    $u->bind_param('i',$exam_id);
+    if (!$u->execute()) { eb_json(['success'=>false,'message'=>$conn->error]); $u->close(); return; }
+    $u->close();
+
+    log_written_activity($conn, 'Written Exam Deleted', "Exam ID $exam_id soft-deleted.");
+    eb_json(['success'=>true,'message'=>'Exam deleted.']);
 }

@@ -217,7 +217,7 @@ function initializeWrittenExamBuilder() {
             const typeLabel  = exam.exam_type || 'mcq';
             const qCount     = parseInt(exam.mcq_count||0) + parseInt(exam.written_count||0);
 
-            const div = document.createElement('div');
+        const div = document.createElement('div');
             div.className = 'flex items-center gap-3 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-xl px-4 py-3 cursor-pointer transition-all group';
             div.innerHTML = `
               <div class="flex-1 min-w-0">
@@ -231,12 +231,52 @@ function initializeWrittenExamBuilder() {
                   ${parseInt(exam.section_count||0) ? `<span class="text-xs text-blue-500">${exam.section_count}sec</span>` : ''}
                 </div>
               </div>
-              <button class="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                <span class="material-symbols-outlined text-sm">edit</span>Open
-              </button>`;
+              <div class="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button class="web-br-open-btn flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg">
+                  <span class="material-symbols-outlined text-sm">edit</span>Open
+                </button>
+                <button class="web-br-del-btn flex items-center gap-1 px-2 py-1.5 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white text-xs font-bold rounded-lg transition-colors" title="Delete exam">
+                  <span class="material-symbols-outlined text-sm">delete</span>
+                </button>
+              </div>`;
+            div.querySelector('.web-br-open-btn').onclick = e => { e.stopPropagation(); openExamInBuilder(exam.id); };
+            div.querySelector('.web-br-del-btn').onclick  = e => { e.stopPropagation(); deleteExam(exam.id, exam.exam_title, div); };
             div.onclick = () => openExamInBuilder(exam.id);
             list.appendChild(div);
         });
+    }
+
+    async function deleteExam(id, title, cardEl) {
+        if (!confirm(`Delete "${title}"?\n\nThis will permanently remove the exam and cannot be undone.`)) return;
+        cardEl.style.opacity = '0.4';
+        cardEl.style.pointerEvents = 'none';
+        try {
+            const res = await fetch(`${EB_API}?action=delete_exam`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ exam_id: id })
+            }).then(r => r.json());
+            if (res.success) {
+                window.showToast('Exam deleted.', 'success');
+                cardEl.remove();
+                // Show empty state if list is now empty
+                const list = document.getElementById('web-br-list');
+                if (!list.children.length) document.getElementById('web-br-empty').classList.remove('hidden');
+                // If the deleted exam was the one currently open, reset builder
+                if (currentExamId === id) {
+                    currentExamId = null;
+                    window.showToast('The exam you were editing has been deleted.', 'error');
+                }
+            } else {
+                window.showToast(res.message || 'Delete failed.', 'error');
+                cardEl.style.opacity = '';
+                cardEl.style.pointerEvents = '';
+            }
+        } catch(e) {
+            window.showToast('Network error.', 'error');
+            cardEl.style.opacity = '';
+            cardEl.style.pointerEvents = '';
+        }
     }
 
     async function openExamInBuilder(id) {
