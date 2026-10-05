@@ -145,7 +145,7 @@ function eb_get_exam($conn) {
     $ss->bind_param('i',$exam_id); $ss->execute();
     $sections = $ss->get_result()->fetch_all(MYSQLI_ASSOC); $ss->close();
 
-    // Questions (all, with sub-questions)
+    // Written questions (with sub-questions)
     $qs = $conn->prepare("SELECT * FROM written_exam_questions WHERE exam_id=? ORDER BY section_id, display_order");
     $qs->bind_param('i',$exam_id); $qs->execute();
     $questions = $qs->get_result()->fetch_all(MYSQLI_ASSOC); $qs->close();
@@ -156,7 +156,15 @@ function eb_get_exam($conn) {
         $q['sub_questions'] = $sqst->get_result()->fetch_all(MYSQLI_ASSOC); $sqst->close();
     }
 
-    eb_json(['success'=>true,'data'=>['exam'=>$exam,'sections'=>$sections,'questions'=>$questions]]);
+    // MCQ questions from shared `questions` table (same exam_id)
+    $mqs = $conn->prepare("SELECT id, question, options, answer, explanation, priority AS display_order FROM questions WHERE exam_id=? AND is_deleted=0 ORDER BY priority, id");
+    $mqs->bind_param('i', $exam_id); $mqs->execute();
+    $mcq_rows = $mqs->get_result()->fetch_all(MYSQLI_ASSOC); $mqs->close();
+    foreach ($mcq_rows as &$mq) {
+        $mq['options'] = json_decode($mq['options'] ?? '[]', true) ?: [];
+    }
+
+    eb_json(['success'=>true,'data'=>['exam'=>$exam,'sections'=>$sections,'questions'=>$questions,'mcq_questions'=>$mcq_rows]]);
 }
 
 /* ─── SECTIONS ──────────────────────────────────────────────────────────────── */

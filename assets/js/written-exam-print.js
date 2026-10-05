@@ -51,7 +51,7 @@ function initializeWrittenExamPrint() {
 
     function rebuildSheet() {
         if (!examData) return;
-        const { exam, sections, questions } = examData;
+        const { exam, sections, questions, mcq_questions = [] } = examData;
         const sheet = document.getElementById('wep-sheet');
 
         let html = `<div class="wep-page">`;
@@ -79,7 +79,26 @@ function initializeWrittenExamPrint() {
             <div style="flex:1;border-bottom:1px solid #000;padding-bottom:2px;">Date: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
           </div>`;
 
-        // Group questions by section
+        let globalQNum = 1;
+
+        // ── Part A: MCQ ────────────────────────────────────────────────────
+        if (mcq_questions.length) {
+            const mcqLabel = questions.length ? 'Part A — Multiple Choice Questions (MCQ)' : 'Multiple Choice Questions (MCQ)';
+            html += `<div class="wep-section-header">${escHtml(mcqLabel)}</div>`;
+            if (questions.length) {
+                html += `<div class="wep-section-inst">Circle the correct letter for each question.</div>`;
+            }
+            mcq_questions.forEach(q => {
+                html += renderMcqQuestion(q, globalQNum++);
+            });
+        }
+
+        // ── Part B: Written ────────────────────────────────────────────────
+        if (questions.length && mcq_questions.length) {
+            html += `<div class="wep-section-header">Part B — Written Questions</div>`;
+        }
+
+        // Group written questions by section
         const sectionMap = {};
         const noSection   = [];
         questions.forEach(q => {
@@ -91,16 +110,14 @@ function initializeWrittenExamPrint() {
             }
         });
 
-        let globalQNum = 1;
-
-        // Questions with no section
+        // Written questions with no section
         if (noSection.length) {
             noSection.forEach(q => {
                 html += renderQuestion(q, globalQNum++);
             });
         }
 
-        // Sectioned questions
+        // Sectioned written questions
         sections.forEach(sec => {
             const qs = sectionMap[sec.id] || [];
             if (!qs.length) return;
@@ -163,6 +180,56 @@ function initializeWrittenExamPrint() {
         return `<div class="wep-answer-lines">${'<div class="wep-line"></div>'.repeat(count)}</div>`;
     }
 
+    // ── MCQ question renderer ───────────────────────────────────────────────────
+    function renderMcqQuestion(q, num) {
+        const LABELS = ['A','B','C','D','E','F'];
+        const opts   = Array.isArray(q.options) ? q.options : [];
+
+        // Correct answer label (A/B/C/D or the text itself)
+        const correctAnswer = (q.answer || '').trim().toUpperCase();
+
+        let html = `<div class="wep-mcq-block">`;
+        html += `<div class="wep-question-row">
+          <span class="wep-q-num">${num}.</span>
+          <span class="wep-q-text">${escHtml(q.question)}</span>
+        </div>`;
+
+        if (opts.length) {
+            html += `<div class="wep-mcq-options">`;
+            opts.forEach((opt, i) => {
+                const label  = LABELS[i] || String(i+1);
+                const isCorrect = showAnswers && (label === correctAnswer || opt === q.answer);
+                html += `<div class="wep-mcq-option ${isCorrect ? 'wep-mcq-correct' : ''}">
+                  <span class="wep-mcq-bubble">${label}</span>
+                  <span>${escHtml(String(opt))}</span>
+                </div>`;
+            });
+            html += `</div>`;
+        } else {
+            // Options stored as A/B/C/D text in separate fields (fallback)
+            const legacyOpts = [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean);
+            if (legacyOpts.length) {
+                html += `<div class="wep-mcq-options">`;
+                legacyOpts.forEach((opt, i) => {
+                    const label = LABELS[i];
+                    const isCorrect = showAnswers && label === correctAnswer;
+                    html += `<div class="wep-mcq-option ${isCorrect ? 'wep-mcq-correct' : ''}">
+                      <span class="wep-mcq-bubble">${label}</span>
+                      <span>${escHtml(String(opt))}</span>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+        }
+
+        if (showAnswers && q.explanation) {
+            html += `<div class="wep-model-answer" style="margin-top:4px;"><strong>Explanation:</strong> ${escHtml(q.explanation)}</div>`;
+        }
+
+        html += `</div>`;
+        return html;
+    }
+
     // ── Open dedicated print window ─────────────────────────────────────────────
     function openPrintWindow() {
         if (!examData) { if(window.showToast) window.showToast('Exam not loaded yet.','error'); return; }
@@ -197,6 +264,12 @@ function initializeWrittenExamPrint() {
             .wep-model-answer { background: #fffde7; border-left: 4px solid #f9a825; padding: 8px 12px; margin-top: 6px; font-size: 11pt; color: #555; border-radius: 4px; }
             .wep-q-image { max-width: 100%; max-height: 200px; margin: 8px 0; border-radius: 4px; }
             .wep-footer { position: absolute; bottom: 1.2cm; left: 2.5cm; right: 2.5cm; border-top: 1px solid #ccc; padding-top: 6px; font-size: 10pt; color: #555; display: flex; justify-content: space-between; }
+            .wep-mcq-block { margin-bottom: 14px; }
+            .wep-mcq-options { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; margin: 6px 0 4px 2.2em; font-size: 11pt; }
+            .wep-mcq-option { display: flex; align-items: baseline; gap: 6px; }
+            .wep-mcq-bubble { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1.5px solid #333; border-radius: 50%; font-size: 9pt; font-weight: 700; flex-shrink: 0; line-height: 1; }
+            .wep-mcq-correct .wep-mcq-bubble { background: #000; color: #fff; border-color: #000; }
+            .wep-mcq-correct { font-weight: 700; }
             @media print { @page { margin: 0; } body { margin: 0; } .wep-page { min-height: auto; } }
         `;
 
