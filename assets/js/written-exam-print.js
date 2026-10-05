@@ -4,12 +4,14 @@ function initializeWrittenExamPrint() {
     const examId = parseInt(urlParams.get('exam_id') || 0);
 
     let examData = null;
-    let showMarks   = true;
-    let showAnswers = false;
+    let showMarks        = true;
+    let showAnswers      = false;
+    let showQuestionsOnly = false;
 
     document.getElementById('wep-print-btn').onclick = () => openPrintWindow();
-    document.getElementById('wep-show-marks').onchange   = e => { showMarks=e.target.checked;   rebuildSheet(); };
-    document.getElementById('wep-show-answers').onchange = e => { showAnswers=e.target.checked; rebuildSheet(); };
+    document.getElementById('wep-show-marks').onchange      = e => { showMarks=e.target.checked;         rebuildSheet(); };
+    document.getElementById('wep-show-answers').onchange    = e => { showAnswers=e.target.checked;       rebuildSheet(); };
+    document.getElementById('wep-questions-only').onchange  = e => { showQuestionsOnly=e.target.checked; rebuildSheet(); };
 
     if (!examId) {
         document.getElementById('wep-loading').innerHTML = '<p class="text-red-400">No exam_id provided.</p>';
@@ -143,13 +145,13 @@ function initializeWrittenExamPrint() {
                     ${showMarks && sq.marks ? `<strong style="margin-left:8px;">[${sq.marks}]</strong>` : ''}
                     ${sq.image_path ? `<img src="${escHtml(sq.image_path)}" class="wep-q-image">` : ''}
                     ${showAnswers && sq.model_answer ? `<div class="wep-model-answer">${escHtml(sq.model_answer)}</div>` : ''}
-                    ${renderAnswerLines(sq.answer_space_lines || 4)}
+                    ${!showQuestionsOnly ? renderAnswerLines(sq.answer_space_lines || 4) : ''}
                   </div>
                 </div>`;
             });
             html += `</div>`;
         } else {
-            html += renderAnswerLines(q.answer_space_lines || 8);
+            if (!showQuestionsOnly) html += renderAnswerLines(q.answer_space_lines || 8);
         }
 
         html += `</div>`;
@@ -164,7 +166,8 @@ function initializeWrittenExamPrint() {
     // ── Open dedicated print window ─────────────────────────────────────────────
     function openPrintWindow() {
         if (!examData) { if(window.showToast) window.showToast('Exam not loaded yet.','error'); return; }
-        const { exam, sections, questions } = examData;
+        const { exam } = examData;
+        const modeLabel = showQuestionsOnly ? ' — Questions Only' : '';
 
         // Build the same HTML as rebuildSheet but self-contained
         const sheetDiv = document.getElementById('wep-sheet');
@@ -206,7 +209,7 @@ function initializeWrittenExamPrint() {
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
-<title>${escHtml(exam.exam_title||'Written Exam')}</title>
+<title>${escHtml(exam.exam_title||'Written Exam')}${modeLabel}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap">
 <style>${styleContent}</style>
 </head>
