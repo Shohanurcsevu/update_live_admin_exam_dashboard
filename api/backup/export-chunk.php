@@ -1,14 +1,20 @@
 <?php
 /**
- * Chunked Export API — v2.0
+ * Chunked Export API — v2.1
  * Exports data table-by-table to avoid memory/timeout issues.
  *
  * GET ?action=meta              → schema DDL, row counts, backup metadata
- * GET ?action=data&table=NAME   → rows for one table (gzipped JSON)
+ * GET ?action=data&table=NAME   → rows for one table (JSON)
  */
 
-set_time_limit(60);
-ini_set('memory_limit', '64M');   // much less than the monolithic 256M
+// Suppress HTML error output — stray output corrupts JSON responses
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ob_start();
+
+set_time_limit(120);
+ini_set('memory_limit', '256M');  // questions table alone can be ~25 MB in memory
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -23,6 +29,7 @@ $ALLOWED_TABLES = get_backup_tables($conn);
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function respond_json($data) {
+    if (ob_get_level()) ob_end_clean();
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -80,18 +87,25 @@ if ($action === 'meta') {
         respond_error("Invalid table name: {$table}");
     }
 
-    $result = $conn->query("SELECT * FROM `{$table}`");
-    $rows = [];
-    if ($result) {
+    try {
+        $result = $conn->query("SELECT * FROM `{$table}`");
+        if (!$result) {
+            $conn->close();
+            respond_error("Query failed for table `{$table}`: " . $conn->error, 500);
+        }
+
+        $rows = [];
         while ($row = $result->fetch_assoc()) {
             $rows[] = $row;
         }
         $result->free();
+        $conn->close();
+
+        respond_json(['table' => $table, 'count' => count($rows), 'rows' => $rows]);
+    } catch (Throwable $e) {
+        if ($conn) @$conn->close();
+        respond_error("Export failed for `{$table}`: " . $e->getMessage(), 500);
     }
-
-    $conn->close();
-
-    respond_json(['table' => $table, 'count' => count($rows), 'rows' => $rows]);
 
 } else {
     $conn->close();
